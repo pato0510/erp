@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RefreshGuard } from './guards/refresh.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -16,8 +17,9 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
-    this.authService.logout(res);
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const user = req.user as { id: string };
+    await this.authService.logout(user.id, res);
     return { message: 'Logged out successfully' };
   }
 
@@ -25,5 +27,12 @@ export class AuthController {
   @Get('me')
   me(@Req() req: Request) {
     return req.user;
+  }
+
+  @UseGuards(RefreshGuard)
+  @Post('refresh')
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const user = req.user as { id: string; refreshToken: string };
+    return this.authService.refresh(user.id, user.refreshToken, res);
   }
 }

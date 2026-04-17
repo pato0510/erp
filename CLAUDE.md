@@ -154,7 +154,8 @@ ARC-007 — GitHub Actions CI pipeline ✓
 ### Sprint 2 — Identity, security and multi-tenancy (in progress)
 
 TEN-001 — Tenant, Company, User and Membership models ✓
+IAM-001 — JWT authentication with HttpOnly cookies ✓
 
 ## Current ticket
 
-IAM-001 — Implement JWT authentication with HttpOnly cookies
+IAM-002 — Logout, session expiration and refresh token
