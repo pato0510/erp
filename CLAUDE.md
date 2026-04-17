@@ -130,7 +130,8 @@ Criterios de aceptación:
 
 ## Completed tickets
 ARC-001 — Nx monorepo base structure ✓
+ARC-002 — Docker Compose with PostgreSQL, Redis and MinIO ✓
+ARC-003 — Prisma configured with prismaSchemaFolder, first migration done ✓
 
 ## Current ticket
-ARC-002 — Configure Docker Compose with PostgreSQL, Redis and MinIO
-<!-- nx configuration end-->
+ARC-004 — Configure Redis connection and BullMQ base queue in NestJS
