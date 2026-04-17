@@ -157,7 +157,8 @@ TEN-001 — Tenant, Company, User and Membership models ✓
 IAM-001 — JWT authentication with HttpOnly cookies ✓
 IAM-002 — Logout, session expiration and refresh token ✓
 IAM-005 — Roles and permissions with CASL ✓
+TEN-003 — PostgreSQL Row Level Security (RLS) ✓
 
 ## Current ticket
 
-TEN-003 — PostgreSQL Row Level Security (RLS) for data isolation
+AUD-001 — PostgreSQL audit triggers for critical events

@@ -7,16 +7,24 @@ export class RlsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Executes a function inside a Prisma transaction with RLS scoped to the given companyId.
+   * Executes a function inside a Prisma transaction with:
+   * - RLS scoped to the given companyId (SET LOCAL rls.company_id)
+   * - Audit context injected (SET LOCAL audit.user_id, audit.company_id)
+   *
    * SET LOCAL only lasts for the current transaction — once the transaction ends,
-   * the setting is automatically discarded.
+   * the settings are automatically discarded.
    */
   async executeWithRls<T>(
     companyId: string,
+    userId: string | null,
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(`SET LOCAL rls.company_id = '${companyId}'`);
+      await tx.$executeRawUnsafe(`SET LOCAL audit.company_id = '${companyId}'`);
+      if (userId) {
+        await tx.$executeRawUnsafe(`SET LOCAL audit.user_id = '${userId}'`);
+      }
       return fn(tx);
     });
   }

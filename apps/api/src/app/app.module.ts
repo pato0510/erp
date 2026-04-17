@@ -6,6 +6,7 @@ import { PrismaModule } from '../modules/common/prisma/prisma.module';
 import { CaslModule } from '../modules/common/casl/casl.module';
 import { RlsModule } from '../modules/common/rls/rls.module';
 import { TenantMiddleware } from '../modules/common/rls/rls.middleware';
+import { AuditModule } from '../modules/audit/audit.module';
 import { IamModule } from '../modules/iam/iam.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
 import { TenancyModule } from '../modules/tenancy/tenancy.module';
@@ -16,6 +17,7 @@ import { TenancyModule } from '../modules/tenancy/tenancy.module';
     PrismaModule,
     CaslModule,
     RlsModule,
+    AuditModule,
     IamModule,
     JobsModule,
     TenancyModule,
