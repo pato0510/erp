@@ -141,13 +141,20 @@ Criterios de aceptación:
 
 ## Completed tickets
 
+### Sprint 1 — Base platform ✓
+
 ARC-001 — Nx monorepo base structure ✓
 ARC-002 — Docker Compose with PostgreSQL, Redis and MinIO ✓
 ARC-003 — Prisma configured with prismaSchemaFolder, first migration done ✓
 ARC-004 — Redis and BullMQ base queue configured ✓
 ARC-005 — ESLint, Prettier, Husky and Nx module boundary rules ✓
 ARC-006 — Sentry and OpenTelemetry distributed tracing ✓
+ARC-007 — GitHub Actions CI pipeline ✓
+
+## Current sprint
+
+Sprint 2 — Identity, security and multi-tenancy
 
 ## Current ticket
 
-ARC-007 — Configure GitHub Actions CI pipeline
+IAM-001 — Implement JWT authentication with HttpOnly cookies
