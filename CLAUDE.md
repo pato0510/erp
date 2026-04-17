@@ -146,7 +146,8 @@ ARC-002 — Docker Compose with PostgreSQL, Redis and MinIO ✓
 ARC-003 — Prisma configured with prismaSchemaFolder, first migration done ✓
 ARC-004 — Redis and BullMQ base queue configured ✓
 ARC-005 — ESLint, Prettier, Husky and Nx module boundary rules ✓
+ARC-006 — Sentry and OpenTelemetry distributed tracing ✓
 
 ## Current ticket
 
-ARC-006 — Configure Sentry and OpenTelemetry distributed tracing
+ARC-007 — Configure GitHub Actions CI pipeline
