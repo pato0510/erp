@@ -16,8 +16,9 @@ model Category {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryTree")
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  movements Movement[]
 
   @@unique([companyId, name, type])
   @@map("categories")
@@ -46,6 +47,8 @@ model Counterparty {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
+  movements Movement[]
+
   @@unique([companyId, taxId])
   @@map("counterparties")
 }
@@ -59,6 +62,8 @@ model CostCenter {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  movements Movement[]
 
   @@unique([companyId, code])
   @@map("cost_centers")
@@ -84,6 +89,8 @@ model FiscalPeriod {
   notes     String?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+
+  movements Movement[]
 
   @@unique([companyId, year, month])
   @@map("fiscal_periods")

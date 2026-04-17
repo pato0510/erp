@@ -1,0 +1,56 @@
+enum MovementType {
+  INCOME
+  EXPENSE
+}
+
+enum MovementStatus {
+  DRAFT
+  CONFIRMED
+  RECONCILED
+  CANCELLED
+}
+
+enum MovementSource {
+  MANUAL
+  IMPORT
+  BANK_SYNC
+  TAX_SYNC
+}
+
+model Movement {
+  id               String         @id @default(uuid()) @db.Uuid
+  companyId        String         @db.Uuid
+  fiscalPeriodId   String         @db.Uuid
+  categoryId       String         @db.Uuid
+  counterpartyId   String?        @db.Uuid
+  costCenterId     String?        @db.Uuid
+  type             MovementType
+  status           MovementStatus @default(DRAFT)
+  source           MovementSource @default(MANUAL)
+  amount           Decimal        @db.Decimal(18, 2)
+  currency         String         @default("CLP")
+  exchangeRate     Decimal?       @db.Decimal(10, 6)
+  date             DateTime       @db.Date
+  description      String
+  reference        String?
+  notes            String?
+  metadata         Json?
+  createdBy        String         @db.Uuid
+  updatedBy        String?        @db.Uuid
+  confirmedAt      DateTime?
+  confirmedBy      String?        @db.Uuid
+  cancelledAt      DateTime?
+  cancelledBy      String?        @db.Uuid
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  fiscalPeriod FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id])
+  category     Category     @relation(fields: [categoryId], references: [id])
+  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id])
+  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id])
+
+  @@index([companyId, date])
+  @@index([companyId, fiscalPeriodId])
+  @@index([companyId, type, status])
+  @@map("movements")
+}

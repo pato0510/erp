@@ -182,6 +182,108 @@ async function main() {
   }
   console.log(`FiscalPeriods: ${periodsCreated} periods seeded for ${year}`);
 
+  // 10. Seed sample movements for April 2026
+  const aprilPeriod = await prisma.fiscalPeriod.findFirst({
+    where: { companyId: company.id, year: 2026, month: 4 },
+  });
+  const ventas = await prisma.category.findFirst({
+    where: { companyId: company.id, name: 'Ventas' },
+  });
+  const servicios = await prisma.category.findFirst({
+    where: { companyId: company.id, name: 'Servicios' },
+  });
+  const arriendo = await prisma.category.findFirst({
+    where: { companyId: company.id, name: 'Arriendo' },
+  });
+  const sueldos = await prisma.category.findFirst({
+    where: { companyId: company.id, name: 'Sueldos' },
+  });
+  const clienteDemo = await prisma.counterparty.findFirst({
+    where: { companyId: company.id, name: 'Cliente Demo' },
+  });
+  const proveedorDemo = await prisma.counterparty.findFirst({
+    where: { companyId: company.id, name: 'Proveedor Demo' },
+  });
+
+  if (aprilPeriod && ventas && servicios && arriendo && sueldos) {
+    const existingMovements = await prisma.movement.count({
+      where: { companyId: company.id },
+    });
+
+    if (existingMovements === 0) {
+      const sampleMovements = [
+        {
+          type: 'INCOME' as const,
+          status: 'CONFIRMED' as const,
+          categoryId: ventas.id,
+          counterpartyId: clienteDemo?.id,
+          amount: 5000000,
+          date: new Date('2026-04-05'),
+          description: 'Factura venta productos abril',
+          reference: 'FAC-001',
+          confirmedAt: new Date(),
+          confirmedBy: user.id,
+        },
+        {
+          type: 'INCOME' as const,
+          status: 'CONFIRMED' as const,
+          categoryId: servicios.id,
+          amount: 2500000,
+          date: new Date('2026-04-10'),
+          description: 'Servicios de consultoría',
+          reference: 'FAC-002',
+          confirmedAt: new Date(),
+          confirmedBy: user.id,
+        },
+        {
+          type: 'EXPENSE' as const,
+          status: 'CONFIRMED' as const,
+          categoryId: arriendo.id,
+          counterpartyId: proveedorDemo?.id,
+          amount: 1200000,
+          date: new Date('2026-04-01'),
+          description: 'Arriendo oficina abril',
+          reference: 'BOL-001',
+          confirmedAt: new Date(),
+          confirmedBy: user.id,
+        },
+        {
+          type: 'EXPENSE' as const,
+          status: 'CONFIRMED' as const,
+          categoryId: sueldos.id,
+          amount: 3500000,
+          date: new Date('2026-04-30'),
+          description: 'Sueldos equipo abril',
+          reference: 'NOM-APR',
+          confirmedAt: new Date(),
+          confirmedBy: user.id,
+        },
+        {
+          type: 'EXPENSE' as const,
+          status: 'DRAFT' as const,
+          categoryId: arriendo.id,
+          amount: 150000,
+          date: new Date('2026-04-15'),
+          description: 'Gastos oficina pendiente revisión',
+        },
+      ];
+
+      for (const mov of sampleMovements) {
+        await prisma.movement.create({
+          data: {
+            companyId: company.id,
+            fiscalPeriodId: aprilPeriod.id,
+            createdBy: user.id,
+            ...mov,
+          },
+        });
+      }
+      console.log(`Movements: ${sampleMovements.length} sample movements seeded`);
+    } else {
+      console.log(`Movements: ${existingMovements} already exist, skipping`);
+    }
+  }
+
   console.log('\nSeed completed successfully!');
 }
 

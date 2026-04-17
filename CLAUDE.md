@@ -160,12 +160,17 @@ IAM-005 — Roles and permissions with CASL ✓
 TEN-003 — PostgreSQL Row Level Security (RLS) ✓
 AUD-001 — PostgreSQL audit triggers for critical events ✓
 
-### Sprint 3 — Configuration and catalogs (in progress)
+### Sprint 3 — Configuration and catalogs ✓
 
 CFG-001 — Company configuration and financial settings ✓
 CAT-001 — Income and expense categories CRUD ✓
 CAT-002 — Counterparties (clients and suppliers) CRUD ✓
+CAT-003 — Cost centers and fiscal periods ✓
+
+## Current sprint
+
+Sprint 4 — Financial core (manual movements)
 
 ## Current ticket
 
-CAT-003 — Cost centers and financial periods
+MOV-001 — Financial movements CRUD

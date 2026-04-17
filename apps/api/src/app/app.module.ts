@@ -11,6 +11,7 @@ import { CatalogsModule } from '../modules/catalogs/catalogs.module';
 import { CompaniesModule } from '../modules/companies/companies.module';
 import { IamModule } from '../modules/iam/iam.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
+import { MovementsModule } from '../modules/movements/movements.module';
 import { TenancyModule } from '../modules/tenancy/tenancy.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { TenancyModule } from '../modules/tenancy/tenancy.module';
     CompaniesModule,
     IamModule,
     JobsModule,
+    MovementsModule,
     TenancyModule,
   ],
   controllers: [AppController],
