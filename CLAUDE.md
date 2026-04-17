@@ -164,7 +164,8 @@ AUD-001 — PostgreSQL audit triggers for critical events ✓
 
 CFG-001 — Company configuration and financial settings ✓
 CAT-001 — Income and expense categories CRUD ✓
+CAT-002 — Counterparties (clients and suppliers) CRUD ✓
 
 ## Current ticket
 
-CAT-002 — Counterparties (clients and suppliers) CRUD
+CAT-003 — Cost centers and financial periods

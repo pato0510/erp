@@ -126,6 +126,62 @@ async function main() {
   }
   console.log(`Counterparties: ${defaultCounterparties.length} default counterparties seeded`);
 
+  // 8. Seed cost centers
+  const defaultCostCenters = [
+    { name: 'Administración', code: 'ADM' },
+    { name: 'Ventas', code: 'VTA' },
+    { name: 'Tecnología', code: 'TI' },
+  ];
+
+  for (const cc of defaultCostCenters) {
+    await prisma.costCenter.upsert({
+      where: { companyId_code: { companyId: company.id, code: cc.code } },
+      update: {},
+      create: { companyId: company.id, name: cc.name, code: cc.code },
+    });
+  }
+  console.log(`CostCenters: ${defaultCostCenters.length} default cost centers seeded`);
+
+  // 9. Seed fiscal periods for 2026
+  const MONTHS = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+  const year = 2026;
+  let periodsCreated = 0;
+
+  for (let month = 1; month <= 12; month++) {
+    const existing = await prisma.fiscalPeriod.findFirst({
+      where: { companyId: company.id, year, month },
+    });
+    if (!existing) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      await prisma.fiscalPeriod.create({
+        data: {
+          companyId: company.id,
+          name: `${MONTHS[month - 1]} ${year}`,
+          year,
+          month,
+          startDate,
+          endDate,
+        },
+      });
+      periodsCreated++;
+    }
+  }
+  console.log(`FiscalPeriods: ${periodsCreated} periods seeded for ${year}`);
+
   console.log('\nSeed completed successfully!');
 }
 

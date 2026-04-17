@@ -11,10 +11,11 @@ type Subjects =
       | typeof ReportSubject
       | typeof CategorySubject
       | typeof CounterpartySubject
+      | typeof CostCenterSubject
+      | typeof FiscalPeriodSubject
     >
   | 'all';
 
-// Subject classes for CASL type inference
 class UserSubject {
   static readonly modelName = 'User' as const;
 }
@@ -36,6 +37,12 @@ class CategorySubject {
 class CounterpartySubject {
   static readonly modelName = 'Counterparty' as const;
 }
+class CostCenterSubject {
+  static readonly modelName = 'CostCenter' as const;
+}
+class FiscalPeriodSubject {
+  static readonly modelName = 'FiscalPeriod' as const;
+}
 
 export type Action = 'create' | 'read' | 'update' | 'delete' | 'manage';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
@@ -48,6 +55,8 @@ export {
   ReportSubject,
   CategorySubject,
   CounterpartySubject,
+  CostCenterSubject,
+  FiscalPeriodSubject,
 };
 
 @Injectable()
@@ -70,6 +79,8 @@ export class CaslAbilityFactory {
         can(['create', 'update'], ReportSubject);
         can(['create', 'update'], CategorySubject);
         can(['create', 'update'], CounterpartySubject);
+        can(['create', 'update'], CostCenterSubject);
+        can(['create', 'update'], FiscalPeriodSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -77,6 +88,7 @@ export class CaslAbilityFactory {
         can(['create', 'update'], MovementSubject);
         can(['create', 'update'], CategorySubject);
         can(['create', 'update'], CounterpartySubject);
+        can(['create', 'update'], CostCenterSubject);
         break;
 
       case UserRole.ANALYST:
@@ -88,6 +100,8 @@ export class CaslAbilityFactory {
         can('read', MovementSubject);
         can('read', CategorySubject);
         can('read', CounterpartySubject);
+        can('read', CostCenterSubject);
+        can('read', FiscalPeriodSubject);
         break;
     }
 

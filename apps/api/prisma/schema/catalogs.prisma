@@ -49,3 +49,42 @@ model Counterparty {
   @@unique([companyId, taxId])
   @@map("counterparties")
 }
+
+model CostCenter {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  code        String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@map("cost_centers")
+}
+
+enum PeriodStatus {
+  OPEN
+  IN_REVIEW
+  CLOSED
+}
+
+model FiscalPeriod {
+  id        String       @id @default(uuid()) @db.Uuid
+  companyId String       @db.Uuid
+  name      String
+  year      Int
+  month     Int
+  startDate DateTime     @db.Date
+  endDate   DateTime     @db.Date
+  status    PeriodStatus @default(OPEN)
+  closedAt  DateTime?
+  closedBy  String?      @db.Uuid
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([companyId, year, month])
+  @@map("fiscal_periods")
+}
