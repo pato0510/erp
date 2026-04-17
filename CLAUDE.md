@@ -1,12 +1,14 @@
 # Excelsia ERP — Contexto del proyecto
 
 ## Qué es este proyecto
+
 Excelsia ERP es una plataforma financiera gerencial para empresas chilenas.
 Permite visualizar, controlar y anticipar la situación financiera consolidando
 movimientos bancarios, información tributaria (SII), compromisos y proyecciones.
 Es un sistema multi-tenant (múltiples empresas) con aislamiento estricto de datos.
 
 ## Stack tecnológico
+
 - Monorepo: Nx (con imposición de límites entre módulos)
 - Frontend: Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui
 - Backend: NestJS + TypeScript (arquitectura por módulos de dominio)
@@ -22,6 +24,7 @@ Es un sistema multi-tenant (múltiples empresas) con aislamiento estricto de dat
 - CI/CD: GitHub Actions
 
 ## Decisiones arquitectónicas clave
+
 1. Monolito modular, NO microservicios
 2. Multi-tenancy con shared database + PostgreSQL RLS (no filtros solo en app)
 3. JWT nunca en localStorage, siempre en cookie HttpOnly Secure SameSite=Strict
@@ -32,44 +35,47 @@ Es un sistema multi-tenant (múltiples empresas) con aislamiento estricto de dat
 8. Transacciones complejas siempre con prisma.$transaction() explícito
 
 ## Estructura del repositorio (Nx monorepo)
+
 excelsia-erp/
-  apps/
-    web/          # Frontend Next.js (BFF layer)
-    api/          # Backend NestJS
-  libs/
-    ui/           # Componentes de UI compartidos (shadcn/ui base)
-    config/       # Configuración compartida (eslint, tsconfig)
-    types/        # Tipos TypeScript compartidos entre apps
-    utils/        # Utilidades compartidas
-  infra/
-    docker/       # Dockerfiles por servicio
-    nginx/        # Configuración nginx
-    scripts/      # Scripts de utilidad (seed, migrate, etc.)
-  docs/           # Documentación técnica y ADRs
-  .github/        # GitHub Actions workflows
+apps/
+web/ # Frontend Next.js (BFF layer)
+api/ # Backend NestJS
+libs/
+ui/ # Componentes de UI compartidos (shadcn/ui base)
+config/ # Configuración compartida (eslint, tsconfig)
+types/ # Tipos TypeScript compartidos entre apps
+utils/ # Utilidades compartidas
+infra/
+docker/ # Dockerfiles por servicio
+nginx/ # Configuración nginx
+scripts/ # Scripts de utilidad (seed, migrate, etc.)
+docs/ # Documentación técnica y ADRs
+.github/ # GitHub Actions workflows
 
 ## Estructura del backend (apps/api/src)
+
 modules/
-  iam/            # Autenticación, sesiones, usuarios
-  tenancy/        # Multi-empresa, membresías
-  companies/      # Configuración de empresa
-  catalogs/       # Categorías, contrapartes, centros de costo
-  banking/        # Integración bancaria, sync
-  tax/            # Integración SII/fiscal
-  movements/      # Movimientos financieros
-  reconciliation/ # Conciliación banco-documento
-  cashflow/       # Caja, tesorería, compromisos
-  alerts/         # Alertas y notificaciones
-  closing/        # Cierre mensual
-  reports/        # Reportes y exportaciones
-  audit/          # Servicio de auditoría (complementa triggers DB)
-  jobs/           # Workers BullMQ
-  common/         # Decoradores, guards, interceptores compartidos
+iam/ # Autenticación, sesiones, usuarios
+tenancy/ # Multi-empresa, membresías
+companies/ # Configuración de empresa
+catalogs/ # Categorías, contrapartes, centros de costo
+banking/ # Integración bancaria, sync
+tax/ # Integración SII/fiscal
+movements/ # Movimientos financieros
+reconciliation/ # Conciliación banco-documento
+cashflow/ # Caja, tesorería, compromisos
+alerts/ # Alertas y notificaciones
+closing/ # Cierre mensual
+reports/ # Reportes y exportaciones
+audit/ # Servicio de auditoría (complementa triggers DB)
+jobs/ # Workers BullMQ
+common/ # Decoradores, guards, interceptores compartidos
 prisma/
-  schema/         # Un archivo .prisma por módulo (prismaSchemaFolder)
+schema/ # Un archivo .prisma por módulo (prismaSchemaFolder)
 main.ts
 
 ## Convenciones de código
+
 - Backend: módulos por dominio de negocio, DTOs tipados con class-validator,
   servicios sin lógica duplicada, transacciones explícitas, logs por caso crítico
 - Frontend: feature folders, componentes puros, React Hook Form + Zod,
@@ -83,11 +89,13 @@ main.ts
   (3) verificar rol/permiso CASL, (4) ejecutar lógica con RLS activo
 
 ## Módulos de dominio y sus límites
+
 Un módulo NUNCA importa directamente las entidades o repositorios de otro módulo.
 La comunicación entre módulos es solo a través de interfaces públicas (facades).
 Nx enforce-module-boundaries garantiza esto automáticamente en CI.
 
 ## Seguridad multi-tenant (CRÍTICO)
+
 El tenant_id se extrae del JWT en el TenantMiddleware.
 Se propaga por AsyncLocalStorage durante todo el ciclo de vida de la request.
 Al iniciar cada transacción DB se ejecuta: SET LOCAL rls.tenant_id = '<id>'
@@ -95,11 +103,14 @@ PostgreSQL RLS hace el resto automáticamente en cada SELECT/UPDATE/DELETE.
 NUNCA confiar solo en filtros WHERE a nivel de aplicación.
 
 ## Sprint actual
+
 Sprint 1 — Plataforma base con Nx
 
 ## Ticket actual
+
 ARC-001 — Crear repositorio y estructura base del monorepo Nx
 Criterios de aceptación:
+
 - Nx monorepo inicializado con apps/web, apps/api, libs/
 - README inicial con descripción del proyecto y stack
 - .gitignore apropiado para Nx + Node.js + TypeScript
@@ -129,9 +140,12 @@ Criterios de aceptación:
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
 ## Completed tickets
+
 ARC-001 — Nx monorepo base structure ✓
 ARC-002 — Docker Compose with PostgreSQL, Redis and MinIO ✓
 ARC-003 — Prisma configured with prismaSchemaFolder, first migration done ✓
+ARC-004 — Redis and BullMQ base queue configured ✓
 
 ## Current ticket
-ARC-004 — Configure Redis connection and BullMQ base queue in NestJS
+
+ARC-005 — Configure ESLint, Prettier, Husky and Nx module boundary rules

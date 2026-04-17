@@ -3,9 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "lint": "nx run-many --target=lint --all",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prisma:generate": "prisma generate --schema=apps/api/prisma/schema",
     "prisma:migrate": "prisma migrate dev --schema=apps/api/prisma/schema",
-    "prisma:studio": "prisma studio --schema=apps/api/prisma/schema"
+    "prisma:studio": "prisma studio --schema=apps/api/prisma/schema",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   },
   "prisma": {
     "schema": "apps/api/prisma/schema"
@@ -32,6 +45,8 @@
     "autoprefixer": "10.4.13",
     "eslint": "^9.8.0",
     "eslint-config-prettier": "^10.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "nx": "22.6.5",
     "postcss": "8.4.38",
     "prettier": "~3.6.2",

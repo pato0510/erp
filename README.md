@@ -8,21 +8,21 @@ Sistema multi-tenant con aislamiento estricto de datos por empresa.
 
 ## Stack tecnologico
 
-| Capa | Tecnologia |
-|------|-----------|
-| Monorepo | Nx |
-| Frontend | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui |
-| Backend | NestJS, TypeScript |
-| Base de datos | PostgreSQL con Row Level Security (RLS) |
-| ORM | Prisma (schema dividido por modulo) |
-| Colas/Jobs | Redis + BullMQ |
-| Storage | MinIO (S3-compatible) |
-| Auth | JWT en cookies HttpOnly + Passport.js |
-| Autorizacion | RBAC + CASL |
-| Auditoria | Triggers PostgreSQL |
-| Observabilidad | Sentry + OpenTelemetry |
-| Infra local | Docker Compose |
-| CI/CD | GitHub Actions |
+| Capa           | Tecnologia                                      |
+| -------------- | ----------------------------------------------- |
+| Monorepo       | Nx                                              |
+| Frontend       | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui |
+| Backend        | NestJS, TypeScript                              |
+| Base de datos  | PostgreSQL con Row Level Security (RLS)         |
+| ORM            | Prisma (schema dividido por modulo)             |
+| Colas/Jobs     | Redis + BullMQ                                  |
+| Storage        | MinIO (S3-compatible)                           |
+| Auth           | JWT en cookies HttpOnly + Passport.js           |
+| Autorizacion   | RBAC + CASL                                     |
+| Auditoria      | Triggers PostgreSQL                             |
+| Observabilidad | Sentry + OpenTelemetry                          |
+| Infra local    | Docker Compose                                  |
+| CI/CD          | GitHub Actions                                  |
 
 ## Estructura del proyecto
 

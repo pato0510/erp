@@ -1,5 +1,20 @@
-# Add files here to ignore them from prettier formatting
-/dist
-/coverage
-/.nx/cache
-/.nx/workspace-data
+# Build outputs
+dist/
+out-tsc/
+coverage/
+
+# Nx
+.nx/cache
+.nx/workspace-data
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+
+# Generated files
+apps/api/prisma/schema/migrations/
+
+# Package manager
+package-lock.json

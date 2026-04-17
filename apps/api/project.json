@@ -61,5 +61,5 @@
       }
     }
   },
-  "tags": []
+  "tags": ["type:app", "scope:backend"]
 }

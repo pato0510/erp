@@ -10,14 +10,14 @@ tipo(scope): descripcion breve en ingles
 
 ## Tipos permitidos
 
-| Tipo | Uso |
-|------|-----|
-| `feat` | Nueva funcionalidad |
-| `fix` | Correccion de bugs |
-| `chore` | Tareas de mantenimiento (deps, config, CI) |
+| Tipo       | Uso                                                          |
+| ---------- | ------------------------------------------------------------ |
+| `feat`     | Nueva funcionalidad                                          |
+| `fix`      | Correccion de bugs                                           |
+| `chore`    | Tareas de mantenimiento (deps, config, CI)                   |
 | `refactor` | Cambio de codigo que no agrega funcionalidad ni corrige bugs |
-| `test` | Agregar o modificar tests |
-| `docs` | Cambios en documentacion |
+| `test`     | Agregar o modificar tests                                    |
+| `docs`     | Cambios en documentacion                                     |
 
 ## Scope
 
