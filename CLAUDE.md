@@ -151,9 +151,9 @@ ARC-005 — ESLint, Prettier, Husky and Nx module boundary rules ✓
 ARC-006 — Sentry and OpenTelemetry distributed tracing ✓
 ARC-007 — GitHub Actions CI pipeline ✓
 
-## Current sprint
+### Sprint 2 — Identity, security and multi-tenancy (in progress)
 
-Sprint 2 — Identity, security and multi-tenancy
+TEN-001 — Tenant, Company, User and Membership models ✓
 
 ## Current ticket
 
