@@ -88,6 +88,52 @@ export class AuthService {
     });
   }
 
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        isActive: true,
+        lastLoginAt: true,
+        memberships: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            role: true,
+            company: {
+              select: {
+                id: true,
+                name: true,
+                taxId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      companies: user.memberships.map((m) => ({
+        companyId: m.company.id,
+        companyName: m.company.name,
+        taxId: m.company.taxId,
+        role: m.role,
+        membershipId: m.id,
+      })),
+    };
+  }
+
   private setAccessTokenCookie(response: Response, token: string) {
     response.cookie('access_token', token, {
       httpOnly: true,
