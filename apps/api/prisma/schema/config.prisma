@@ -1,0 +1,18 @@
+model CompanySettings {
+  id                String   @id @default(uuid()) @db.Uuid
+  companyId         String   @unique @db.Uuid
+  fiscalYearStart   Int      @default(1) // Month 1-12
+  defaultCurrency   String   @default("CLP")
+  timezone          String   @default("America/Santiago")
+  invoicePrefix     String?
+  decimalSeparator  String   @default(",")
+  thousandSeparator String   @default(".")
+  taxRate           Decimal  @default(0.19) // IVA Chile 19%
+  extraSettings     Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("company_settings")
+}

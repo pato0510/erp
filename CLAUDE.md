@@ -151,14 +151,19 @@ ARC-005 — ESLint, Prettier, Husky and Nx module boundary rules ✓
 ARC-006 — Sentry and OpenTelemetry distributed tracing ✓
 ARC-007 — GitHub Actions CI pipeline ✓
 
-### Sprint 2 — Identity, security and multi-tenancy (in progress)
+### Sprint 2 — Identity, security and multi-tenancy ✓
 
 TEN-001 — Tenant, Company, User and Membership models ✓
 IAM-001 — JWT authentication with HttpOnly cookies ✓
 IAM-002 — Logout, session expiration and refresh token ✓
 IAM-005 — Roles and permissions with CASL ✓
 TEN-003 — PostgreSQL Row Level Security (RLS) ✓
+AUD-001 — PostgreSQL audit triggers for critical events ✓
+
+### Sprint 3 — Configuration and catalogs (in progress)
+
+CFG-001 — Company configuration and financial settings ✓
 
 ## Current ticket
 
-AUD-001 — PostgreSQL audit triggers for critical events
+CAT-001 — Income and expense categories CRUD

@@ -45,7 +45,17 @@ async function main() {
   });
   console.log(`User: ${user.email} (${user.id})`);
 
-  // 4. Upsert membership
+  // 4. Upsert company settings (Chilean defaults)
+  const settings = await prisma.companySettings.upsert({
+    where: { companyId: company.id },
+    update: {},
+    create: { companyId: company.id },
+  });
+  console.log(
+    `CompanySettings: ${settings.defaultCurrency} / ${settings.timezone} (${settings.id})`,
+  );
+
+  // 5. Upsert membership
   const membership = await prisma.membership.upsert({
     where: { userId_companyId: { userId: user.id, companyId: company.id } },
     update: {},
