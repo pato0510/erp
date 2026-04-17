@@ -167,10 +167,10 @@ CAT-001 — Income and expense categories CRUD ✓
 CAT-002 — Counterparties (clients and suppliers) CRUD ✓
 CAT-003 — Cost centers and fiscal periods ✓
 
-## Current sprint
+### Sprint 4 — Financial core (in progress)
 
-Sprint 4 — Financial core (manual movements)
+MOV-001 — Financial movements CRUD ✓
 
 ## Current ticket
 
-MOV-001 — Financial movements CRUD
+CASH-001 — Initial balance and consolidated cash position

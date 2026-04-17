@@ -284,6 +284,107 @@ async function main() {
     }
   }
 
+  // 11. Seed bank accounts
+  const bankAccounts = [
+    {
+      name: 'Cuenta Corriente Banco Chile',
+      type: 'CHECKING' as const,
+      accountNumber: '****1234',
+      bankName: 'Banco de Chile',
+    },
+    { name: 'Caja Chica Oficina', type: 'CASH' as const, accountNumber: null, bankName: null },
+  ];
+
+  const createdAccounts: { id: string; name: string }[] = [];
+  for (const ba of bankAccounts) {
+    let account = await prisma.bankAccount.findFirst({
+      where: { companyId: company.id, name: ba.name },
+    });
+    if (!account) {
+      account = await prisma.bankAccount.create({
+        data: { companyId: company.id, ...ba },
+      });
+    }
+    createdAccounts.push({ id: account.id, name: account.name });
+  }
+  console.log(`BankAccounts: ${createdAccounts.length} bank accounts seeded`);
+
+  // 12. Seed opening balances for April 2026
+  if (aprilPeriod) {
+    const openingBalances = [
+      { bankAccountId: createdAccounts[0].id, openingBalance: 15000000 },
+      { bankAccountId: createdAccounts[1].id, openingBalance: 500000 },
+    ];
+
+    for (const ob of openingBalances) {
+      await prisma.accountBalance.upsert({
+        where: {
+          bankAccountId_fiscalPeriodId: {
+            bankAccountId: ob.bankAccountId,
+            fiscalPeriodId: aprilPeriod.id,
+          },
+        },
+        update: {},
+        create: {
+          companyId: company.id,
+          bankAccountId: ob.bankAccountId,
+          fiscalPeriodId: aprilPeriod.id,
+          openingBalance: ob.openingBalance,
+          setBy: user.id,
+        },
+      });
+    }
+    console.log('AccountBalances: opening balances set for April 2026');
+
+    // 13. Seed commitments
+    const existingCommitments = await prisma.commitment.count({
+      where: { companyId: company.id },
+    });
+
+    if (existingCommitments === 0 && arriendo && sueldos) {
+      const serviciosBasicos = await prisma.category.findFirst({
+        where: { companyId: company.id, name: 'Servicios Básicos' },
+      });
+
+      const commitments = [
+        {
+          type: 'EXPENSE' as const,
+          amount: 2500000,
+          dueDate: new Date('2026-04-30'),
+          description: 'Arriendo oficina mayo',
+          categoryId: arriendo.id,
+        },
+        {
+          type: 'EXPENSE' as const,
+          amount: 8000000,
+          dueDate: new Date('2026-04-28'),
+          description: 'Sueldos equipo mayo',
+          categoryId: sueldos.id,
+        },
+        {
+          type: 'EXPENSE' as const,
+          amount: 150000,
+          dueDate: new Date('2026-04-25'),
+          description: 'Servicios básicos abril',
+          categoryId: serviciosBasicos?.id,
+        },
+      ];
+
+      for (const c of commitments) {
+        await prisma.commitment.create({
+          data: {
+            companyId: company.id,
+            fiscalPeriodId: aprilPeriod.id,
+            ...c,
+          },
+        });
+      }
+      console.log(`Commitments: ${commitments.length} upcoming commitments seeded`);
+    } else if (existingCommitments > 0) {
+      console.log(`Commitments: ${existingCommitments} already exist, skipping`);
+    }
+  }
+
   console.log('\nSeed completed successfully!');
 }
 

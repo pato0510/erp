@@ -18,7 +18,8 @@ model Category {
 
   parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryTree")
-  movements Movement[]
+  movements   Movement[]
+  commitments Commitment[]
 
   @@unique([companyId, name, type])
   @@map("categories")
@@ -47,7 +48,8 @@ model Counterparty {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  movements Movement[]
+  movements   Movement[]
+  commitments Commitment[]
 
   @@unique([companyId, taxId])
   @@map("counterparties")
@@ -90,7 +92,9 @@ model FiscalPeriod {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  movements Movement[]
+  movements       Movement[]
+  accountBalances AccountBalance[]
+  commitments     Commitment[]
 
   @@unique([companyId, year, month])
   @@map("fiscal_periods")

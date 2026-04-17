@@ -1,0 +1,77 @@
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CASH
+  CREDIT_LINE
+  OTHER
+}
+
+model BankAccount {
+  id            String      @id @default(uuid()) @db.Uuid
+  companyId     String      @db.Uuid
+  name          String
+  accountNumber String?
+  type          AccountType
+  currency      String      @default("CLP")
+  bankName      String?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  balances AccountBalance[]
+
+  @@unique([companyId, accountNumber])
+  @@map("bank_accounts")
+}
+
+model AccountBalance {
+  id             String   @id @default(uuid()) @db.Uuid
+  companyId      String   @db.Uuid
+  bankAccountId  String   @db.Uuid
+  fiscalPeriodId String   @db.Uuid
+  openingBalance Decimal  @db.Decimal(18, 2)
+  closingBalance Decimal? @db.Decimal(18, 2)
+  currency       String   @default("CLP")
+  setBy          String   @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  bankAccount  BankAccount  @relation(fields: [bankAccountId], references: [id])
+  fiscalPeriod FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id])
+
+  @@unique([bankAccountId, fiscalPeriodId])
+  @@map("account_balances")
+}
+
+enum CommitmentStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model Commitment {
+  id             String           @id @default(uuid()) @db.Uuid
+  companyId      String           @db.Uuid
+  fiscalPeriodId String           @db.Uuid
+  counterpartyId String?          @db.Uuid
+  categoryId     String?          @db.Uuid
+  type           MovementType
+  amount         Decimal          @db.Decimal(18, 2)
+  currency       String           @default("CLP")
+  dueDate        DateTime         @db.Date
+  description    String
+  status         CommitmentStatus @default(PENDING)
+  paidAt         DateTime?
+  paidBy         String?          @db.Uuid
+  movementId     String?          @db.Uuid
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  fiscalPeriod FiscalPeriod  @relation(fields: [fiscalPeriodId], references: [id])
+  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id])
+  category     Category?     @relation(fields: [categoryId], references: [id])
+
+  @@index([companyId, dueDate])
+  @@map("commitments")
+}
