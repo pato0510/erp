@@ -9,6 +9,7 @@ type Subjects =
       | typeof TenantSubject
       | typeof MovementSubject
       | typeof ReportSubject
+      | typeof CategorySubject
     >
   | 'all';
 
@@ -28,11 +29,21 @@ class MovementSubject {
 class ReportSubject {
   static readonly modelName = 'Report' as const;
 }
+class CategorySubject {
+  static readonly modelName = 'Category' as const;
+}
 
 export type Action = 'create' | 'read' | 'update' | 'delete' | 'manage';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
-export { UserSubject, CompanySubject, TenantSubject, MovementSubject, ReportSubject };
+export {
+  UserSubject,
+  CompanySubject,
+  TenantSubject,
+  MovementSubject,
+  ReportSubject,
+  CategorySubject,
+};
 
 @Injectable()
 export class CaslAbilityFactory {
@@ -52,12 +63,13 @@ export class CaslAbilityFactory {
         can('read', 'all');
         can(['create', 'update'], MovementSubject);
         can(['create', 'update'], ReportSubject);
-        // Cannot delete users or manage company settings
+        can(['create', 'update'], CategorySubject);
         break;
 
       case UserRole.ACCOUNTANT:
         can('read', 'all');
         can(['create', 'update'], MovementSubject);
+        can(['create', 'update'], CategorySubject);
         break;
 
       case UserRole.ANALYST:
@@ -67,6 +79,7 @@ export class CaslAbilityFactory {
       case UserRole.VIEWER:
         can('read', ReportSubject);
         can('read', MovementSubject);
+        can('read', CategorySubject);
         break;
     }
 

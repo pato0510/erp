@@ -1,0 +1,24 @@
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Category {
+  id          String       @id @default(uuid()) @db.Uuid
+  companyId   String       @db.Uuid
+  name        String
+  type        CategoryType
+  description String?
+  color       String? // Hex color e.g. "#4CAF50"
+  icon        String? // Icon name for UI
+  isActive    Boolean      @default(true)
+  parentId    String?      @db.Uuid
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+
+  @@unique([companyId, name, type])
+  @@map("categories")
+}

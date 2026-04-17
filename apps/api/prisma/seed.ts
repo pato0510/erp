@@ -67,6 +67,40 @@ async function main() {
   });
   console.log(`Membership: ${membership.role} (${membership.id})`);
 
+  // 6. Seed default categories
+  const defaultCategories = [
+    { name: 'Ventas', type: 'INCOME' as const, color: '#4CAF50', icon: 'shopping-cart' },
+    { name: 'Servicios', type: 'INCOME' as const, color: '#2196F3', icon: 'briefcase' },
+    { name: 'Otros Ingresos', type: 'INCOME' as const, color: '#9C27B0', icon: 'plus-circle' },
+    { name: 'Arriendo', type: 'EXPENSE' as const, color: '#F44336', icon: 'home' },
+    { name: 'Sueldos', type: 'EXPENSE' as const, color: '#FF9800', icon: 'users' },
+    { name: 'Servicios Básicos', type: 'EXPENSE' as const, color: '#FF5722', icon: 'zap' },
+    { name: 'Proveedores', type: 'EXPENSE' as const, color: '#795548', icon: 'truck' },
+    { name: 'Impuestos', type: 'EXPENSE' as const, color: '#607D8B', icon: 'file-text' },
+    { name: 'Otros Gastos', type: 'EXPENSE' as const, color: '#9E9E9E', icon: 'minus-circle' },
+  ];
+
+  for (const cat of defaultCategories) {
+    await prisma.category.upsert({
+      where: {
+        companyId_name_type: {
+          companyId: company.id,
+          name: cat.name,
+          type: cat.type,
+        },
+      },
+      update: {},
+      create: {
+        companyId: company.id,
+        name: cat.name,
+        type: cat.type,
+        color: cat.color,
+        icon: cat.icon,
+      },
+    });
+  }
+  console.log(`Categories: ${defaultCategories.length} default categories seeded`);
+
   console.log('\nSeed completed successfully!');
 }
 
