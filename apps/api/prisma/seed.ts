@@ -101,6 +101,31 @@ async function main() {
   }
   console.log(`Categories: ${defaultCategories.length} default categories seeded`);
 
+  // 7. Seed default counterparties
+  const defaultCounterparties = [
+    { name: 'Banco de Chile', type: 'BANK' as const, taxId: '97.004.000-5' },
+    { name: 'SII', type: 'GOVERNMENT' as const, taxId: '60.803.000-K' },
+    { name: 'Cliente Demo', type: 'CLIENT' as const, taxId: null },
+    { name: 'Proveedor Demo', type: 'SUPPLIER' as const, taxId: null },
+  ];
+
+  for (const cp of defaultCounterparties) {
+    const existing = await prisma.counterparty.findFirst({
+      where: { companyId: company.id, name: cp.name },
+    });
+    if (!existing) {
+      await prisma.counterparty.create({
+        data: {
+          companyId: company.id,
+          name: cp.name,
+          type: cp.type,
+          taxId: cp.taxId,
+        },
+      });
+    }
+  }
+  console.log(`Counterparties: ${defaultCounterparties.length} default counterparties seeded`);
+
   console.log('\nSeed completed successfully!');
 }
 

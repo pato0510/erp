@@ -10,6 +10,7 @@ type Subjects =
       | typeof MovementSubject
       | typeof ReportSubject
       | typeof CategorySubject
+      | typeof CounterpartySubject
     >
   | 'all';
 
@@ -32,6 +33,9 @@ class ReportSubject {
 class CategorySubject {
   static readonly modelName = 'Category' as const;
 }
+class CounterpartySubject {
+  static readonly modelName = 'Counterparty' as const;
+}
 
 export type Action = 'create' | 'read' | 'update' | 'delete' | 'manage';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
@@ -43,6 +47,7 @@ export {
   MovementSubject,
   ReportSubject,
   CategorySubject,
+  CounterpartySubject,
 };
 
 @Injectable()
@@ -64,12 +69,14 @@ export class CaslAbilityFactory {
         can(['create', 'update'], MovementSubject);
         can(['create', 'update'], ReportSubject);
         can(['create', 'update'], CategorySubject);
+        can(['create', 'update'], CounterpartySubject);
         break;
 
       case UserRole.ACCOUNTANT:
         can('read', 'all');
         can(['create', 'update'], MovementSubject);
         can(['create', 'update'], CategorySubject);
+        can(['create', 'update'], CounterpartySubject);
         break;
 
       case UserRole.ANALYST:
@@ -80,6 +87,7 @@ export class CaslAbilityFactory {
         can('read', ReportSubject);
         can('read', MovementSubject);
         can('read', CategorySubject);
+        can('read', CounterpartySubject);
         break;
     }
 

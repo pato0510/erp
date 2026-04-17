@@ -22,3 +22,30 @@ model Category {
   @@unique([companyId, name, type])
   @@map("categories")
 }
+
+enum CounterpartyType {
+  CLIENT
+  SUPPLIER
+  BANK
+  GOVERNMENT
+  OTHER
+}
+
+model Counterparty {
+  id        String           @id @default(uuid()) @db.Uuid
+  companyId String           @db.Uuid
+  name      String
+  type      CounterpartyType
+  taxId     String?
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+  isActive  Boolean          @default(true)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([companyId, taxId])
+  @@map("counterparties")
+}
