@@ -24,4 +24,9 @@ export class AppController {
     });
     return { message: 'Job added to queue', jobId: job.id };
   }
+
+  @Get('sentry-test')
+  sentryTest() {
+    throw new Error('Sentry test error — this is intentional');
+  }
 }

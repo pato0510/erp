@@ -145,7 +145,8 @@ ARC-001 — Nx monorepo base structure ✓
 ARC-002 — Docker Compose with PostgreSQL, Redis and MinIO ✓
 ARC-003 — Prisma configured with prismaSchemaFolder, first migration done ✓
 ARC-004 — Redis and BullMQ base queue configured ✓
+ARC-005 — ESLint, Prettier, Husky and Nx module boundary rules ✓
 
 ## Current ticket
 
-ARC-005 — Configure ESLint, Prettier, Husky and Nx module boundary rules
+ARC-006 — Configure Sentry and OpenTelemetry distributed tracing
