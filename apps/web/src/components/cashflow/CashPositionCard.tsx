@@ -13,7 +13,7 @@ const VARIANT_STYLES: Record<ColorVariant, { text: string; bg: string }> = {
 
 interface CashPositionCardProps {
   title: string;
-  amount: number;
+  amount: string | number;
   color: ColorVariant;
   subtitle?: string;
 }

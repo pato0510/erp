@@ -10,7 +10,7 @@ import { useMovements } from '../../../../hooks/useMovements';
 
 const schema = z.object({
   type: z.enum(['INCOME', 'EXPENSE']),
-  amount: z.number({ coerce: true }).min(1, 'Monto debe ser mayor a 0'),
+  amount: z.number().min(1, 'Monto debe ser mayor a 0'),
   date: z.string().min(1, 'Fecha es requerida'),
   description: z.string().min(1, 'Descripción es requerida').max(500),
   categoryId: z.string().uuid('Seleccione una categoría'),

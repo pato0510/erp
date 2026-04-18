@@ -149,7 +149,7 @@ export default function DashboardPage() {
               title="Caja Total"
               value={formatCLP(data.cash.totalCash)}
               icon={DollarSign}
-              color={data.cash.totalCash >= 0 ? 'text-green-600' : 'text-red-600'}
+              color={Number(data.cash.totalCash) >= 0 ? 'text-green-600' : 'text-red-600'}
               subtitle={`Apertura: ${formatCLP(data.cash.openingBalance)}`}
             />
             <KpiCard
@@ -157,7 +157,8 @@ export default function DashboardPage() {
               value={formatCLP(data.cash.freeCash)}
               icon={Wallet}
               color={
-                data.cash.totalCash > 0 && data.cash.freeCash / data.cash.totalCash < 0.2
+                Number(data.cash.totalCash) > 0 &&
+                Number(data.cash.freeCash) / Number(data.cash.totalCash) < 0.2
                   ? 'text-yellow-500'
                   : 'text-green-600'
               }

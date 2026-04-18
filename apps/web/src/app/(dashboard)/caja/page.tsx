@@ -80,7 +80,7 @@ export default function CajaPage() {
   const [periodId, setPeriodId] = useState('');
   const [commitTab, setCommitTab] = useState<'upcoming' | 'all'>('upcoming');
 
-  const reloadRef = useRef<() => void>();
+  const reloadRef = useRef<(() => void) | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -142,22 +142,31 @@ export default function CajaPage() {
           ))}
         </div>
       ) : position ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <CashPositionCard
-            title="Caja Total"
-            amount={position.totalCash}
-            color={position.totalCash >= 0 ? 'green' : 'red'}
-            subtitle={`Ingr: ${formatCLP(position.totalIncome)} | Egr: ${formatCLP(position.totalExpense)}`}
-          />
-          <CashPositionCard
-            title="Caja Libre"
-            amount={position.freeCash}
-            color={freeCashColor(position.freeCash, position.totalCash)}
-            subtitle={`${position.totalCash > 0 ? Math.round((position.freeCash / position.totalCash) * 100) : 0}% disponible`}
-          />
-          <CashPositionCard title="Comprometido" amount={position.committedAmount} color="orange" />
-          <CashPositionCard title="Saldo Apertura" amount={position.openingBalance} color="gray" />
-        </div>
+        (() => {
+          const totalCash = Number(position.totalCash) || 0;
+          const freeCash = Number(position.freeCash) || 0;
+          const committed = Number(position.committedAmount) || 0;
+          const opening = Number(position.openingBalance) || 0;
+          const pct = totalCash > 0 ? Math.round((freeCash / totalCash) * 100) : 0;
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <CashPositionCard
+                title="Caja Total"
+                amount={totalCash}
+                color={totalCash >= 0 ? 'green' : 'red'}
+                subtitle={`Ingr: ${formatCLP(position.totalIncome)} | Egr: ${formatCLP(position.totalExpense)}`}
+              />
+              <CashPositionCard
+                title="Caja Libre"
+                amount={freeCash}
+                color={freeCashColor(freeCash, totalCash)}
+                subtitle={`${pct}% disponible`}
+              />
+              <CashPositionCard title="Comprometido" amount={committed} color="orange" />
+              <CashPositionCard title="Saldo Apertura" amount={opening} color="gray" />
+            </div>
+          );
+        })()
       ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

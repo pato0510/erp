@@ -42,7 +42,7 @@ export default function MovimientosPage() {
   const [page, setPage] = useState(1);
 
   // Ref to avoid stale closure in confirm/cancel handlers
-  const reloadRef = useRef<() => void>();
+  const reloadRef = useRef<(() => void) | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);

@@ -9,7 +9,7 @@ import { apiClient } from '../../../../lib/api';
 
 const schema = z.object({
   type: z.enum(['INCOME', 'EXPENSE']),
-  amount: z.number({ coerce: true }).min(1, 'Monto debe ser mayor a 0'),
+  amount: z.number().min(1, 'Monto debe ser mayor a 0'),
   dueDate: z.string().min(1, 'Fecha de vencimiento es requerida'),
   description: z.string().min(1, 'Descripción es requerida').max(500),
   counterpartyId: z.string().optional(),

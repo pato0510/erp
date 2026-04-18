@@ -1,5 +1,13 @@
-export function formatCLP(amount: number): string {
-  return '$' + Math.round(amount).toLocaleString('es-CL');
+export function formatCLP(amount: string | number | null | undefined): string {
+  if (amount === null || amount === undefined) return '$0';
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num)) return '$0';
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num);
 }
 
 export function formatDate(date: string | Date): string {
