@@ -171,7 +171,9 @@ CAT-003 — Cost centers and fiscal periods ✓
 
 MOV-001 — Financial movements CRUD ✓
 CASH-001 — Bank accounts, opening balances and commitments ✓
+MOV-002 — Bulk import movements from CSV/Excel ✓
+DASH-001 — Main financial dashboard with KPIs ✓
 
 ## Current ticket
 
-MOV-002 — Bulk import movements from CSV/Excel
+DASH-002 — Movements and cashflow frontend screens

@@ -69,6 +69,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "@casl/ability": "^6.8.0",
     "@casl/prisma": "^1.6.2",
+    "@hookform/resolvers": "^5.2.2",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
@@ -86,14 +87,17 @@
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
     "ioredis": "^5.10.1",
+    "lucide-react": "^1.8.0",
     "next": "~16.1.6",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hook-form": "^7.72.1",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6"
   }
 }
