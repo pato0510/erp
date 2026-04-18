@@ -54,3 +54,19 @@ model Movement {
   @@index([companyId, type, status])
   @@map("movements")
 }
+
+model ImportLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  companyId    String   @db.Uuid
+  userId       String   @db.Uuid
+  filename     String
+  storagePath  String
+  totalRows    Int
+  importedRows Int
+  errorRows    Int
+  status       String // SUCCESS, PARTIAL, FAILED
+  errors       Json?
+  createdAt    DateTime @default(now())
+
+  @@map("import_logs")
+}

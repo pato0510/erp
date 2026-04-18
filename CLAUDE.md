@@ -170,7 +170,8 @@ CAT-003 — Cost centers and fiscal periods ✓
 ### Sprint 4 — Financial core (in progress)
 
 MOV-001 — Financial movements CRUD ✓
+CASH-001 — Bank accounts, opening balances and commitments ✓
 
 ## Current ticket
 
-CASH-001 — Initial balance and consolidated cash position
+MOV-002 — Bulk import movements from CSV/Excel

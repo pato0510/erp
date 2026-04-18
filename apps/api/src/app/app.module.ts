@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from '../modules/common/prisma/prisma.module';
 import { CaslModule } from '../modules/common/casl/casl.module';
 import { RlsModule } from '../modules/common/rls/rls.module';
+import { StorageModule } from '../modules/common/storage/storage.module';
 import { TenantMiddleware } from '../modules/common/rls/rls.middleware';
 import { AuditModule } from '../modules/audit/audit.module';
 import { CashflowModule } from '../modules/cashflow/cashflow.module';
@@ -21,6 +22,7 @@ import { TenancyModule } from '../modules/tenancy/tenancy.module';
     PrismaModule,
     CaslModule,
     RlsModule,
+    StorageModule,
     AuditModule,
     CashflowModule,
     CatalogsModule,

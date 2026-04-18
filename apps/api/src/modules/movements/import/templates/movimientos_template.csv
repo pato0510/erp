@@ -1,0 +1,4 @@
+fecha,tipo,monto,descripcion,categoria,contraparte,referencia,notas
+05/04/2026,INGRESO,5000000,Factura venta productos,Ventas,Cliente Demo,FAC-001,
+10/04/2026,EGRESO,1200000,Arriendo oficina abril,Arriendo,Proveedor Demo,BOL-001,Pago mensual
+15/04/2026,INGRESO,2500000,Servicios de consultoría,Servicios,,FAC-002,Consultoría TI
