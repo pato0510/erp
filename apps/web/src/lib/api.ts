@@ -73,6 +73,29 @@ class ApiClient {
       body: body ? JSON.stringify(body) : undefined,
     });
   }
+
+  async uploadFile<T>(path: string, formData: FormData): Promise<T> {
+    const headers: Record<string, string> = {};
+    const companyId = this.getCompanyId();
+    if (companyId) headers['x-company-id'] = companyId;
+
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message || `HTTP ${res.status}`);
+    }
+    return res.json();
+  }
 }
 
 export const apiClient = new ApiClient();

@@ -16,7 +16,7 @@ import {
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/movements', label: 'Movimientos', icon: ArrowLeftRight },
+  { href: '/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
   { href: '/cashflow', label: 'Caja', icon: Wallet },
   { href: '/categories', label: 'Categorías', icon: Tag },
   { href: '/counterparties', label: 'Contrapartes', icon: Users },
@@ -58,7 +58,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              pathname === item.href ||
+              (item.href !== '/dashboard' && pathname.startsWith(item.href));
             const Icon = item.icon;
             return (
               <Link
