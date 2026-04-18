@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useMovements } from '../../../hooks/useMovements';
+import { apiClient } from '../../../lib/api';
 import { MovementStatusBadge } from '../../../components/movements/MovementStatusBadge';
 import { MovementTypeBadge } from '../../../components/movements/MovementTypeBadge';
 import { formatCLP, formatDate } from '../../../lib/formatters';
@@ -20,71 +20,75 @@ interface Movement {
   counterparty?: { name: string };
 }
 
-interface Filters {
-  type: string;
-  status: string;
-  dateFrom: string;
-  dateTo: string;
-  search: string;
+interface PaginatedResult {
+  data: Movement[];
+  total: number;
   page: number;
+  totalPages: number;
 }
 
 export default function MovimientosPage() {
-  const { fetchMovements, confirmMovement, cancelMovement } = useMovements();
   const [movements, setMovements] = useState<Movement[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState<Filters>({
-    type: '',
-    status: '',
-    dateFrom: '',
-    dateTo: '',
-    search: '',
-    page: 1,
-  });
+
+  // Individual primitive states — stable useEffect deps
+  const [filterType, setFilterType] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
+  const [page, setPage] = useState(1);
+
+  // Ref to avoid stale closure in confirm/cancel handlers
+  const reloadRef = useRef<() => void>();
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetchMovements({
-        type: filters.type || undefined,
-        status: filters.status || undefined,
-        dateFrom: filters.dateFrom || undefined,
-        dateTo: filters.dateTo || undefined,
-        search: filters.search || undefined,
-        page: filters.page,
-        limit: 15,
-      });
-      setMovements(res.data as unknown as Movement[]);
+      const params = new URLSearchParams();
+      if (filterType) params.set('type', filterType);
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterDateFrom) params.set('dateFrom', filterDateFrom);
+      if (filterDateTo) params.set('dateTo', filterDateTo);
+      if (filterSearch) params.set('search', filterSearch);
+      params.set('page', String(page));
+      params.set('limit', '15');
+
+      const res = await apiClient.get<PaginatedResult>(`/api/movements?${params}`);
+      setMovements(res.data);
       setTotal(res.total);
       setTotalPages(res.totalPages);
     } catch {
-      /* handled by apiClient */
+      // handled by apiClient
     } finally {
       setIsLoading(false);
     }
-  }, [filters, fetchMovements]);
+  }, [filterType, filterStatus, filterDateFrom, filterDateTo, filterSearch, page]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  reloadRef.current = load;
+
   const handleConfirm = async (id: string) => {
-    await confirmMovement(id);
-    load();
+    await apiClient.post(`/api/movements/${id}/confirm`);
+    reloadRef.current?.();
   };
 
   const handleCancel = async (id: string) => {
     const reason = prompt('Razón de cancelación:');
     if (reason !== null) {
-      await cancelMovement(id, reason);
-      load();
+      await apiClient.post(`/api/movements/${id}/cancel`, { reason });
+      reloadRef.current?.();
     }
   };
 
-  const updateFilter = (key: keyof Filters, value: string | number) => {
-    setFilters((f) => ({ ...f, [key]: value, ...(key !== 'page' ? { page: 1 } : {}) }));
+  const updateFilter = (setter: (v: string) => void, value: string) => {
+    setter(value);
+    setPage(1);
   };
 
   const totalIncome = movements
@@ -136,8 +140,8 @@ export default function MovimientosPage() {
         <div>
           <label className="block text-xs text-gray-500 mb-1">Tipo</label>
           <select
-            value={filters.type}
-            onChange={(e) => updateFilter('type', e.target.value)}
+            value={filterType}
+            onChange={(e) => updateFilter(setFilterType, e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">Todos</option>
@@ -148,8 +152,8 @@ export default function MovimientosPage() {
         <div>
           <label className="block text-xs text-gray-500 mb-1">Estado</label>
           <select
-            value={filters.status}
-            onChange={(e) => updateFilter('status', e.target.value)}
+            value={filterStatus}
+            onChange={(e) => updateFilter(setFilterStatus, e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">Todos</option>
@@ -162,8 +166,8 @@ export default function MovimientosPage() {
           <label className="block text-xs text-gray-500 mb-1">Desde</label>
           <input
             type="date"
-            value={filters.dateFrom}
-            onChange={(e) => updateFilter('dateFrom', e.target.value)}
+            value={filterDateFrom}
+            onChange={(e) => updateFilter(setFilterDateFrom, e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
@@ -171,8 +175,8 @@ export default function MovimientosPage() {
           <label className="block text-xs text-gray-500 mb-1">Hasta</label>
           <input
             type="date"
-            value={filters.dateTo}
-            onChange={(e) => updateFilter('dateTo', e.target.value)}
+            value={filterDateTo}
+            onChange={(e) => updateFilter(setFilterDateTo, e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
@@ -183,8 +187,8 @@ export default function MovimientosPage() {
             <input
               type="text"
               placeholder="Buscar descripción..."
-              value={filters.search}
-              onChange={(e) => updateFilter('search', e.target.value)}
+              value={filterSearch}
+              onChange={(e) => updateFilter(setFilterSearch, e.target.value)}
               className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm"
             />
           </div>
@@ -274,19 +278,19 @@ export default function MovimientosPage() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
             <p className="text-sm text-gray-500">
-              {total} movimientos &middot; Página {filters.page} de {totalPages}
+              {total} movimientos &middot; Página {page} de {totalPages}
             </p>
             <div className="flex gap-2">
               <button
-                disabled={filters.page <= 1}
-                onClick={() => updateFilter('page', filters.page - 1)}
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
                 className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-white transition"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
-                disabled={filters.page >= totalPages}
-                onClick={() => updateFilter('page', filters.page + 1)}
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
                 className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-white transition"
               >
                 <ChevronRight size={16} />
