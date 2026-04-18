@@ -17,7 +17,7 @@ import {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
-  { href: '/cashflow', label: 'Caja', icon: Wallet },
+  { href: '/caja', label: 'Caja', icon: Wallet },
   { href: '/categories', label: 'Categorías', icon: Tag },
   { href: '/counterparties', label: 'Contrapartes', icon: Users },
   { href: '/settings', label: 'Configuración', icon: Settings },
