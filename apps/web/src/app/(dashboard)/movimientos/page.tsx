@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Upload, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import { downloadFile } from '../../../lib/download';
 import { MovementStatusBadge } from '../../../components/movements/MovementStatusBadge';
 import { MovementTypeBadge } from '../../../components/movements/MovementTypeBadge';
 import { formatCLP, formatDate } from '../../../lib/formatters';
@@ -104,6 +105,24 @@ export default function MovimientosPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Movimientos</h1>
         <div className="flex gap-3">
+          <button
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (filterType) params.set('type', filterType);
+              if (filterStatus) params.set('status', filterStatus);
+              if (filterDateFrom) params.set('dateFrom', filterDateFrom);
+              if (filterDateTo) params.set('dateTo', filterDateTo);
+              const qs = params.toString();
+              const date = new Date().toISOString().split('T')[0];
+              downloadFile(
+                `/api/reports/movements/export${qs ? `?${qs}` : ''}`,
+                `movimientos-${date}.xlsx`,
+              );
+            }}
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+          >
+            <Download size={16} /> Exportar Excel
+          </button>
           <Link
             href="/movimientos/importar"
             className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"

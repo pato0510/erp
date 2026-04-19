@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Building2, CreditCard, Banknote } from 'lucide-react';
+import { Plus, Building2, CreditCard, Banknote, Download } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import { downloadFile } from '../../../lib/download';
 import { CashPositionCard } from '../../../components/cashflow/CashPositionCard';
 import { CommitmentStatusBadge } from '../../../components/cashflow/CommitmentStatusBadge';
 import { MovementTypeBadge } from '../../../components/movements/MovementTypeBadge';
@@ -128,7 +129,23 @@ export default function CajaPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Caja y Tesorería</h1>
-        <PeriodSelector value={periodId} onChange={setPeriodId} />
+        <div className="flex items-center gap-3">
+          {periodId && (
+            <button
+              onClick={() => {
+                const date = new Date().toISOString().split('T')[0];
+                downloadFile(
+                  `/api/reports/cashflow/export?fiscalPeriodId=${periodId}`,
+                  `caja-${date}.xlsx`,
+                );
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              <Download size={16} /> Exportar
+            </button>
+          )}
+          <PeriodSelector value={periodId} onChange={setPeriodId} />
+        </div>
       </div>
 
       {/* SECTION 1 — Cash Position Cards */}

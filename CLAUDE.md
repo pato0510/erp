@@ -181,10 +181,11 @@ CASH-002 — Cashflow frontend screen ✓
 
 Sprint 5 — Dashboard, alerts and reports
 
-### Sprint 5 (in progress)
+### Sprint 5 — Dashboard, alerts and reports (in progress)
 
 DASH-004 — Enhanced dashboard with charts and period selector ✓
+ALR-001 — Alerts system with rules and frontend screen ✓
 
 ## Current ticket
 
-ALR-001 — Alerts frontend screen and backend rules
+REP-001 — Excel export and reports

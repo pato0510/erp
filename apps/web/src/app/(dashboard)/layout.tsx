@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   Bell,
+  FileBarChart,
 } from 'lucide-react';
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { href: '/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
   { href: '/caja', label: 'Caja', icon: Wallet },
   { href: '/alertas', label: 'Alertas', icon: Bell },
+  { href: '/reportes', label: 'Reportes', icon: FileBarChart },
   { href: '/categories', label: 'Categorías', icon: Tag },
   { href: '/counterparties', label: 'Contrapartes', icon: Users },
   { href: '/settings', label: 'Configuración', icon: Settings },
