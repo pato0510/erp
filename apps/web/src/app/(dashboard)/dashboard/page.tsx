@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { apiClient } from '../../../lib/api';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../lib/formatters';
+import { PeriodSelector } from '../../../components/shared/PeriodSelector';
 import {
   DollarSign,
   TrendingUp,
@@ -11,7 +14,24 @@ import {
   Clock,
   ArrowUpRight,
   ArrowDownRight,
+  Plus,
+  Upload,
+  FileText,
+  AlertCircle,
 } from 'lucide-react';
+
+// Lazy load recharts to avoid SSR issues
+const BarChart = dynamic(() => import('recharts').then((m) => m.BarChart), { ssr: false });
+const Bar = dynamic(() => import('recharts').then((m) => m.Bar), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then((m) => m.XAxis), { ssr: false });
+const YAxis = dynamic(() => import('recharts').then((m) => m.YAxis), { ssr: false });
+const Tooltip = dynamic(() => import('recharts').then((m) => m.Tooltip), { ssr: false });
+const ResponsiveContainer = dynamic(() => import('recharts').then((m) => m.ResponsiveContainer), {
+  ssr: false,
+});
+const PieChart = dynamic(() => import('recharts').then((m) => m.PieChart), { ssr: false });
+const Pie = dynamic(() => import('recharts').then((m) => m.Pie), { ssr: false });
+const Cell = dynamic(() => import('recharts').then((m) => m.Cell), { ssr: false });
 
 interface DashboardData {
   period: { name: string; status: string };
@@ -91,18 +111,34 @@ function SkeletonCard() {
   );
 }
 
+const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
+  OPEN: { label: 'Abierto', cls: 'bg-green-100 text-green-700' },
+  IN_REVIEW: { label: 'En Revisión', cls: 'bg-yellow-100 text-yellow-700' },
+  CLOSED: { label: 'Cerrado', cls: 'bg-gray-100 text-gray-500' },
+};
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [periodId, setPeriodId] = useState('');
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    const param = periodId ? `?fiscalPeriodId=${periodId}` : '';
+    try {
+      const result = await apiClient.get<DashboardData>(`/api/dashboard${param}`);
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [periodId]);
 
   useEffect(() => {
-    apiClient
-      .get<DashboardData>('/api/dashboard')
-      .then(setData)
-      .catch((err) => setError(err.message))
-      .finally(() => setIsLoading(false));
-  }, []);
+    load();
+  }, [load]);
 
   if (error) {
     return (
@@ -110,32 +146,48 @@ export default function DashboardPage() {
     );
   }
 
+  const weekCommitments =
+    data?.commitments.upcoming.filter((c) => {
+      const days = (new Date(c.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+      return days >= 0 && days <= 7;
+    }).length ?? 0;
+
+  const incomeExpenseData = data
+    ? [
+        { name: 'Ingresos', value: Number(data.movements.totalIncome) },
+        { name: 'Egresos', value: Number(data.movements.totalExpense) },
+      ]
+    : [];
+
+  const pieData =
+    data?.categories.topExpenses.map((c) => ({
+      name: c.categoryName,
+      value: Number(c.total),
+      color: c.color || '#6B7280',
+    })) ?? [];
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           {data && (
             <p className="text-gray-500 mt-1">
               {data.period.name} &middot;{' '}
               <span
-                className={
-                  data.period.status === 'OPEN'
-                    ? 'text-green-600'
-                    : data.period.status === 'CLOSED'
-                      ? 'text-gray-400'
-                      : 'text-yellow-600'
-                }
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[data.period.status]?.cls || 'bg-gray-100 text-gray-500'}`}
               >
-                {data.period.status}
+                {STATUS_LABELS[data.period.status]?.label || data.period.status}
               </span>
             </p>
           )}
         </div>
+        <PeriodSelector value={periodId} onChange={setPeriodId} />
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
         {isLoading ? (
           <>
             <SkeletonCard />
@@ -165,32 +217,196 @@ export default function DashboardPage() {
               subtitle={`Comprometido: ${formatCLP(data.cash.committedAmount)}`}
             />
             <KpiCard
-              title="Ingresos del Período"
+              title="Ingresos"
               value={formatCLP(data.movements.totalIncome)}
               icon={TrendingUp}
               color="text-blue-600"
               subtitle={`${data.movements.confirmedCount} confirmados`}
             />
             <KpiCard
-              title="Egresos del Período"
+              title="Egresos"
               value={formatCLP(data.movements.totalExpense)}
               icon={TrendingDown}
               color="text-red-500"
-              subtitle={`${data.movements.draftCount} borradores`}
+              subtitle={`Balance: ${formatCLP(data.movements.balance)}`}
             />
           </>
         ) : null}
       </div>
 
+      {/* Summary chips + Quick actions */}
+      {data && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex flex-wrap gap-2">
+            {weekCommitments > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                <AlertCircle size={12} />
+                {weekCommitments} vencimiento{weekCommitments > 1 ? 's' : ''} esta semana
+              </span>
+            )}
+            {data.movements.draftCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+                <FileText size={12} />
+                {data.movements.draftCount} borrador{data.movements.draftCount > 1 ? 'es' : ''}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Link
+              href="/movimientos/nuevo"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              <Plus size={12} /> Nuevo Movimiento
+            </Link>
+            <Link
+              href="/caja/nuevo-compromiso"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              <Clock size={12} /> Nuevo Compromiso
+            </Link>
+            <Link
+              href="/movimientos/importar"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              <Upload size={12} /> Importar CSV
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {data && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* CHART 1 — Income vs Expense bar */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Ingresos vs Egresos</h3>
+            {incomeExpenseData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={incomeExpenseData} layout="vertical" barSize={28}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(v: unknown) => formatCLP(v as number)}
+                    contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                  />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                    <Cell fill="#3B82F6" />
+                    <Cell fill="#EF4444" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-gray-400 text-sm text-center py-8">Sin datos</p>
+            )}
+          </div>
+
+          {/* CHART 2 — Expense categories pie */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Categorías de Gasto</h3>
+            {pieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={3}
+                  >
+                    {pieData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(v: unknown) => formatCLP(v as number)}
+                    contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-gray-400 text-sm text-center py-8">Sin datos de gastos</p>
+            )}
+            <div className="flex flex-wrap gap-2 mt-2">
+              {pieData.map((d) => (
+                <span key={d.name} className="flex items-center gap-1 text-xs text-gray-500">
+                  <span
+                    className="inline-block w-2 h-2 rounded-full"
+                    style={{ backgroundColor: d.color }}
+                  />
+                  {d.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* CHART 3 — Cash flow summary */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Flujo de Caja</h3>
+            <div className="space-y-3">
+              {[
+                {
+                  label: 'Saldo Apertura',
+                  value: Number(data.cash.openingBalance),
+                  color: 'bg-gray-400',
+                },
+                {
+                  label: 'Ingresos',
+                  value: Number(data.movements.totalIncome),
+                  color: 'bg-green-500',
+                },
+                {
+                  label: 'Egresos',
+                  value: Number(data.movements.totalExpense),
+                  color: 'bg-red-500',
+                },
+                {
+                  label: 'Caja Libre',
+                  value: Number(data.cash.freeCash),
+                  color: 'bg-blue-500',
+                },
+              ].map((item) => {
+                const maxVal = Math.max(
+                  Number(data.cash.openingBalance),
+                  Number(data.movements.totalIncome),
+                  Number(data.movements.totalExpense),
+                  Number(data.cash.freeCash),
+                  1,
+                );
+                const pct = Math.round((Math.abs(item.value) / maxVal) * 100);
+                return (
+                  <div key={item.label}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-600">{item.label}</span>
+                      <span className="font-medium text-gray-900">{formatCLP(item.value)}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${item.color}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {data && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Upcoming Commitments */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                 <Clock size={18} />
                 Compromisos Próximos
               </h2>
+              <Link href="/caja" className="text-xs text-blue-600 hover:underline">
+                Ver todos
+              </Link>
             </div>
             <div className="divide-y divide-gray-100">
               {data.commitments.upcoming.length === 0 ? (
@@ -208,7 +424,6 @@ export default function DashboardPage() {
                       : daysUntil < 15
                         ? 'text-yellow-600'
                         : 'text-gray-600';
-
                   return (
                     <div key={c.id} className="px-6 py-3 flex items-center justify-between">
                       <div>
@@ -219,7 +434,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <span className="text-sm font-semibold text-gray-900">
-                        {formatCLP(Number(c.amount))}
+                        {formatCLP(c.amount)}
                       </span>
                     </div>
                   );
@@ -230,8 +445,11 @@ export default function DashboardPage() {
 
           {/* Recent Movements */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-semibold text-gray-900">Movimientos Recientes</h2>
+              <Link href="/movimientos" className="text-xs text-blue-600 hover:underline">
+                Ver todos
+              </Link>
             </div>
             <div className="divide-y divide-gray-100">
               {data.recentMovements.length === 0 ? (
@@ -240,7 +458,11 @@ export default function DashboardPage() {
                 </p>
               ) : (
                 data.recentMovements.map((m) => (
-                  <div key={m.id} className="px-6 py-3 flex items-center justify-between">
+                  <Link
+                    key={m.id}
+                    href="/movimientos"
+                    className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition block"
+                  >
                     <div className="flex items-center gap-3">
                       <div
                         className={`p-1.5 rounded-md ${m.type === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}`}
@@ -253,8 +475,15 @@ export default function DashboardPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-900">{m.description}</p>
-                        <p className="text-xs text-gray-400">
-                          {m.category.name} &middot; {formatDate(m.date)}
+                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                          <span
+                            className="inline-block w-2 h-2 rounded-full"
+                            style={{ backgroundColor: m.category.color || '#888' }}
+                          />
+                          {m.category.name}
+                          {m.counterparty ? ` · ${m.counterparty.name}` : ''}
+                          {' · '}
+                          {formatDate(m.date)}
                         </p>
                       </div>
                     </div>
@@ -262,41 +491,9 @@ export default function DashboardPage() {
                       className={`text-sm font-semibold ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
                     >
                       {m.type === 'INCOME' ? '+' : '-'}
-                      {formatCLP(Number(m.amount))}
+                      {formatCLP(m.amount)}
                     </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Top Expense Categories */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm lg:col-span-2">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900">Principales Categorías de Gasto</h2>
-            </div>
-            <div className="p-6 space-y-3">
-              {data.categories.topExpenses.length === 0 ? (
-                <p className="text-gray-400 text-center text-sm py-4">Sin datos de gastos</p>
-              ) : (
-                data.categories.topExpenses.map((cat) => (
-                  <div key={cat.categoryName}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium text-gray-700">{cat.categoryName}</span>
-                      <span className="text-gray-500">
-                        {formatCLP(cat.total)} ({cat.percentage}%)
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{
-                          width: `${cat.percentage}%`,
-                          backgroundColor: cat.color || '#6B7280',
-                        }}
-                      />
-                    </div>
-                  </div>
+                  </Link>
                 ))
               )}
             </div>
