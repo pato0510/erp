@@ -1,0 +1,50 @@
+enum AlertType {
+  COMMITMENT_DUE
+  LOW_CASH_BALANCE
+  DRAFT_MOVEMENTS
+  PERIOD_CLOSING
+  RECONCILIATION
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  DISMISSED
+  RESOLVED
+}
+
+model Alert {
+  id          String        @id @default(uuid()) @db.Uuid
+  companyId   String        @db.Uuid
+  type        AlertType
+  severity    AlertSeverity
+  status      AlertStatus   @default(ACTIVE)
+  title       String
+  message     String
+  metadata    Json?
+  dismissedAt DateTime?
+  dismissedBy String?       @db.Uuid
+  resolvedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([companyId, status])
+  @@map("alerts")
+}
+
+model AlertThreshold {
+  id                     String   @id @default(uuid()) @db.Uuid
+  companyId              String   @unique @db.Uuid
+  lowCashThreshold       Decimal  @default(1000000) @db.Decimal(18, 2)
+  commitmentDaysWarning  Int      @default(7)
+  commitmentDaysCritical Int      @default(3)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("alert_thresholds")
+}

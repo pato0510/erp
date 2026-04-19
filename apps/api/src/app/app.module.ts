@@ -7,6 +7,7 @@ import { CaslModule } from '../modules/common/casl/casl.module';
 import { RlsModule } from '../modules/common/rls/rls.module';
 import { StorageModule } from '../modules/common/storage/storage.module';
 import { TenantMiddleware } from '../modules/common/rls/rls.middleware';
+import { AlertsModule } from '../modules/alerts/alerts.module';
 import { AuditModule } from '../modules/audit/audit.module';
 import { CashflowModule } from '../modules/cashflow/cashflow.module';
 import { DashboardModule } from '../modules/dashboard/dashboard.module';
@@ -24,6 +25,7 @@ import { TenancyModule } from '../modules/tenancy/tenancy.module';
     CaslModule,
     RlsModule,
     StorageModule,
+    AlertsModule,
     AuditModule,
     CashflowModule,
     DashboardModule,

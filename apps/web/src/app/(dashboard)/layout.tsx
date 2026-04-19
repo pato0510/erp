@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { apiClient } from '../../lib/api';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -12,12 +13,14 @@ import {
   Users,
   Settings,
   LogOut,
+  Bell,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
   { href: '/caja', label: 'Caja', icon: Wallet },
+  { href: '/alertas', label: 'Alertas', icon: Bell },
   { href: '/categories', label: 'Categorías', icon: Tag },
   { href: '/counterparties', label: 'Contrapartes', icon: Users },
   { href: '/settings', label: 'Configuración', icon: Settings },
@@ -26,12 +29,26 @@ const navItems = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, companies, isLoading, logout } = useAuth();
   const pathname = usePathname();
+  const [criticalCount, setCriticalCount] = useState(0);
 
   useEffect(() => {
     if (!isLoading && !user) {
       window.location.href = '/login';
     }
   }, [isLoading, user]);
+
+  // Fetch alert count once user is loaded
+  useEffect(() => {
+    if (user) {
+      apiClient.get<{ critical: number }>('/api/alerts/thresholds').catch(() => undefined);
+      apiClient
+        .get<{ id: string; severity: string }[]>('/api/alerts')
+        .then((alerts) => {
+          setCriticalCount(alerts.filter((a) => a.severity === 'CRITICAL').length);
+        })
+        .catch(() => undefined);
+    }
+  }, [user]);
 
   if (isLoading) {
     return (
@@ -62,6 +79,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href));
             const Icon = item.icon;
+            const showBadge = item.href === '/alertas' && criticalCount > 0;
             return (
               <Link
                 key={item.href}
@@ -73,7 +91,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }`}
               >
                 <Icon size={18} />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {showBadge && (
+                  <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                    {criticalCount}
+                  </span>
+                )}
               </Link>
             );
           })}

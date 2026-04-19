@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { MovementStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AlertsService } from '../alerts/alerts.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly alertsService: AlertsService,
+  ) {}
 
   async getDashboardData(companyId: string, fiscalPeriodId?: string) {
     // Resolve fiscal period
@@ -188,6 +192,17 @@ export class DashboardService {
         topIncome: mapCategoryTotals(topIncomeCategories, totalIncome),
       },
       recentMovements,
+      alerts: await this.getAlertSummary(companyId),
     };
+  }
+
+  private async getAlertSummary(companyId: string) {
+    const counts = await this.alertsService.getAlertCounts(companyId);
+    const items = await this.prisma.alert.findMany({
+      where: { companyId, status: 'ACTIVE' },
+      orderBy: [{ severity: 'desc' }, { createdAt: 'desc' }],
+      take: 5,
+    });
+    return { ...counts, items };
   }
 }

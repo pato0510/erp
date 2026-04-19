@@ -167,13 +167,24 @@ CAT-001 — Income and expense categories CRUD ✓
 CAT-002 — Counterparties (clients and suppliers) CRUD ✓
 CAT-003 — Cost centers and fiscal periods ✓
 
-### Sprint 4 — Financial core (in progress)
+### Sprint 4 — Financial core ✓
 
 MOV-001 — Financial movements CRUD ✓
 CASH-001 — Bank accounts, opening balances and commitments ✓
 MOV-002 — Bulk import movements from CSV/Excel ✓
 DASH-001 — Main financial dashboard with KPIs ✓
+DASH-002 — Movements frontend screens ✓
+DASH-003 — Fix movements infinite re-render ✓
+CASH-002 — Cashflow frontend screen ✓
+
+## Current sprint
+
+Sprint 5 — Dashboard, alerts and reports
+
+### Sprint 5 (in progress)
+
+DASH-004 — Enhanced dashboard with charts and period selector ✓
 
 ## Current ticket
 
-DASH-002 — Movements and cashflow frontend screens
+ALR-001 — Alerts frontend screen and backend rules

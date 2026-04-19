@@ -69,6 +69,12 @@ interface DashboardData {
     category: { name: string; color: string };
     counterparty?: { name: string };
   }[];
+  alerts: {
+    critical: number;
+    warning: number;
+    info: number;
+    items: { id: string; severity: string; title: string; message: string }[];
+  };
 }
 
 function KpiCard({
@@ -185,6 +191,27 @@ export default function DashboardPage() {
         </div>
         <PeriodSelector value={periodId} onChange={setPeriodId} />
       </div>
+
+      {/* Critical alert banner */}
+      {data && data.alerts.critical > 0 && (
+        <Link
+          href="/alertas"
+          className="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3 hover:bg-red-100 transition"
+        >
+          <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-800">
+              {data.alerts.critical} alerta{data.alerts.critical > 1 ? 's' : ''} crítica
+              {data.alerts.critical > 1 ? 's' : ''}
+            </p>
+            <p className="text-xs text-red-600">
+              {data.alerts.items.find((a) => a.severity === 'CRITICAL')?.title ||
+                'Requiere atención inmediata'}
+            </p>
+          </div>
+          <span className="text-xs text-red-500">Ver alertas →</span>
+        </Link>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
