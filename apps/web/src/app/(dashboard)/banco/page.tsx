@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Landmark, RefreshCw, Plus, ChevronDown, ChevronUp, History } from 'lucide-react';
+import Link from 'next/link';
+import { Landmark, RefreshCw, Plus, ChevronDown, ChevronUp, History, FileUp } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../lib/formatters';
 import { Toast } from '../../../components/shared/Toast';
@@ -222,12 +223,22 @@ export default function BancoPage() {
 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Conexiones Bancarias</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus size={16} /> Nueva Conexión
-        </button>
+        <div className="flex items-center gap-2">
+          {connections.length > 0 && (
+            <Link
+              href="/banco/cartola"
+              className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-700"
+            >
+              <FileUp size={16} /> Importar Cartola
+            </Link>
+          )}
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus size={16} /> Nueva Conexión
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -472,7 +483,7 @@ export default function BancoPage() {
                                 className={`px-4 py-2 text-right font-semibold ${m.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}
                               >
                                 {m.type === 'CREDIT' ? '+' : '-'}
-                                {formatCLP(m.amount)}
+                                {formatCLP(Math.abs(Number(m.amount)))}
                               </td>
                               <td className="px-4 py-2 text-center">
                                 <span
