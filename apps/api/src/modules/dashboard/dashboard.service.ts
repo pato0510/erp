@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { MovementStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AlertsService } from '../alerts/alerts.service';
+import { TaxService } from '../tax/tax.service';
 
 @Injectable()
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly alertsService: AlertsService,
+    private readonly taxService: TaxService,
   ) {}
 
   async getDashboardData(companyId: string, fiscalPeriodId?: string) {
@@ -193,6 +195,17 @@ export class DashboardService {
       },
       recentMovements,
       alerts: await this.getAlertSummary(companyId),
+      tax: await this.getTaxSummary(companyId, periodId),
+    };
+  }
+
+  private async getTaxSummary(companyId: string, fiscalPeriodId: string) {
+    const summary = await this.taxService.getSummary(companyId, fiscalPeriodId);
+    return {
+      emitidosTotal: summary.emitidos.total,
+      recibidosTotal: summary.recibidos.total,
+      balance: summary.balance,
+      pendingReconciliation: summary.pendingReconciliation,
     };
   }
 

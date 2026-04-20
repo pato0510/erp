@@ -183,22 +183,27 @@ DASH-004 — Enhanced dashboard with charts and period selector ✓
 ALR-001 — Alerts system with rules and frontend screen ✓
 REP-001 — Excel export and reports ✓
 
-### Sprint 6 — Banking integration (in progress)
+### Sprint 6 — Banking integration ✓
 
 BNK-001 — Banking adapter with mock provider ✓
 BNK-002 — Automatic sync with BullMQ and sync history ✓
+BNK-003 — Manual cartola import as fallback ✓
+
+### Sprint 7 — SII integration and reconciliation (in progress)
+
+TAX-001 — SII/fiscal integration model and sync with mock provider ✓
 
 ## Current sprint
 
-Sprint 6 — Banking integration
+Sprint 7 — SII integration and reconciliation
 
 ## Current ticket
 
-BNK-003 — Manual cartola import as fallback
+REC-001 — Reconciliation (next)
 
-## Next tickets after BNK-003
+## Next tickets
 
-- Sprint 7: TAX-001 (SII integration), REC-001 (reconciliation)
+- Sprint 7: REC-001 (reconciliation)
 - Sprint 8: CLS-001 (monthly closing), hardening
 
 ## Architecture reminders

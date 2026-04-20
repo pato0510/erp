@@ -19,6 +19,7 @@ import { IamModule } from '../modules/iam/iam.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
 import { MovementsModule } from '../modules/movements/movements.module';
 import { ReportsModule } from '../modules/reports/reports.module';
+import { TaxModule } from '../modules/tax/tax.module';
 import { TenancyModule } from '../modules/tenancy/tenancy.module';
 
 @Module({
@@ -40,6 +41,7 @@ import { TenancyModule } from '../modules/tenancy/tenancy.module';
     JobsModule,
     MovementsModule,
     ReportsModule,
+    TaxModule,
     TenancyModule,
   ],
   controllers: [AppController],
