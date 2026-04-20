@@ -159,11 +159,10 @@ Sprint 8 — Monthly closing and hardening
 
 ## Current ticket
 
-CLS-001 — Monthly closing process
+SEC-001 — Security hardening and production checklist
 
-## Next tickets
+## Completed tickets (add to Sprint 8 section)
 
-- CLS-001 — Monthly closing (in progress)
-- SEC-001 — Security hardening
-- QA-001 — Critical test suite
-- REL-001 — Production go-live checklist
+### Sprint 8 — Hardening (in progress)
+
+CLS-001 — Monthly closing process ✓

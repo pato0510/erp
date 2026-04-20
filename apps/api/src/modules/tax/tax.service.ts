@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DocumentDirection, DocumentType, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SiiProviderFactory } from './providers/sii-provider.factory';
@@ -6,6 +6,14 @@ import { TaxDocumentResult } from './providers/sii-provider.interface';
 import { paginate } from '@erp/utils';
 
 const DEFAULT_PROVIDER = 'mock-sii';
+
+const EMPTY_SUMMARY = {
+  emitidos: { count: 0, netTotal: 0, taxTotal: 0, total: 0 },
+  recibidos: { count: 0, netTotal: 0, taxTotal: 0, total: 0 },
+  balance: 0,
+  pendingReconciliation: 0,
+  lastSync: { emitidos: null as Date | null, recibidos: null as Date | null },
+};
 
 export interface TaxFilterOptions {
   direction?: DocumentDirection;
@@ -21,6 +29,8 @@ export interface TaxFilterOptions {
 
 @Injectable()
 export class TaxService {
+  private readonly logger = new Logger(TaxService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly providerFactory: SiiProviderFactory,
@@ -150,57 +160,84 @@ export class TaxService {
   }
 
   async getSummary(companyId: string, fiscalPeriodId?: string) {
+    // If a specific period was requested, verify it belongs to this company.
+    // A stale/invalid id shouldn't take down the dashboard — we degrade to the
+    // company-wide summary instead.
+    let effectivePeriodId = fiscalPeriodId;
+    if (effectivePeriodId) {
+      const period = await this.prisma.fiscalPeriod
+        .findFirst({
+          where: { id: effectivePeriodId, companyId },
+          select: { id: true },
+        })
+        .catch(() => null);
+      if (!period) {
+        this.logger.warn(
+          `getSummary: fiscalPeriodId ${effectivePeriodId} not found for company ${companyId}; returning company-wide summary`,
+        );
+        effectivePeriodId = undefined;
+      }
+    }
+
     const baseWhere: Prisma.TaxDocumentWhereInput = { companyId };
-    if (fiscalPeriodId) baseWhere.fiscalPeriodId = fiscalPeriodId;
+    if (effectivePeriodId) baseWhere.fiscalPeriodId = effectivePeriodId;
 
-    const [emitidosAgg, recibidosAgg, pendingCount, lastEmitidoSync, lastRecibidoSync] =
-      await Promise.all([
-        this.prisma.taxDocument.aggregate({
-          where: { ...baseWhere, direction: 'EMITIDO' },
-          _count: true,
-          _sum: { netAmount: true, taxAmount: true, totalAmount: true },
-        }),
-        this.prisma.taxDocument.aggregate({
-          where: { ...baseWhere, direction: 'RECIBIDO' },
-          _count: true,
-          _sum: { netAmount: true, taxAmount: true, totalAmount: true },
-        }),
-        this.prisma.taxDocument.count({ where: { ...baseWhere, isReconciled: false } }),
-        this.prisma.taxSyncRun.findFirst({
-          where: { companyId, direction: 'EMITIDO', status: 'SUCCESS' },
-          orderBy: { completedAt: 'desc' },
-          select: { completedAt: true },
-        }),
-        this.prisma.taxSyncRun.findFirst({
-          where: { companyId, direction: 'RECIBIDO', status: 'SUCCESS' },
-          orderBy: { completedAt: 'desc' },
-          select: { completedAt: true },
-        }),
-      ]);
+    try {
+      const [emitidosAgg, recibidosAgg, pendingCount, lastEmitidoSync, lastRecibidoSync] =
+        await Promise.all([
+          this.prisma.taxDocument.aggregate({
+            where: { ...baseWhere, direction: 'EMITIDO' },
+            _count: true,
+            _sum: { netAmount: true, taxAmount: true, totalAmount: true },
+          }),
+          this.prisma.taxDocument.aggregate({
+            where: { ...baseWhere, direction: 'RECIBIDO' },
+            _count: true,
+            _sum: { netAmount: true, taxAmount: true, totalAmount: true },
+          }),
+          this.prisma.taxDocument.count({ where: { ...baseWhere, isReconciled: false } }),
+          this.prisma.taxSyncRun.findFirst({
+            where: { companyId, direction: 'EMITIDO', status: 'SUCCESS' },
+            orderBy: { completedAt: 'desc' },
+            select: { completedAt: true },
+          }),
+          this.prisma.taxSyncRun.findFirst({
+            where: { companyId, direction: 'RECIBIDO', status: 'SUCCESS' },
+            orderBy: { completedAt: 'desc' },
+            select: { completedAt: true },
+          }),
+        ]);
 
-    const emitidosTotal = Number(emitidosAgg._sum.totalAmount ?? 0);
-    const recibidosTotal = Number(recibidosAgg._sum.totalAmount ?? 0);
+      const emitidosTotal = Number(emitidosAgg._sum.totalAmount ?? 0);
+      const recibidosTotal = Number(recibidosAgg._sum.totalAmount ?? 0);
 
-    return {
-      emitidos: {
-        count: emitidosAgg._count,
-        netTotal: Number(emitidosAgg._sum.netAmount ?? 0),
-        taxTotal: Number(emitidosAgg._sum.taxAmount ?? 0),
-        total: emitidosTotal,
-      },
-      recibidos: {
-        count: recibidosAgg._count,
-        netTotal: Number(recibidosAgg._sum.netAmount ?? 0),
-        taxTotal: Number(recibidosAgg._sum.taxAmount ?? 0),
-        total: recibidosTotal,
-      },
-      balance: emitidosTotal - recibidosTotal,
-      pendingReconciliation: pendingCount,
-      lastSync: {
-        emitidos: lastEmitidoSync?.completedAt ?? null,
-        recibidos: lastRecibidoSync?.completedAt ?? null,
-      },
-    };
+      return {
+        emitidos: {
+          count: emitidosAgg._count ?? 0,
+          netTotal: Number(emitidosAgg._sum.netAmount ?? 0),
+          taxTotal: Number(emitidosAgg._sum.taxAmount ?? 0),
+          total: emitidosTotal,
+        },
+        recibidos: {
+          count: recibidosAgg._count ?? 0,
+          netTotal: Number(recibidosAgg._sum.netAmount ?? 0),
+          taxTotal: Number(recibidosAgg._sum.taxAmount ?? 0),
+          total: recibidosTotal,
+        },
+        balance: emitidosTotal - recibidosTotal,
+        pendingReconciliation: pendingCount,
+        lastSync: {
+          emitidos: lastEmitidoSync?.completedAt ?? null,
+          recibidos: lastRecibidoSync?.completedAt ?? null,
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `getSummary failed for company ${companyId}: ${err instanceof Error ? err.message : err}`,
+      );
+      // Return a safe empty summary rather than crashing the caller (dashboard).
+      return { ...EMPTY_SUMMARY };
+    }
   }
 
   private async upsertDocument(
