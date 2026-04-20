@@ -188,7 +188,8 @@ REP-001 — Excel export and reports ✓
 ### Sprint 6 — Banking integration (in progress)
 
 BNK-001 — Banking adapter with mock provider ✓
+BNK-002 — Automatic sync with BullMQ jobs and sync history ✓
 
 ## Current ticket
 
-BNK-002 — Automatic sync with BullMQ jobs and sync history screen
+BNK-003 — Manual cartola import as fallback
