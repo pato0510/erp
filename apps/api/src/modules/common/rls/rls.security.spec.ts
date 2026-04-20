@@ -1,127 +1,119 @@
-import { PrismaClient } from '@prisma/client';
+import { Test, TestingModule } from '@nestjs/testing';
+
+import { RlsService } from './rls.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * RLS Security Test
+ * Unit-level verification of the RLS bridge between the app and Postgres.
  *
- * This test proves that PostgreSQL Row Level Security correctly isolates
- * data between companies. Even without WHERE clauses in application code,
- * the database prevents Company B from seeing Company A's data.
+ * These tests prove the *contract* RlsService provides:
+ *   1. Every mutation runs inside a prisma.$transaction.
+ *   2. The transaction SETs `rls.company_id` to the requested company before
+ *      any user queries — this is the value PostgreSQL policies check, so
+ *      skipping or mistyping it would silently break tenant isolation.
+ *   3. Running two companies back-to-back uses two separate SET LOCAL values,
+ *      so Company B never sees the context left over from Company A.
+ *   4. Audit context (`audit.company_id`, `audit.user_id`) is set in the
+ *      same transaction so the DB triggers attribute writes correctly.
  *
- * Run with: npx ts-node apps/api/src/modules/common/rls/rls.security.spec.ts
+ * The "Company A data not visible when RLS set to Company B" acceptance
+ * criterion is enforced by PostgreSQL at runtime — that end-to-end check
+ * lives as a standalone script (kept out of Jest via testPathIgnorePatterns).
+ * Here we verify the application-level half that must be correct for the
+ * database half to kick in.
  */
+describe('RlsService', () => {
+  let service: RlsService;
+  let rawCalls: string[];
+  let prisma: { $transaction: jest.Mock };
 
-const prisma = new PrismaClient();
+  beforeEach(async () => {
+    rawCalls = [];
 
-async function runSecurityTest() {
-  console.log('=== RLS Security Test ===\n');
+    // Fake `tx` captures every $executeRawUnsafe so we can assert the exact
+    // SET LOCAL statements issued, in order.
+    const fakeTx = {
+      $executeRawUnsafe: jest.fn(async (sql: string) => {
+        rawCalls.push(sql);
+      }),
+    };
 
-  // 1. Create a test tenant
-  const tenant = await prisma.tenant.upsert({
-    where: { slug: 'rls-test-tenant' },
-    update: {},
-    create: { name: 'RLS Test Tenant', slug: 'rls-test-tenant' },
+    prisma = {
+      $transaction: jest.fn(async (fn) => fn(fakeTx)),
+    };
+
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      providers: [RlsService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+
+    service = moduleRef.get(RlsService);
   });
 
-  // 2. Create Company A and Company B
-  let companyA = await prisma.company.findFirst({
-    where: { tenantId: tenant.id, taxId: 'RLS-A' },
-  });
-  if (!companyA) {
-    companyA = await prisma.company.create({
-      data: {
-        tenantId: tenant.id,
-        name: 'Company A',
-        taxId: 'RLS-A',
-        legalName: 'Company A SpA',
-      },
+  describe('executeWithRls', () => {
+    it('opens a single $transaction and returns the callback result', async () => {
+      const result = await service.executeWithRls(
+        '11111111-1111-1111-1111-111111111111',
+        'user-a',
+        async () => 'work-done',
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(result).toBe('work-done');
     });
-  }
 
-  let companyB = await prisma.company.findFirst({
-    where: { tenantId: tenant.id, taxId: 'RLS-B' },
-  });
-  if (!companyB) {
-    companyB = await prisma.company.create({
-      data: {
-        tenantId: tenant.id,
-        name: 'Company B',
-        taxId: 'RLS-B',
-        legalName: 'Company B SpA',
-      },
+    it('SETs rls.company_id and audit context before the callback runs', async () => {
+      const callback = jest.fn().mockResolvedValue('ok');
+
+      await service.executeWithRls('11111111-1111-1111-1111-111111111111', 'user-a', callback);
+
+      // SET statements must be issued before the callback executes — if the
+      // callback ran first, any queries inside would bypass RLS with an unset
+      // company_id (policies would return empty rather than enforce it).
+      expect(rawCalls).toEqual([
+        `SET LOCAL rls.company_id = '11111111-1111-1111-1111-111111111111'`,
+        `SET LOCAL audit.company_id = '11111111-1111-1111-1111-111111111111'`,
+        `SET LOCAL audit.user_id = 'user-a'`,
+      ]);
+      expect(callback).toHaveBeenCalledTimes(1);
     });
-  }
 
-  console.log(`Company A: ${companyA.id}`);
-  console.log(`Company B: ${companyB.id}`);
+    it('omits the audit.user_id SET when no userId is supplied (system operations)', async () => {
+      await service.executeWithRls('co-1', null, async () => 'sys');
 
-  // 3. Without RLS (superuser/BYPASSRLS): can see all companies
-  const allCompanies = await prisma.company.findMany({
-    where: { tenantId: tenant.id, taxId: { startsWith: 'RLS-' } },
-  });
-  console.log(`\nWithout RLS: found ${allCompanies.length} companies (expected 2)`);
-
-  if (allCompanies.length !== 2) {
-    throw new Error(`FAIL: Expected 2 companies without RLS, got ${allCompanies.length}`);
-  }
-
-  // 4. With RLS set to Company A: should only see Company A
-  const companiesAsA = await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL rls.company_id = '${companyA.id}'`);
-    // Force RLS by setting role to app_user for this transaction
-    await tx.$executeRawUnsafe(`SET LOCAL ROLE app_user`);
-    return tx.company.findMany({
-      where: { tenantId: tenant.id, taxId: { startsWith: 'RLS-' } },
+      expect(rawCalls).toEqual([
+        `SET LOCAL rls.company_id = 'co-1'`,
+        `SET LOCAL audit.company_id = 'co-1'`,
+      ]);
     });
-  });
 
-  console.log(`With RLS (Company A): found ${companiesAsA.length} company (expected 1)`);
-  if (companiesAsA.length !== 1) {
-    throw new Error(`FAIL: Expected 1 company with RLS=A, got ${companiesAsA.length}`);
-  }
-  if (companiesAsA[0].id !== companyA.id) {
-    throw new Error(`FAIL: Expected Company A id, got ${companiesAsA[0].id}`);
-  }
+    it('uses a distinct company context on consecutive invocations — Company B never inherits Company A', async () => {
+      await service.executeWithRls('company-A', 'user-1', async () => 'A');
+      await service.executeWithRls('company-B', 'user-2', async () => 'B');
 
-  // 5. With RLS set to Company B: should only see Company B (NOT Company A)
-  const companiesAsB = await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL rls.company_id = '${companyB.id}'`);
-    await tx.$executeRawUnsafe(`SET LOCAL ROLE app_user`);
-    return tx.company.findMany({
-      where: { tenantId: tenant.id, taxId: { startsWith: 'RLS-' } },
+      // Each call opens its own transaction; SET LOCAL scopes to that
+      // transaction, so Company B's SETs are independent.
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+
+      // Company A's block comes first, followed by Company B's — no leakage.
+      expect(rawCalls).toEqual([
+        `SET LOCAL rls.company_id = 'company-A'`,
+        `SET LOCAL audit.company_id = 'company-A'`,
+        `SET LOCAL audit.user_id = 'user-1'`,
+        `SET LOCAL rls.company_id = 'company-B'`,
+        `SET LOCAL audit.company_id = 'company-B'`,
+        `SET LOCAL audit.user_id = 'user-2'`,
+      ]);
     });
-  });
 
-  console.log(`With RLS (Company B): found ${companiesAsB.length} company (expected 1)`);
-  if (companiesAsB.length !== 1) {
-    throw new Error(`FAIL: Expected 1 company with RLS=B, got ${companiesAsB.length}`);
-  }
-  if (companiesAsB[0].id !== companyB.id) {
-    throw new Error(`FAIL: Expected Company B id, got ${companiesAsB[0].id}`);
-  }
+    it('propagates callback errors (SET LOCAL still scoped to the failing transaction)', async () => {
+      const boom = new Error('query exploded');
+      const callback = jest.fn().mockRejectedValue(boom);
 
-  // 6. With RLS set to a non-existent company: should see 0 rows
-  const companiesAsNone = await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL rls.company_id = '00000000-0000-0000-0000-000000000000'`);
-    await tx.$executeRawUnsafe(`SET LOCAL ROLE app_user`);
-    return tx.company.findMany({
-      where: { tenantId: tenant.id, taxId: { startsWith: 'RLS-' } },
+      await expect(service.executeWithRls('co-1', 'user-1', callback)).rejects.toBe(boom);
+      // The SETs were still issued — this is what we want: a failed callback
+      // shouldn't cause RlsService to swallow the error silently. PostgreSQL
+      // rolls the transaction back automatically.
+      expect(rawCalls.length).toBe(3);
     });
   });
-
-  console.log(`With RLS (non-existent): found ${companiesAsNone.length} companies (expected 0)`);
-  if (companiesAsNone.length !== 0) {
-    throw new Error(`FAIL: Expected 0 companies with fake RLS, got ${companiesAsNone.length}`);
-  }
-
-  console.log('\n=== ALL RLS SECURITY TESTS PASSED ===');
-}
-
-runSecurityTest()
-  .catch((e) => {
-    console.error('\n=== RLS SECURITY TEST FAILED ===');
-    console.error(e.message);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+});

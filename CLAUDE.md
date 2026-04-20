@@ -161,7 +161,8 @@ Sprint 8 — Hardening and production ready
 
 CLS-001 — Monthly closing process ✓
 FIX-001 — Dashboard error isolation and tax summary fix ✓
+SEC-001 — Security hardening and rate limiting ✓
 
 ## Current ticket
 
-SEC-001 — Security hardening and rate limiting
+QA-001 — Critical test suite

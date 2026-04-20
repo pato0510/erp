@@ -31,11 +31,19 @@ async function main() {
   }
   console.log(`Company: ${company.name} (${company.id})`);
 
-  // 3. Upsert test user
+  // 3. Upsert test user — refresh passwordHash and profile on every run so
+  // re-running the seed is enough to reset credentials to the known demo
+  // password. Previously `update: {}` left stale hashes behind and looked like
+  // "login broken" even though the code was fine.
   const passwordHash = await bcrypt.hash('Admin1234!', 10);
   const user = await prisma.user.upsert({
     where: { email: 'admin@excelsia.dev' },
-    update: {},
+    update: {
+      passwordHash,
+      firstName: 'Admin',
+      lastName: 'Demo',
+      isActive: true,
+    },
     create: {
       email: 'admin@excelsia.dev',
       passwordHash,
@@ -43,7 +51,7 @@ async function main() {
       lastName: 'Demo',
     },
   });
-  console.log(`User: ${user.email} (${user.id})`);
+  console.log(`User: ${user.email} (${user.id}) — passwordHash refreshed`);
 
   // 4. Upsert company settings (Chilean defaults)
   const settings = await prisma.companySettings.upsert({

@@ -59,6 +59,19 @@
           "buildTarget": "api:build:production"
         }
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/api",
+        "command": "jest --config jest.config.ts"
+      },
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "outputs": [],
+      "metadata": {
+        "technologies": ["jest"]
+      }
     }
   },
   "tags": ["type:app", "scope:backend"]
