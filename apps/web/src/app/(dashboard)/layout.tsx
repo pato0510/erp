@@ -16,6 +16,7 @@ import {
   Bell,
   FileBarChart,
   Landmark,
+  Receipt,
 } from 'lucide-react';
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { href: '/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
   { href: '/caja', label: 'Caja', icon: Wallet },
   { href: '/banco', label: 'Banco', icon: Landmark },
+  { href: '/tributario', label: 'Tributario', icon: Receipt },
   { href: '/alertas', label: 'Alertas', icon: Bell },
   { href: '/reportes', label: 'Reportes', icon: FileBarChart },
   { href: '/categories', label: 'Categorías', icon: Tag },
