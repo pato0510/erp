@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Landmark, RefreshCw, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Landmark, RefreshCw, Plus, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../lib/formatters';
+import { Toast } from '../../../components/shared/Toast';
 
 interface Connection {
   id: string;
@@ -31,11 +32,33 @@ interface ExternalMovement {
   isReconciled: boolean;
 }
 
+interface SyncRun {
+  id: string;
+  status: string;
+  startedAt: string;
+  completedAt: string | null;
+  movementsSynced: number;
+  balancesSynced: number;
+  errorMessage: string | null;
+}
+
+interface ToastData {
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 const STATUS_BADGES: Record<string, { label: string; cls: string }> = {
   ACTIVE: { label: 'Activo', cls: 'bg-green-100 text-green-700' },
   ERROR: { label: 'Error', cls: 'bg-red-100 text-red-700' },
   PENDING: { label: 'Pendiente', cls: 'bg-yellow-100 text-yellow-700' },
   INACTIVE: { label: 'Inactivo', cls: 'bg-gray-100 text-gray-500' },
+};
+
+const SYNC_STATUS: Record<string, { label: string; cls: string }> = {
+  PENDING: { label: 'Pendiente', cls: 'bg-gray-100 text-gray-600' },
+  RUNNING: { label: 'Ejecutando', cls: 'bg-blue-100 text-blue-700' },
+  SUCCESS: { label: 'Exitoso', cls: 'bg-green-100 text-green-700' },
+  FAILED: { label: 'Fallido', cls: 'bg-red-100 text-red-700' },
 };
 
 export default function BancoPage() {
@@ -44,10 +67,12 @@ export default function BancoPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
   const [movements, setMovements] = useState<ExternalMovement[]>([]);
-  const [isSyncing, setIsSyncing] = useState<string | null>(null);
+  const [syncHistory, setSyncHistory] = useState<SyncRun[]>([]);
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<ToastData | null>(null);
 
-  // Form state
   const [formAccountId, setFormAccountId] = useState('');
   const [formProviderId, setFormProviderId] = useState('MOCK-001');
   const [isCreating, setIsCreating] = useState(false);
@@ -64,7 +89,7 @@ export default function BancoPage() {
       setConnections(conns);
       setAccounts(accts);
     } catch {
-      // handled
+      /* handled */
     } finally {
       setIsLoading(false);
     }
@@ -73,8 +98,60 @@ export default function BancoPage() {
   useEffect(() => {
     load();
   }, [load]);
-
   reloadRef.current = load;
+
+  const pollJob = useCallback(async (jobId: string, connId: string, type: string) => {
+    const key = `${connId}-${type}`;
+    setSyncingIds((s) => new Set(s).add(key));
+
+    const poll = async () => {
+      try {
+        const status = await apiClient.get<{
+          status: string;
+          result: unknown;
+          failedReason?: string;
+        }>(`/api/banking/jobs/${jobId}/status`);
+        if (status.status === 'completed') {
+          setSyncingIds((s) => {
+            const n = new Set(s);
+            n.delete(key);
+            return n;
+          });
+          setToast({
+            message: `Sincronización de ${type === 'balance' ? 'saldos' : 'movimientos'} completada`,
+            type: 'success',
+          });
+          reloadRef.current?.();
+          if (type === 'movements') {
+            const res = await apiClient.get<{ data: ExternalMovement[] }>(
+              `/api/banking/connections/${connId}/movements?limit=30`,
+            );
+            setMovements(res.data);
+            setExpandedId(connId);
+          }
+          return;
+        }
+        if (status.status === 'failed') {
+          setSyncingIds((s) => {
+            const n = new Set(s);
+            n.delete(key);
+            return n;
+          });
+          setToast({ message: status.failedReason || 'Error en sincronización', type: 'error' });
+          reloadRef.current?.();
+          return;
+        }
+        setTimeout(poll, 2000);
+      } catch {
+        setSyncingIds((s) => {
+          const n = new Set(s);
+          n.delete(key);
+          return n;
+        });
+      }
+    };
+    setTimeout(poll, 1000);
+  }, []);
 
   const handleCreate = async () => {
     if (!formAccountId) return;
@@ -87,41 +164,25 @@ export default function BancoPage() {
       });
       setShowForm(false);
       setFormAccountId('');
+      setToast({ message: 'Conexión creada exitosamente', type: 'success' });
       reloadRef.current?.();
     } catch {
-      // handled
+      /* handled */
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleSyncBalance = async (id: string) => {
-    setIsSyncing(id + '-balance');
+  const handleSync = async (connId: string, type: 'balance' | 'movements') => {
     try {
-      await apiClient.post(`/api/banking/connections/${id}/sync-balance`);
-      reloadRef.current?.();
-    } catch {
-      // handled
-    } finally {
-      setIsSyncing(null);
-    }
-  };
-
-  const handleSyncMovements = async (id: string) => {
-    setIsSyncing(id + '-movements');
-    try {
-      await apiClient.post(`/api/banking/connections/${id}/sync-movements`, {});
-      // Load external movements
-      const res = await apiClient.get<{ data: ExternalMovement[] }>(
-        `/api/banking/connections/${id}/movements?limit=30`,
+      const endpoint = type === 'balance' ? 'sync-balance' : 'sync-movements';
+      const res = await apiClient.post<{ jobId: string }>(
+        `/api/banking/connections/${connId}/${endpoint}`,
+        {},
       );
-      setMovements(res.data);
-      setExpandedId(id);
-      reloadRef.current?.();
+      pollJob(res.jobId, connId, type);
     } catch {
-      // handled
-    } finally {
-      setIsSyncing(null);
+      setToast({ message: 'Error al iniciar sincronización', type: 'error' });
     }
   };
 
@@ -137,12 +198,28 @@ export default function BancoPage() {
       setMovements(res.data);
       setExpandedId(id);
     } catch {
-      // handled
+      /* handled */
+    }
+  };
+
+  const toggleHistory = async (id: string) => {
+    if (historyId === id) {
+      setHistoryId(null);
+      return;
+    }
+    try {
+      const runs = await apiClient.get<SyncRun[]>(`/api/banking/connections/${id}/sync-history`);
+      setSyncHistory(runs);
+      setHistoryId(id);
+    } catch {
+      /* handled */
     }
   };
 
   return (
     <div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Conexiones Bancarias</h1>
         <button
@@ -153,7 +230,6 @@ export default function BancoPage() {
         </button>
       </div>
 
-      {/* Add connection form */}
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6 max-w-lg space-y-4">
           <h3 className="font-semibold text-gray-900">Conectar cuenta bancaria</h3>
@@ -181,7 +257,7 @@ export default function BancoPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              ID de cuenta del proveedor
+              ID cuenta proveedor
             </label>
             <input
               type="text"
@@ -209,7 +285,6 @@ export default function BancoPage() {
         </div>
       )}
 
-      {/* Connections list */}
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2].map((i) => (
@@ -232,6 +307,9 @@ export default function BancoPage() {
           {connections.map((conn) => {
             const status = STATUS_BADGES[conn.status] || STATUS_BADGES.PENDING;
             const isExpanded = expandedId === conn.id;
+            const isHistoryOpen = historyId === conn.id;
+            const isSyncingBal = syncingIds.has(`${conn.id}-balance`);
+            const isSyncingMov = syncingIds.has(`${conn.id}-movements`);
             return (
               <div key={conn.id} className="bg-white border border-gray-200 rounded-xl shadow-sm">
                 <div className="p-5">
@@ -258,26 +336,30 @@ export default function BancoPage() {
                         {status.label}
                       </span>
                       <button
-                        onClick={() => handleSyncBalance(conn.id)}
-                        disabled={isSyncing === conn.id + '-balance'}
+                        onClick={() => handleSync(conn.id, 'balance')}
+                        disabled={isSyncingBal}
                         className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition flex items-center gap-1"
                       >
-                        <RefreshCw
-                          size={12}
-                          className={isSyncing === conn.id + '-balance' ? 'animate-spin' : ''}
-                        />
+                        <RefreshCw size={12} className={isSyncingBal ? 'animate-spin' : ''} />{' '}
                         Saldos
                       </button>
                       <button
-                        onClick={() => handleSyncMovements(conn.id)}
-                        disabled={isSyncing === conn.id + '-movements'}
+                        onClick={() => handleSync(conn.id, 'movements')}
+                        disabled={isSyncingMov}
                         className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-1"
                       >
-                        <RefreshCw
-                          size={12}
-                          className={isSyncing === conn.id + '-movements' ? 'animate-spin' : ''}
-                        />
+                        <RefreshCw size={12} className={isSyncingMov ? 'animate-spin' : ''} />{' '}
                         Movimientos
+                      </button>
+                      <button
+                        onClick={() => toggleHistory(conn.id)}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 transition"
+                        title="Historial"
+                      >
+                        <History
+                          size={16}
+                          className={isHistoryOpen ? 'text-blue-600' : 'text-gray-400'}
+                        />
                       </button>
                       <button
                         onClick={() => toggleMovements(conn.id)}
@@ -294,7 +376,67 @@ export default function BancoPage() {
                   )}
                 </div>
 
-                {/* External movements table */}
+                {/* Sync History */}
+                {isHistoryOpen && (
+                  <div className="border-t border-gray-200 bg-gray-50">
+                    <div className="px-5 py-3 flex items-center gap-2">
+                      <History size={14} className="text-gray-400" />
+                      <span className="text-xs font-medium text-gray-500">
+                        Historial de sincronización
+                      </span>
+                    </div>
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="text-left px-4 py-2 text-gray-500">Inicio</th>
+                          <th className="text-center px-4 py-2 text-gray-500">Estado</th>
+                          <th className="text-right px-4 py-2 text-gray-500">Mov. sincronizados</th>
+                          <th className="text-right px-4 py-2 text-gray-500">Duración</th>
+                          <th className="text-left px-4 py-2 text-gray-500">Error</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {syncHistory.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                              Sin historial
+                            </td>
+                          </tr>
+                        ) : (
+                          syncHistory.slice(0, 10).map((run) => {
+                            const st = SYNC_STATUS[run.status] || SYNC_STATUS.PENDING;
+                            const duration = run.completedAt
+                              ? `${Math.round((new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) / 1000)}s`
+                              : '-';
+                            return (
+                              <tr key={run.id}>
+                                <td className="px-4 py-2 text-gray-600">
+                                  {formatRelativeDate(run.startedAt)}
+                                </td>
+                                <td className="px-4 py-2 text-center">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}`}
+                                  >
+                                    {st.label}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 text-right text-gray-700">
+                                  {run.movementsSynced + run.balancesSynced}
+                                </td>
+                                <td className="px-4 py-2 text-right text-gray-500">{duration}</td>
+                                <td className="px-4 py-2 text-red-500 truncate max-w-[200px]">
+                                  {run.errorMessage || '-'}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* External movements */}
                 {isExpanded && (
                   <div className="border-t border-gray-200">
                     <table className="w-full text-sm">
@@ -311,7 +453,7 @@ export default function BancoPage() {
                         {movements.length === 0 ? (
                           <tr>
                             <td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-sm">
-                              Sin movimientos. Presiona &ldquo;Movimientos&rdquo; para sincronizar.
+                              Sin movimientos. Sincroniza para ver datos.
                             </td>
                           </tr>
                         ) : (

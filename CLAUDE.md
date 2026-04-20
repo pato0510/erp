@@ -185,8 +185,10 @@ REP-001 — Excel export and reports ✓
 
 ## Current sprint
 
-Sprint 6 — Banking integration
+### Sprint 6 — Banking integration (in progress)
+
+BNK-001 — Banking adapter with mock provider ✓
 
 ## Current ticket
 
-BNK-001 — Banking adapter design and bank connection model
+BNK-002 — Automatic sync with BullMQ jobs and sync history screen
