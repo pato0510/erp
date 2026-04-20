@@ -1,0 +1,34 @@
+enum ReconciliationStatus {
+  PENDING
+  AUTO_MATCHED
+  SUGGESTED
+  CONFIRMED
+  REJECTED
+  MANUAL
+}
+
+model ReconciliationMatch {
+  id                  String               @id @default(uuid()) @db.Uuid
+  companyId           String               @db.Uuid
+  fiscalPeriodId      String?              @db.Uuid
+  status              ReconciliationStatus @default(PENDING)
+  confidenceScore     Decimal?             @db.Decimal(5, 4)
+
+  externalMovementId  String?              @db.Uuid
+  taxDocumentId       String?              @db.Uuid
+  movementId          String?              @db.Uuid
+
+  matchType           String
+  amountDifference    Decimal?             @db.Decimal(18, 2)
+  notes               String?
+
+  confirmedBy         String?              @db.Uuid
+  confirmedAt         DateTime?
+  rejectedBy          String?              @db.Uuid
+  rejectedAt          DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([companyId, fiscalPeriodId, status])
+  @@map("reconciliation_matches")
+}

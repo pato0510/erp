@@ -139,6 +139,16 @@ Criterios de aceptación:
 - DON'T USE for: basic generator syntax (`nx g @nx/react:app`), standard commands, things you already know
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
+## Architecture reminders
+
+- JWT in HttpOnly cookies ALWAYS
+- RLS active on all financial tables
+- Every new table needs: RLS policy + audit trigger + GRANT to app_user
+- Use RlsService.executeWithRls(companyId, userId, fn) for mutations
+- Stable useEffect pattern in frontend (primitive deps, no object state)
+- All amounts use formatCLP() from lib/formatters.ts
+- Decimal values from Prisma come as strings — use Number() before arithmetic
+
 ## Completed tickets
 
 ### Sprint 1 — Base platform ✓
@@ -189,29 +199,18 @@ BNK-001 — Banking adapter with mock provider ✓
 BNK-002 — Automatic sync with BullMQ and sync history ✓
 BNK-003 — Manual cartola import as fallback ✓
 
-### Sprint 7 — SII integration and reconciliation (in progress)
+### Sprint 7 — Tax and reconciliation (in progress)
 
-TAX-001 — SII/fiscal integration model and sync with mock provider ✓
+TAX-001 — SII integration with mock provider ✓
 
 ## Current sprint
 
-Sprint 7 — SII integration and reconciliation
+Sprint 7 — Tax and reconciliation
 
 ## Current ticket
 
-REC-001 — Reconciliation (next)
+REC-001 — Reconciliation engine: exact matching and workbench
 
 ## Next tickets
 
-- Sprint 7: REC-001 (reconciliation)
 - Sprint 8: CLS-001 (monthly closing), hardening
-
-## Architecture reminders
-
-- JWT in HttpOnly cookies ALWAYS
-- RLS active on all financial tables
-- Every new table needs: RLS policy + audit trigger + GRANT to app_user
-- Use RlsService.executeWithRls(companyId, userId, fn) for mutations
-- Stable useEffect pattern in frontend (primitive deps, no object state)
-- All amounts use formatCLP() from lib/formatters.ts
-- Decimal values from Prisma come as strings — use Number() before arithmetic

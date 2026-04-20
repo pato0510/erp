@@ -17,6 +17,7 @@ import {
   FileBarChart,
   Landmark,
   Receipt,
+  GitMerge,
 } from 'lucide-react';
 
 const navItems = [
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/caja', label: 'Caja', icon: Wallet },
   { href: '/banco', label: 'Banco', icon: Landmark },
   { href: '/tributario', label: 'Tributario', icon: Receipt },
+  { href: '/conciliacion', label: 'Conciliación', icon: GitMerge },
   { href: '/alertas', label: 'Alertas', icon: Bell },
   { href: '/reportes', label: 'Reportes', icon: FileBarChart },
   { href: '/categories', label: 'Categorías', icon: Tag },

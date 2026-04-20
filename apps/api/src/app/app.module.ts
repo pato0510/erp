@@ -18,6 +18,7 @@ import { CompaniesModule } from '../modules/companies/companies.module';
 import { IamModule } from '../modules/iam/iam.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
 import { MovementsModule } from '../modules/movements/movements.module';
+import { ReconciliationModule } from '../modules/reconciliation/reconciliation.module';
 import { ReportsModule } from '../modules/reports/reports.module';
 import { TaxModule } from '../modules/tax/tax.module';
 import { TenancyModule } from '../modules/tenancy/tenancy.module';
@@ -40,6 +41,7 @@ import { TenancyModule } from '../modules/tenancy/tenancy.module';
     IamModule,
     JobsModule,
     MovementsModule,
+    ReconciliationModule,
     ReportsModule,
     TaxModule,
     TenancyModule,
