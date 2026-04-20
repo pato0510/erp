@@ -15,12 +15,14 @@ import {
   LogOut,
   Bell,
   FileBarChart,
+  Landmark,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
   { href: '/caja', label: 'Caja', icon: Wallet },
+  { href: '/banco', label: 'Banco', icon: Landmark },
   { href: '/alertas', label: 'Alertas', icon: Bell },
   { href: '/reportes', label: 'Reportes', icon: FileBarChart },
   { href: '/categories', label: 'Categorías', icon: Tag },

@@ -18,7 +18,8 @@ model BankAccount {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  balances AccountBalance[]
+  balances    AccountBalance[]
+  connections BankConnection[]
 
   @@unique([companyId, accountNumber])
   @@map("bank_accounts")

@@ -1,0 +1,75 @@
+enum BankConnectionStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  PENDING
+}
+
+enum SyncStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model BankConnection {
+  id                  String               @id @default(uuid()) @db.Uuid
+  companyId           String               @db.Uuid
+  bankAccountId       String               @db.Uuid
+  provider            String
+  providerAccountId   String
+  providerCredentials Json?
+  status              BankConnectionStatus @default(PENDING)
+  lastSyncAt          DateTime?
+  lastErrorMessage    String?
+  isActive            Boolean              @default(true)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  bankAccount  BankAccount     @relation(fields: [bankAccountId], references: [id])
+  syncRuns     BankSyncRun[]
+  movements    ExternalBankMovement[]
+
+  @@map("bank_connections")
+}
+
+model BankSyncRun {
+  id               String     @id @default(uuid()) @db.Uuid
+  companyId        String     @db.Uuid
+  bankConnectionId String     @db.Uuid
+  status           SyncStatus @default(PENDING)
+  provider         String
+  startedAt        DateTime   @default(now())
+  completedAt      DateTime?
+  balancesSynced   Int        @default(0)
+  movementsSynced  Int        @default(0)
+  errorMessage     String?
+  rawResponse      Json?
+  createdAt        DateTime   @default(now())
+
+  bankConnection BankConnection @relation(fields: [bankConnectionId], references: [id])
+
+  @@map("bank_sync_runs")
+}
+
+model ExternalBankMovement {
+  id               String   @id @default(uuid()) @db.Uuid
+  companyId        String   @db.Uuid
+  bankConnectionId String   @db.Uuid
+  externalId       String
+  date             DateTime @db.Date
+  description      String
+  amount           Decimal  @db.Decimal(18, 2)
+  currency         String   @default("CLP")
+  type             String // CREDIT or DEBIT
+  balance          Decimal? @db.Decimal(18, 2)
+  metadata         Json?
+  movementId       String?  @db.Uuid
+  isReconciled     Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  bankConnection BankConnection @relation(fields: [bankConnectionId], references: [id])
+
+  @@unique([bankConnectionId, externalId])
+  @@map("external_bank_movements")
+}

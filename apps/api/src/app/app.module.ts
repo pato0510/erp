@@ -9,6 +9,7 @@ import { StorageModule } from '../modules/common/storage/storage.module';
 import { TenantMiddleware } from '../modules/common/rls/rls.middleware';
 import { AlertsModule } from '../modules/alerts/alerts.module';
 import { AuditModule } from '../modules/audit/audit.module';
+import { BankingModule } from '../modules/banking/banking.module';
 import { CashflowModule } from '../modules/cashflow/cashflow.module';
 import { DashboardModule } from '../modules/dashboard/dashboard.module';
 import { CatalogsModule } from '../modules/catalogs/catalogs.module';
@@ -28,6 +29,7 @@ import { TenancyModule } from '../modules/tenancy/tenancy.module';
     StorageModule,
     AlertsModule,
     AuditModule,
+    BankingModule,
     CashflowModule,
     DashboardModule,
     CatalogsModule,

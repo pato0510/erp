@@ -177,15 +177,16 @@ DASH-002 — Movements frontend screens ✓
 DASH-003 — Fix movements infinite re-render ✓
 CASH-002 — Cashflow frontend screen ✓
 
-## Current sprint
-
-Sprint 5 — Dashboard, alerts and reports
-
-### Sprint 5 — Dashboard, alerts and reports (in progress)
+### Sprint 5 — Dashboard, alerts and reports ✓
 
 DASH-004 — Enhanced dashboard with charts and period selector ✓
 ALR-001 — Alerts system with rules and frontend screen ✓
+REP-001 — Excel export and reports ✓
+
+## Current sprint
+
+Sprint 6 — Banking integration
 
 ## Current ticket
 
-REP-001 — Excel export and reports
+BNK-001 — Banking adapter design and bank connection model
