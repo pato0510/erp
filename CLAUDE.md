@@ -195,11 +195,11 @@ Sprint 7 — SII integration and reconciliation
 
 ## Current ticket
 
-TAX-001 — SII integration (next)
+TAX-001 — SII/fiscal integration model and sync with mock provider
 
 ## Next tickets
 
-- Sprint 7: TAX-001 (SII integration), REC-001 (reconciliation)
+- Sprint 7: REC-001 (reconciliation)
 - Sprint 8: CLS-001 (monthly closing), hardening
 
 ## Architecture reminders
