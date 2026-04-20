@@ -100,6 +100,7 @@ export class MovementsService {
     if (movement.status !== MovementStatus.DRAFT) {
       throw new BadRequestException('Only DRAFT movements can be edited');
     }
+    await this.assertPeriodOpen(movement.fiscalPeriodId);
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.movement.update({
@@ -120,6 +121,7 @@ export class MovementsService {
     if (movement.status !== MovementStatus.DRAFT) {
       throw new BadRequestException('Only DRAFT movements can be confirmed');
     }
+    await this.assertPeriodOpen(movement.fiscalPeriodId);
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.movement.update({
@@ -144,6 +146,7 @@ export class MovementsService {
     if (movement.status === MovementStatus.RECONCILED) {
       throw new BadRequestException('Reconciled movements cannot be cancelled');
     }
+    await this.assertPeriodOpen(movement.fiscalPeriodId);
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.movement.update({
@@ -191,5 +194,18 @@ export class MovementsService {
       balance: totalIncome - totalExpense,
       fiscalPeriodId,
     };
+  }
+
+  private async assertPeriodOpen(fiscalPeriodId: string) {
+    const period = await this.prisma.fiscalPeriod.findUnique({
+      where: { id: fiscalPeriodId },
+      select: { status: true, name: true },
+    });
+    if (period?.status === 'CLOSED') {
+      throw new BadRequestException(
+        `El período "${period.name}" está cerrado y los movimientos están bloqueados. ` +
+          'Reábrelo antes de modificar cualquier movimiento.',
+      );
+    }
   }
 }

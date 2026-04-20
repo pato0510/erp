@@ -12,6 +12,7 @@ import { AlertsModule } from '../modules/alerts/alerts.module';
 import { AuditModule } from '../modules/audit/audit.module';
 import { BankingModule } from '../modules/banking/banking.module';
 import { CashflowModule } from '../modules/cashflow/cashflow.module';
+import { ClosingModule } from '../modules/closing/closing.module';
 import { DashboardModule } from '../modules/dashboard/dashboard.module';
 import { CatalogsModule } from '../modules/catalogs/catalogs.module';
 import { CompaniesModule } from '../modules/companies/companies.module';
@@ -35,6 +36,7 @@ import { TenancyModule } from '../modules/tenancy/tenancy.module';
     AuditModule,
     BankingModule,
     CashflowModule,
+    ClosingModule,
     DashboardModule,
     CatalogsModule,
     CompaniesModule,

@@ -18,6 +18,7 @@ import {
   Landmark,
   Receipt,
   GitMerge,
+  CheckSquare,
 } from 'lucide-react';
 
 const navItems = [
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/banco', label: 'Banco', icon: Landmark },
   { href: '/tributario', label: 'Tributario', icon: Receipt },
   { href: '/conciliacion', label: 'Conciliación', icon: GitMerge },
+  { href: '/cierre', label: 'Cierre', icon: CheckSquare },
   { href: '/alertas', label: 'Alertas', icon: Bell },
   { href: '/reportes', label: 'Reportes', icon: FileBarChart },
   { href: '/categories', label: 'Categorías', icon: Tag },
