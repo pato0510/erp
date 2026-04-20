@@ -145,10 +145,10 @@ Criterios de aceptación:
 
 ARC-001 — Nx monorepo base structure ✓
 ARC-002 — Docker Compose with PostgreSQL, Redis and MinIO ✓
-ARC-003 — Prisma configured with prismaSchemaFolder, first migration done ✓
-ARC-004 — Redis and BullMQ base queue configured ✓
-ARC-005 — ESLint, Prettier, Husky and Nx module boundary rules ✓
-ARC-006 — Sentry and OpenTelemetry distributed tracing ✓
+ARC-003 — Prisma configured with prismaSchemaFolder ✓
+ARC-004 — Redis and BullMQ base queue ✓
+ARC-005 — ESLint, Prettier, Husky and Nx module boundaries ✓
+ARC-006 — Sentry and distributed tracing ✓
 ARC-007 — GitHub Actions CI pipeline ✓
 
 ### Sprint 2 — Identity, security and multi-tenancy ✓
@@ -158,13 +158,13 @@ IAM-001 — JWT authentication with HttpOnly cookies ✓
 IAM-002 — Logout, session expiration and refresh token ✓
 IAM-005 — Roles and permissions with CASL ✓
 TEN-003 — PostgreSQL Row Level Security (RLS) ✓
-AUD-001 — PostgreSQL audit triggers for critical events ✓
+AUD-001 — PostgreSQL audit triggers ✓
 
 ### Sprint 3 — Configuration and catalogs ✓
 
 CFG-001 — Company configuration and financial settings ✓
 CAT-001 — Income and expense categories CRUD ✓
-CAT-002 — Counterparties (clients and suppliers) CRUD ✓
+CAT-002 — Counterparties CRUD ✓
 CAT-003 — Cost centers and fiscal periods ✓
 
 ### Sprint 4 — Financial core ✓
@@ -183,13 +183,30 @@ DASH-004 — Enhanced dashboard with charts and period selector ✓
 ALR-001 — Alerts system with rules and frontend screen ✓
 REP-001 — Excel export and reports ✓
 
-## Current sprint
-
 ### Sprint 6 — Banking integration (in progress)
 
 BNK-001 — Banking adapter with mock provider ✓
-BNK-002 — Automatic sync with BullMQ jobs and sync history ✓
+BNK-002 — Automatic sync with BullMQ and sync history ✓
+
+## Current sprint
+
+Sprint 6 — Banking integration
 
 ## Current ticket
 
 BNK-003 — Manual cartola import as fallback
+
+## Next tickets after BNK-003
+
+- Sprint 7: TAX-001 (SII integration), REC-001 (reconciliation)
+- Sprint 8: CLS-001 (monthly closing), hardening
+
+## Architecture reminders
+
+- JWT in HttpOnly cookies ALWAYS
+- RLS active on all financial tables
+- Every new table needs: RLS policy + audit trigger + GRANT to app_user
+- Use RlsService.executeWithRls(companyId, userId, fn) for mutations
+- Stable useEffect pattern in frontend (primitive deps, no object state)
+- All amounts use formatCLP() from lib/formatters.ts
+- Decimal values from Prisma come as strings — use Number() before arithmetic
