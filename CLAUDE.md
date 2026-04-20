@@ -155,14 +155,13 @@ REC-001 — Reconciliation engine with exact matching ✓
 
 ## Current sprint
 
-Sprint 8 — Monthly closing and hardening
-
-## Current ticket
-
-SEC-001 — Security hardening and production checklist
-
-## Completed tickets (add to Sprint 8 section)
+Sprint 8 — Hardening and production ready
 
 ### Sprint 8 — Hardening (in progress)
 
 CLS-001 — Monthly closing process ✓
+FIX-001 — Dashboard error isolation and tax summary fix ✓
+
+## Current ticket
+
+SEC-001 — Security hardening and rate limiting
