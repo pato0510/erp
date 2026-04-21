@@ -12,6 +12,10 @@ const nextConfig = {
   // Use this to set Nx-specific options
   // See: https://nx.dev/recipes/next/next-config-setup
   nx: {},
+  // Emit a self-contained server.js under .next/standalone so the production
+  // Docker image (infra/docker/Dockerfile.web) can run Next without shipping
+  // the full node_modules tree. Safe in dev — Next dev ignores it.
+  output: 'standalone',
 };
 
 const plugins = [

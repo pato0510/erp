@@ -153,16 +153,14 @@ BNK-003 — Manual cartola import as fallback ✓
 TAX-001 — SII integration with mock provider ✓
 REC-001 — Reconciliation engine with exact matching ✓
 
-## Current sprint
-
-Sprint 8 — Hardening and production ready
-
-### Sprint 8 — Hardening (in progress)
+### Sprint 8 — Hardening ✓
 
 CLS-001 — Monthly closing process ✓
-FIX-001 — Dashboard error isolation and tax summary fix ✓
+FIX-001 — Dashboard error isolation ✓
 SEC-001 — Security hardening and rate limiting ✓
+QA-001 — Critical test suite 31/31 passing ✓
+REL-001 — Production go-live checklist ✓
 
-## Current ticket
+## Status
 
-QA-001 — Critical test suite
+V1 COMPLETE — Ready for production
