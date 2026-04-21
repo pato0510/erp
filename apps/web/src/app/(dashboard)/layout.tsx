@@ -32,9 +32,9 @@ const navItems = [
   { href: '/cierre', label: 'Cierre', icon: CheckSquare },
   { href: '/alertas', label: 'Alertas', icon: Bell },
   { href: '/reportes', label: 'Reportes', icon: FileBarChart },
-  { href: '/categories', label: 'Categorías', icon: Tag },
-  { href: '/counterparties', label: 'Contrapartes', icon: Users },
-  { href: '/settings', label: 'Configuración', icon: Settings },
+  { href: '/categorias', label: 'Categorías', icon: Tag },
+  { href: '/contrapartes', label: 'Contrapartes', icon: Users },
+  { href: '/configuracion', label: 'Configuración', icon: Settings },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

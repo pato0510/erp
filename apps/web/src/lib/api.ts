@@ -74,6 +74,10 @@ class ApiClient {
     });
   }
 
+  delete<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: 'DELETE' });
+  }
+
   async uploadFile<T>(path: string, formData: FormData): Promise<T> {
     const headers: Record<string, string> = {};
     const companyId = this.getCompanyId();
