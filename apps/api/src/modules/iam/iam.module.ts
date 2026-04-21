@@ -4,6 +4,8 @@ import { PassportModule } from '@nestjs/passport';
 import type { StringValue } from 'ms';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { UsersController } from './users.controller';
+import { UsersService } from './users.service';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshStrategy } from './strategies/refresh.strategy';
@@ -18,8 +20,8 @@ import { RefreshStrategy } from './strategies/refresh.strategy';
       },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, RefreshStrategy],
-  exports: [AuthService],
+  controllers: [AuthController, UsersController],
+  providers: [AuthService, UsersService, LocalStrategy, JwtStrategy, RefreshStrategy],
+  exports: [AuthService, UsersService],
 })
 export class IamModule {}

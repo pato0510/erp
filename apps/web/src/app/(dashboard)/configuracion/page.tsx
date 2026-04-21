@@ -1,7 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Save, Building2, CalendarClock, Bell, Calendar } from 'lucide-react';
+import Link from 'next/link';
+import {
+  Save,
+  Building2,
+  CalendarClock,
+  Bell,
+  Calendar,
+  Users as UsersIcon,
+  ChevronRight,
+} from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { formatCLP, formatDate } from '../../../lib/formatters';
 import { Toast } from '../../../components/shared/Toast';
@@ -98,6 +107,36 @@ export default function ConfiguracionPage() {
       </nav>
 
       <div className="space-y-6">
+        <Link
+          href="/configuracion/usuarios"
+          className="block bg-white border border-gray-200 rounded-xl shadow-sm hover:border-gray-300 transition"
+        >
+          <div className="px-6 py-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-50">
+              <UsersIcon size={18} className="text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-gray-900"
+                style={{
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontWeight: 600,
+                  fontSize: 15,
+                }}
+              >
+                Gestionar usuarios
+              </p>
+              <p
+                className="text-xs text-gray-500 mt-0.5"
+                style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 300 }}
+              >
+                Crea, edita y administra los usuarios con acceso a la empresa
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-gray-400" />
+          </div>
+        </Link>
+
         <CompanySection onToast={setToast} />
         <PeriodsSection onToast={setToast} />
         <ThresholdsSection onToast={setToast} />
