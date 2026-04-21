@@ -1,22 +1,53 @@
 :root {
-  --color-dark: #1C1C1E;
-  --color-dark-secondary: #2C2C2E;
-  --color-dark-border: #3A3A3C;
-  --color-dark-text: #8E8E93;
-  --color-accent: #2563EB;
-  --color-accent-secondary: #1E3A5F;
-  --color-accent-light: #93C5FD;
-  --color-accent-muted: #64748B;
+  /* Legacy accent tokens — still consumed across the app */
+  --color-dark: #1c1c1e;
+  --color-dark-secondary: #2c2c2e;
+  --color-dark-border: #3a3a3c;
+  --color-dark-text: #8e8e93;
+  --color-accent: #2563eb;
+  --color-accent-secondary: #1e3a5f;
+  --color-accent-light: #93c5fd;
+  --color-accent-muted: #64748b;
   --color-accent-dim: rgba(37, 99, 235, 0.08);
-  --color-accent-surface: #F1F5F9;
+  --color-accent-surface: #f1f5f9;
   --color-surface: #fafafa;
   --color-border: #e8eaed;
-  --color-border-dark: #2C2C2E;
+  --color-border-dark: #2c2c2e;
   --color-text-muted: #9aa0ad;
+
+  /* Theme-aware semantic tokens — LIGHT mode */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-card: #ffffff;
+  --text-primary: #0c0f1a;
+  --text-secondary: #6b7280;
+  --text-muted: #9aa0ad;
+  --border-color: #e8eaed;
+  --input-bg: #fafafa;
+  --sidebar-bg: #1c1c1e;
+  --sidebar-text: #8e8e93;
+  --sidebar-border: #2c2c2e;
+
+  /* Typography & radii */
   --font-mono: 'JetBrains Mono', monospace;
   --font-display: 'Outfit', sans-serif;
   --font-body: 'Outfit', sans-serif;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
+}
+
+html.dark {
+  /* Theme-aware semantic tokens — DARK mode */
+  --bg-primary: #0f0f0f;
+  --bg-secondary: #1a1a1a;
+  --bg-card: #1c1c1e;
+  --text-primary: #f5f5f5;
+  --text-secondary: #a0a0a0;
+  --text-muted: #6b6b6b;
+  --border-color: #2c2c2e;
+  --input-bg: #242424;
+  --sidebar-bg: #141414;
+  --sidebar-text: #8e8e93;
+  --sidebar-border: #1c1c1e;
 }

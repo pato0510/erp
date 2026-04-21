@@ -147,7 +147,7 @@ export default function CategoriasPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 className="text-2xl text-gray-900">Categorías</h1>
+        <h1 className="text-2xl text-[var(--text-primary)]">Categorías</h1>
         <button
           onClick={() => setModal({ mode: 'create', type: tab })}
           className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full transition"
@@ -162,13 +162,13 @@ export default function CategoriasPage() {
       </div>
 
       {/* Tabs */}
-      <div className="inline-flex gap-1 bg-white border border-gray-200 rounded-lg p-1 mb-6">
+      <div className="inline-flex gap-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-1 mb-6">
         {(['INCOME', 'EXPENSE'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm rounded-md transition ${
-              tab === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'
+              tab === t ? 'bg-gray-900 text-white' : 'text-[var(--text-secondary)] hover:bg-gray-50'
             }`}
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
@@ -178,9 +178,9 @@ export default function CategoriasPage() {
       </div>
 
       {/* List */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
         {isLoading ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[var(--border-color)]">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="px-5 py-4 animate-pulse flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-gray-200" />
@@ -193,7 +193,7 @@ export default function CategoriasPage() {
         ) : categories.length === 0 ? (
           <div className="p-12 text-center">
             <Tag size={36} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-600 font-medium">
+            <p className="text-[var(--text-secondary)] font-medium">
               Aún no tienes categorías. Crea tu primera categoría.
             </p>
             <button
@@ -209,7 +209,7 @@ export default function CategoriasPage() {
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[var(--border-color)]">
             {categories.map((c) => {
               const subCount = c.children?.length ?? 0;
               return (
@@ -223,7 +223,7 @@ export default function CategoriasPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <p
-                      className="truncate text-gray-900"
+                      className="truncate text-[var(--text-primary)]"
                       style={{
                         fontFamily: 'var(--font-outfit), sans-serif',
                         fontWeight: 500,
@@ -234,7 +234,7 @@ export default function CategoriasPage() {
                     </p>
                     {c.description && (
                       <p
-                        className="truncate text-gray-400"
+                        className="truncate text-[var(--text-muted)]"
                         style={{
                           fontFamily: 'var(--font-outfit), sans-serif',
                           fontWeight: 300,
@@ -246,13 +246,13 @@ export default function CategoriasPage() {
                     )}
                   </div>
                   {subCount > 0 && (
-                    <span className="label text-[10px] text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
+                    <span className="label text-[10px] text-[var(--text-secondary)] bg-gray-100 rounded-full px-2 py-0.5">
                       {subCount} sub
                     </span>
                   )}
                   <button
                     onClick={() => setModal({ mode: 'edit', category: c })}
-                    className="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+                    className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
                     title="Editar"
                   >
                     <Pencil size={14} />
@@ -267,7 +267,7 @@ export default function CategoriasPage() {
                   </button>
                   <button
                     onClick={() => handleHardDelete(c)}
-                    className="p-2 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600 transition"
+                    className="p-2 rounded-md hover:bg-red-50 text-[var(--text-muted)] hover:text-red-600 transition"
                     title="Eliminar permanentemente"
                   >
                     <Trash2 size={14} />
@@ -340,9 +340,9 @@ function CategoryModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h3 className="text-base font-semibold text-gray-900">
+      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)]">
+          <h3 className="text-base font-semibold text-[var(--text-primary)]">
             {modal.mode === 'create' ? 'Nueva categoría' : 'Editar categoría'}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
@@ -358,7 +358,7 @@ function CategoryModal({
           {modal.mode === 'create' && (
             <FormField label="Tipo">
               <div
-                className="text-sm text-gray-600 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200"
+                className="text-sm text-[var(--text-secondary)] px-3 py-2 rounded-lg bg-gray-50 border border-[var(--border-color)]"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
               >
                 {initialType === 'INCOME' ? 'Ingreso' : 'Egreso'}
@@ -412,7 +412,7 @@ function CategoryModal({
           </FormField>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -440,12 +440,12 @@ function CategoryModal({
         .tn-textarea {
           width: 100%;
           padding: 10px 12px;
-          border: 1px solid #e8eaed;
+          border: 1px solid var(--border-color);
           border-radius: 8px;
           font-family: var(--font-outfit), sans-serif;
           font-size: 14px;
-          color: #1c1c1e;
-          background: #ffffff;
+          color: var(--text-primary);
+          background: var(--input-bg);
           outline: none;
           transition:
             border-color 120ms ease,
@@ -473,7 +473,7 @@ function FormField({
   return (
     <div>
       <label
-        className="block mb-1.5 text-gray-700"
+        className="block mb-1.5 text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500, fontSize: 13 }}
       >
         {label}

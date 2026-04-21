@@ -41,8 +41,12 @@ const TYPE_META: Record<CounterpartyType, { label: string; color: string; badgeC
   CLIENT: { label: 'Cliente', color: '#2563EB', badgeCls: 'bg-blue-50 text-blue-700' },
   SUPPLIER: { label: 'Proveedor', color: '#64748B', badgeCls: 'bg-slate-100 text-slate-700' },
   BANK: { label: 'Banco', color: '#1E3A5F', badgeCls: 'bg-indigo-50 text-indigo-800' },
-  GOVERNMENT: { label: 'Gobierno', color: '#475569', badgeCls: 'bg-gray-100 text-gray-700' },
-  OTHER: { label: 'Otro', color: '#94A3B8', badgeCls: 'bg-gray-50 text-gray-600' },
+  GOVERNMENT: {
+    label: 'Gobierno',
+    color: '#475569',
+    badgeCls: 'bg-gray-100 text-[var(--text-secondary)]',
+  },
+  OTHER: { label: 'Otro', color: '#94A3B8', badgeCls: 'bg-gray-50 text-[var(--text-secondary)]' },
 };
 
 const PAGE_SIZE = 20;
@@ -157,7 +161,7 @@ export default function ContrapartesPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 className="text-2xl text-gray-900">Contrapartes</h1>
+        <h1 className="text-2xl text-[var(--text-primary)]">Contrapartes</h1>
         <button
           onClick={() => setModal({ mode: 'create' })}
           className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
@@ -172,9 +176,12 @@ export default function ContrapartesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex flex-wrap items-center gap-3">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4 mb-6 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[220px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+          />
           <input
             type="text"
             placeholder="Buscar por nombre o RUT..."
@@ -199,8 +206,8 @@ export default function ContrapartesPage() {
               onClick={() => setTypeFilter(t.v as typeof typeFilter)}
               className={`px-3 py-1.5 text-xs rounded-md transition ${
                 typeFilter === t.v
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
               style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
             >
@@ -211,9 +218,9 @@ export default function ContrapartesPage() {
       </div>
 
       {/* List */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
         {isLoading ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[var(--border-color)]">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="px-5 py-4 animate-pulse flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gray-200" />
@@ -227,8 +234,10 @@ export default function ContrapartesPage() {
         ) : !data || data.data.length === 0 ? (
           <div className="p-12 text-center">
             <Users size={36} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-600 font-medium">No se encontraron contrapartes</p>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-[var(--text-secondary)] font-medium">
+              No se encontraron contrapartes
+            </p>
+            <p className="text-[var(--text-muted)] text-sm mt-1">
               {search || typeFilter
                 ? 'Ajusta los filtros o crea una nueva.'
                 : 'Crea tu primera contraparte.'}
@@ -247,7 +256,7 @@ export default function ContrapartesPage() {
           </div>
         ) : (
           <>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-[var(--border-color)]">
               {data.data.map((c) => {
                 const meta = TYPE_META[c.type];
                 return (
@@ -270,7 +279,7 @@ export default function ContrapartesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p
-                          className="truncate text-gray-900"
+                          className="truncate text-[var(--text-primary)]"
                           style={{
                             fontFamily: 'var(--font-outfit), sans-serif',
                             fontWeight: 500,
@@ -286,13 +295,17 @@ export default function ContrapartesPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                        {c.taxId && <span className="mono text-xs text-gray-400">{c.taxId}</span>}
-                        {c.email && <span className="text-xs text-gray-400">{c.email}</span>}
+                        {c.taxId && (
+                          <span className="mono text-xs text-[var(--text-muted)]">{c.taxId}</span>
+                        )}
+                        {c.email && (
+                          <span className="text-xs text-[var(--text-muted)]">{c.email}</span>
+                        )}
                       </div>
                     </div>
                     <button
                       onClick={() => setModal({ mode: 'edit', counterparty: c })}
-                      className="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+                      className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
                       title="Editar"
                     >
                       <Pencil size={14} />
@@ -311,22 +324,22 @@ export default function ContrapartesPage() {
             </div>
 
             {data.totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                <p className="text-xs text-gray-500">
+              <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)] bg-gray-50">
+                <p className="text-xs text-[var(--text-secondary)]">
                   {data.total} contrapartes · Página {data.page} de {data.totalPages}
                 </p>
                 <div className="flex gap-2">
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((p) => p - 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-white transition"
+                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                   >
                     <ChevronLeft size={16} />
                   </button>
                   <button
                     disabled={page >= data.totalPages}
                     onClick={() => setPage((p) => p + 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-white transition"
+                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -345,12 +358,12 @@ export default function ContrapartesPage() {
         .cp-input {
           width: 100%;
           padding: 10px 12px;
-          border: 1px solid #e8eaed;
+          border: 1px solid var(--border-color);
           border-radius: 8px;
           font-family: var(--font-outfit), sans-serif;
           font-size: 14px;
-          color: #1c1c1e;
-          background: #ffffff;
+          color: var(--text-primary);
+          background: var(--input-bg);
           outline: none;
           transition:
             border-color 120ms ease,
@@ -415,9 +428,9 @@ function CounterpartyModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 sticky top-0 bg-white">
-          <h3 className="text-base font-semibold text-gray-900">
+      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)]">
+          <h3 className="text-base font-semibold text-[var(--text-primary)]">
             {modal.mode === 'create' ? 'Nueva contraparte' : 'Editar contraparte'}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
@@ -495,7 +508,7 @@ function CounterpartyModal({
           </Field>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 sticky bottom-0 bg-white">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -533,7 +546,7 @@ function Field({
   return (
     <div>
       <label
-        className="block mb-1.5 text-gray-700"
+        className="block mb-1.5 text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500, fontSize: 13 }}
       >
         {label}

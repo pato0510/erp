@@ -52,7 +52,7 @@ interface Thresholds {
 const STATUS_BADGE: Record<FiscalPeriod['status'], { label: string; cls: string }> = {
   OPEN: { label: 'Abierto', cls: 'bg-green-100 text-green-700' },
   IN_REVIEW: { label: 'En revisión', cls: 'bg-yellow-100 text-yellow-700' },
-  CLOSED: { label: 'Cerrado', cls: 'bg-gray-100 text-gray-500' },
+  CLOSED: { label: 'Cerrado', cls: 'bg-gray-100 text-[var(--text-secondary)]' },
 };
 
 const MONTH_NAMES = [
@@ -83,8 +83,8 @@ export default function ConfiguracionPage() {
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <h1 className="text-2xl text-gray-900 mb-2">Configuración</h1>
-      <p className="text-sm text-gray-500 mb-6" style={{ fontWeight: 300 }}>
+      <h1 className="text-2xl text-[var(--text-primary)] mb-2">Configuración</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-6" style={{ fontWeight: 300 }}>
         Ajusta los parámetros operacionales de tu empresa
       </p>
 
@@ -98,7 +98,7 @@ export default function ConfiguracionPage() {
           <a
             key={a.id}
             href={`#${a.id}`}
-            className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-gray-600 hover:text-gray-900 hover:border-gray-300 transition"
+            className="px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-gray-300 transition"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             {a.label}
@@ -109,7 +109,7 @@ export default function ConfiguracionPage() {
       <div className="space-y-6">
         <Link
           href="/configuracion/usuarios"
-          className="block bg-white border border-gray-200 rounded-xl shadow-sm hover:border-gray-300 transition"
+          className="block bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm hover:border-gray-300 transition"
         >
           <div className="px-6 py-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-50">
@@ -117,7 +117,7 @@ export default function ConfiguracionPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p
-                className="text-gray-900"
+                className="text-[var(--text-primary)]"
                 style={{
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 600,
@@ -127,13 +127,13 @@ export default function ConfiguracionPage() {
                 Gestionar usuarios
               </p>
               <p
-                className="text-xs text-gray-500 mt-0.5"
+                className="text-xs text-[var(--text-secondary)] mt-0.5"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 300 }}
               >
                 Crea, edita y administra los usuarios con acceso a la empresa
               </p>
             </div>
-            <ChevronRight size={16} className="text-gray-400" />
+            <ChevronRight size={16} className="text-[var(--text-muted)]" />
           </div>
         </Link>
 
@@ -146,12 +146,12 @@ export default function ConfiguracionPage() {
         .cfg-input {
           width: 100%;
           padding: 10px 12px;
-          border: 1px solid #e8eaed;
+          border: 1px solid var(--border-color);
           border-radius: 8px;
           font-family: var(--font-outfit), sans-serif;
           font-size: 14px;
-          color: #1c1c1e;
-          background: #ffffff;
+          color: var(--text-primary);
+          background: var(--input-bg);
           outline: none;
           transition:
             border-color 120ms ease,
@@ -162,8 +162,8 @@ export default function ConfiguracionPage() {
           box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
         .cfg-input:disabled {
-          background: #f8f9fa;
-          color: #64748b;
+          background: var(--bg-secondary);
+          color: var(--text-muted);
           cursor: not-allowed;
         }
       `}</style>
@@ -247,16 +247,19 @@ function CompanySection({
   };
 
   return (
-    <section id="empresa" className="bg-white border border-gray-200 rounded-xl shadow-sm">
-      <header className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+    <section
+      id="empresa"
+      className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm"
+    >
+      <header className="px-6 py-4 border-b border-[var(--border-color)] flex items-center gap-3">
         <div className="p-2 rounded-lg bg-blue-50">
           <Building2 size={18} className="text-blue-600" />
         </div>
         <div>
-          <h2 className="text-base text-gray-900" style={{ fontWeight: 600 }}>
+          <h2 className="text-base text-[var(--text-primary)]" style={{ fontWeight: 600 }}>
             Empresa
           </h2>
-          <p className="text-xs text-gray-500" style={{ fontWeight: 300 }}>
+          <p className="text-xs text-[var(--text-secondary)]" style={{ fontWeight: 300 }}>
             Información legal y parámetros contables
           </p>
         </div>
@@ -334,7 +337,7 @@ function CompanySection({
               </CfgField>
             </div>
           </div>
-          <footer className="px-6 py-3 border-t border-gray-100 flex justify-end bg-gray-50 rounded-b-xl">
+          <footer className="px-6 py-3 border-t border-[var(--border-color)] flex justify-end bg-gray-50 rounded-b-xl">
             <button
               onClick={save}
               disabled={saving}
@@ -400,17 +403,20 @@ function PeriodsSection({
   };
 
   return (
-    <section id="periodos" className="bg-white border border-gray-200 rounded-xl shadow-sm">
-      <header className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+    <section
+      id="periodos"
+      className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm"
+    >
+      <header className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-blue-50">
             <CalendarClock size={18} className="text-blue-600" />
           </div>
           <div>
-            <h2 className="text-base text-gray-900" style={{ fontWeight: 600 }}>
+            <h2 className="text-base text-[var(--text-primary)]" style={{ fontWeight: 600 }}>
               Períodos fiscales
             </h2>
-            <p className="text-xs text-gray-500" style={{ fontWeight: 300 }}>
+            <p className="text-xs text-[var(--text-secondary)]" style={{ fontWeight: 300 }}>
               Períodos del año {CURRENT_YEAR}
             </p>
           </div>
@@ -437,24 +443,24 @@ function PeriodsSection({
           ))}
         </div>
       ) : periods.length === 0 ? (
-        <div className="p-8 text-center text-sm text-gray-400">
+        <div className="p-8 text-center text-sm text-[var(--text-muted)]">
           Sin períodos para {CURRENT_YEAR}
         </div>
       ) : (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-[var(--border-color)]">
           {periods.map((p) => {
             const badge = STATUS_BADGE[p.status];
             return (
               <div key={p.id} className="px-6 py-3 flex items-center gap-3">
                 <div
-                  className="mono text-xs text-gray-400 w-8"
+                  className="mono text-xs text-[var(--text-muted)] w-8"
                   style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}
                 >
                   {String(p.month).padStart(2, '0')}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p
-                    className="text-gray-900"
+                    className="text-[var(--text-primary)]"
                     style={{
                       fontFamily: 'var(--font-outfit), sans-serif',
                       fontWeight: 500,
@@ -464,7 +470,7 @@ function PeriodsSection({
                     {p.name}
                   </p>
                   <p
-                    className="mono text-xs text-gray-400"
+                    className="mono text-xs text-[var(--text-muted)]"
                     style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}
                   >
                     {formatDate(p.startDate)} — {formatDate(p.endDate)}
@@ -531,16 +537,19 @@ function ThresholdsSection({
   };
 
   return (
-    <section id="alertas" className="bg-white border border-gray-200 rounded-xl shadow-sm">
-      <header className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+    <section
+      id="alertas"
+      className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm"
+    >
+      <header className="px-6 py-4 border-b border-[var(--border-color)] flex items-center gap-3">
         <div className="p-2 rounded-lg bg-blue-50">
           <Bell size={18} className="text-blue-600" />
         </div>
         <div>
-          <h2 className="text-base text-gray-900" style={{ fontWeight: 600 }}>
+          <h2 className="text-base text-[var(--text-primary)]" style={{ fontWeight: 600 }}>
             Umbrales de alerta
           </h2>
-          <p className="text-xs text-gray-500" style={{ fontWeight: 300 }}>
+          <p className="text-xs text-[var(--text-secondary)]" style={{ fontWeight: 300 }}>
             Ajusta cuándo la plataforma debe notificarte
           </p>
         </div>
@@ -596,7 +605,7 @@ function ThresholdsSection({
               </CfgField>
             </div>
           </div>
-          <footer className="px-6 py-3 border-t border-gray-100 flex justify-end bg-gray-50 rounded-b-xl">
+          <footer className="px-6 py-3 border-t border-[var(--border-color)] flex justify-end bg-gray-50 rounded-b-xl">
             <button
               onClick={save}
               disabled={saving}
@@ -631,7 +640,7 @@ function CfgField({
   return (
     <div>
       <label
-        className="block mb-1.5 text-gray-700"
+        className="block mb-1.5 text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500, fontSize: 13 }}
       >
         {label}
@@ -639,7 +648,7 @@ function CfgField({
       {children}
       {help && (
         <p
-          className="mt-1.5 text-xs text-gray-400"
+          className="mt-1.5 text-xs text-[var(--text-muted)]"
           style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 300 }}
         >
           {help}

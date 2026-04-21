@@ -19,8 +19,11 @@ import {
   Receipt,
   GitMerge,
   CheckSquare,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { ExcelsiaLogo } from '../../components/shared/ExcelsiaLogo';
+import { useTheme } from '../../lib/theme';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -39,6 +42,7 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const [criticalCount, setCriticalCount] = useState(0);
 
@@ -84,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div
-      style={{ minHeight: '100vh', display: 'flex', background: '#fafafa' }}
+      style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-secondary)' }}
       className="tn-shell"
     >
       {/* Sidebar */}
@@ -93,12 +97,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         style={{
           position: 'relative',
           width: 244,
-          background: 'var(--color-dark)',
+          background: 'var(--sidebar-bg)',
           color: '#ffffff',
           display: 'flex',
           flexDirection: 'column',
-          borderRight: '1px solid var(--color-border-dark)',
+          borderRight: '1px solid var(--sidebar-border)',
           overflow: 'hidden',
+          transition: 'background-color 150ms ease',
         }}
       >
         {/* Geometric background */}
@@ -110,7 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           aria-hidden="true"
           style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.6 }}
         >
-          <g stroke="#2C2C2E" strokeWidth="1" fill="none">
+          <g stroke="var(--sidebar-border)" strokeWidth="1" fill="none">
             <circle cx="220" cy="80" r="130" />
             <circle cx="30" cy="720" r="180" />
             <line x1="0" y1="420" x2="244" y2="420" />
@@ -123,7 +128,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             position: 'relative',
             zIndex: 1,
             padding: '24px 20px 20px',
-            borderBottom: '1px solid var(--color-border-dark)',
+            borderBottom: '1px solid var(--sidebar-border)',
           }}
         >
           <ExcelsiaLogo size={22} />
@@ -184,9 +189,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             position: 'relative',
             zIndex: 1,
             padding: '14px 20px 18px',
-            borderTop: '1px solid var(--color-border-dark)',
+            borderTop: '1px solid var(--sidebar-border)',
           }}
         >
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              color: '#8E8E93',
+              padding: '6px 0',
+              marginBottom: 12,
+              fontFamily: 'var(--font-jetbrains-mono), monospace',
+              fontSize: 10,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              transition: 'color 120ms ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#ffffff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#8E8E93';
+            }}
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+          </button>
           <div
             style={{
               fontFamily: 'var(--font-jetbrains-mono), monospace',
@@ -209,7 +244,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               gap: 10,
               width: '100%',
               background: 'transparent',
-              border: '1px solid var(--color-border-dark)',
+              border: '1px solid var(--sidebar-border)',
               color: '#8E8E93',
               padding: '8px 12px',
               borderRadius: 'var(--radius-sm)',
@@ -226,7 +261,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.color = '#8E8E93';
-              e.currentTarget.style.borderColor = 'var(--color-border-dark)';
+              e.currentTarget.style.borderColor = 'var(--sidebar-border)';
             }}
           >
             <LogOut size={14} />
@@ -240,7 +275,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         style={{
           flex: 1,
           overflow: 'auto',
-          background: '#F8F9FA',
+          background: 'var(--bg-secondary)',
+          color: 'var(--text-primary)',
+          transition: 'background-color 150ms ease, color 150ms ease',
         }}
       >
         <div style={{ padding: '32px 40px' }}>{children}</div>
@@ -290,7 +327,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             align-items: center;
             height: 56px;
             border-right: none !important;
-            border-bottom: 1px solid var(--color-border-dark);
+            border-bottom: 1px solid var(--sidebar-border);
           }
           .tn-sidebar nav {
             display: none !important;

@@ -26,8 +26,16 @@ const ROLE_META: Record<UserRole, { label: string; color: string; badgeCls: stri
   ADMIN: { label: 'Administrador', color: '#2563EB', badgeCls: 'bg-blue-50 text-blue-700' },
   MANAGER: { label: 'Gerente', color: '#3B82F6', badgeCls: 'bg-blue-50 text-blue-600' },
   ACCOUNTANT: { label: 'Contador', color: '#64748B', badgeCls: 'bg-slate-100 text-slate-700' },
-  ANALYST: { label: 'Analista', color: '#94A3B8', badgeCls: 'bg-gray-100 text-gray-700' },
-  VIEWER: { label: 'Visualizador', color: '#CBD5E1', badgeCls: 'bg-gray-50 text-gray-600' },
+  ANALYST: {
+    label: 'Analista',
+    color: '#94A3B8',
+    badgeCls: 'bg-gray-100 text-[var(--text-secondary)]',
+  },
+  VIEWER: {
+    label: 'Visualizador',
+    color: '#CBD5E1',
+    badgeCls: 'bg-gray-50 text-[var(--text-secondary)]',
+  },
 };
 
 const ROLES: UserRole[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'ANALYST', 'VIEWER'];
@@ -129,7 +137,7 @@ export default function UsuariosPage() {
       {/* Back link */}
       <Link
         href="/configuracion"
-        className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 mb-3 transition"
+        className="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] mb-3 transition"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
       >
         <ArrowLeft size={12} /> Configuración
@@ -138,9 +146,9 @@ export default function UsuariosPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl text-gray-900">Usuarios</h1>
+          <h1 className="text-2xl text-[var(--text-primary)]">Usuarios</h1>
           <p
-            className="text-sm text-gray-500 mt-1"
+            className="text-sm text-[var(--text-secondary)] mt-1"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 300 }}
           >
             Gestiona los usuarios con acceso a tu empresa
@@ -160,9 +168,9 @@ export default function UsuariosPage() {
       </div>
 
       {/* List */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
         {isLoading ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[var(--border-color)]">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="px-5 py-4 animate-pulse flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gray-200" />
@@ -176,7 +184,9 @@ export default function UsuariosPage() {
         ) : users.length === 0 ? (
           <div className="p-12 text-center">
             <Users size={36} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-600 font-medium">No hay usuarios en esta empresa</p>
+            <p className="text-[var(--text-secondary)] font-medium">
+              No hay usuarios en esta empresa
+            </p>
             <button
               onClick={() => setModal({ mode: 'create' })}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
@@ -190,7 +200,7 @@ export default function UsuariosPage() {
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[var(--border-color)]">
             {users.map((u) => {
               const meta = ROLE_META[u.role];
               return (
@@ -213,7 +223,7 @@ export default function UsuariosPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p
-                        className="truncate text-gray-900"
+                        className="truncate text-[var(--text-primary)]"
                         style={{
                           fontFamily: 'var(--font-outfit), sans-serif',
                           fontWeight: 500,
@@ -230,13 +240,13 @@ export default function UsuariosPage() {
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span
-                        className="mono text-xs text-gray-400"
+                        className="mono text-xs text-[var(--text-muted)]"
                         style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}
                       >
                         {u.email}
                       </span>
                       {u.lastLoginAt && (
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-[var(--text-muted)]">
                           · Último acceso {formatRelativeDate(u.lastLoginAt)}
                         </span>
                       )}
@@ -244,7 +254,7 @@ export default function UsuariosPage() {
                   </div>
                   <button
                     onClick={() => setModal({ mode: 'edit', user: u })}
-                    className="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+                    className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
                     title="Editar"
                   >
                     <Pencil size={14} />
@@ -270,12 +280,12 @@ export default function UsuariosPage() {
         .u-input {
           width: 100%;
           padding: 10px 12px;
-          border: 1px solid #e8eaed;
+          border: 1px solid var(--border-color);
           border-radius: 8px;
           font-family: var(--font-outfit), sans-serif;
           font-size: 14px;
-          color: #1c1c1e;
-          background: #ffffff;
+          color: var(--text-primary);
+          background: var(--input-bg);
           outline: none;
           transition:
             border-color 120ms ease,
@@ -359,9 +369,9 @@ function UserModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 sticky top-0 bg-white">
-          <h3 className="text-base font-semibold text-gray-900">
+      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)]">
+          <h3 className="text-base font-semibold text-[var(--text-primary)]">
             {isCreate ? 'Nuevo usuario' : 'Editar usuario'}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
@@ -401,7 +411,7 @@ function UserModal({
             />
             {!isCreate && (
               <p
-                className="text-xs text-gray-400 mt-1"
+                className="text-xs text-[var(--text-muted)] mt-1"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 300 }}
               >
                 El email no se puede modificar.
@@ -444,7 +454,7 @@ function UserModal({
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
                 tabIndex={-1}
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
@@ -472,7 +482,7 @@ function UserModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 sticky bottom-0 bg-white">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -512,7 +522,7 @@ function Field({
   return (
     <div>
       <label
-        className="block mb-1.5 text-gray-700"
+        className="block mb-1.5 text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500, fontSize: 13 }}
       >
         {label}
@@ -521,7 +531,7 @@ function Field({
       {children}
       {help && (
         <p
-          className="mt-1.5 text-xs text-gray-400"
+          className="mt-1.5 text-xs text-[var(--text-muted)]"
           style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 300 }}
         >
           {help}

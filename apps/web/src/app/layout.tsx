@@ -1,5 +1,6 @@
 import './global.css';
 import { DM_Serif_Display, Inter, JetBrains_Mono, Outfit } from 'next/font/google';
+import { ThemeProvider, themeHydrationScript } from '../lib/theme';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -34,11 +35,16 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        {/* Runs before hydration — applies the persisted theme class so the
+            first paint matches the user's preference without a flash. */}
+        <script dangerouslySetInnerHTML={{ __html: themeHydrationScript }} />
+      </head>
       <body
         className={`min-h-screen ${inter.variable} ${jetbrainsMono.variable} ${dmSerifDisplay.variable} ${outfit.variable}`}
       >
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

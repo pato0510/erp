@@ -128,7 +128,7 @@ export default function CajaPage() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-gray-900">Caja y Tesorería</h1>
+        <h1 className="text-2xl text-[var(--text-primary)]">Caja y Tesorería</h1>
         <div className="flex items-center gap-3">
           {periodId && (
             <button
@@ -152,7 +152,10 @@ export default function CajaPage() {
       {isLoading && !position ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-gray-200 p-5 animate-pulse">
+            <div
+              key={i}
+              className="rounded-xl border border-[var(--border-color)] p-5 animate-pulse"
+            >
               <div className="h-3 bg-gray-200 rounded w-20 mb-3" />
               <div className="h-7 bg-gray-200 rounded w-32" />
             </div>
@@ -189,13 +192,15 @@ export default function CajaPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* SECTION 2 — Bank Accounts */}
         <div className="lg:col-span-1">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">Cuentas Bancarias</h2>
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm">
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+              <h2 className="font-semibold text-[var(--text-primary)]">Cuentas Bancarias</h2>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-[var(--border-color)]">
               {accounts.length === 0 ? (
-                <p className="px-5 py-8 text-gray-400 text-center text-sm">Sin cuentas</p>
+                <p className="px-5 py-8 text-[var(--text-muted)] text-center text-sm">
+                  Sin cuentas
+                </p>
               ) : (
                 accounts.map((acc) => {
                   const Icon = ACCOUNT_ICONS[acc.type] || CreditCard;
@@ -203,16 +208,20 @@ export default function CajaPage() {
                   return (
                     <div key={acc.id} className="px-5 py-3 flex items-center gap-3">
                       <div className="p-2 bg-gray-100 rounded-lg">
-                        <Icon size={18} className="text-gray-600" />
+                        <Icon size={18} className="text-[var(--text-secondary)]" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{acc.name}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                          {acc.name}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">
                           {ACCOUNT_TYPE_LABELS[acc.type] || acc.type}
                           {acc.bankName ? ` · ${acc.bankName}` : ''}
                         </p>
                       </div>
-                      <p className="amount text-sm text-gray-700">{formatCLP(balance)}</p>
+                      <p className="amount text-sm text-[var(--text-secondary)]">
+                        {formatCLP(balance)}
+                      </p>
                     </div>
                   );
                 })
@@ -223,15 +232,15 @@ export default function CajaPage() {
 
         {/* SECTION 3 — Commitments */}
         <div className="lg:col-span-2">
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm">
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
               <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
                 <button
                   onClick={() => setCommitTab('upcoming')}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
                     commitTab === 'upcoming'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-secondary)]'
                   }`}
                 >
                   Próximos 30 días
@@ -240,8 +249,8 @@ export default function CajaPage() {
                   onClick={() => setCommitTab('all')}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
                     commitTab === 'all'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-secondary)]'
                   }`}
                 >
                   Todos pendientes
@@ -256,29 +265,29 @@ export default function CajaPage() {
             </div>
 
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 border-b border-[var(--border-color)]">
                 <tr>
-                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                     Vencimiento
                   </th>
-                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                     Descripción
                   </th>
-                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                     Tipo
                   </th>
-                  <th className="label text-right px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                  <th className="label text-right px-4 py-2.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                     Monto
                   </th>
-                  <th className="label text-center px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                  <th className="label text-center px-4 py-2.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                     Estado
                   </th>
-                  <th className="label text-right px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                  <th className="label text-right px-4 py-2.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                     Acciones
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--border-color)]">
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
@@ -291,7 +300,10 @@ export default function CajaPage() {
                   ))
                 ) : commitments.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-sm">
+                    <td
+                      colSpan={6}
+                      className="px-4 py-10 text-center text-[var(--text-muted)] text-sm"
+                    >
                       Sin compromisos pendientes
                     </td>
                   </tr>
@@ -302,20 +314,22 @@ export default function CajaPage() {
                         <span className={`mono ${dueDateUrgency(c.dueDate)}`}>
                           {formatDate(c.dueDate)}
                         </span>
-                        <span className="block text-xs text-gray-400">
+                        <span className="block text-xs text-[var(--text-muted)]">
                           {formatRelativeDate(c.dueDate)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5">
-                        <p className="text-gray-900 font-medium text-sm">{c.description}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-[var(--text-primary)] font-medium text-sm">
+                          {c.description}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">
                           {c.counterparty?.name || c.category?.name || ''}
                         </p>
                       </td>
                       <td className="px-4 py-2.5">
                         <MovementTypeBadge type={c.type} />
                       </td>
-                      <td className="amount px-4 py-2.5 text-right text-gray-900">
+                      <td className="amount px-4 py-2.5 text-right text-[var(--text-primary)]">
                         {formatCLP(Number(c.amount))}
                       </td>
                       <td className="px-4 py-2.5 text-center">
@@ -332,7 +346,7 @@ export default function CajaPage() {
                             </button>
                             <button
                               onClick={() => handleCancelCommitment(c.id)}
-                              className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
+                              className="text-xs px-2 py-1 rounded bg-gray-100 text-[var(--text-secondary)] hover:bg-gray-200 transition"
                             >
                               Cancelar
                             </button>

@@ -88,7 +88,7 @@ function KpiCard({
   subtitle?: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
           <p
@@ -97,7 +97,7 @@ function KpiCard({
               fontWeight: 500,
               fontSize: 16,
               letterSpacing: '-0.01em',
-              color: '#6b7280',
+              color: 'var(--text-secondary)',
             }}
           >
             {title}
@@ -107,7 +107,7 @@ function KpiCard({
             style={{
               marginTop: 6,
               fontSize: 32,
-              color: '#1C1C1E',
+              color: 'var(--text-primary)',
               lineHeight: 1.1,
             }}
           >
@@ -120,7 +120,7 @@ function KpiCard({
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 300,
                 fontSize: 13,
-                color: '#9aa0ad',
+                color: 'var(--text-muted)',
               }}
             >
               {subtitle}
@@ -139,7 +139,7 @@ function KpiCard({
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm animate-pulse">
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm animate-pulse">
       <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
       <div className="h-8 bg-gray-200 rounded w-36" />
     </div>
@@ -149,7 +149,7 @@ function SkeletonCard() {
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   OPEN: { label: 'Abierto', cls: 'bg-green-100 text-green-700' },
   IN_REVIEW: { label: 'En Revisión', cls: 'bg-yellow-100 text-yellow-700' },
-  CLOSED: { label: 'Cerrado', cls: 'bg-gray-100 text-gray-500' },
+  CLOSED: { label: 'Cerrado', cls: 'bg-gray-100 text-[var(--text-secondary)]' },
 };
 
 const PIE_COLORS = [
@@ -217,12 +217,12 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl text-gray-900">Dashboard</h1>
+          <h1 className="text-2xl text-[var(--text-primary)]">Dashboard</h1>
           {data && (
-            <p className="text-gray-500 mt-1">
+            <p className="text-[var(--text-secondary)] mt-1">
               {data.period.name} &middot;{' '}
               <span
-                className={`badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[data.period.status]?.cls || 'bg-gray-100 text-gray-500'}`}
+                className={`badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[data.period.status]?.cls || 'bg-gray-100 text-[var(--text-secondary)]'}`}
               >
                 {STATUS_LABELS[data.period.status]?.label || data.period.status}
               </span>
@@ -344,8 +344,10 @@ export default function DashboardPage() {
       {data && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* CHART 1 — Income vs Expense bar */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Ingresos vs Egresos</h3>
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
+              Ingresos vs Egresos
+            </h3>
             {incomeExpenseData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={180}>
@@ -362,7 +364,7 @@ export default function DashboardPage() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                <div className="flex items-center gap-4 mt-3 text-xs text-[var(--text-secondary)]">
                   <span className="flex items-center gap-1.5">
                     <span
                       className="inline-block w-2.5 h-2.5 rounded-full"
@@ -380,13 +382,15 @@ export default function DashboardPage() {
                 </div>
               </>
             ) : (
-              <p className="text-gray-400 text-sm text-center py-8">Sin datos</p>
+              <p className="text-[var(--text-muted)] text-sm text-center py-8">Sin datos</p>
             )}
           </div>
 
           {/* CHART 2 — Expense categories pie */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Categorías de Gasto</h3>
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
+              Categorías de Gasto
+            </h3>
             {pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
@@ -411,11 +415,16 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-gray-400 text-sm text-center py-8">Sin datos de gastos</p>
+              <p className="text-[var(--text-muted)] text-sm text-center py-8">
+                Sin datos de gastos
+              </p>
             )}
             <div className="flex flex-wrap gap-2 mt-2">
               {pieData.map((d) => (
-                <span key={d.name} className="flex items-center gap-1 text-xs text-gray-500">
+                <span
+                  key={d.name}
+                  className="flex items-center gap-1 text-xs text-[var(--text-secondary)]"
+                >
                   <span
                     className="inline-block w-2 h-2 rounded-full"
                     style={{ backgroundColor: d.color }}
@@ -427,8 +436,8 @@ export default function DashboardPage() {
           </div>
 
           {/* CHART 3 — Cash flow summary */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Flujo de Caja</h3>
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Flujo de Caja</h3>
             <div className="space-y-3">
               {[
                 {
@@ -463,8 +472,10 @@ export default function DashboardPage() {
                 return (
                   <div key={item.label}>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-600">{item.label}</span>
-                      <span className="amount text-gray-900">{formatCLP(item.value)}</span>
+                      <span className="text-[var(--text-secondary)]">{item.label}</span>
+                      <span className="amount text-[var(--text-primary)]">
+                        {formatCLP(item.value)}
+                      </span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2">
                       <div
@@ -483,9 +494,9 @@ export default function DashboardPage() {
       {data && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Upcoming Commitments */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm">
+            <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+              <h2 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
                 <Clock size={18} />
                 Compromisos Próximos
               </h2>
@@ -493,9 +504,9 @@ export default function DashboardPage() {
                 Ver todos
               </Link>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-[var(--border-color)]">
               {data.commitments.upcoming.length === 0 ? (
-                <p className="px-6 py-8 text-gray-400 text-center text-sm">
+                <p className="px-6 py-8 text-[var(--text-muted)] text-center text-sm">
                   Sin compromisos pendientes
                 </p>
               ) : (
@@ -508,17 +519,21 @@ export default function DashboardPage() {
                       ? 'text-red-600'
                       : daysUntil < 15
                         ? 'text-yellow-600'
-                        : 'text-gray-600';
+                        : 'text-[var(--text-secondary)]';
                   return (
                     <div key={c.id} className="px-6 py-3 flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{c.description}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                          {c.description}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">
                           {c.counterparty?.name || c.category?.name || ''} &middot;{' '}
                           <span className={urgencyColor}>{formatRelativeDate(c.dueDate)}</span>
                         </p>
                       </div>
-                      <span className="amount text-sm text-gray-900">{formatCLP(c.amount)}</span>
+                      <span className="amount text-sm text-[var(--text-primary)]">
+                        {formatCLP(c.amount)}
+                      </span>
                     </div>
                   );
                 })
@@ -527,16 +542,16 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent Movements */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">Movimientos Recientes</h2>
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm">
+            <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+              <h2 className="font-semibold text-[var(--text-primary)]">Movimientos Recientes</h2>
               <Link href="/movimientos" className="text-xs text-blue-600 hover:underline">
                 Ver todos
               </Link>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-[var(--border-color)]">
               {data.recentMovements.length === 0 ? (
-                <p className="px-6 py-8 text-gray-400 text-center text-sm">
+                <p className="px-6 py-8 text-[var(--text-muted)] text-center text-sm">
                   Sin movimientos confirmados
                 </p>
               ) : (
@@ -557,8 +572,10 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{m.description}</p>
-                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                          {m.description}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)] flex items-center gap-1">
                           <span
                             className="inline-block w-2 h-2 rounded-full"
                             style={{ backgroundColor: m.category.color || '#888' }}

@@ -34,7 +34,8 @@ export function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+      className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+      style={{ backgroundColor: '#ffffff', color: '#1c1c1e' }}
     >
       <option value="">Período actual</option>
       {periods.map((p) => (

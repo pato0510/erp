@@ -103,7 +103,7 @@ export default function MovimientosPage() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-gray-900">Movimientos</h1>
+        <h1 className="text-2xl text-[var(--text-primary)]">Movimientos</h1>
         <div className="flex gap-3">
           <button
             onClick={() => {
@@ -155,9 +155,9 @@ export default function MovimientosPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex flex-wrap gap-3 items-end">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4 mb-6 flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Tipo</label>
+          <label className="block text-xs text-[var(--text-secondary)] mb-1">Tipo</label>
           <select
             value={filterType}
             onChange={(e) => updateFilter(setFilterType, e.target.value)}
@@ -169,7 +169,7 @@ export default function MovimientosPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Estado</label>
+          <label className="block text-xs text-[var(--text-secondary)] mb-1">Estado</label>
           <select
             value={filterStatus}
             onChange={(e) => updateFilter(setFilterStatus, e.target.value)}
@@ -182,7 +182,7 @@ export default function MovimientosPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Desde</label>
+          <label className="block text-xs text-[var(--text-secondary)] mb-1">Desde</label>
           <input
             type="date"
             value={filterDateFrom}
@@ -191,7 +191,7 @@ export default function MovimientosPage() {
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Hasta</label>
+          <label className="block text-xs text-[var(--text-secondary)] mb-1">Hasta</label>
           <input
             type="date"
             value={filterDateTo}
@@ -200,9 +200,9 @@ export default function MovimientosPage() {
           />
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs text-gray-500 mb-1">Buscar</label>
+          <label className="block text-xs text-[var(--text-secondary)] mb-1">Buscar</label>
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
+            <Search size={16} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
             <input
               type="text"
               placeholder="Buscar descripción..."
@@ -215,37 +215,37 @@ export default function MovimientosPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-[var(--border-color)]">
             <tr>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Fecha
               </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Tipo
               </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Descripción
               </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Categoría
               </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Contraparte
               </th>
-              <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Monto
               </th>
-              <th className="label text-center px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="label text-center px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Estado
               </th>
-              <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Acciones
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-[var(--border-color)]">
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="animate-pulse">
@@ -258,22 +258,28 @@ export default function MovimientosPage() {
               ))
             ) : movements.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">
                   No se encontraron movimientos
                 </td>
               </tr>
             ) : (
               movements.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50">
-                  <td className="mono px-4 py-3 text-gray-700">{formatDate(m.date)}</td>
+                  <td className="mono px-4 py-3 text-[var(--text-secondary)]">
+                    {formatDate(m.date)}
+                  </td>
                   <td className="px-4 py-3">
                     <MovementTypeBadge type={m.type} />
                   </td>
-                  <td className="px-4 py-3 text-gray-900 font-medium max-w-[200px] truncate">
+                  <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-[200px] truncate">
                     {m.description}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{m.category?.name || '-'}</td>
-                  <td className="px-4 py-3 text-gray-600">{m.counterparty?.name || '-'}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)]">
+                    {m.category?.name || '-'}
+                  </td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)]">
+                    {m.counterparty?.name || '-'}
+                  </td>
                   <td
                     className={`amount px-4 py-3 text-right ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
                   >
@@ -311,22 +317,22 @@ export default function MovimientosPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-            <p className="text-sm text-gray-500">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)] bg-gray-50">
+            <p className="text-sm text-[var(--text-secondary)]">
               {total} movimientos &middot; Página {page} de {totalPages}
             </p>
             <div className="flex gap-2">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-white transition"
+                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-white transition"
+                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
               >
                 <ChevronRight size={16} />
               </button>

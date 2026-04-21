@@ -20,8 +20,57 @@ body {
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #ffffff;
-  color: #1C1C1E;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Inputs adapt to theme. Pages can still override per-input via inline styles. */
+input,
+textarea,
+select {
+  background-color: var(--input-bg);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Dark-mode overrides for Tailwind grays that pages use for table headers,
+   pagination bars, tab groups and subtle badges. Without these the backgrounds
+   stay light gray in dark mode and the text-secondary color washes out. */
+html.dark .bg-gray-50 {
+  background-color: #242424;
+}
+html.dark .bg-gray-100 {
+  background-color: #2a2a2a;
+}
+html.dark .border-gray-300 {
+  border-color: var(--border-color);
+}
+html.dark .hover\:bg-gray-50:hover {
+  background-color: #242424;
+}
+html.dark .hover\:bg-gray-100:hover {
+  background-color: #2a2a2a;
+}
+html.dark .hover\:border-gray-300:hover {
+  border-color: var(--border-color);
+}
+
+/* Outline buttons (no filled background — only a border) inherit color from the
+   UA `buttontext`, which can render dark on dark in dark mode. Force the theme
+   primary color so "Sincronizar Emitidos", "Saldos", "Importar CSV", etc. stay
+   legible. Filled buttons have their own `bg-*`/`text-*` classes and are not
+   affected. */
+html.dark button.border-gray-300,
+html.dark a.border-gray-300,
+html.dark label.border-gray-300 {
+  color: var(--text-primary);
 }
 
 .font-mono-brand {
