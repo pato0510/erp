@@ -222,7 +222,7 @@ export default function BancoPage() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Conexiones Bancarias</h1>
+        <h1 className="text-2xl text-gray-900">Conexiones Bancarias</h1>
         <div className="flex items-center gap-2">
           {connections.length > 0 && (
             <Link
@@ -470,7 +470,7 @@ export default function BancoPage() {
                         ) : (
                           movements.map((m) => (
                             <tr key={m.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-gray-700">{formatDate(m.date)}</td>
+                              <td className="mono px-4 py-2 text-gray-700">{formatDate(m.date)}</td>
                               <td className="px-4 py-2 text-gray-900">{m.description}</td>
                               <td className="px-4 py-2">
                                 <span
@@ -480,7 +480,7 @@ export default function BancoPage() {
                                 </span>
                               </td>
                               <td
-                                className={`px-4 py-2 text-right font-semibold ${m.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}
+                                className={`amount px-4 py-2 text-right ${m.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}
                               >
                                 {m.type === 'CREDIT' ? '+' : '-'}
                                 {formatCLP(Math.abs(Number(m.amount)))}

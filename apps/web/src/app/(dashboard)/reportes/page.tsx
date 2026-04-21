@@ -70,7 +70,7 @@ export default function ReportesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Reportes y Exportaciones</h1>
+      <h1 className="text-2xl text-gray-900 mb-6">Reportes y Exportaciones</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Export Movements */}
@@ -185,8 +185,8 @@ export default function ReportesPage() {
                   { label: 'Apertura', value: summary.cash.opening, color: 'text-gray-700' },
                 ].map((kpi) => (
                   <div key={kpi.label} className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">{kpi.label}</p>
-                    <p className={`text-lg font-bold ${kpi.color}`}>{formatCLP(kpi.value)}</p>
+                    <p className="label text-[11px] text-gray-500">{kpi.label}</p>
+                    <p className={`amount text-lg mt-0.5 ${kpi.color}`}>{formatCLP(kpi.value)}</p>
                   </div>
                 ))}
               </div>
@@ -199,26 +199,26 @@ export default function ReportesPage() {
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-green-50 rounded-lg p-3">
-                  <p className="text-xs text-green-600">Ingresos</p>
-                  <p className="text-lg font-bold text-green-700">
+                  <p className="label text-[11px] text-green-600">Ingresos</p>
+                  <p className="amount text-lg mt-0.5 text-green-700">
                     {formatCLP(summary.movements.income)}
                   </p>
                 </div>
                 <div className="bg-red-50 rounded-lg p-3">
-                  <p className="text-xs text-red-600">Egresos</p>
-                  <p className="text-lg font-bold text-red-700">
+                  <p className="label text-[11px] text-red-600">Egresos</p>
+                  <p className="amount text-lg mt-0.5 text-red-700">
                     {formatCLP(summary.movements.expense)}
                   </p>
                 </div>
                 <div className="bg-blue-50 rounded-lg p-3">
-                  <p className="text-xs text-blue-600">Balance</p>
-                  <p className="text-lg font-bold text-blue-700">
+                  <p className="label text-[11px] text-blue-600">Balance</p>
+                  <p className="amount text-lg mt-0.5 text-blue-700">
                     {formatCLP(summary.movements.balance)}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Confirmados</p>
-                  <p className="text-lg font-bold text-gray-700">{summary.movements.count}</p>
+                  <p className="label text-[11px] text-gray-500">Confirmados</p>
+                  <p className="amount text-lg mt-0.5 text-gray-700">{summary.movements.count}</p>
                 </div>
               </div>
             </div>

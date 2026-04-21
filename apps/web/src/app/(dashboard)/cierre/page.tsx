@@ -222,7 +222,7 @@ export default function CierrePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl text-gray-900 flex items-center gap-2">
             <CheckSquare size={24} className="text-gray-500" /> Cierre mensual
           </h1>
           <p className="text-gray-500 text-sm mt-1">
@@ -581,7 +581,7 @@ function ClosingSummaryCard({
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Conciliación bancaria
             </h3>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="amount text-[28px] leading-tight text-gray-900">
               {summary.reconciliation.reconciledPercentage}%
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -596,20 +596,18 @@ function ClosingSummaryCard({
             </h3>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Emitidos</span>
-              <span className="font-semibold text-gray-900">
-                {formatCLP(summary.tax.emitidosTotal)}
-              </span>
+              <span className="amount text-gray-900">{formatCLP(summary.tax.emitidosTotal)}</span>
             </div>
             <div className="flex justify-between text-sm mt-1">
               <span className="text-gray-500">Recibidos</span>
-              <span className="font-semibold text-gray-900">
-                {formatCLP(summary.tax.recibidosTotal)}
-              </span>
+              <span className="amount text-gray-900">{formatCLP(summary.tax.recibidosTotal)}</span>
             </div>
             <div className="flex justify-between text-sm mt-2 pt-2 border-t border-gray-100">
-              <span className="text-gray-600 font-medium">Balance</span>
+              <span className="text-gray-600" style={{ fontWeight: 500 }}>
+                Balance
+              </span>
               <span
-                className={`font-bold ${summary.tax.balance >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                className={`amount ${summary.tax.balance >= 0 ? 'text-green-600' : 'text-red-500'}`}
               >
                 {formatCLP(summary.tax.balance)}
               </span>
@@ -631,7 +629,7 @@ function ClosingSummaryCard({
                   />
                   <span className="text-sm text-gray-900 flex-1 truncate">{c.name}</span>
                   <span className="text-xs text-gray-500">{c.percentage}%</span>
-                  <span className="text-sm font-semibold text-gray-900 w-28 text-right">
+                  <span className="amount text-sm text-gray-900 w-28 text-right">
                     {formatCLP(c.total)}
                   </span>
                 </div>
@@ -672,8 +670,8 @@ function ClosingSummaryCard({
 function SummaryStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <p className="text-xs text-gray-500 font-medium">{label}</p>
-      <p className={`text-lg font-bold mt-0.5 ${color}`}>{value}</p>
+      <p className="label text-gray-500 text-[11px]">{label}</p>
+      <p className={`amount text-[22px] mt-1 leading-tight ${color}`}>{value}</p>
     </div>
   );
 }

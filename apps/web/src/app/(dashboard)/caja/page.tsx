@@ -128,7 +128,7 @@ export default function CajaPage() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Caja y Tesorería</h1>
+        <h1 className="text-2xl text-gray-900">Caja y Tesorería</h1>
         <div className="flex items-center gap-3">
           {periodId && (
             <button
@@ -212,7 +212,7 @@ export default function CajaPage() {
                           {acc.bankName ? ` · ${acc.bankName}` : ''}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-gray-700">{formatCLP(balance)}</p>
+                      <p className="amount text-sm text-gray-700">{formatCLP(balance)}</p>
                     </div>
                   );
                 })
@@ -258,12 +258,24 @@ export default function CajaPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-2.5 font-medium text-gray-500">Vencimiento</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-gray-500">Descripción</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-gray-500">Tipo</th>
-                  <th className="text-right px-4 py-2.5 font-medium text-gray-500">Monto</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-gray-500">Estado</th>
-                  <th className="text-right px-4 py-2.5 font-medium text-gray-500">Acciones</th>
+                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                    Vencimiento
+                  </th>
+                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                    Descripción
+                  </th>
+                  <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                    Tipo
+                  </th>
+                  <th className="label text-right px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                    Monto
+                  </th>
+                  <th className="label text-center px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                    Estado
+                  </th>
+                  <th className="label text-right px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -287,7 +299,9 @@ export default function CajaPage() {
                   commitments.map((c) => (
                     <tr key={c.id} className="hover:bg-gray-50">
                       <td className="px-4 py-2.5">
-                        <span className={dueDateUrgency(c.dueDate)}>{formatDate(c.dueDate)}</span>
+                        <span className={`mono ${dueDateUrgency(c.dueDate)}`}>
+                          {formatDate(c.dueDate)}
+                        </span>
                         <span className="block text-xs text-gray-400">
                           {formatRelativeDate(c.dueDate)}
                         </span>
@@ -301,7 +315,7 @@ export default function CajaPage() {
                       <td className="px-4 py-2.5">
                         <MovementTypeBadge type={c.type} />
                       </td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">
+                      <td className="amount px-4 py-2.5 text-right text-gray-900">
                         {formatCLP(Number(c.amount))}
                       </td>
                       <td className="px-4 py-2.5 text-center">

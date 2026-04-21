@@ -103,7 +103,7 @@ export default function MovimientosPage() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Movimientos</h1>
+        <h1 className="text-2xl text-gray-900">Movimientos</h1>
         <div className="flex gap-3">
           <button
             onClick={() => {
@@ -141,16 +141,16 @@ export default function MovimientosPage() {
       {/* Summary bar */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-          <p className="text-xs text-green-600 font-medium">Ingresos</p>
-          <p className="text-lg font-bold text-green-700">{formatCLP(totalIncome)}</p>
+          <p className="label text-xs text-green-600 uppercase tracking-wider">Ingresos</p>
+          <p className="amount text-lg text-green-700">{formatCLP(totalIncome)}</p>
         </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-          <p className="text-xs text-red-600 font-medium">Egresos</p>
-          <p className="text-lg font-bold text-red-700">{formatCLP(totalExpense)}</p>
+          <p className="label text-xs text-red-600 uppercase tracking-wider">Egresos</p>
+          <p className="amount text-lg text-red-700">{formatCLP(totalExpense)}</p>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-          <p className="text-xs text-blue-600 font-medium">Balance</p>
-          <p className="text-lg font-bold text-blue-700">{formatCLP(totalIncome - totalExpense)}</p>
+          <p className="label text-xs text-blue-600 uppercase tracking-wider">Balance</p>
+          <p className="amount text-lg text-blue-700">{formatCLP(totalIncome - totalExpense)}</p>
         </div>
       </div>
 
@@ -219,14 +219,30 @@ export default function MovimientosPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Tipo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Descripción</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Categoría</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">Contraparte</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">Monto</th>
-              <th className="text-center px-4 py-3 font-medium text-gray-500">Estado</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">Acciones</th>
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+                Fecha
+              </th>
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+                Tipo
+              </th>
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+                Descripción
+              </th>
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+                Categoría
+              </th>
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+                Contraparte
+              </th>
+              <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+                Monto
+              </th>
+              <th className="label text-center px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+                Estado
+              </th>
+              <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-gray-500">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -249,7 +265,7 @@ export default function MovimientosPage() {
             ) : (
               movements.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-700">{formatDate(m.date)}</td>
+                  <td className="mono px-4 py-3 text-gray-700">{formatDate(m.date)}</td>
                   <td className="px-4 py-3">
                     <MovementTypeBadge type={m.type} />
                   </td>
@@ -259,7 +275,7 @@ export default function MovimientosPage() {
                   <td className="px-4 py-3 text-gray-600">{m.category?.name || '-'}</td>
                   <td className="px-4 py-3 text-gray-600">{m.counterparty?.name || '-'}</td>
                   <td
-                    className={`px-4 py-3 text-right font-semibold ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
+                    className={`amount px-4 py-3 text-right ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
                   >
                     {m.type === 'INCOME' ? '+' : '-'}
                     {formatCLP(Number(m.amount))}

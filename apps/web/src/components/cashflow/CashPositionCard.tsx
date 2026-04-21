@@ -22,9 +22,9 @@ export function CashPositionCard({ title, amount, color, subtitle }: CashPositio
   const style = VARIANT_STYLES[color];
   return (
     <div className={`rounded-xl border p-5 ${style.bg}`}>
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{title}</p>
-      <p className={`text-2xl font-bold mt-1 ${style.text}`}>{formatCLP(amount)}</p>
-      {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+      <p className="label text-[11px] text-gray-500 uppercase tracking-wider">{title}</p>
+      <p className={`amount text-2xl mt-1 ${style.text}`}>{formatCLP(amount)}</p>
+      {subtitle && <p className="mt-1 text-xs font-light text-gray-400">{subtitle}</p>}
     </div>
   );
 }

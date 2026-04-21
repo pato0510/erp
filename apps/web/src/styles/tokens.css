@@ -1,0 +1,22 @@
+:root {
+  --color-dark: #1C1C1E;
+  --color-dark-secondary: #2C2C2E;
+  --color-dark-border: #3A3A3C;
+  --color-dark-text: #8E8E93;
+  --color-accent: #2563EB;
+  --color-accent-secondary: #1E3A5F;
+  --color-accent-light: #93C5FD;
+  --color-accent-muted: #64748B;
+  --color-accent-dim: rgba(37, 99, 235, 0.08);
+  --color-accent-surface: #F1F5F9;
+  --color-surface: #fafafa;
+  --color-border: #e8eaed;
+  --color-border-dark: #2C2C2E;
+  --color-text-muted: #9aa0ad;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}

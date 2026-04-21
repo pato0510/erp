@@ -109,7 +109,7 @@ export default function AlertasPage() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Alertas</h1>
+        <h1 className="text-2xl text-gray-900">Alertas</h1>
         <button
           onClick={handleGenerate}
           disabled={isGenerating}

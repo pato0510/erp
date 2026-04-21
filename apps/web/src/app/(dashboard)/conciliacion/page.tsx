@@ -89,9 +89,15 @@ function KpiCard({
     <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-500 font-medium">{title}</p>
-          <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+          <p className="text-sm text-gray-500" style={{ fontWeight: 500 }}>
+            {title}
+          </p>
+          <p className={`amount text-[28px] mt-1 leading-tight ${color}`}>{value}</p>
+          {subtitle && (
+            <p className="text-xs text-gray-400 mt-1" style={{ fontWeight: 300 }}>
+              {subtitle}
+            </p>
+          )}
           {children}
         </div>
         <div
@@ -223,7 +229,7 @@ export default function ConciliacionPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl text-gray-900 flex items-center gap-2">
             <GitMerge size={24} className="text-gray-500" /> Conciliación
           </h1>
           <p className="text-gray-500 text-sm mt-1">
@@ -393,10 +399,10 @@ export default function ConciliacionPage() {
                     const amount = Math.abs(Number(m.amount));
                     return (
                       <tr key={m.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-gray-600">{formatDate(m.date)}</td>
+                        <td className="mono px-4 py-2 text-gray-600">{formatDate(m.date)}</td>
                         <td className="px-4 py-2 text-gray-900">{m.description}</td>
                         <td
-                          className={`px-4 py-2 text-right font-medium ${m.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}
+                          className={`amount px-4 py-2 text-right ${m.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}
                         >
                           {m.type === 'CREDIT' ? '+' : '-'}
                           {formatCLP(amount)}
@@ -445,7 +451,7 @@ export default function ConciliacionPage() {
                         <TaxDocumentTypeBadge type={d.type} />
                       </td>
                       <td className="px-4 py-2 text-gray-900">{d.issuerName}</td>
-                      <td className="px-4 py-2 text-right font-semibold text-gray-900">
+                      <td className="amount px-4 py-2 text-right text-gray-900">
                         {formatCLP(d.totalAmount)}
                       </td>
                       <td className="px-4 py-2 text-right text-xs text-gray-400">

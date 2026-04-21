@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { apiClient } from '../../../lib/api';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../lib/formatters';
 import { PeriodSelector } from '../../../components/shared/PeriodSelector';
@@ -19,19 +18,17 @@ import {
   FileText,
   AlertCircle,
 } from 'lucide-react';
-
-// Lazy load recharts to avoid SSR issues
-const BarChart = dynamic(() => import('recharts').then((m) => m.BarChart), { ssr: false });
-const Bar = dynamic(() => import('recharts').then((m) => m.Bar), { ssr: false });
-const XAxis = dynamic(() => import('recharts').then((m) => m.XAxis), { ssr: false });
-const YAxis = dynamic(() => import('recharts').then((m) => m.YAxis), { ssr: false });
-const Tooltip = dynamic(() => import('recharts').then((m) => m.Tooltip), { ssr: false });
-const ResponsiveContainer = dynamic(() => import('recharts').then((m) => m.ResponsiveContainer), {
-  ssr: false,
-});
-const PieChart = dynamic(() => import('recharts').then((m) => m.PieChart), { ssr: false });
-const Pie = dynamic(() => import('recharts').then((m) => m.Pie), { ssr: false });
-const Cell = dynamic(() => import('recharts').then((m) => m.Cell), { ssr: false });
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 interface DashboardData {
   period: { name: string; status: string };
@@ -94,9 +91,41 @@ function KpiCard({
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500 font-medium">{title}</p>
-          <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+          <p
+            style={{
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 500,
+              fontSize: 16,
+              letterSpacing: '-0.01em',
+              color: '#6b7280',
+            }}
+          >
+            {title}
+          </p>
+          <p
+            className="amount"
+            style={{
+              marginTop: 6,
+              fontSize: 32,
+              color: '#1C1C1E',
+              lineHeight: 1.1,
+            }}
+          >
+            {value}
+          </p>
+          {subtitle && (
+            <p
+              style={{
+                marginTop: 6,
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 300,
+                fontSize: 13,
+                color: '#9aa0ad',
+              }}
+            >
+              {subtitle}
+            </p>
+          )}
         </div>
         <div
           className={`p-3 rounded-lg ${color.replace('text-', 'bg-').replace('600', '100').replace('500', '100')}`}
@@ -122,6 +151,17 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   IN_REVIEW: { label: 'En Revisión', cls: 'bg-yellow-100 text-yellow-700' },
   CLOSED: { label: 'Cerrado', cls: 'bg-gray-100 text-gray-500' },
 };
+
+const PIE_COLORS = [
+  '#1E3A5F',
+  '#2563EB',
+  '#3B82F6',
+  '#60A5FA',
+  '#93C5FD',
+  '#64748B',
+  '#475569',
+  '#334155',
+];
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -166,10 +206,10 @@ export default function DashboardPage() {
     : [];
 
   const pieData =
-    data?.categories.topExpenses.map((c) => ({
+    data?.categories.topExpenses.map((c, i) => ({
       name: c.categoryName,
       value: Number(c.total),
-      color: c.color || '#6B7280',
+      color: PIE_COLORS[i % PIE_COLORS.length],
     })) ?? [];
 
   return (
@@ -177,12 +217,12 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-2xl text-gray-900">Dashboard</h1>
           {data && (
             <p className="text-gray-500 mt-1">
               {data.period.name} &middot;{' '}
               <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[data.period.status]?.cls || 'bg-gray-100 text-gray-500'}`}
+                className={`badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[data.period.status]?.cls || 'bg-gray-100 text-gray-500'}`}
               >
                 {STATUS_LABELS[data.period.status]?.label || data.period.status}
               </span>
@@ -307,20 +347,38 @@ export default function DashboardPage() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Ingresos vs Egresos</h3>
             {incomeExpenseData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={incomeExpenseData} layout="vertical" barSize={28}>
-                  <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    formatter={(v: unknown) => formatCLP(v as number)}
-                    contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                  />
-                  <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                    <Cell fill="#3B82F6" />
-                    <Cell fill="#EF4444" />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={incomeExpenseData} layout="vertical" barSize={28}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      formatter={(v: unknown) => formatCLP(v as number)}
+                      contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                    />
+                    <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                      <Cell fill="#2563EB" />
+                      <Cell fill="#94A3B8" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: '#2563EB' }}
+                    />
+                    Ingresos
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: '#94A3B8' }}
+                    />
+                    Egresos
+                  </span>
+                </div>
+              </>
             ) : (
               <p className="text-gray-400 text-sm text-center py-8">Sin datos</p>
             )}
@@ -343,7 +401,7 @@ export default function DashboardPage() {
                     paddingAngle={3}
                   >
                     {pieData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -376,22 +434,22 @@ export default function DashboardPage() {
                 {
                   label: 'Saldo Apertura',
                   value: Number(data.cash.openingBalance),
-                  color: 'bg-gray-400',
+                  color: '#64748B',
                 },
                 {
                   label: 'Ingresos',
                   value: Number(data.movements.totalIncome),
-                  color: 'bg-green-500',
+                  color: '#2563EB',
                 },
                 {
                   label: 'Egresos',
                   value: Number(data.movements.totalExpense),
-                  color: 'bg-red-500',
+                  color: '#94A3B8',
                 },
                 {
                   label: 'Caja Libre',
                   value: Number(data.cash.freeCash),
-                  color: 'bg-blue-500',
+                  color: '#1E3A5F',
                 },
               ].map((item) => {
                 const maxVal = Math.max(
@@ -406,12 +464,12 @@ export default function DashboardPage() {
                   <div key={item.label}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-gray-600">{item.label}</span>
-                      <span className="font-medium text-gray-900">{formatCLP(item.value)}</span>
+                      <span className="amount text-gray-900">{formatCLP(item.value)}</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${item.color}`}
-                        style={{ width: `${pct}%` }}
+                        className="h-2 rounded-full"
+                        style={{ width: `${pct}%`, backgroundColor: item.color }}
                       />
                     </div>
                   </div>
@@ -460,9 +518,7 @@ export default function DashboardPage() {
                           <span className={urgencyColor}>{formatRelativeDate(c.dueDate)}</span>
                         </p>
                       </div>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {formatCLP(c.amount)}
-                      </span>
+                      <span className="amount text-sm text-gray-900">{formatCLP(c.amount)}</span>
                     </div>
                   );
                 })
@@ -515,7 +571,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <span
-                      className={`text-sm font-semibold ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
+                      className={`amount text-sm ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
                     >
                       {m.type === 'INCOME' ? '+' : '-'}
                       {formatCLP(m.amount)}

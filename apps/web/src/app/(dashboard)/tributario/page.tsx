@@ -79,9 +79,15 @@ function SummaryCard({
     <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500 font-medium">{title}</p>
-          <p className={`text-xl font-bold mt-1 ${color}`}>{value}</p>
-          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+          <p className="text-sm text-gray-500" style={{ fontWeight: 500 }}>
+            {title}
+          </p>
+          <p className={`amount text-[26px] mt-1 leading-tight ${color}`}>{value}</p>
+          {subtitle && (
+            <p className="text-xs text-gray-400 mt-1" style={{ fontWeight: 300 }}>
+              {subtitle}
+            </p>
+          )}
         </div>
         <div
           className={`p-2.5 rounded-lg ${color.replace('text-', 'bg-').replace('600', '100').replace('500', '100')}`}
@@ -218,7 +224,7 @@ export default function TributarioPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl text-gray-900 flex items-center gap-2">
             <Receipt size={24} className="text-gray-500" /> Tributario
           </h1>
           <p className="text-gray-500 text-sm mt-1">
@@ -399,18 +405,20 @@ export default function TributarioPage() {
                       <td className="px-4 py-2.5">
                         <TaxDocumentTypeBadge type={doc.type} />
                       </td>
-                      <td className="px-4 py-2.5 text-gray-600">{formatDate(doc.issueDate)}</td>
+                      <td className="mono px-4 py-2.5 text-gray-600">
+                        {formatDate(doc.issueDate)}
+                      </td>
                       <td className="px-4 py-2.5">
                         <div className="text-gray-900">{counterpartyName}</div>
                         <div className="text-xs text-gray-400">{counterpartyRut}</div>
                       </td>
-                      <td className="px-4 py-2.5 text-right text-gray-700">
+                      <td className="amount px-4 py-2.5 text-right text-gray-700">
                         {formatCLP(doc.netAmount)}
                       </td>
-                      <td className="px-4 py-2.5 text-right text-gray-500">
+                      <td className="amount px-4 py-2.5 text-right text-gray-500">
                         {formatCLP(doc.taxAmount)}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">
+                      <td className="amount px-4 py-2.5 text-right text-gray-900">
                         {formatCLP(doc.totalAmount)}
                       </td>
                       <td className="px-4 py-2.5 text-center">
