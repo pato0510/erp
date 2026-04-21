@@ -67,4 +67,14 @@ export class CategoriesController {
   ) {
     return this.categoriesService.deactivate(id, companyId, user.id);
   }
+
+  @Delete(':id/permanent')
+  @CheckPolicies((ability) => ability.can('delete', CategorySubject))
+  hardDelete(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.categoriesService.hardDelete(id, companyId, user.id);
+  }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Pencil, Power, PowerOff, Tag, X } from 'lucide-react';
+import { Plus, Pencil, Power, PowerOff, Tag, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { Toast } from '../../../components/shared/Toast';
 
@@ -114,6 +114,24 @@ export default function CategoriasPage() {
     } catch (err) {
       setToast({
         message: err instanceof Error ? err.message : 'Error',
+        type: 'error',
+      });
+    }
+  };
+
+  const handleHardDelete = async (c: Category) => {
+    if (
+      !window.confirm(`¿Eliminar "${c.name}" permanentemente? Esta acción no se puede deshacer.`)
+    ) {
+      return;
+    }
+    try {
+      await apiClient.delete(`/api/categories/${c.id}/permanent`);
+      setToast({ message: 'Categoría eliminada', type: 'success' });
+      load();
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Error al eliminar',
         type: 'error',
       });
     }
@@ -247,6 +265,13 @@ export default function CategoriasPage() {
                   >
                     {c.isActive ? <PowerOff size={14} /> : <Power size={14} />}
                   </button>
+                  <button
+                    onClick={() => handleHardDelete(c)}
+                    className="p-2 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600 transition"
+                    title="Eliminar permanentemente"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               );
             })}
@@ -297,13 +322,16 @@ function CategoryModal({
     if (!name.trim()) return;
     setSubmitting(true);
     try {
+      const trimmedParent = parentId.trim();
       await onSave({
         id: initial?.id,
         name: name.trim(),
         type: initialType,
         color,
         description: description.trim() || undefined,
-        parentId: parentId || null,
+        // Create: omit when empty. Edit: send null to unset a previously-set parent,
+        // undefined when it was empty and stays empty (no-op on backend).
+        parentId: trimmedParent ? trimmedParent : initial?.parentId ? null : undefined,
       });
     } finally {
       setSubmitting(false);

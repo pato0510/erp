@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { CompaniesService } from './companies.service';
+import { UpdateCompanyDto } from './dto/update-company.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { PoliciesGuard } from '../common/guards/policies.guard';
@@ -22,6 +23,16 @@ export class CompaniesController {
   @CheckPolicies((ability) => ability.can('read', CompanySubject))
   getSettings(@Param('id') id: string) {
     return this.companiesService.getSettings(id);
+  }
+
+  @Patch(':id')
+  @CheckPolicies((ability) => ability.can('update', CompanySubject))
+  updateCompany(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateCompanyDto,
+  ) {
+    return this.companiesService.updateCompany(id, user.id, dto);
   }
 
   @Patch(':id/settings')

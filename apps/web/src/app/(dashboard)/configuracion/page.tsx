@@ -144,6 +144,8 @@ function CompanySection({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [legalName, setLegalName] = useState('');
+  const [taxId, setTaxId] = useState('');
   const [fiscalYearStart, setFiscalYearStart] = useState(1);
   const [defaultCurrency, setDefaultCurrency] = useState('CLP');
   const [timezone, setTimezone] = useState('America/Santiago');
@@ -162,6 +164,8 @@ function CompanySection({
       .then(([c, s]) => {
         setCompany(c);
         setSettings(s);
+        setLegalName(c.legalName);
+        setTaxId(c.taxId);
         setFiscalYearStart(s.fiscalYearStart);
         setDefaultCurrency(s.defaultCurrency);
         setTimezone(s.timezone);
@@ -176,17 +180,22 @@ function CompanySection({
     if (!companyId) return;
     setSaving(true);
     try {
-      const body = {
+      const companyBody = {
+        legalName: legalName.trim(),
+        taxId: taxId.trim(),
+      };
+      const settingsBody = {
         fiscalYearStart,
         defaultCurrency,
         timezone,
         taxRate: Number(taxRatePct) / 100,
       };
-      const updated = await apiClient.patch<CompanySettings>(
-        `/api/companies/${companyId}/settings`,
-        body,
-      );
-      setSettings(updated);
+      const [updatedCompany, updatedSettings] = await Promise.all([
+        apiClient.patch<Company>(`/api/companies/${companyId}`, companyBody),
+        apiClient.patch<CompanySettings>(`/api/companies/${companyId}/settings`, settingsBody),
+      ]);
+      setCompany(updatedCompany);
+      setSettings(updatedSettings);
       onToast({ message: 'Configuración guardada', type: 'success' });
     } catch (err) {
       onToast({
@@ -224,14 +233,20 @@ function CompanySection({
         <>
           <div className="p-6 space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <CfgField label="Razón social" help="Editable desde la administración de la cuenta">
-                <input value={company.legalName} disabled className="cfg-input" />
-              </CfgField>
-              <CfgField label="RUT" help="Editable desde la administración de la cuenta">
+              <CfgField label="Razón social">
                 <input
-                  value={company.taxId}
-                  disabled
+                  value={legalName}
+                  onChange={(e) => setLegalName(e.target.value)}
                   className="cfg-input"
+                  maxLength={200}
+                />
+              </CfgField>
+              <CfgField label="RUT">
+                <input
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
+                  className="cfg-input"
+                  maxLength={20}
                   style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}
                 />
               </CfgField>
