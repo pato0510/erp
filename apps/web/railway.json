@@ -1,0 +1,16 @@
+{
+  "$schema": "https://railway.app/railway-schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm ci && npx nx build web --prod"
+  },
+  "deploy": {
+    "startCommand": "node apps/web/.next/standalone/apps/web/server.js",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
+  "_notes": {
+    "env": "HOSTNAME=0.0.0.0 is required for Railway to expose the port correctly. Also set PORT (Railway provides it) and NEXT_PUBLIC_API_URL pointing to the API service.",
+    "standaloneLayout": "In Nx monorepos, Next.js standalone output is nested at apps/web/.next/standalone/apps/web/server.js (not at apps/web/.next/standalone/server.js)."
+  }
+}
