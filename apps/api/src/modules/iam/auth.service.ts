@@ -71,19 +71,21 @@ export class AuthService {
       data: { refreshTokenHash: null },
     });
 
+    const isProd = process.env.NODE_ENV === 'production';
+
     response.clearCookie('access_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      domain: process.env.COOKIE_DOMAIN || undefined,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      domain: undefined,
       path: '/',
     });
 
     response.clearCookie('refresh_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      domain: process.env.COOKIE_DOMAIN || undefined,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      domain: undefined,
       path: '/api/auth/refresh',
     });
   }
@@ -134,23 +136,30 @@ export class AuthService {
     };
   }
 
+  // Cross-domain cookies on Railway (web on one *.up.railway.app, API on another)
+  // require SameSite=None + Secure. SameSite=None without Secure is rejected by
+  // browsers, so on localhost HTTP we fall back to SameSite=Lax + Secure=false.
+  // domain is left undefined on purpose so the browser scopes the cookie to the
+  // API host that set it — a COOKIE_DOMAIN override would break cross-site auth.
   private setAccessTokenCookie(response: Response, token: string) {
+    const isProd = process.env.NODE_ENV === 'production';
     response.cookie('access_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      domain: process.env.COOKIE_DOMAIN || undefined,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      domain: undefined,
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
       path: '/',
     });
   }
 
   private setRefreshTokenCookie(response: Response, token: string) {
+    const isProd = process.env.NODE_ENV === 'production';
     response.cookie('refresh_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      domain: process.env.COOKIE_DOMAIN || undefined,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      domain: undefined,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/api/auth/refresh',
     });
