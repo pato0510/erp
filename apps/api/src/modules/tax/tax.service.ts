@@ -43,6 +43,10 @@ export class TaxService {
     direction: DocumentDirection,
     providerName: string = DEFAULT_PROVIDER,
   ) {
+    this.logger.log(
+      `syncDocuments start company=${companyId} fiscalPeriodId=${fiscalPeriodId} direction=${direction} provider=${providerName}`,
+    );
+
     const period = await this.prisma.fiscalPeriod.findFirst({
       where: { id: fiscalPeriodId, companyId },
     });

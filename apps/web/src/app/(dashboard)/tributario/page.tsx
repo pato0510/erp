@@ -193,7 +193,7 @@ export default function TributarioPage() {
   };
 
   const handleSync = async (action: 'EMITIDO' | 'RECIBIDO' | 'ALL') => {
-    if (!periodId) {
+    if (!periodId || periodId.trim() === '') {
       setToast({
         message: 'Selecciona un período fiscal antes de sincronizar',
         type: 'info',
@@ -203,21 +203,43 @@ export default function TributarioPage() {
     setSyncingAction(action);
     try {
       if (action === 'ALL') {
-        const res = await apiClient.post<{ totalSynced: number; totalSkipped: number }>(
-          `/api/tax/sync-all?fiscalPeriodId=${periodId}`,
-        );
-        setToast({
-          message: `Sincronización completa: ${res.totalSynced} nuevos, ${res.totalSkipped} ya existían`,
-          type: 'success',
-        });
+        const res = await apiClient.post<{
+          totalSynced: number;
+          totalSkipped: number;
+          emitidos?: { errors?: { folio: number; message: string }[] };
+          recibidos?: { errors?: { folio: number; message: string }[] };
+        }>('/api/tax/sync-all', { fiscalPeriodId: periodId });
+
+        // `syncDocuments` swallows provider errors and returns them in the
+        // errors array rather than throwing. If we synced nothing AND the
+        // service reported at least one error, surface it — otherwise the
+        // user sees "0 nuevos" with no context on why.
+        const firstError =
+          res.emitidos?.errors?.[0]?.message ?? res.recibidos?.errors?.[0]?.message;
+        if ((res.totalSynced ?? 0) === 0 && firstError) {
+          setToast({ message: `Sync falló: ${firstError}`, type: 'error' });
+        } else {
+          setToast({
+            message: `Sincronización completa: ${res.totalSynced} nuevos, ${res.totalSkipped} ya existían`,
+            type: 'success',
+          });
+        }
       } else {
-        const res = await apiClient.post<{ synced: number; skipped: number }>(
-          `/api/tax/sync?fiscalPeriodId=${periodId}&direction=${action}`,
-        );
-        setToast({
-          message: `Sincronizados ${res.synced} documentos (${res.skipped} ya existían)`,
-          type: 'success',
-        });
+        const res = await apiClient.post<{
+          synced: number;
+          skipped: number;
+          errors?: { folio: number; message: string }[];
+        }>('/api/tax/sync', { fiscalPeriodId: periodId, direction: action });
+
+        const firstError = res.errors?.[0]?.message;
+        if ((res.synced ?? 0) === 0 && firstError) {
+          setToast({ message: `Sync falló: ${firstError}`, type: 'error' });
+        } else {
+          setToast({
+            message: `Sincronizados ${res.synced} documentos (${res.skipped} ya existían)`,
+            type: 'success',
+          });
+        }
       }
       reloadRef.current?.();
     } catch (err) {

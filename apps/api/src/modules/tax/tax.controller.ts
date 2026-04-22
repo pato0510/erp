@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Query,
@@ -30,6 +32,8 @@ const DOCUMENT_TYPES: DocumentType[] = [
 @Controller('tax')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class TaxController {
+  private readonly logger = new Logger(TaxController.name);
+
   constructor(private readonly taxService: TaxService) {}
 
   @Post('sync')
@@ -37,9 +41,19 @@ export class TaxController {
   async sync(
     @CurrentCompany() companyId: string,
     @CurrentUser() user: { id: string },
-    @Query('fiscalPeriodId') fiscalPeriodId: string,
-    @Query('direction') direction: string,
+    @Query('fiscalPeriodId') qsFiscalPeriodId: string | undefined,
+    @Query('direction') qsDirection: string | undefined,
+    @Body() body: { fiscalPeriodId?: string; direction?: string } = {},
   ) {
+    // Accept params from either query string or JSON body so the endpoint
+    // works with both calling styles. Body wins when both are present.
+    const fiscalPeriodId = body.fiscalPeriodId ?? qsFiscalPeriodId;
+    const direction = body.direction ?? qsDirection;
+
+    this.logger.log(
+      `POST /tax/sync company=${companyId} fiscalPeriodId=${fiscalPeriodId} direction=${direction}`,
+    );
+
     if (!fiscalPeriodId) throw new BadRequestException('fiscalPeriodId is required');
     if (!DIRECTIONS.includes(direction as DocumentDirection)) {
       throw new BadRequestException(`direction must be one of: ${DIRECTIONS.join(', ')}`);
@@ -57,8 +71,13 @@ export class TaxController {
   async syncAll(
     @CurrentCompany() companyId: string,
     @CurrentUser() user: { id: string },
-    @Query('fiscalPeriodId') fiscalPeriodId: string,
+    @Query('fiscalPeriodId') qsFiscalPeriodId: string | undefined,
+    @Body() body: { fiscalPeriodId?: string } = {},
   ) {
+    const fiscalPeriodId = body.fiscalPeriodId ?? qsFiscalPeriodId;
+
+    this.logger.log(`POST /tax/sync-all company=${companyId} fiscalPeriodId=${fiscalPeriodId}`);
+
     if (!fiscalPeriodId) throw new BadRequestException('fiscalPeriodId is required');
     return this.taxService.syncAll(companyId, user.id, fiscalPeriodId);
   }

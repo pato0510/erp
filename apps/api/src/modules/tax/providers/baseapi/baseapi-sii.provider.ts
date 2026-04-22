@@ -101,24 +101,26 @@ export class BaseApiSiiProvider implements ISiiProvider {
     const { rut, password } = this.resolveCredentials(credentials);
     // BaseAPI puts the period and tipo in the URL path (not the body). `tipo`
     // is singular — `venta` for emitidos, `compra` for recibidos.
-    const payload = await this.post(`/sii/rcv/${this.formatPeriod(period)}/venta`, {
-      rut,
-      password,
-    });
-    return extractDocuments(payload).map((row) =>
-      this.mapRow(row, DocumentDirection.EMITIDO, rut, period),
-    );
+    const path = `/sii/rcv/${this.formatPeriod(period)}/venta`;
+    const url = `${this.baseUrl}${path}`;
+
+    console.log('BaseAPI call:', url, 'period:', period);
+    const payload = await this.post(path, { rut, password });
+    const rows = extractDocuments(payload);
+    this.logger.log(`getEmitidos ${this.formatPeriod(period)} → ${rows.length} rows`);
+    return rows.map((row) => this.mapRow(row, DocumentDirection.EMITIDO, rut, period));
   }
 
   async getRecibidos(credentials: unknown, period: SiiPeriod): Promise<TaxDocumentResult[]> {
     const { rut, password } = this.resolveCredentials(credentials);
-    const payload = await this.post(`/sii/rcv/${this.formatPeriod(period)}/compra`, {
-      rut,
-      password,
-    });
-    return extractDocuments(payload).map((row) =>
-      this.mapRow(row, DocumentDirection.RECIBIDO, rut, period),
-    );
+    const path = `/sii/rcv/${this.formatPeriod(period)}/compra`;
+    const url = `${this.baseUrl}${path}`;
+
+    console.log('BaseAPI call:', url, 'period:', period);
+    const payload = await this.post(path, { rut, password });
+    const rows = extractDocuments(payload);
+    this.logger.log(`getRecibidos ${this.formatPeriod(period)} → ${rows.length} rows`);
+    return rows.map((row) => this.mapRow(row, DocumentDirection.RECIBIDO, rut, period));
   }
 
   async validateConnection(credentials: BaseApiCredentials = {}): Promise<{
