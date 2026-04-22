@@ -47,7 +47,36 @@ export class SiiConnectionService {
 
     const bucket = process.env.SII_CERT_BUCKET || 'excelsia-documents';
     const key = `sii/${companyId}/certificate.pfx`;
-    await this.storage.uploadFile(bucket, key, file.buffer, 'application/x-pkcs12');
+
+    // Prefer MinIO/S3 when configured. If the endpoint isn't set or the upload
+    // throws (network, missing bucket, auth), persist the bytes in Postgres as
+    // a fallback so deployments without object storage still work end-to-end.
+    let storedPath: string | null = null;
+    let storedData: Uint8Array<ArrayBuffer> | null = null;
+    let storedName: string | null = null;
+
+    // Prisma's Bytes column input expects `Uint8Array<ArrayBuffer>`. Multer's
+    // `file.buffer` is a Buffer over a possibly shared/sliced ArrayBufferLike,
+    // which TS won't narrow. `Uint8Array.from(...)` allocates a fresh, plain
+    // ArrayBuffer-backed copy that matches the expected type.
+    const fileBytes: Uint8Array<ArrayBuffer> = Uint8Array.from(file.buffer);
+
+    if (this.storage.isConfigured()) {
+      try {
+        await this.storage.uploadFile(bucket, key, file.buffer, 'application/x-pkcs12');
+        storedPath = key;
+      } catch (err) {
+        this.logger.warn(
+          `MinIO upload failed (${err instanceof Error ? err.message : err}); falling back to DB storage`,
+        );
+        storedData = fileBytes;
+        storedName = file.originalname;
+      }
+    } else {
+      this.logger.warn('MinIO not available, storing certificate in DB');
+      storedData = fileBytes;
+      storedName = file.originalname;
+    }
 
     const encryptedPassword = this.encryptPassword(password);
 
@@ -56,14 +85,18 @@ export class SiiConnectionService {
         where: { companyId },
         update: {
           rut: rut.trim(),
-          certificatePath: key,
+          certificatePath: storedPath,
+          certificateData: storedData,
+          certificateName: storedName,
           certificatePasswordHash: encryptedPassword,
           lastErrorMessage: null,
         },
         create: {
           companyId,
           rut: rut.trim(),
-          certificatePath: key,
+          certificatePath: storedPath,
+          certificateData: storedData,
+          certificateName: storedName,
           certificatePasswordHash: encryptedPassword,
         },
       });
@@ -72,10 +105,35 @@ export class SiiConnectionService {
     return { success: true, connectionId: connection.id };
   }
 
+  /**
+   * Loads the .pfx bytes for a company, preferring the DB-backed copy (which
+   * is the fallback when MinIO is unavailable) and only fetching from MinIO
+   * when nothing is stored locally.
+   */
+  private async loadCertificateBuffer(connection: {
+    certificateData: Uint8Array | null;
+    certificatePath: string | null;
+  }): Promise<Buffer | null> {
+    if (connection.certificateData) {
+      return Buffer.isBuffer(connection.certificateData)
+        ? connection.certificateData
+        : Buffer.from(connection.certificateData);
+    }
+    if (!connection.certificatePath) return null;
+    if (!this.storage.isConfigured()) {
+      throw new BadRequestException(
+        'Certificado almacenado en MinIO pero MinIO no está configurado',
+      );
+    }
+    const bucket = process.env.SII_CERT_BUCKET || 'excelsia-documents';
+    return this.storage.downloadFile(bucket, connection.certificatePath);
+  }
+
   async testConnection(companyId: string, userId: string) {
     const connection = await this.prisma.siiConnection.findUnique({ where: { companyId } });
     if (!connection) throw new NotFoundException('SII connection not configured');
-    if (!connection.certificatePath || !connection.certificatePasswordHash) {
+    const hasCertificate = Boolean(connection.certificatePath || connection.certificateData);
+    if (!hasCertificate || !connection.certificatePasswordHash) {
       throw new BadRequestException('Certificate not uploaded yet');
     }
 
@@ -99,6 +157,20 @@ export class SiiConnectionService {
       };
     }
 
+    // Confirm the certificate bytes are reachable via either source. We don't
+    // forward the buffer to the LibreDTE info endpoint (it only needs the API
+    // hash/key), but exercising the loader here surfaces storage gaps before
+    // a real sync run depends on it.
+    try {
+      const buffer = await this.loadCertificateBuffer(connection);
+      if (!buffer) throw new Error('Certificate buffer is empty');
+    } catch (err) {
+      const message = `No se pudo cargar el certificado: ${err instanceof Error ? err.message : err}`;
+      this.logger.error(`testConnection company=${companyId}: ${message}`);
+      await this.updateStatus(companyId, userId, false, message);
+      return { isActive: false, message };
+    }
+
     try {
       await this.libredte.get(`/dte/contribuyentes/info/${encodeURIComponent(connection.rut)}`);
       await this.updateStatus(companyId, userId, true, null);
@@ -114,10 +186,13 @@ export class SiiConnectionService {
   async getConnection(companyId: string) {
     const connection = await this.prisma.siiConnection.findUnique({
       where: { companyId },
+      // Never return certificateData (potentially huge) or the encrypted
+      // password to clients. We only expose existence flags.
       select: {
         id: true,
         rut: true,
         certificatePath: true,
+        certificateName: true,
         isActive: true,
         lastSyncAt: true,
         lastErrorMessage: true,
@@ -126,10 +201,22 @@ export class SiiConnectionService {
       },
     });
     if (!connection) return null;
+
+    // Probe certificateData existence without pulling the bytes over the wire.
+    const certificateDataPresent = await this.prisma.siiConnection.count({
+      where: { companyId, certificateData: { not: null } },
+    });
+
     return {
       id: connection.id,
       rut: connection.rut,
-      hasCertificate: Boolean(connection.certificatePath),
+      hasCertificate: Boolean(connection.certificatePath) || certificateDataPresent > 0,
+      certificateSource: connection.certificatePath
+        ? ('minio' as const)
+        : certificateDataPresent > 0
+          ? ('database' as const)
+          : null,
+      certificateName: connection.certificateName,
       isActive: connection.isActive,
       lastSyncAt: connection.lastSyncAt,
       lastErrorMessage: connection.lastErrorMessage,

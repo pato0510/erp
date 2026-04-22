@@ -1,6 +1,12 @@
 // SII (Servicio de Impuestos Internos) connection per company.
 //
-// `certificatePath`  — MinIO key of the encrypted .pfx under SII_CERT_BUCKET.
+// Certificate storage is dual-mode: MinIO/S3 when configured, otherwise the
+// .pfx bytes live directly in the DB so deployments without object storage
+// (e.g. Railway without an attached bucket) still work.
+//
+// `certificatePath` — MinIO key under SII_CERT_BUCKET (preferred).
+// `certificateData` — raw .pfx bytes (fallback when MinIO is unavailable).
+// `certificateName` — original filename, only meaningful for the DB path.
 // `certificatePasswordHash` — despite the "hash" suffix in the field name,
 //   this column holds the AES-256-GCM ciphertext of the cert password,
 //   base64-encoded with the IV and auth tag embedded. We cannot use a
@@ -11,6 +17,8 @@ model SiiConnection {
   companyId               String    @unique @db.Uuid
   rut                     String
   certificatePath         String?
+  certificateData         Bytes?
+  certificateName         String?
   certificatePasswordHash String?
   isActive                Boolean   @default(false)
   lastSyncAt              DateTime?

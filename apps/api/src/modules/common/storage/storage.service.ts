@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Readable } from 'stream';
 
 @Injectable()
 export class StorageService {
@@ -19,6 +20,15 @@ export class StorageService {
     });
   }
 
+  /**
+   * Whether MinIO/S3 looks usable. Without an endpoint the SDK builds a
+   * malformed URL like `http://undefined:9000` that always errors out — we'd
+   * rather fall back deterministically than wait for a network timeout.
+   */
+  isConfigured(): boolean {
+    return Boolean(process.env.MINIO_ENDPOINT && process.env.MINIO_ENDPOINT.trim().length > 0);
+  }
+
   async uploadFile(bucket: string, key: string, buffer: Buffer, mimetype: string): Promise<string> {
     await this.s3.send(
       new PutObjectCommand({
@@ -30,6 +40,27 @@ export class StorageService {
     );
     this.logger.log(`Uploaded ${key} to ${bucket}`);
     return key;
+  }
+
+  async downloadFile(bucket: string, key: string): Promise<Buffer> {
+    const res = await this.s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    const body = res.Body;
+    if (!body) throw new Error(`Empty body returned for ${bucket}/${key}`);
+    if (body instanceof Readable) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of body) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
+    }
+    // Newer SDK builds expose a `transformToByteArray` helper — fall back to
+    // it when the body is not a Node Readable (e.g. browser-like stream).
+    const maybeArray = body as { transformToByteArray?: () => Promise<Uint8Array> };
+    if (typeof maybeArray.transformToByteArray === 'function') {
+      const bytes = await maybeArray.transformToByteArray();
+      return Buffer.from(bytes);
+    }
+    throw new Error(`Unsupported S3 body type for ${bucket}/${key}`);
   }
 
   async getFileUrl(bucket: string, key: string): Promise<string> {
