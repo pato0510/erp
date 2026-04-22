@@ -12,7 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { formatCLP, formatDate } from '../../../lib/formatters';
+import { formatCLP } from '../../../lib/formatters';
 import { Toast } from '../../../components/shared/Toast';
 
 interface Company {
@@ -69,9 +69,6 @@ const MONTH_NAMES = [
   'Noviembre',
   'Diciembre',
 ];
-
-const CURRENT_YEAR = new Date().getFullYear();
-const NEXT_YEAR = CURRENT_YEAR + 1;
 
 export default function ConfiguracionPage() {
   const [toast, setToast] = useState<{
@@ -365,6 +362,10 @@ function PeriodsSection({
 }: {
   onToast: (t: { message: string; type: 'success' | 'error' | 'info' }) => void;
 }) {
+  const currentYear = new Date().getFullYear();
+  const YEAR_OPTIONS = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -372,26 +373,39 @@ function PeriodsSection({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<FiscalPeriod[]>(`/api/fiscal-periods?year=${CURRENT_YEAR}`);
-      // Sort ascending by month just in case
+      const res = await apiClient.get<FiscalPeriod[]>(`/api/fiscal-periods?year=${selectedYear}`);
       res.sort((a, b) => a.month - b.month);
       setPeriods(res);
-    } catch {
-      onToast({ message: 'Error cargando períodos', type: 'error' });
+    } catch (err) {
+      onToast({
+        message: err instanceof Error ? err.message : 'Error cargando períodos',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
-  }, [onToast]);
+  }, [selectedYear, onToast]);
 
+  // Primitive-only deps (selectedYear + stable setter) — no infinite loop.
   useEffect(() => {
     load();
   }, [load]);
 
-  const generateNext = async () => {
+  const generate = async () => {
     setGenerating(true);
     try {
-      await apiClient.post(`/api/fiscal-periods/generate/${NEXT_YEAR}`);
-      onToast({ message: `Períodos ${NEXT_YEAR} generados`, type: 'success' });
+      const res = await apiClient.post<{ created: number; periods: string[] }>(
+        `/api/fiscal-periods/generate/${selectedYear}`,
+      );
+      onToast({
+        message:
+          res.created === 0
+            ? `Todos los períodos de ${selectedYear} ya existían`
+            : `${res.created} período${res.created === 1 ? '' : 's'} de ${selectedYear} generado${res.created === 1 ? '' : 's'}`,
+        type: 'success',
+      });
+      // Immediate refresh so new cards appear without a manual reload.
+      await load();
     } catch (err) {
       onToast({
         message: err instanceof Error ? err.message : 'Error al generar períodos',
@@ -402,27 +416,54 @@ function PeriodsSection({
     }
   };
 
+  // Index existing periods by month so the 12-card grid can look them up in O(1).
+  const byMonth = new Map(periods.map((p) => [p.month, p]));
+
   return (
     <section
       id="periodos"
       className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm"
     >
-      <header className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-blue-50">
-            <CalendarClock size={18} className="text-blue-600" />
-          </div>
-          <div>
-            <h2 className="text-base text-[var(--text-primary)]" style={{ fontWeight: 600 }}>
-              Períodos fiscales
-            </h2>
-            <p className="text-xs text-[var(--text-secondary)]" style={{ fontWeight: 300 }}>
-              Períodos del año {CURRENT_YEAR}
-            </p>
-          </div>
+      <header className="px-6 py-4 border-b border-[var(--border-color)] flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-blue-50">
+          <CalendarClock size={18} className="text-blue-600" />
+        </div>
+        <div>
+          <h2 className="text-base text-[var(--text-primary)]" style={{ fontWeight: 600 }}>
+            Períodos fiscales
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)]" style={{ fontWeight: 300 }}>
+            Selecciona un año para ver o generar sus períodos
+          </p>
+        </div>
+      </header>
+
+      {/* Year selector + generate action */}
+      <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          {YEAR_OPTIONS.map((y) => {
+            const active = selectedYear === y;
+            return (
+              <button
+                key={y}
+                onClick={() => setSelectedYear(y)}
+                className={`px-3 py-1.5 text-sm rounded-md transition ${
+                  active
+                    ? 'bg-blue-600 text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+                style={{
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontWeight: 500,
+                }}
+              >
+                {y}
+              </button>
+            );
+          })}
         </div>
         <button
-          onClick={generateNext}
+          onClick={generate}
           disabled={generating}
           className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
           style={{
@@ -432,58 +473,89 @@ function PeriodsSection({
           }}
         >
           <Calendar size={14} />
-          {generating ? 'Generando...' : `Generar períodos ${NEXT_YEAR}`}
+          {generating ? 'Generando...' : `Generar períodos ${selectedYear}`}
         </button>
-      </header>
+      </div>
 
-      {loading ? (
-        <div className="p-6 space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-9 bg-gray-100 rounded animate-pulse" />
-          ))}
-        </div>
-      ) : periods.length === 0 ? (
-        <div className="p-8 text-center text-sm text-[var(--text-muted)]">
-          Sin períodos para {CURRENT_YEAR}
-        </div>
-      ) : (
-        <div className="divide-y divide-[var(--border-color)]">
-          {periods.map((p) => {
-            const badge = STATUS_BADGE[p.status];
-            return (
-              <div key={p.id} className="px-6 py-3 flex items-center gap-3">
+      {/* Grid or empty state */}
+      <div className="p-6">
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : periods.length === 0 ? (
+          <div className="text-center py-10">
+            <p
+              className="text-sm text-[var(--text-secondary)]"
+              style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
+            >
+              No hay períodos para {selectedYear}. Genera los períodos.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {Array.from({ length: 12 }, (_, i) => {
+              const month = i + 1;
+              const period = byMonth.get(month);
+              const monthLabel = MONTH_NAMES[i];
+
+              if (!period) {
+                return (
+                  <div
+                    key={month}
+                    className="rounded-lg border-2 border-dashed border-[var(--border-color)] p-3 flex flex-col gap-1.5 min-h-[80px]"
+                  >
+                    <p
+                      className="text-sm text-[var(--text-muted)]"
+                      style={{
+                        fontFamily: 'var(--font-outfit), sans-serif',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {monthLabel} {selectedYear}
+                    </p>
+                    <span
+                      className="text-[11px] text-[var(--text-muted)] mt-auto"
+                      style={{
+                        fontFamily: 'var(--font-outfit), sans-serif',
+                        fontWeight: 300,
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      No generado
+                    </span>
+                  </div>
+                );
+              }
+
+              const badge = STATUS_BADGE[period.status];
+              return (
                 <div
-                  className="mono text-xs text-[var(--text-muted)] w-8"
-                  style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}
+                  key={period.id}
+                  className="rounded-lg border border-[var(--border-color)] p-3 flex flex-col gap-1.5 min-h-[80px]"
                 >
-                  {String(p.month).padStart(2, '0')}
-                </div>
-                <div className="flex-1 min-w-0">
                   <p
-                    className="text-[var(--text-primary)]"
+                    className="text-sm text-[var(--text-primary)]"
                     style={{
                       fontFamily: 'var(--font-outfit), sans-serif',
                       fontWeight: 500,
-                      fontSize: 14,
                     }}
                   >
-                    {p.name}
+                    {monthLabel} {selectedYear}
                   </p>
-                  <p
-                    className="mono text-xs text-[var(--text-muted)]"
-                    style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}
+                  <span
+                    className={`badge self-start text-[10px] px-2 py-0.5 rounded-full ${badge.cls}`}
                   >
-                    {formatDate(p.startDate)} — {formatDate(p.endDate)}
-                  </p>
+                    {badge.label}
+                  </span>
                 </div>
-                <span className={`badge text-[11px] px-2.5 py-0.5 rounded-full ${badge.cls}`}>
-                  {badge.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
