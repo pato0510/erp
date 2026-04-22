@@ -1,4 +1,5 @@
 import nx from '@nx/eslint-plugin';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
   ...nx.configs['flat/base'],
@@ -6,6 +7,14 @@ export default [
   ...nx.configs['flat/javascript'],
   {
     ignores: ['**/dist', '**/out-tsc', '**/.next'],
+  },
+  {
+    files: ['**/*.tsx', '**/*.jsx'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+    },
   },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],

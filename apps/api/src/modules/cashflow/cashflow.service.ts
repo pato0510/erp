@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommitmentStatus, MovementStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { RlsService } from '../common/rls/rls.service';
@@ -30,6 +30,47 @@ export class CashflowService {
       where: { companyId, isActive: true },
       include: { balances: { orderBy: { createdAt: 'desc' }, take: 1 } },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  async deleteAccount(id: string, companyId: string, userId: string) {
+    const account = await this.prisma.bankAccount.findFirst({
+      where: { id, companyId },
+    });
+    if (!account) throw new NotFoundException('Cuenta bancaria no encontrada');
+
+    // Movement has no direct link to BankAccount — the proxy for "confirmed movements"
+    // is ExternalBankMovement rows imported via any BankConnection tied to this account.
+    const connections = await this.prisma.bankConnection.findMany({
+      where: { bankAccountId: id, companyId },
+      select: { id: true },
+    });
+
+    if (connections.length > 0) {
+      const movementCount = await this.prisma.externalBankMovement.count({
+        where: { bankConnectionId: { in: connections.map((c) => c.id) } },
+      });
+      if (movementCount > 0) {
+        throw new BadRequestException(
+          'No se puede eliminar una cuenta con movimientos confirmados. Desactívala en su lugar.',
+        );
+      }
+    }
+
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      await tx.accountBalance.deleteMany({ where: { bankAccountId: id, companyId } });
+
+      if (connections.length > 0) {
+        const connectionIds = connections.map((c) => c.id);
+        await tx.bankSyncRun.deleteMany({
+          where: { bankConnectionId: { in: connectionIds } },
+        });
+        await tx.bankConnection.deleteMany({
+          where: { bankAccountId: id, companyId },
+        });
+      }
+
+      return tx.bankAccount.delete({ where: { id } });
     });
   }
 

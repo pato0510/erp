@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CashflowService } from './cashflow.service';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 import { SetOpeningBalanceDto } from './dto/set-opening-balance.dto';
@@ -62,6 +72,16 @@ export class CashflowController {
     @Body() dto: SetOpeningBalanceDto,
   ) {
     return this.cashflowService.setOpeningBalance(companyId, user.id, dto);
+  }
+
+  @Delete('accounts/:id')
+  @CheckPolicies((ability) => ability.can('delete', MovementSubject))
+  deleteAccount(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.cashflowService.deleteAccount(id, companyId, user.id);
   }
 
   // ── Commitments ────────────────────────────────────────

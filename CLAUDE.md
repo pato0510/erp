@@ -164,3 +164,7 @@ REL-001 — Production go-live checklist ✓
 ## Status
 
 V1 COMPLETE — Ready for production
+
+## current ticket
+
+Se debe crear boton para poder crear cuenta bancaria en sección de "Caja".
