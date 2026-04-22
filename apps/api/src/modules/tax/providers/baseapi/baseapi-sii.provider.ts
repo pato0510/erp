@@ -99,10 +99,11 @@ export class BaseApiSiiProvider implements ISiiProvider {
 
   async getEmitidos(credentials: unknown, period: SiiPeriod): Promise<TaxDocumentResult[]> {
     const { rut, password } = this.resolveCredentials(credentials);
-    const payload = await this.post('/sii/rcv/ventas', {
+    // BaseAPI puts the period and tipo in the URL path (not the body). `tipo`
+    // is singular — `venta` for emitidos, `compra` for recibidos.
+    const payload = await this.post(`/sii/rcv/${this.formatPeriod(period)}/venta`, {
       rut,
       password,
-      periodo: this.formatPeriod(period),
     });
     return extractDocuments(payload).map((row) =>
       this.mapRow(row, DocumentDirection.EMITIDO, rut, period),
@@ -111,10 +112,9 @@ export class BaseApiSiiProvider implements ISiiProvider {
 
   async getRecibidos(credentials: unknown, period: SiiPeriod): Promise<TaxDocumentResult[]> {
     const { rut, password } = this.resolveCredentials(credentials);
-    const payload = await this.post('/sii/rcv/compras', {
+    const payload = await this.post(`/sii/rcv/${this.formatPeriod(period)}/compra`, {
       rut,
       password,
-      periodo: this.formatPeriod(period),
     });
     return extractDocuments(payload).map((row) =>
       this.mapRow(row, DocumentDirection.RECIBIDO, rut, period),
