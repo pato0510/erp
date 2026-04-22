@@ -165,32 +165,56 @@ REL-001 — Production go-live checklist ✓
 
 V1 COMPLETE — Ready for production
 
-## SII Integration — LibreDTE
+## SII Integration — ## SII Integration — BaseAPI (UPDATED)
 
-Provider: LibreDTE (libredte.cl)
-Authentication: API Hash + API Key (stored in env vars)
-Client RUT: 77.004.647-5
-Certificate format: .pfx with password
+Provider: BaseAPI (baseapi.cl) — GRATUITO
+Previous provider: LibreDTE — DESCARTADO (costo $40.000+IVA/mes)
 
-### Environment variables needed
+### How it works
 
-LIBREDTE_API_HASH=your_api_hash
-LIBREDTE_API_KEY=your_api_key
-LIBREDTE_BASE_URL=https://libredte.cl/api
-SII_CERT_PASSWORD=pfx_certificate_password
+BaseAPI connects to SII using RUT + SII portal password.
+No certificate needed for reading documents.
+Returns JSON directly (no SOAP, no XML).
+
+### Environment variables (Railway)
+
+BASEAPI_KEY=api_key_from_baseapi_dashboard
+SII_RUT=77004647-5
+SII_PASSWORD=client_sii_portal_password
+
+### BaseAPI Endpoints used
+
+POST https://api.baseapi.cl/api/v1/sii/rcv/ventas — facturas emitidas
+POST https://api.baseapi.cl/api/v1/sii/rcv/compras — facturas recibidas
+POST https://api.baseapi.cl/api/v1/sii/contribuyente/informacion — test connection
+Auth: Header X-API-Key: {BASEAPI_KEY}
+Period format: "YYYY-MM"
+
+### Document types synced
+
+- Tipo 33: Factura Electrónica (EMITIDO y RECIBIDO)
+- Tipo 34: Factura No Afecta
+- Tipo 39: Boleta Electrónica
+- Tipo 61: Nota de Crédito
+- Tipo 56: Nota de Débito
+  Direction: EMITIDO (ventas) and RECIBIDO (compras)
 
 ### Architecture
 
-- Certificate .pfx stored securely in MinIO
-- LibreDTE handles all SII authentication complexity
-- Sync runs automatically every 24h via BullMQ
-- Manual sync available from /tributario screen
+- BaseApiSiiProvider implements ISiiProvider interface
+- Default provider: 'baseapi' (replaces mock-sii in production)
+- Mock provider kept for local development/testing
+- Sync runs manually from /tributario screen
+- Future: auto-sync every 24h via BullMQ
 
-### Document types to sync
+### SiiConnection model
 
-- DTE tipo 33: Factura Electrónica
-- DTE tipo 34: Factura No Afecta
-- DTE tipo 39: Boleta Electrónica
-- DTE tipo 61: Nota de Crédito
-- DTE tipo 56: Nota de Débito
-  Direction: EMITIDO (issued) and RECIBIDO (received)
+- Still exists in DB for audit trail
+- certificateData field kept but not used for BaseAPI
+- Provider field: 'baseapi'
+- isActive: true when BASEAPI_KEY + SII_PASSWORD are set
+
+### Production URLs
+
+Frontend: https://app.excelsia.cl
+Backend: https://api.excelsia.clLibreDTE
