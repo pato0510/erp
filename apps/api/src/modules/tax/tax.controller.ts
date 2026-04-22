@@ -63,6 +63,12 @@ export class TaxController {
     return this.taxService.syncAll(companyId, user.id, fiscalPeriodId);
   }
 
+  @Post('test-connection')
+  @CheckPolicies((ability) => ability.can('read', MovementSubject))
+  async testConnection() {
+    return this.taxService.testConnection();
+  }
+
   @Get('documents')
   @CheckPolicies((ability) => ability.can('read', MovementSubject))
   findDocuments(

@@ -1,11 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DocumentDirection, DocumentType, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { SiiProviderFactory } from './providers/sii-provider.factory';
+import { DEFAULT_SII_PROVIDER, SiiProviderFactory } from './providers/sii-provider.factory';
 import { TaxDocumentResult } from './providers/sii-provider.interface';
 import { paginate } from '@erp/utils';
 
-const DEFAULT_PROVIDER = 'mock-sii';
+const DEFAULT_PROVIDER = DEFAULT_SII_PROVIDER;
 
 const EMPTY_SUMMARY = {
   emitidos: { count: 0, netTotal: 0, taxTotal: 0, total: 0 },
@@ -62,10 +62,18 @@ export class TaxService {
 
     try {
       const siiPeriod = { year: period.year, month: period.month };
+      // Credentials currently come from env vars (SII_RUT/SII_PASSWORD). Once
+      // we persist them per-company on SiiConnection, swap this block for a
+      // DB lookup — the provider interface accepts `unknown`, so no signature
+      // change is needed here.
+      const credentials = {
+        rut: process.env.SII_RUT,
+        password: process.env.SII_PASSWORD,
+      };
       const documents =
         direction === 'EMITIDO'
-          ? await provider.getEmitidos(null, siiPeriod)
-          : await provider.getRecibidos(null, siiPeriod);
+          ? await provider.getEmitidos(credentials, siiPeriod)
+          : await provider.getRecibidos(credentials, siiPeriod);
 
       let synced = 0;
       let skipped = 0;
@@ -96,12 +104,26 @@ export class TaxService {
       return { synced, skipped, errors, syncRunId: syncRun.id };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      this.logger.warn(
+        `syncDocuments failed company=${companyId} period=${fiscalPeriodId} direction=${direction}: ${message}`,
+      );
       await this.prisma.taxSyncRun.update({
         where: { id: syncRun.id },
         data: { status: 'FAILED', completedAt: new Date(), errorMessage: message },
       });
-      throw err;
+      // Returning a structured result (instead of throwing) matches the task's
+      // "handle errors gracefully" directive and keeps sync-all from dying on
+      // the first half.
+      return { synced: 0, skipped: 0, errors: [{ folio: 0, message }], syncRunId: syncRun.id };
     }
+  }
+
+  async testConnection() {
+    const baseApi = this.providerFactory.getBaseApiProvider();
+    return baseApi.validateConnection({
+      rut: process.env.SII_RUT,
+      password: process.env.SII_PASSWORD,
+    });
   }
 
   async syncAll(companyId: string, userId: string, fiscalPeriodId: string) {
