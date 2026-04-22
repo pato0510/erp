@@ -53,13 +53,15 @@ function toNumber(v: unknown): number {
 
 function parseIssueDate(raw: unknown): Date {
   if (!raw) return new Date();
-  const s = String(raw);
-  // SII dates are frequently YYYY-MM-DD; JS `new Date(...)` handles that.
+  const s = String(raw).trim();
+  // DD/MM/YYYY and DD-MM-YYYY must be matched BEFORE `new Date(s)` because
+  // V8 happily parses "07/01/2026" as the US-style July 1 — we'd lose every
+  // DD/MM date to a silent month/day swap otherwise.
+  const dmy = s.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+  if (dmy) return new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+  // ISO 8601 (YYYY-MM-DD) or full timestamps — JS parses these correctly.
   const d = new Date(s);
   if (!Number.isNaN(d.getTime())) return d;
-  // Some BaseAPI shapes emit DD-MM-YYYY or DD/MM/YYYY — try that too.
-  const m = s.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
   return new Date();
 }
 
@@ -67,8 +69,18 @@ function extractDocuments(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) return payload as Record<string, unknown>[];
   if (payload && typeof payload === 'object') {
     const p = payload as Record<string, unknown>;
-    // Most BaseAPI responses wrap the list in { success, data } or similar.
-    for (const key of ['data', 'documentos', 'detalles', 'result', 'ventas', 'compras']) {
+    // BaseAPI RCV responses come as { success, data: { datos: [...] } }. The
+    // ordered fallbacks below cover that shape plus variants we've seen from
+    // other endpoints (`documentos`, `detalles`, etc.) so the parser stays
+    // tolerant without assuming one specific layout.
+    if (p.data && typeof p.data === 'object' && !Array.isArray(p.data)) {
+      const inner = p.data as Record<string, unknown>;
+      for (const key of ['datos', 'documentos', 'detalles', 'result', 'rows', 'items']) {
+        const v = inner[key];
+        if (Array.isArray(v)) return v as Record<string, unknown>[];
+      }
+    }
+    for (const key of ['datos', 'data', 'documentos', 'detalles', 'result', 'ventas', 'compras']) {
       const v = p[key];
       if (Array.isArray(v)) return v as Record<string, unknown>[];
     }
@@ -107,6 +119,8 @@ export class BaseApiSiiProvider implements ISiiProvider {
     console.log('BaseAPI call:', url, 'period:', period);
     const payload = await this.post(path, { rut, password });
     const rows = extractDocuments(payload);
+    console.log(`BaseAPI ventas ${this.formatPeriod(period)} → ${rows.length} rows extracted`);
+    if (rows.length > 0) console.log('First row sample:', rows[0]);
     this.logger.log(`getEmitidos ${this.formatPeriod(period)} → ${rows.length} rows`);
     return rows.map((row) => this.mapRow(row, DocumentDirection.EMITIDO, rut, period));
   }
@@ -119,8 +133,14 @@ export class BaseApiSiiProvider implements ISiiProvider {
     console.log('BaseAPI call:', url, 'period:', period);
     const payload = await this.post(path, { rut, password });
     const rows = extractDocuments(payload);
+    console.log(`BaseAPI compras ${this.formatPeriod(period)} → ${rows.length} rows extracted`);
+    if (rows.length > 0) console.log('First row sample:', rows[0]);
     this.logger.log(`getRecibidos ${this.formatPeriod(period)} → ${rows.length} rows`);
     return rows.map((row) => this.mapRow(row, DocumentDirection.RECIBIDO, rut, period));
+  }
+
+  private companyName(): string {
+    return process.env.SII_COMPANY_NAME || 'AGS SOLUTIONS SPA';
   }
 
   async validateConnection(credentials: BaseApiCredentials = {}): Promise<{
@@ -222,16 +242,45 @@ export class BaseApiSiiProvider implements ISiiProvider {
     companyRut: string,
     period: SiiPeriod,
   ): TaxDocumentResult {
-    const codigo = pick<number | string>(row, 'tipoDTE', 'TipoDoc', 'tipoDoc', 'codigo', 'tipo');
-    const folioRaw = pick<number | string>(row, 'folio', 'FolioDoc', 'Folio');
+    // BaseAPI RCV field names include spaces and mixed case (e.g. "Tipo Doc",
+    // "Monto total"). We keep the older fallbacks (`TipoDoc`, `mntTotal`,
+    // etc.) so the mock provider and any future endpoints with a cleaner
+    // shape keep working.
+    const codigoRaw = pick<number | string>(
+      row,
+      'Tipo Doc',
+      'tipoDTE',
+      'TipoDoc',
+      'tipoDoc',
+      'codigo',
+      'tipo',
+    );
+    const codigoNumeric =
+      typeof codigoRaw === 'number' ? codigoRaw : parseInt(String(codigoRaw ?? 0), 10);
+    const folioRaw = pick<number | string>(row, 'Folio', 'folio', 'FolioDoc');
     const folio = typeof folioRaw === 'number' ? folioRaw : parseInt(String(folioRaw ?? 0), 10);
 
+    // The counterparty is whoever is NOT the company on this row. For ventas
+    // BaseAPI sends "Rut cliente" / "Razon Social"; for compras it's
+    // "RUT Proveedor" / "Razón Social" (accented) — we accept either.
     const counterpartyRut = String(
-      pick(row, 'rutReceptor', 'RUTDoc', 'rutEmisor', 'RUTEmisor', 'rut', 'rutContraparte') ?? '',
+      pick(
+        row,
+        'Rut cliente',
+        'RUT Proveedor',
+        'rutReceptor',
+        'RUTDoc',
+        'rutEmisor',
+        'RUTEmisor',
+        'rut',
+        'rutContraparte',
+      ) ?? '',
     );
     const counterpartyName = String(
       pick(
         row,
+        'Razon Social',
+        'Razón Social',
         'razonSocial',
         'RznSoc',
         'rznSocRecep',
@@ -241,25 +290,40 @@ export class BaseApiSiiProvider implements ISiiProvider {
       ) ?? 'Sin nombre',
     );
 
-    const netAmount = toNumber(pick(row, 'mntNeto', 'MntNeto', 'netAmount', 'monto_neto'));
-    const taxAmount = toNumber(pick(row, 'mntIVA', 'MntIVA', 'iva', 'taxAmount', 'monto_iva'));
+    const netAmount = toNumber(
+      pick(row, 'Monto Neto', 'mntNeto', 'MntNeto', 'netAmount', 'monto_neto'),
+    );
+    const taxAmount = toNumber(
+      pick(row, 'Monto IVA', 'mntIVA', 'MntIVA', 'iva', 'taxAmount', 'monto_iva'),
+    );
     const totalAmount = toNumber(
-      pick(row, 'mntTotal', 'MntTotal', 'totalAmount', 'monto_total', 'total'),
+      pick(
+        row,
+        'Monto total',
+        'Monto Total',
+        'mntTotal',
+        'MntTotal',
+        'totalAmount',
+        'monto_total',
+        'total',
+      ),
     );
 
-    const issueDate = parseIssueDate(pick(row, 'fchEmis', 'FchEmis', 'fechaEmision', 'fecha'));
-    const type = mapDocumentType(codigo);
+    const issueDate = parseIssueDate(
+      pick(row, 'Fecha Docto', 'fchEmis', 'FchEmis', 'fechaEmision', 'fecha'),
+    );
+    const type = mapDocumentType(codigoRaw);
 
+    const companyName = this.companyName();
     const issuerRut = direction === DocumentDirection.EMITIDO ? companyRut : counterpartyRut;
-    const issuerName =
-      direction === DocumentDirection.EMITIDO
-        ? String(pick(row, 'rznSocEmisor', 'razonSocialEmisor') ?? counterpartyName)
-        : counterpartyName;
+    const issuerName = direction === DocumentDirection.EMITIDO ? companyName : counterpartyName;
     const receiverRut = direction === DocumentDirection.EMITIDO ? counterpartyRut : companyRut;
-    const receiverName =
-      direction === DocumentDirection.EMITIDO
-        ? counterpartyName
-        : String(pick(row, 'rznSocRecep', 'razonSocialReceptor') ?? counterpartyName);
+    const receiverName = direction === DocumentDirection.EMITIDO ? counterpartyName : companyName;
+
+    // externalId uses the raw SII code (e.g. "33") rather than the enum name
+    // so cross-referencing against BaseAPI payloads by eye is trivial.
+    const tipoDocCode =
+      Number.isFinite(codigoNumeric) && codigoNumeric > 0 ? String(codigoNumeric) : String(type);
 
     return {
       type,
@@ -274,7 +338,7 @@ export class BaseApiSiiProvider implements ISiiProvider {
       taxAmount,
       totalAmount: totalAmount || netAmount + taxAmount,
       status: TaxDocumentStatus.ACCEPTED,
-      externalId: `BASEAPI-${direction}-${period.year}${String(period.month).padStart(2, '0')}-${type}-${folio}`,
+      externalId: `BASEAPI-${direction}-${this.formatPeriod(period)}-${tipoDocCode}-${folio}`,
       metadata: { provider: 'baseapi', raw: row },
     };
   }
