@@ -1,0 +1,12 @@
+model CompanyGoal {
+  id           String   @id @default(uuid()) @db.Uuid
+  companyId    String   @db.Uuid
+  year         Int
+  incomeGoal   Decimal? @db.Decimal(18, 2)
+  expenseLimit Decimal? @db.Decimal(18, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([companyId, year])
+  @@map("company_goals")
+}

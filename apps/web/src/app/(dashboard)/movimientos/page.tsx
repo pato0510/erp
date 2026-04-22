@@ -17,8 +17,10 @@ interface Movement {
   date: string;
   description: string;
   reference?: string;
-  category: { name: string };
-  counterparty?: { name: string };
+  category: { id: string; name: string };
+  counterparty?: { id: string; name: string };
+  costCenter?: { id: string; name: string; code: string | null };
+  fiscalPeriod?: { id: string; name: string; year: number; month: number };
 }
 
 interface PaginatedResult {
@@ -26,6 +28,18 @@ interface PaginatedResult {
   total: number;
   page: number;
   totalPages: number;
+}
+
+interface SelectOption {
+  id: string;
+  name: string;
+}
+
+interface FiscalPeriodOption {
+  id: string;
+  name: string;
+  year: number;
+  month: number;
 }
 
 export default function MovimientosPage() {
@@ -37,10 +51,20 @@ export default function MovimientosPage() {
   // Individual primitive states — stable useEffect deps
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterCategoryId, setFilterCategoryId] = useState('');
+  const [filterCounterpartyId, setFilterCounterpartyId] = useState('');
+  const [filterCostCenterId, setFilterCostCenterId] = useState('');
+  const [filterFiscalPeriodId, setFilterFiscalPeriodId] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [page, setPage] = useState(1);
+
+  // Filter option lists
+  const [categories, setCategories] = useState<SelectOption[]>([]);
+  const [counterparties, setCounterparties] = useState<SelectOption[]>([]);
+  const [costCenters, setCostCenters] = useState<SelectOption[]>([]);
+  const [fiscalPeriods, setFiscalPeriods] = useState<FiscalPeriodOption[]>([]);
 
   // Ref to avoid stale closure in confirm/cancel handlers
   const reloadRef = useRef<(() => void) | null>(null);
@@ -51,6 +75,10 @@ export default function MovimientosPage() {
       const params = new URLSearchParams();
       if (filterType) params.set('type', filterType);
       if (filterStatus) params.set('status', filterStatus);
+      if (filterCategoryId) params.set('categoryId', filterCategoryId);
+      if (filterCounterpartyId) params.set('counterpartyId', filterCounterpartyId);
+      if (filterCostCenterId) params.set('costCenterId', filterCostCenterId);
+      if (filterFiscalPeriodId) params.set('fiscalPeriodId', filterFiscalPeriodId);
       if (filterDateFrom) params.set('dateFrom', filterDateFrom);
       if (filterDateTo) params.set('dateTo', filterDateTo);
       if (filterSearch) params.set('search', filterSearch);
@@ -66,11 +94,45 @@ export default function MovimientosPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [filterType, filterStatus, filterDateFrom, filterDateTo, filterSearch, page]);
+  }, [
+    filterType,
+    filterStatus,
+    filterCategoryId,
+    filterCounterpartyId,
+    filterCostCenterId,
+    filterFiscalPeriodId,
+    filterDateFrom,
+    filterDateTo,
+    filterSearch,
+    page,
+  ]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Load filter options once on mount — these don't change often enough to
+  // warrant refetching on every filter tweak.
+  useEffect(() => {
+    Promise.all([
+      apiClient
+        .get<SelectOption[]>('/api/categories')
+        .then(setCategories)
+        .catch(() => undefined),
+      apiClient
+        .get<{ data: SelectOption[] }>('/api/counterparties?limit=200')
+        .then((r) => setCounterparties(r.data))
+        .catch(() => undefined),
+      apiClient
+        .get<SelectOption[]>('/api/cost-centers')
+        .then(setCostCenters)
+        .catch(() => undefined),
+      apiClient
+        .get<FiscalPeriodOption[]>('/api/fiscal-periods')
+        .then(setFiscalPeriods)
+        .catch(() => undefined),
+    ]);
+  }, []);
 
   reloadRef.current = load;
 
@@ -92,12 +154,37 @@ export default function MovimientosPage() {
     setPage(1);
   };
 
+  const clearFilters = () => {
+    setFilterType('');
+    setFilterStatus('');
+    setFilterCategoryId('');
+    setFilterCounterpartyId('');
+    setFilterCostCenterId('');
+    setFilterFiscalPeriodId('');
+    setFilterDateFrom('');
+    setFilterDateTo('');
+    setFilterSearch('');
+    setPage(1);
+  };
+
   const totalIncome = movements
     .filter((m) => m.type === 'INCOME' && m.status === 'CONFIRMED')
     .reduce((s, m) => s + Number(m.amount), 0);
   const totalExpense = movements
     .filter((m) => m.type === 'EXPENSE' && m.status === 'CONFIRMED')
     .reduce((s, m) => s + Number(m.amount), 0);
+
+  const activeFilterCount = [
+    filterType,
+    filterStatus,
+    filterCategoryId,
+    filterCounterpartyId,
+    filterCostCenterId,
+    filterFiscalPeriodId,
+    filterDateFrom,
+    filterDateTo,
+    filterSearch,
+  ].filter(Boolean).length;
 
   return (
     <div>
@@ -110,6 +197,10 @@ export default function MovimientosPage() {
               const params = new URLSearchParams();
               if (filterType) params.set('type', filterType);
               if (filterStatus) params.set('status', filterStatus);
+              if (filterCategoryId) params.set('categoryId', filterCategoryId);
+              if (filterCounterpartyId) params.set('counterpartyId', filterCounterpartyId);
+              if (filterCostCenterId) params.set('costCenterId', filterCostCenterId);
+              if (filterFiscalPeriodId) params.set('fiscalPeriodId', filterFiscalPeriodId);
               if (filterDateFrom) params.set('dateFrom', filterDateFrom);
               if (filterDateTo) params.set('dateTo', filterDateTo);
               const qs = params.toString();
@@ -155,62 +246,137 @@ export default function MovimientosPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4 mb-6 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs text-[var(--text-secondary)] mb-1">Tipo</label>
-          <select
-            value={filterType}
-            onChange={(e) => updateFilter(setFilterType, e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">Todos</option>
-            <option value="INCOME">Ingresos</option>
-            <option value="EXPENSE">Egresos</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-[var(--text-secondary)] mb-1">Estado</label>
-          <select
-            value={filterStatus}
-            onChange={(e) => updateFilter(setFilterStatus, e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">Todos</option>
-            <option value="DRAFT">Borrador</option>
-            <option value="CONFIRMED">Confirmado</option>
-            <option value="CANCELLED">Cancelado</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-[var(--text-secondary)] mb-1">Desde</label>
-          <input
-            type="date"
-            value={filterDateFrom}
-            onChange={(e) => updateFilter(setFilterDateFrom, e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-[var(--text-secondary)] mb-1">Hasta</label>
-          <input
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => updateFilter(setFilterDateTo, e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs text-[var(--text-secondary)] mb-1">Buscar</label>
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4 mb-6">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Tipo</label>
+            <select
+              value={filterType}
+              onChange={(e) => updateFilter(setFilterType, e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="INCOME">Ingresos</option>
+              <option value="EXPENSE">Egresos</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Estado</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => updateFilter(setFilterStatus, e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="DRAFT">Borrador</option>
+              <option value="CONFIRMED">Confirmado</option>
+              <option value="RECONCILED">Conciliado</option>
+              <option value="CANCELLED">Cancelado</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">
+              Período fiscal
+            </label>
+            <select
+              value={filterFiscalPeriodId}
+              onChange={(e) => updateFilter(setFilterFiscalPeriodId, e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
+              {fiscalPeriods.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Categoría</label>
+            <select
+              value={filterCategoryId}
+              onChange={(e) => updateFilter(setFilterCategoryId, e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Todas</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Contraparte</label>
+            <select
+              value={filterCounterpartyId}
+              onChange={(e) => updateFilter(setFilterCounterpartyId, e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Todas</option>
+              {counterparties.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">
+              Centro de costo
+            </label>
+            <select
+              value={filterCostCenterId}
+              onChange={(e) => updateFilter(setFilterCostCenterId, e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
+              {costCenters.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Desde</label>
             <input
-              type="text"
-              placeholder="Buscar descripción..."
-              value={filterSearch}
-              onChange={(e) => updateFilter(setFilterSearch, e.target.value)}
-              className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => updateFilter(setFilterDateFrom, e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
             />
           </div>
+          <div>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Hasta</label>
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => updateFilter(setFilterDateTo, e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Buscar</label>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                placeholder="Descripción o referencia..."
+                value={filterSearch}
+                onChange={(e) => updateFilter(setFilterSearch, e.target.value)}
+                className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearFilters}
+              className="text-xs text-blue-600 hover:underline px-2 py-2"
+            >
+              Limpiar ({activeFilterCount})
+            </button>
+          )}
         </div>
       </div>
 
@@ -221,6 +387,9 @@ export default function MovimientosPage() {
             <tr>
               <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Fecha
+              </th>
+              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+                Período Fiscal
               </th>
               <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Tipo
@@ -249,7 +418,7 @@ export default function MovimientosPage() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="animate-pulse">
-                  {Array.from({ length: 8 }).map((_, j) => (
+                  {Array.from({ length: 9 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 bg-gray-200 rounded w-20" />
                     </td>
@@ -258,7 +427,7 @@ export default function MovimientosPage() {
               ))
             ) : movements.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">
+                <td colSpan={9} className="px-4 py-12 text-center text-[var(--text-muted)]">
                   No se encontraron movimientos
                 </td>
               </tr>
@@ -267,6 +436,9 @@ export default function MovimientosPage() {
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="mono px-4 py-3 text-[var(--text-secondary)]">
                     {formatDate(m.date)}
+                  </td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">
+                    {m.fiscalPeriod?.name || '-'}
                   </td>
                   <td className="px-4 py-3">
                     <MovementTypeBadge type={m.type} />

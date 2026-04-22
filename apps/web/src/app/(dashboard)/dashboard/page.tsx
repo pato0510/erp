@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { apiClient } from '../../../lib/api';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../lib/formatters';
 import { PeriodSelector } from '../../../components/shared/PeriodSelector';
+import { Toast } from '../../../components/shared/Toast';
+import { Gauge } from '../../../components/dashboard/Gauge';
+import { GoalsModal } from '../../../components/dashboard/GoalsModal';
 import {
   DollarSign,
   TrendingUp,
@@ -17,11 +20,17 @@ import {
   Upload,
   FileText,
   AlertCircle,
+  Percent,
+  Target,
+  Pencil,
 } from 'lucide-react';
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -29,6 +38,67 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+
+interface AnnualMonth {
+  month: number;
+  name: string;
+  income: number;
+  expense: number;
+  margin: number;
+  hasData: boolean;
+}
+
+interface AnnualCategoryRow {
+  categoryName: string;
+  total: number;
+  percentage: number;
+}
+
+interface AnnualData {
+  year: number;
+  goals: { incomeGoal: number | null; expenseLimit: number | null } | null;
+  months: AnnualMonth[];
+  totals: {
+    income: number;
+    expense: number;
+    margin: number;
+    result: number;
+    incomeVsGoal: number;
+    expenseVsLimit: number;
+  };
+  categories: {
+    topExpenses: AnnualCategoryRow[];
+    topIncome: AnnualCategoryRow[];
+  };
+}
+
+const MONTH_SHORT = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+];
+
+function marginColor(margin: number): string {
+  if (margin > 20) return 'text-blue-600';
+  if (margin >= 10) return 'text-yellow-500';
+  return 'text-red-500';
+}
+
+function expenseGaugeColor(pct: number): string {
+  if (pct > 100) return '#dc2626';
+  if (pct >= 80) return '#dc2626';
+  if (pct >= 60) return '#d97706';
+  return '#16a34a';
+}
 
 interface DashboardData {
   period: { name: string; status: string };
@@ -168,6 +238,14 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [periodId, setPeriodId] = useState('');
+  const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
+  const [selectedYear, setSelectedYear] = useState(2026);
+  const [annualData, setAnnualData] = useState<AnnualData | null>(null);
+  const [goalsModalOpen, setGoalsModalOpen] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+  } | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -182,9 +260,35 @@ export default function DashboardPage() {
     }
   }, [periodId]);
 
+  const loadAnnual = useCallback(async () => {
+    if (viewMode !== 'year') return;
+    const url = `/api/dashboard/annual?year=${selectedYear}`;
+
+    console.log('[dashboard] fetching annual', { url, viewMode, selectedYear });
+    try {
+      const result = await apiClient.get<AnnualData>(url);
+
+      console.log('[dashboard] annual response', result);
+      setAnnualData(result);
+    } catch (err) {
+      console.error('[dashboard] annual fetch failed', err);
+      setToast({
+        message:
+          err instanceof Error
+            ? `No se pudieron cargar los datos anuales: ${err.message}`
+            : 'No se pudieron cargar los datos anuales',
+        type: 'error',
+      });
+    }
+  }, [viewMode, selectedYear]);
+
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    loadAnnual();
+  }, [loadAnnual]);
 
   if (error) {
     return (
@@ -205,15 +309,59 @@ export default function DashboardPage() {
       ]
     : [];
 
-  const pieData =
-    data?.categories.topExpenses.map((c, i) => ({
-      name: c.categoryName,
-      value: Number(c.total),
-      color: PIE_COLORS[i % PIE_COLORS.length],
-    })) ?? [];
+  const monthMargin = data
+    ? Number(data.movements.totalIncome) > 0
+      ? ((Number(data.movements.totalIncome) - Number(data.movements.totalExpense)) /
+          Number(data.movements.totalIncome)) *
+        100
+      : 0
+    : 0;
+  const marginValue = viewMode === 'year' ? Number(annualData?.totals.margin ?? 0) : monthMargin;
+
+  const goals = annualData?.goals ?? null;
+  const hasGoals = Boolean(goals && (goals.incomeGoal || goals.expenseLimit));
+  const incomeVsGoal = Number(annualData?.totals.incomeVsGoal ?? 0);
+  const expenseVsLimit = Number(annualData?.totals.expenseVsLimit ?? 0);
+
+  const monthlyGoal = goals?.incomeGoal ? goals.incomeGoal / 12 : null;
+  const months12 = Array.from({ length: 12 }, (_, i) => {
+    const m = annualData?.months?.find((x) => x.month === i + 1);
+    return {
+      name: MONTH_SHORT[i],
+      income: m?.hasData ? Number(m.income) : null,
+      expense: m?.hasData ? Number(m.expense) : null,
+      goal: monthlyGoal,
+    };
+  });
+
+  const expenseCategorySource =
+    viewMode === 'year'
+      ? (annualData?.categories?.topExpenses ?? []).map((c) => ({
+          categoryName: c.categoryName,
+          total: Number(c.total),
+        }))
+      : (data?.categories.topExpenses ?? []).map((c) => ({
+          categoryName: c.categoryName,
+          total: Number(c.total),
+        }));
+
+  const pieData = expenseCategorySource.map((c, i) => ({
+    name: c.categoryName,
+    value: c.total,
+    color: PIE_COLORS[i % PIE_COLORS.length],
+  }));
+
+  const pieTitle =
+    viewMode === 'year'
+      ? `Categorías de Gasto — ${selectedYear}`
+      : `Categorías de Gasto${data ? ` — ${data.period.name}` : ''}`;
+
+  const yearOptions = [2025, 2026, 2027];
 
   return (
     <div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -229,7 +377,44 @@ export default function DashboardPage() {
             </p>
           )}
         </div>
-        <PeriodSelector value={periodId} onChange={setPeriodId} />
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="inline-flex gap-1 bg-gray-100 rounded-lg p-0.5">
+            {(['month', 'year'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                  viewMode === mode
+                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                    : 'text-[var(--text-secondary)]'
+                }`}
+                style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+              >
+                {mode === 'month' ? 'Mes' : 'Año'}
+              </button>
+            ))}
+          </div>
+          {viewMode === 'month' ? (
+            <PeriodSelector value={periodId} onChange={setPeriodId} />
+          ) : (
+            <div className="inline-flex gap-1 bg-gray-100 rounded-lg p-0.5">
+              {yearOptions.map((y) => (
+                <button
+                  key={y}
+                  onClick={() => setSelectedYear(y)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                    selectedYear === y
+                      ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                      : 'text-[var(--text-secondary)]'
+                  }`}
+                  style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+                >
+                  {y}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Critical alert banner */}
@@ -254,9 +439,10 @@ export default function DashboardPage() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 mb-6">
         {isLoading ? (
           <>
+            <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
@@ -297,9 +483,110 @@ export default function DashboardPage() {
               color="text-red-500"
               subtitle={`Balance: ${formatCLP(data.movements.balance)}`}
             />
+            <KpiCard
+              title="Margen bruto"
+              value={`${marginValue.toFixed(1)}%`}
+              icon={Percent}
+              color={marginColor(marginValue)}
+              subtitle={viewMode === 'year' ? `Año ${selectedYear}` : 'Período actual'}
+            />
           </>
         ) : null}
       </div>
+
+      {/* Gauges — Ingresos vs Meta y Egresos vs Límite */}
+      {hasGoals && annualData ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+          {goals?.incomeGoal ? (
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                  Ingresos vs Meta {selectedYear}
+                </h3>
+                <button
+                  onClick={() => setGoalsModalOpen(true)}
+                  className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-muted)]"
+                  title="Editar metas"
+                  aria-label="Editar metas"
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+              <div className="flex justify-center">
+                <Gauge
+                  percentage={incomeVsGoal}
+                  fillColor={incomeVsGoal >= 100 ? '#16a34a' : '#2563EB'}
+                  centerText={`${Math.round(incomeVsGoal)}%`}
+                  ariaLabel="Ingresos vs meta anual"
+                />
+              </div>
+              <p className="mt-2 text-center text-sm text-[var(--text-secondary)]">
+                {incomeVsGoal >= 100 ? (
+                  <span className="text-green-600 font-medium">¡Meta superada!</span>
+                ) : (
+                  <>
+                    Logrado{' '}
+                    <span className="amount text-[var(--text-primary)]">
+                      {formatCLP(annualData.totals.income)}
+                    </span>{' '}
+                    de <span className="amount">{formatCLP(Number(goals.incomeGoal))}</span> meta
+                    anual
+                  </>
+                )}
+              </p>
+            </div>
+          ) : null}
+
+          {goals?.expenseLimit ? (
+            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                  Egresos vs Límite {selectedYear}
+                </h3>
+                <button
+                  onClick={() => setGoalsModalOpen(true)}
+                  className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-muted)]"
+                  title="Editar metas"
+                  aria-label="Editar metas"
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+              <div className="flex justify-center">
+                <Gauge
+                  percentage={expenseVsLimit}
+                  fillColor={expenseGaugeColor(expenseVsLimit)}
+                  centerText={`${Math.round(expenseVsLimit)}%`}
+                  ariaLabel="Egresos vs límite anual"
+                />
+              </div>
+              <p className="mt-2 text-center text-sm text-[var(--text-secondary)]">
+                {expenseVsLimit > 100 ? (
+                  <span className="text-red-600 font-medium">¡Límite superado!</span>
+                ) : (
+                  <>
+                    Usado{' '}
+                    <span className="amount text-[var(--text-primary)]">
+                      {formatCLP(annualData.totals.expense)}
+                    </span>{' '}
+                    de <span className="amount">{formatCLP(Number(goals.expenseLimit))}</span>{' '}
+                    límite anual
+                  </>
+                )}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mb-6">
+          <button
+            onClick={() => setGoalsModalOpen(true)}
+            className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+          >
+            <Target size={14} /> Definir metas
+          </button>
+        </div>
+      )}
 
       {/* Summary chips + Quick actions */}
       {data && (
@@ -343,12 +630,83 @@ export default function DashboardPage() {
 
       {data && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* CHART 1 — Income vs Expense bar */}
+          {/* CHART 1 — Income vs Expense (bar in month view, line in year view) */}
           <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
             <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
-              Ingresos vs Egresos
+              {viewMode === 'year' ? `Evolución mensual ${selectedYear}` : 'Ingresos vs Egresos'}
             </h3>
-            {incomeExpenseData.length > 0 ? (
+            {viewMode === 'year' ? (
+              <>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={months12}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
+                    />
+                    <Tooltip
+                      formatter={(v: unknown) => (v == null ? 'Sin datos' : formatCLP(v as number))}
+                      contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="income"
+                      name="Ingresos"
+                      stroke="#2563EB"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      connectNulls={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="expense"
+                      name="Egresos"
+                      stroke="#94A3B8"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      connectNulls={false}
+                    />
+                    {goals?.incomeGoal ? (
+                      <Line
+                        type="monotone"
+                        dataKey="goal"
+                        name="Meta mensual"
+                        stroke="#16a34a"
+                        strokeWidth={2}
+                        strokeDasharray="4 4"
+                        dot={false}
+                      />
+                    ) : null}
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-[var(--text-secondary)]">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: '#2563EB' }}
+                    />
+                    Ingresos
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: '#94A3B8' }}
+                    />
+                    Egresos
+                  </span>
+                  {goals?.incomeGoal ? (
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className="inline-block w-5 h-0.5"
+                        style={{ backgroundColor: '#16a34a' }}
+                      />
+                      Meta mensual
+                    </span>
+                  ) : null}
+                </div>
+              </>
+            ) : incomeExpenseData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={incomeExpenseData} layout="vertical" barSize={28}>
@@ -388,9 +746,7 @@ export default function DashboardPage() {
 
           {/* CHART 2 — Expense categories pie */}
           <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
-              Categorías de Gasto
-            </h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">{pieTitle}</h3>
             {pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
@@ -599,6 +955,21 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {goalsModalOpen && (
+        <GoalsModal
+          year={selectedYear}
+          initialIncomeGoal={goals?.incomeGoal ?? null}
+          initialExpenseLimit={goals?.expenseLimit ?? null}
+          onClose={() => setGoalsModalOpen(false)}
+          onSaved={() => {
+            setGoalsModalOpen(false);
+            setToast({ message: 'Metas actualizadas', type: 'success' });
+            loadAnnual();
+          }}
+          onError={(message) => setToast({ message, type: 'error' })}
+        />
       )}
     </div>
   );

@@ -4,6 +4,22 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { AlertsService } from '../alerts/alerts.service';
 import { TaxService } from '../tax/tax.service';
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
+import { GoalsService } from './goals.service';
+
+const MONTH_NAMES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
 
 // Each section has a default shape so the dashboard contract stays stable
 // even when one of its data sources fails. The frontend can render a
@@ -57,7 +73,164 @@ export class DashboardService {
     private readonly alertsService: AlertsService,
     private readonly taxService: TaxService,
     private readonly reconciliationService: ReconciliationService,
+    private readonly goalsService: GoalsService,
   ) {}
+
+  async getAnnualData(companyId: string, year: number) {
+    // Aggregations live on the fiscal period, not on the movement's physical
+    // date. A movement booked against period 2026-03 belongs to March of 2026
+    // even if its `date` is April 5th. We still select date/fiscalPeriod so the
+    // client keeps both pieces of info.
+    const annualWhere = {
+      companyId,
+      status: MovementStatus.CONFIRMED,
+      fiscalPeriod: { year },
+    };
+
+    this.logger.log(`getAnnualData company=${companyId} year=${year} (by fiscalPeriod.year)`);
+
+    // Each data source is isolated so one failing query (e.g., a missing
+    // company_goals table on an un-migrated DB) cannot 500 the whole endpoint.
+    const [grouped, goals, expenseGroups, incomeGroups] = await Promise.all([
+      this.prisma.movement
+        .findMany({
+          where: { ...annualWhere, type: { in: ['INCOME', 'EXPENSE'] } },
+          select: {
+            amount: true,
+            type: true,
+            date: true,
+            fiscalPeriod: { select: { month: true } },
+          },
+        })
+        .catch((err) => {
+          this.logger.error(
+            `annual: movement.findMany failed: ${err instanceof Error ? err.stack : err}`,
+          );
+          return [] as {
+            amount: unknown;
+            type: 'INCOME' | 'EXPENSE';
+            date: Date;
+            fiscalPeriod: { month: number };
+          }[];
+        }),
+      this.goalsService.getGoals(companyId, year).catch((err) => {
+        this.logger.error(
+          `annual: goalsService.getGoals failed (table missing?): ${err instanceof Error ? err.stack : err}`,
+        );
+        return null;
+      }),
+      this.prisma.movement
+        .groupBy({
+          by: ['categoryId'],
+          where: { ...annualWhere, type: 'EXPENSE' },
+          _sum: { amount: true },
+          orderBy: { _sum: { amount: 'desc' } },
+          take: 5,
+        })
+        .catch((err) => {
+          this.logger.error(
+            `annual: expense groupBy failed: ${err instanceof Error ? err.stack : err}`,
+          );
+          return [] as { categoryId: string; _sum: { amount: unknown } }[];
+        }),
+      this.prisma.movement
+        .groupBy({
+          by: ['categoryId'],
+          where: { ...annualWhere, type: 'INCOME' },
+          _sum: { amount: true },
+          orderBy: { _sum: { amount: 'desc' } },
+          take: 5,
+        })
+        .catch((err) => {
+          this.logger.error(
+            `annual: income groupBy failed: ${err instanceof Error ? err.stack : err}`,
+          );
+          return [] as { categoryId: string; _sum: { amount: unknown } }[];
+        }),
+    ]);
+
+    this.logger.log(
+      `getAnnualData company=${companyId} year=${year} rows=${grouped.length} expenseGroups=${expenseGroups.length} incomeGroups=${incomeGroups.length}`,
+    );
+
+    const monthly = Array.from({ length: 12 }, () => ({ income: 0, expense: 0, hasData: false }));
+    for (const m of grouped) {
+      const monthIdx = m.fiscalPeriod.month - 1;
+      if (monthIdx < 0 || monthIdx > 11) continue;
+      const bucket = monthly[monthIdx];
+      const value = Number(m.amount);
+      if (m.type === 'INCOME') bucket.income += value;
+      else bucket.expense += value;
+      bucket.hasData = true;
+    }
+
+    const months = monthly.map((b, idx) => {
+      const margin = b.income > 0 ? ((b.income - b.expense) / b.income) * 100 : 0;
+      return {
+        month: idx + 1,
+        name: MONTH_NAMES[idx],
+        income: b.income,
+        expense: b.expense,
+        margin: Math.round(margin * 10) / 10,
+        hasData: b.hasData,
+      };
+    });
+
+    const totalIncome = months.reduce((s, m) => s + m.income, 0);
+    const totalExpense = months.reduce((s, m) => s + m.expense, 0);
+    const totalMargin = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
+    const incomeGoal = goals?.incomeGoal ? Number(goals.incomeGoal) : 0;
+    const expenseLimit = goals?.expenseLimit ? Number(goals.expenseLimit) : 0;
+
+    const categoryIds = [
+      ...expenseGroups.map((g) => g.categoryId),
+      ...incomeGroups.map((g) => g.categoryId),
+    ];
+    const categoryRows =
+      categoryIds.length > 0
+        ? await this.prisma.category.findMany({
+            where: { id: { in: categoryIds } },
+            select: { id: true, name: true },
+          })
+        : [];
+    const categoryName = new Map(categoryRows.map((c) => [c.id, c.name]));
+    const categoriesBreakdown = (
+      groups: typeof expenseGroups,
+      grandTotal: number,
+    ): { categoryName: string; total: number; percentage: number }[] =>
+      groups.map((g) => {
+        const total = Number(g._sum.amount || 0);
+        return {
+          categoryName: categoryName.get(g.categoryId) || 'Sin categoría',
+          total,
+          percentage: grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0,
+        };
+      });
+
+    return {
+      year,
+      goals: goals
+        ? {
+            incomeGoal: goals.incomeGoal ? Number(goals.incomeGoal) : null,
+            expenseLimit: goals.expenseLimit ? Number(goals.expenseLimit) : null,
+          }
+        : null,
+      months,
+      totals: {
+        income: totalIncome,
+        expense: totalExpense,
+        margin: Math.round(totalMargin * 10) / 10,
+        result: totalIncome - totalExpense,
+        incomeVsGoal: incomeGoal > 0 ? Math.round((totalIncome / incomeGoal) * 1000) / 10 : 0,
+        expenseVsLimit:
+          expenseLimit > 0 ? Math.round((totalExpense / expenseLimit) * 1000) / 10 : 0,
+      },
+      categories: {
+        topExpenses: categoriesBreakdown(expenseGroups, totalExpense),
+        topIncome: categoriesBreakdown(incomeGroups, totalIncome),
+      },
+    };
+  }
 
   async getDashboardData(companyId: string, fiscalPeriodId?: string) {
     // Resolving the period is the only step that must succeed — without one
