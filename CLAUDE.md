@@ -165,6 +165,32 @@ REL-001 — Production go-live checklist ✓
 
 V1 COMPLETE — Ready for production
 
-## current ticket
+## SII Integration — LibreDTE
 
-Se debe crear boton para poder crear cuenta bancaria en sección de "Caja".
+Provider: LibreDTE (libredte.cl)
+Authentication: API Hash + API Key (stored in env vars)
+Client RUT: 77.004.647-5
+Certificate format: .pfx with password
+
+### Environment variables needed
+
+LIBREDTE_API_HASH=your_api_hash
+LIBREDTE_API_KEY=your_api_key
+LIBREDTE_BASE_URL=https://libredte.cl/api
+SII_CERT_PASSWORD=pfx_certificate_password
+
+### Architecture
+
+- Certificate .pfx stored securely in MinIO
+- LibreDTE handles all SII authentication complexity
+- Sync runs automatically every 24h via BullMQ
+- Manual sync available from /tributario screen
+
+### Document types to sync
+
+- DTE tipo 33: Factura Electrónica
+- DTE tipo 34: Factura No Afecta
+- DTE tipo 39: Boleta Electrónica
+- DTE tipo 61: Nota de Crédito
+- DTE tipo 56: Nota de Débito
+  Direction: EMITIDO (issued) and RECIBIDO (received)

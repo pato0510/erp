@@ -10,12 +10,25 @@ import {
   AlertCircle,
   CheckCircle,
   Search,
+  ShieldCheck,
+  XCircle,
+  UploadCloud,
 } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../lib/formatters';
 import { PeriodSelector } from '../../../components/shared/PeriodSelector';
 import { Toast } from '../../../components/shared/Toast';
 import { TaxDocumentTypeBadge } from '../../../components/tax/TaxDocumentTypeBadge';
+import { SiiConnectionModal } from '../../../components/tax/SiiConnectionModal';
+
+interface SiiConnection {
+  id: string;
+  rut: string;
+  hasCertificate: boolean;
+  isActive: boolean;
+  lastSyncAt: string | null;
+  lastErrorMessage: string | null;
+}
 
 type Direction = 'EMITIDO' | 'RECIBIDO';
 type Tab = 'EMITIDO' | 'RECIBIDO' | 'ALL';
@@ -109,6 +122,10 @@ export default function TributarioPage() {
   const [isSummaryLoading, setIsSummaryLoading] = useState(true);
   const [isDocsLoading, setIsDocsLoading] = useState(true);
   const [syncingAction, setSyncingAction] = useState<'EMITIDO' | 'RECIBIDO' | 'ALL' | null>(null);
+  const [connection, setConnection] = useState<SiiConnection | null>(null);
+  const [isConnectionLoading, setIsConnectionLoading] = useState(true);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionModalOpen, setConnectionModalOpen] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
@@ -149,6 +166,18 @@ export default function TributarioPage() {
     }
   }, [tab, periodId, search, page]);
 
+  const loadConnection = useCallback(async () => {
+    setIsConnectionLoading(true);
+    try {
+      const res = await apiClient.get<SiiConnection | null>('/api/sii/connection');
+      setConnection(res);
+    } catch {
+      setConnection(null);
+    } finally {
+      setIsConnectionLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadSummary();
   }, [loadSummary]);
@@ -156,6 +185,31 @@ export default function TributarioPage() {
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
+
+  useEffect(() => {
+    loadConnection();
+  }, [loadConnection]);
+
+  const handleTestConnection = async () => {
+    setIsTestingConnection(true);
+    try {
+      const res = await apiClient.post<{ isActive: boolean; message: string }>(
+        '/api/sii/connection/test',
+      );
+      setToast({
+        message: res.message,
+        type: res.isActive ? 'success' : 'error',
+      });
+      loadConnection();
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Error al probar la conexión',
+        type: 'error',
+      });
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
 
   // Reset page when tab / filters change
   useEffect(() => {
@@ -233,6 +287,89 @@ export default function TributarioPage() {
         </div>
         <PeriodSelector value={periodId} onChange={setPeriodId} />
       </div>
+
+      {/* SECTION 0 — SII Connection */}
+      {isConnectionLoading ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-40 mb-3" />
+          <div className="h-3 bg-gray-200 rounded w-64" />
+        </div>
+      ) : !connection || !connection.hasCertificate ? (
+        <div className="bg-gradient-to-br from-blue-50 to-white border border-blue-200 rounded-xl p-6 mb-6 flex items-start gap-4">
+          <div className="p-3 rounded-xl bg-white border border-blue-200">
+            <ShieldCheck size={22} className="text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-base font-semibold text-gray-900 mb-1">
+              Conecta tu empresa al SII
+            </h2>
+            <p className="text-sm text-gray-500 mb-3">
+              Sube tu certificado digital para sincronizar tus facturas automáticamente desde el SII
+              a través de LibreDTE.
+            </p>
+            <button
+              onClick={() => setConnectionModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full transition"
+              style={{
+                background: '#1C1C1E',
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+              }}
+            >
+              <UploadCloud size={14} /> Configurar conexión
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className={`p-2.5 rounded-lg ${connection.isActive ? 'bg-green-50' : 'bg-red-50'}`}>
+            {connection.isActive ? (
+              <CheckCircle size={20} className="text-green-600" />
+            ) : (
+              <XCircle size={20} className="text-red-500" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold text-gray-900">Conexión SII</p>
+              <span
+                className={`label text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                  connection.isActive
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : 'bg-red-50 text-red-700 border-red-200'
+                }`}
+              >
+                {connection.isActive ? 'Activo' : 'Inactivo'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              RUT {connection.rut}
+              {connection.lastSyncAt
+                ? ` · Última verificación ${formatRelativeDate(connection.lastSyncAt)}`
+                : ' · Sin verificaciones'}
+            </p>
+            {connection.lastErrorMessage && !connection.isActive && (
+              <p className="text-xs text-red-600 mt-1 truncate">{connection.lastErrorMessage}</p>
+            )}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={handleTestConnection}
+              disabled={isTestingConnection}
+              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition"
+            >
+              <RefreshCw size={14} className={isTestingConnection ? 'animate-spin' : ''} />
+              Probar conexión
+            </button>
+            <button
+              onClick={() => setConnectionModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              <UploadCloud size={14} /> Actualizar certificado
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* SECTION 1 — Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -468,6 +605,18 @@ export default function TributarioPage() {
           </div>
         )}
       </div>
+
+      {connectionModalOpen && (
+        <SiiConnectionModal
+          initialRut={connection?.rut ?? '77.004.647-5'}
+          onClose={() => setConnectionModalOpen(false)}
+          onSaved={() => {
+            setConnectionModalOpen(false);
+            setToast({ message: 'Conexión SII configurada', type: 'success' });
+            loadConnection();
+          }}
+        />
+      )}
     </div>
   );
 }
