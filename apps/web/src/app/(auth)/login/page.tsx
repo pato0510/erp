@@ -89,7 +89,7 @@ export default function LoginPage() {
       if (me.companies.length > 0) {
         apiClient.setCompanyId(me.companies[0].companyId);
       }
-      window.location.href = '/dashboard';
+      window.location.href = '/modulos';
     } catch {
       setError('Credenciales inválidas');
     } finally {

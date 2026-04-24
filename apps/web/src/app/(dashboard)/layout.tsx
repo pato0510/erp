@@ -131,6 +131,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             borderBottom: '1px solid var(--sidebar-border)',
           }}
         >
+          <Link
+            href="/modulos"
+            className="tn-back-modulos"
+            style={{
+              display: 'inline-block',
+              marginBottom: 12,
+              fontFamily: 'var(--font-jetbrains-mono), monospace',
+              fontSize: 10,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: '#8E8E93',
+              textDecoration: 'none',
+              transition: 'color 120ms ease',
+            }}
+          >
+            ← Volver a módulos
+          </Link>
           <ExcelsiaLogo size={22} />
         </div>
 
@@ -284,6 +301,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </main>
 
       <style jsx>{`
+        :global(.tn-back-modulos:hover) {
+          color: #ffffff !important;
+        }
         :global(.tn-nav__item) {
           position: relative;
           display: flex;
