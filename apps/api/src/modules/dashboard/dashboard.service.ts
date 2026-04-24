@@ -21,6 +21,21 @@ const MONTH_NAMES = [
   'Diciembre',
 ];
 
+const MONTH_SHORT = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+];
+
 // Each section has a default shape so the dashboard contract stays stable
 // even when one of its data sources fails. The frontend can render a
 // degraded state without null-checking every field.
@@ -229,6 +244,142 @@ export class DashboardService {
         topExpenses: categoriesBreakdown(expenseGroups, totalExpense),
         topIncome: categoriesBreakdown(incomeGroups, totalIncome),
       },
+    };
+  }
+
+  async getMultiYearData(companyId: string, fromYear: number, toYear: number) {
+    if (fromYear > toYear) {
+      // Tolerate swapped bounds instead of 400'ing the dashboard.
+      [fromYear, toYear] = [toYear, fromYear];
+    }
+
+    this.logger.log(`getMultiYearData company=${companyId} range=${fromYear}-${toYear}`);
+
+    const movements = await this.prisma.movement
+      .findMany({
+        where: {
+          companyId,
+          status: MovementStatus.CONFIRMED,
+          type: { in: ['INCOME', 'EXPENSE'] },
+          fiscalPeriod: { year: { gte: fromYear, lte: toYear } },
+        },
+        select: {
+          amount: true,
+          type: true,
+          fiscalPeriod: { select: { year: true, month: true } },
+        },
+      })
+      .catch((err) => {
+        this.logger.error(
+          `multiyear: movement.findMany failed: ${err instanceof Error ? err.stack : err}`,
+        );
+        return [] as {
+          amount: unknown;
+          type: 'INCOME' | 'EXPENSE';
+          fiscalPeriod: { year: number; month: number };
+        }[];
+      });
+
+    // Build a (year, month) -> { income, expense } map in one pass; then
+    // project it onto a complete year-x-12-month grid so months with no data
+    // still appear (as hasData: false) and the frontend can render gaps.
+    const bucketKey = (y: number, m: number) => `${y}-${m}`;
+    const buckets = new Map<string, { income: number; expense: number }>();
+    for (const m of movements) {
+      const y = m.fiscalPeriod.year;
+      const mo = m.fiscalPeriod.month;
+      if (y < fromYear || y > toYear) continue;
+      if (mo < 1 || mo > 12) continue;
+      const key = bucketKey(y, mo);
+      const bucket = buckets.get(key) ?? { income: 0, expense: 0 };
+      const value = Number(m.amount);
+      if (m.type === 'INCOME') bucket.income += value;
+      else bucket.expense += value;
+      buckets.set(key, bucket);
+    }
+
+    const years: {
+      year: number;
+      income: number;
+      expense: number;
+      margin: number;
+      result: number;
+      hasData: boolean;
+    }[] = [];
+    const monthlyEvolution: {
+      year: number;
+      month: number;
+      label: string;
+      income: number;
+      expense: number;
+      hasData: boolean;
+    }[] = [];
+
+    for (let y = fromYear; y <= toYear; y++) {
+      let yearIncome = 0;
+      let yearExpense = 0;
+      let yearHasData = false;
+      for (let mo = 1; mo <= 12; mo++) {
+        const bucket = buckets.get(bucketKey(y, mo));
+        const hasData = !!bucket;
+        const income = bucket?.income ?? 0;
+        const expense = bucket?.expense ?? 0;
+        if (hasData) {
+          yearIncome += income;
+          yearExpense += expense;
+          yearHasData = true;
+        }
+        monthlyEvolution.push({
+          year: y,
+          month: mo,
+          label: `${MONTH_SHORT[mo - 1]} ${y}`,
+          income,
+          expense,
+          hasData,
+        });
+      }
+      const margin = yearIncome > 0 ? ((yearIncome - yearExpense) / yearIncome) * 100 : 0;
+      years.push({
+        year: y,
+        income: yearIncome,
+        expense: yearExpense,
+        margin: Math.round(margin * 10) / 10,
+        result: yearIncome - yearExpense,
+        hasData: yearHasData,
+      });
+    }
+
+    const totalIncome = years.reduce((s, y) => s + y.income, 0);
+    const totalExpense = years.reduce((s, y) => s + y.expense, 0);
+    const totalMargin = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
+
+    // bestYear: highest income among years with data. worstYear: highest
+    // expense/income ratio (fallback to highest expense when no income yet).
+    const yearsWithData = years.filter((y) => y.hasData);
+    const bestYear =
+      yearsWithData.length > 0
+        ? yearsWithData.reduce((best, y) => (y.income > best.income ? y : best)).year
+        : fromYear;
+    const worstYear =
+      yearsWithData.length > 0
+        ? yearsWithData.reduce((worst, y) => {
+            const wRatio = worst.income > 0 ? worst.expense / worst.income : worst.expense;
+            const yRatio = y.income > 0 ? y.expense / y.income : y.expense;
+            return yRatio > wRatio ? y : worst;
+          }).year
+        : fromYear;
+
+    return {
+      years,
+      totals: {
+        income: totalIncome,
+        expense: totalExpense,
+        margin: Math.round(totalMargin * 10) / 10,
+        result: totalIncome - totalExpense,
+        bestYear,
+        worstYear,
+      },
+      monthlyEvolution,
     };
   }
 

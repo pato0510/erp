@@ -72,6 +72,37 @@ interface AnnualData {
   };
 }
 
+interface MultiYearYear {
+  year: number;
+  income: number;
+  expense: number;
+  margin: number;
+  result: number;
+  hasData: boolean;
+}
+
+interface MultiYearMonth {
+  year: number;
+  month: number;
+  label: string;
+  income: number;
+  expense: number;
+  hasData: boolean;
+}
+
+interface MultiYearData {
+  years: MultiYearYear[];
+  totals: {
+    income: number;
+    expense: number;
+    margin: number;
+    result: number;
+    bestYear: number;
+    worstYear: number;
+  };
+  monthlyEvolution: MultiYearMonth[];
+}
+
 const MONTH_SHORT = [
   'Ene',
   'Feb',
@@ -238,9 +269,13 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [periodId, setPeriodId] = useState('');
-  const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
+  const [viewMode, setViewMode] = useState<'month' | 'year' | 'multiyear'>('month');
   const [selectedYear, setSelectedYear] = useState(2026);
   const [annualData, setAnnualData] = useState<AnnualData | null>(null);
+  const [multiYearData, setMultiYearData] = useState<MultiYearData | null>(null);
+  const [multiYearFrom, setMultiYearFrom] = useState(2019);
+  const [multiYearTo, setMultiYearTo] = useState(new Date().getFullYear());
+  const [multiYearChartMode, setMultiYearChartMode] = useState<'year' | 'month'>('month');
   const [goalsModalOpen, setGoalsModalOpen] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -282,6 +317,24 @@ export default function DashboardPage() {
     }
   }, [viewMode, selectedYear]);
 
+  const loadMultiYear = useCallback(async () => {
+    if (viewMode !== 'multiyear') return;
+    try {
+      const result = await apiClient.get<MultiYearData>(
+        `/api/dashboard/multiyear?fromYear=${multiYearFrom}&toYear=${multiYearTo}`,
+      );
+      setMultiYearData(result);
+    } catch (err) {
+      setToast({
+        message:
+          err instanceof Error
+            ? `No se pudieron cargar los datos históricos: ${err.message}`
+            : 'No se pudieron cargar los datos históricos',
+        type: 'error',
+      });
+    }
+  }, [viewMode, multiYearFrom, multiYearTo]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -289,6 +342,10 @@ export default function DashboardPage() {
   useEffect(() => {
     loadAnnual();
   }, [loadAnnual]);
+
+  useEffect(() => {
+    loadMultiYear();
+  }, [loadMultiYear]);
 
   if (error) {
     return (
@@ -379,7 +436,11 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="inline-flex gap-1 bg-gray-100 rounded-lg p-0.5">
-            {(['month', 'year'] as const).map((mode) => (
+            {[
+              { mode: 'month' as const, label: 'Mes' },
+              { mode: 'year' as const, label: 'Año' },
+              { mode: 'multiyear' as const, label: 'Historia' },
+            ].map(({ mode, label }) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -390,13 +451,13 @@ export default function DashboardPage() {
                 }`}
                 style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
               >
-                {mode === 'month' ? 'Mes' : 'Año'}
+                {label}
               </button>
             ))}
           </div>
           {viewMode === 'month' ? (
             <PeriodSelector value={periodId} onChange={setPeriodId} />
-          ) : (
+          ) : viewMode === 'year' ? (
             <div className="inline-flex gap-1 bg-gray-100 rounded-lg p-0.5">
               {yearOptions.map((y) => (
                 <button
@@ -413,548 +474,583 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
+          ) : (
+            <MultiYearRange
+              fromYear={multiYearFrom}
+              toYear={multiYearTo}
+              onChange={(f, t) => {
+                setMultiYearFrom(f);
+                setMultiYearTo(t);
+              }}
+            />
           )}
         </div>
       </div>
 
-      {/* Critical alert banner */}
-      {data && data.alerts.critical > 0 && (
-        <Link
-          href="/alertas"
-          className="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3 hover:bg-red-100 transition"
-        >
-          <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-red-800">
-              {data.alerts.critical} alerta{data.alerts.critical > 1 ? 's' : ''} crítica
-              {data.alerts.critical > 1 ? 's' : ''}
-            </p>
-            <p className="text-xs text-red-600">
-              {data.alerts.items.find((a) => a.severity === 'CRITICAL')?.title ||
-                'Requiere atención inmediata'}
-            </p>
-          </div>
-          <span className="text-xs text-red-500">Ver alertas →</span>
-        </Link>
+      {viewMode === 'multiyear' && (
+        <MultiYearContent
+          data={multiYearData}
+          onYearClick={(year) => {
+            setSelectedYear(year);
+            setViewMode('year');
+          }}
+          chartMode={multiYearChartMode}
+          onChartModeChange={setMultiYearChartMode}
+        />
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 mb-6">
-        {isLoading ? (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
-        ) : data ? (
-          <>
-            <KpiCard
-              title="Caja Total"
-              value={formatCLP(data.cash.totalCash)}
-              icon={DollarSign}
-              color={Number(data.cash.totalCash) >= 0 ? 'text-green-600' : 'text-red-600'}
-              subtitle={`Apertura: ${formatCLP(data.cash.openingBalance)}`}
-            />
-            <KpiCard
-              title="Caja Libre"
-              value={formatCLP(data.cash.freeCash)}
-              icon={Wallet}
-              color={
-                Number(data.cash.totalCash) > 0 &&
-                Number(data.cash.freeCash) / Number(data.cash.totalCash) < 0.2
-                  ? 'text-yellow-500'
-                  : 'text-green-600'
-              }
-              subtitle={`Comprometido: ${formatCLP(data.cash.committedAmount)}`}
-            />
-            <KpiCard
-              title="Ingresos"
-              value={formatCLP(data.movements.totalIncome)}
-              icon={TrendingUp}
-              color="text-blue-600"
-              subtitle={`${data.movements.confirmedCount} confirmados`}
-            />
-            <KpiCard
-              title="Egresos"
-              value={formatCLP(data.movements.totalExpense)}
-              icon={TrendingDown}
-              color="text-red-500"
-              subtitle={`Balance: ${formatCLP(data.movements.balance)}`}
-            />
-            <KpiCard
-              title="Margen bruto"
-              value={`${marginValue.toFixed(1)}%`}
-              icon={Percent}
-              color={marginColor(marginValue)}
-              subtitle={viewMode === 'year' ? `Año ${selectedYear}` : 'Período actual'}
-            />
-          </>
-        ) : null}
-      </div>
-
-      {/* Gauges — Ingresos vs Meta y Egresos vs Límite */}
-      {hasGoals && annualData ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-          {goals?.incomeGoal ? (
-            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                  Ingresos vs Meta {selectedYear}
-                </h3>
-                <button
-                  onClick={() => setGoalsModalOpen(true)}
-                  className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-muted)]"
-                  title="Editar metas"
-                  aria-label="Editar metas"
-                >
-                  <Pencil size={14} />
-                </button>
-              </div>
-              <div className="flex justify-center">
-                <Gauge
-                  percentage={incomeVsGoal}
-                  fillColor={incomeVsGoal >= 100 ? '#16a34a' : '#2563EB'}
-                  centerText={`${Math.round(incomeVsGoal)}%`}
-                  ariaLabel="Ingresos vs meta anual"
-                />
-              </div>
-              <p className="mt-2 text-center text-sm text-[var(--text-secondary)]">
-                {incomeVsGoal >= 100 ? (
-                  <span className="text-green-600 font-medium">¡Meta superada!</span>
-                ) : (
-                  <>
-                    Logrado{' '}
-                    <span className="amount text-[var(--text-primary)]">
-                      {formatCLP(annualData.totals.income)}
-                    </span>{' '}
-                    de <span className="amount">{formatCLP(Number(goals.incomeGoal))}</span> meta
-                    anual
-                  </>
-                )}
-              </p>
-            </div>
-          ) : null}
-
-          {goals?.expenseLimit ? (
-            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                  Egresos vs Límite {selectedYear}
-                </h3>
-                <button
-                  onClick={() => setGoalsModalOpen(true)}
-                  className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-muted)]"
-                  title="Editar metas"
-                  aria-label="Editar metas"
-                >
-                  <Pencil size={14} />
-                </button>
-              </div>
-              <div className="flex justify-center">
-                <Gauge
-                  percentage={expenseVsLimit}
-                  fillColor={expenseGaugeColor(expenseVsLimit)}
-                  centerText={`${Math.round(expenseVsLimit)}%`}
-                  ariaLabel="Egresos vs límite anual"
-                />
-              </div>
-              <p className="mt-2 text-center text-sm text-[var(--text-secondary)]">
-                {expenseVsLimit > 100 ? (
-                  <span className="text-red-600 font-medium">¡Límite superado!</span>
-                ) : (
-                  <>
-                    Usado{' '}
-                    <span className="amount text-[var(--text-primary)]">
-                      {formatCLP(annualData.totals.expense)}
-                    </span>{' '}
-                    de <span className="amount">{formatCLP(Number(goals.expenseLimit))}</span>{' '}
-                    límite anual
-                  </>
-                )}
-              </p>
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <div className="mb-6">
-          <button
-            onClick={() => setGoalsModalOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
-          >
-            <Target size={14} /> Definir metas
-          </button>
-        </div>
-      )}
-
-      {/* Summary chips + Quick actions */}
-      {data && (
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div className="flex flex-wrap gap-2">
-            {weekCommitments > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                <AlertCircle size={12} />
-                {weekCommitments} vencimiento{weekCommitments > 1 ? 's' : ''} esta semana
-              </span>
-            )}
-            {data.movements.draftCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
-                <FileText size={12} />
-                {data.movements.draftCount} borrador{data.movements.draftCount > 1 ? 'es' : ''}
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
+      {viewMode !== 'multiyear' && (
+        <>
+          {/* Critical alert banner */}
+          {data && data.alerts.critical > 0 && (
             <Link
-              href="/movimientos/nuevo"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              href="/alertas"
+              className="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3 hover:bg-red-100 transition"
             >
-              <Plus size={12} /> Nuevo Movimiento
-            </Link>
-            <Link
-              href="/caja/nuevo-compromiso"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-            >
-              <Clock size={12} /> Nuevo Compromiso
-            </Link>
-            <Link
-              href="/movimientos/importar"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-            >
-              <Upload size={12} /> Importar CSV
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {data && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* CHART 1 — Income vs Expense (bar in month view, line in year view) */}
-          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
-              {viewMode === 'year' ? `Evolución mensual ${selectedYear}` : 'Ingresos vs Egresos'}
-            </h3>
-            {viewMode === 'year' ? (
-              <>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={months12}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
-                    />
-                    <Tooltip
-                      formatter={(v: unknown) => (v == null ? 'Sin datos' : formatCLP(v as number))}
-                      contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="income"
-                      name="Ingresos"
-                      stroke="#2563EB"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      connectNulls={false}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="expense"
-                      name="Egresos"
-                      stroke="#94A3B8"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      connectNulls={false}
-                    />
-                    {goals?.incomeGoal ? (
-                      <Line
-                        type="monotone"
-                        dataKey="goal"
-                        name="Meta mensual"
-                        stroke="#16a34a"
-                        strokeWidth={2}
-                        strokeDasharray="4 4"
-                        dot={false}
-                      />
-                    ) : null}
-                  </LineChart>
-                </ResponsiveContainer>
-                <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-[var(--text-secondary)]">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: '#2563EB' }}
-                    />
-                    Ingresos
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: '#94A3B8' }}
-                    />
-                    Egresos
-                  </span>
-                  {goals?.incomeGoal ? (
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className="inline-block w-5 h-0.5"
-                        style={{ backgroundColor: '#16a34a' }}
-                      />
-                      Meta mensual
-                    </span>
-                  ) : null}
-                </div>
-              </>
-            ) : incomeExpenseData.length > 0 ? (
-              <>
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={incomeExpenseData} layout="vertical" barSize={28}>
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      formatter={(v: unknown) => formatCLP(v as number)}
-                      contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                    />
-                    <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                      <Cell fill="#2563EB" />
-                      <Cell fill="#94A3B8" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="flex items-center gap-4 mt-3 text-xs text-[var(--text-secondary)]">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: '#2563EB' }}
-                    />
-                    Ingresos
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: '#94A3B8' }}
-                    />
-                    Egresos
-                  </span>
-                </div>
-              </>
-            ) : (
-              <p className="text-[var(--text-muted)] text-sm text-center py-8">Sin datos</p>
-            )}
-          </div>
-
-          {/* CHART 2 — Expense categories pie */}
-          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">{pieTitle}</h3>
-            {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={70}
-                    paddingAngle={3}
-                  >
-                    {pieData.map((entry, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v: unknown) => formatCLP(v as number)}
-                    contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-[var(--text-muted)] text-sm text-center py-8">
-                Sin datos de gastos
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2 mt-2">
-              {pieData.map((d) => (
-                <span
-                  key={d.name}
-                  className="flex items-center gap-1 text-xs text-[var(--text-secondary)]"
-                >
-                  <span
-                    className="inline-block w-2 h-2 rounded-full"
-                    style={{ backgroundColor: d.color }}
-                  />
-                  {d.name}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* CHART 3 — Cash flow summary */}
-          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Flujo de Caja</h3>
-            <div className="space-y-3">
-              {[
-                {
-                  label: 'Saldo Apertura',
-                  value: Number(data.cash.openingBalance),
-                  color: '#64748B',
-                },
-                {
-                  label: 'Ingresos',
-                  value: Number(data.movements.totalIncome),
-                  color: '#2563EB',
-                },
-                {
-                  label: 'Egresos',
-                  value: Number(data.movements.totalExpense),
-                  color: '#94A3B8',
-                },
-                {
-                  label: 'Caja Libre',
-                  value: Number(data.cash.freeCash),
-                  color: '#1E3A5F',
-                },
-              ].map((item) => {
-                const maxVal = Math.max(
-                  Number(data.cash.openingBalance),
-                  Number(data.movements.totalIncome),
-                  Number(data.movements.totalExpense),
-                  Number(data.cash.freeCash),
-                  1,
-                );
-                const pct = Math.round((Math.abs(item.value) / maxVal) * 100);
-                return (
-                  <div key={item.label}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-[var(--text-secondary)]">{item.label}</span>
-                      <span className="amount text-[var(--text-primary)]">
-                        {formatCLP(item.value)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{ width: `${pct}%`, backgroundColor: item.color }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {data && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Upcoming Commitments */}
-          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm">
-            <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
-              <h2 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                <Clock size={18} />
-                Compromisos Próximos
-              </h2>
-              <Link href="/caja" className="text-xs text-blue-600 hover:underline">
-                Ver todos
-              </Link>
-            </div>
-            <div className="divide-y divide-[var(--border-color)]">
-              {data.commitments.upcoming.length === 0 ? (
-                <p className="px-6 py-8 text-[var(--text-muted)] text-center text-sm">
-                  Sin compromisos pendientes
+              <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-800">
+                  {data.alerts.critical} alerta{data.alerts.critical > 1 ? 's' : ''} crítica
+                  {data.alerts.critical > 1 ? 's' : ''}
                 </p>
-              ) : (
-                data.commitments.upcoming.slice(0, 5).map((c) => {
-                  const daysUntil = Math.round(
-                    (new Date(c.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-                  );
-                  const urgencyColor =
-                    daysUntil < 7
-                      ? 'text-red-600'
-                      : daysUntil < 15
-                        ? 'text-yellow-600'
-                        : 'text-[var(--text-secondary)]';
-                  return (
-                    <div key={c.id} className="px-6 py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">
-                          {c.description}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          {c.counterparty?.name || c.category?.name || ''} &middot;{' '}
-                          <span className={urgencyColor}>{formatRelativeDate(c.dueDate)}</span>
-                        </p>
-                      </div>
-                      <span className="amount text-sm text-[var(--text-primary)]">
-                        {formatCLP(c.amount)}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                <p className="text-xs text-red-600">
+                  {data.alerts.items.find((a) => a.severity === 'CRITICAL')?.title ||
+                    'Requiere atención inmediata'}
+                </p>
+              </div>
+              <span className="text-xs text-red-500">Ver alertas →</span>
+            </Link>
+          )}
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 mb-6">
+            {isLoading ? (
+              <>
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </>
+            ) : data ? (
+              <>
+                <KpiCard
+                  title="Caja Total"
+                  value={formatCLP(data.cash.totalCash)}
+                  icon={DollarSign}
+                  color={Number(data.cash.totalCash) >= 0 ? 'text-green-600' : 'text-red-600'}
+                  subtitle={`Apertura: ${formatCLP(data.cash.openingBalance)}`}
+                />
+                <KpiCard
+                  title="Caja Libre"
+                  value={formatCLP(data.cash.freeCash)}
+                  icon={Wallet}
+                  color={
+                    Number(data.cash.totalCash) > 0 &&
+                    Number(data.cash.freeCash) / Number(data.cash.totalCash) < 0.2
+                      ? 'text-yellow-500'
+                      : 'text-green-600'
+                  }
+                  subtitle={`Comprometido: ${formatCLP(data.cash.committedAmount)}`}
+                />
+                <KpiCard
+                  title="Ingresos"
+                  value={formatCLP(data.movements.totalIncome)}
+                  icon={TrendingUp}
+                  color="text-blue-600"
+                  subtitle={`${data.movements.confirmedCount} confirmados`}
+                />
+                <KpiCard
+                  title="Egresos"
+                  value={formatCLP(data.movements.totalExpense)}
+                  icon={TrendingDown}
+                  color="text-red-500"
+                  subtitle={`Balance: ${formatCLP(data.movements.balance)}`}
+                />
+                <KpiCard
+                  title="Margen bruto"
+                  value={`${marginValue.toFixed(1)}%`}
+                  icon={Percent}
+                  color={marginColor(marginValue)}
+                  subtitle={viewMode === 'year' ? `Año ${selectedYear}` : 'Período actual'}
+                />
+              </>
+            ) : null}
           </div>
 
-          {/* Recent Movements */}
-          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm">
-            <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
-              <h2 className="font-semibold text-[var(--text-primary)]">Movimientos Recientes</h2>
-              <Link href="/movimientos" className="text-xs text-blue-600 hover:underline">
-                Ver todos
-              </Link>
-            </div>
-            <div className="divide-y divide-[var(--border-color)]">
-              {data.recentMovements.length === 0 ? (
-                <p className="px-6 py-8 text-[var(--text-muted)] text-center text-sm">
-                  Sin movimientos confirmados
-                </p>
-              ) : (
-                data.recentMovements.map((m) => (
-                  <Link
-                    key={m.id}
-                    href="/movimientos"
-                    className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition block"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-1.5 rounded-md ${m.type === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}`}
-                      >
-                        {m.type === 'INCOME' ? (
-                          <ArrowUpRight size={14} className="text-green-600" />
-                        ) : (
-                          <ArrowDownRight size={14} className="text-red-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">
-                          {m.description}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-                          <span
-                            className="inline-block w-2 h-2 rounded-full"
-                            style={{ backgroundColor: m.category.color || '#888' }}
-                          />
-                          {m.category.name}
-                          {m.counterparty ? ` · ${m.counterparty.name}` : ''}
-                          {' · '}
-                          {formatDate(m.date)}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className={`amount text-sm ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
+          {/* Gauges — Ingresos vs Meta y Egresos vs Límite */}
+          {hasGoals && annualData ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+              {goals?.incomeGoal ? (
+                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                      Ingresos vs Meta {selectedYear}
+                    </h3>
+                    <button
+                      onClick={() => setGoalsModalOpen(true)}
+                      className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-muted)]"
+                      title="Editar metas"
+                      aria-label="Editar metas"
                     >
-                      {m.type === 'INCOME' ? '+' : '-'}
-                      {formatCLP(m.amount)}
-                    </span>
-                  </Link>
-                ))
-              )}
+                      <Pencil size={14} />
+                    </button>
+                  </div>
+                  <div className="flex justify-center">
+                    <Gauge
+                      percentage={incomeVsGoal}
+                      fillColor={incomeVsGoal >= 100 ? '#16a34a' : '#2563EB'}
+                      centerText={`${Math.round(incomeVsGoal)}%`}
+                      ariaLabel="Ingresos vs meta anual"
+                    />
+                  </div>
+                  <p className="mt-2 text-center text-sm text-[var(--text-secondary)]">
+                    {incomeVsGoal >= 100 ? (
+                      <span className="text-green-600 font-medium">¡Meta superada!</span>
+                    ) : (
+                      <>
+                        Logrado{' '}
+                        <span className="amount text-[var(--text-primary)]">
+                          {formatCLP(annualData.totals.income)}
+                        </span>{' '}
+                        de <span className="amount">{formatCLP(Number(goals.incomeGoal))}</span>{' '}
+                        meta anual
+                      </>
+                    )}
+                  </p>
+                </div>
+              ) : null}
+
+              {goals?.expenseLimit ? (
+                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                      Egresos vs Límite {selectedYear}
+                    </h3>
+                    <button
+                      onClick={() => setGoalsModalOpen(true)}
+                      className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-muted)]"
+                      title="Editar metas"
+                      aria-label="Editar metas"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  </div>
+                  <div className="flex justify-center">
+                    <Gauge
+                      percentage={expenseVsLimit}
+                      fillColor={expenseGaugeColor(expenseVsLimit)}
+                      centerText={`${Math.round(expenseVsLimit)}%`}
+                      ariaLabel="Egresos vs límite anual"
+                    />
+                  </div>
+                  <p className="mt-2 text-center text-sm text-[var(--text-secondary)]">
+                    {expenseVsLimit > 100 ? (
+                      <span className="text-red-600 font-medium">¡Límite superado!</span>
+                    ) : (
+                      <>
+                        Usado{' '}
+                        <span className="amount text-[var(--text-primary)]">
+                          {formatCLP(annualData.totals.expense)}
+                        </span>{' '}
+                        de <span className="amount">{formatCLP(Number(goals.expenseLimit))}</span>{' '}
+                        límite anual
+                      </>
+                    )}
+                  </p>
+                </div>
+              ) : null}
             </div>
-          </div>
-        </div>
+          ) : (
+            <div className="mb-6">
+              <button
+                onClick={() => setGoalsModalOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+              >
+                <Target size={14} /> Definir metas
+              </button>
+            </div>
+          )}
+
+          {/* Summary chips + Quick actions */}
+          {data && (
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div className="flex flex-wrap gap-2">
+                {weekCommitments > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                    <AlertCircle size={12} />
+                    {weekCommitments} vencimiento{weekCommitments > 1 ? 's' : ''} esta semana
+                  </span>
+                )}
+                {data.movements.draftCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+                    <FileText size={12} />
+                    {data.movements.draftCount} borrador{data.movements.draftCount > 1 ? 'es' : ''}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Link
+                  href="/movimientos/nuevo"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                >
+                  <Plus size={12} /> Nuevo Movimiento
+                </Link>
+                <Link
+                  href="/caja/nuevo-compromiso"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                >
+                  <Clock size={12} /> Nuevo Compromiso
+                </Link>
+                <Link
+                  href="/movimientos/importar"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                >
+                  <Upload size={12} /> Importar CSV
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {data && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              {/* CHART 1 — Income vs Expense (bar in month view, line in year view) */}
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
+                  {viewMode === 'year'
+                    ? `Evolución mensual ${selectedYear}`
+                    : 'Ingresos vs Egresos'}
+                </h3>
+                {viewMode === 'year' ? (
+                  <>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart data={months12}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
+                        />
+                        <Tooltip
+                          formatter={(v: unknown) =>
+                            v == null ? 'Sin datos' : formatCLP(v as number)
+                          }
+                          contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="income"
+                          name="Ingresos"
+                          stroke="#2563EB"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          connectNulls={false}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="expense"
+                          name="Egresos"
+                          stroke="#94A3B8"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          connectNulls={false}
+                        />
+                        {goals?.incomeGoal ? (
+                          <Line
+                            type="monotone"
+                            dataKey="goal"
+                            name="Meta mensual"
+                            stroke="#16a34a"
+                            strokeWidth={2}
+                            strokeDasharray="4 4"
+                            dot={false}
+                          />
+                        ) : null}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-[var(--text-secondary)]">
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: '#2563EB' }}
+                        />
+                        Ingresos
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: '#94A3B8' }}
+                        />
+                        Egresos
+                      </span>
+                      {goals?.incomeGoal ? (
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            className="inline-block w-5 h-0.5"
+                            style={{ backgroundColor: '#16a34a' }}
+                          />
+                          Meta mensual
+                        </span>
+                      ) : null}
+                    </div>
+                  </>
+                ) : incomeExpenseData.length > 0 ? (
+                  <>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={incomeExpenseData} layout="vertical" barSize={28}>
+                        <XAxis type="number" hide />
+                        <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(v: unknown) => formatCLP(v as number)}
+                          contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                        />
+                        <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                          <Cell fill="#2563EB" />
+                          <Cell fill="#94A3B8" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="flex items-center gap-4 mt-3 text-xs text-[var(--text-secondary)]">
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: '#2563EB' }}
+                        />
+                        Ingresos
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: '#94A3B8' }}
+                        />
+                        Egresos
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-[var(--text-muted)] text-sm text-center py-8">Sin datos</p>
+                )}
+              </div>
+
+              {/* CHART 2 — Expense categories pie */}
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
+                  {pieTitle}
+                </h3>
+                {pieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={70}
+                        paddingAngle={3}
+                      >
+                        {pieData.map((entry, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: unknown) => formatCLP(v as number)}
+                        contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-[var(--text-muted)] text-sm text-center py-8">
+                    Sin datos de gastos
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {pieData.map((d) => (
+                    <span
+                      key={d.name}
+                      className="flex items-center gap-1 text-xs text-[var(--text-secondary)]"
+                    >
+                      <span
+                        className="inline-block w-2 h-2 rounded-full"
+                        style={{ backgroundColor: d.color }}
+                      />
+                      {d.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* CHART 3 — Cash flow summary */}
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
+                  Flujo de Caja
+                </h3>
+                <div className="space-y-3">
+                  {[
+                    {
+                      label: 'Saldo Apertura',
+                      value: Number(data.cash.openingBalance),
+                      color: '#64748B',
+                    },
+                    {
+                      label: 'Ingresos',
+                      value: Number(data.movements.totalIncome),
+                      color: '#2563EB',
+                    },
+                    {
+                      label: 'Egresos',
+                      value: Number(data.movements.totalExpense),
+                      color: '#94A3B8',
+                    },
+                    {
+                      label: 'Caja Libre',
+                      value: Number(data.cash.freeCash),
+                      color: '#1E3A5F',
+                    },
+                  ].map((item) => {
+                    const maxVal = Math.max(
+                      Number(data.cash.openingBalance),
+                      Number(data.movements.totalIncome),
+                      Number(data.movements.totalExpense),
+                      Number(data.cash.freeCash),
+                      1,
+                    );
+                    const pct = Math.round((Math.abs(item.value) / maxVal) * 100);
+                    return (
+                      <div key={item.label}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-[var(--text-secondary)]">{item.label}</span>
+                          <span className="amount text-[var(--text-primary)]">
+                            {formatCLP(item.value)}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full"
+                            style={{ width: `${pct}%`, backgroundColor: item.color }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {data && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Upcoming Commitments */}
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm">
+                <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                  <h2 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                    <Clock size={18} />
+                    Compromisos Próximos
+                  </h2>
+                  <Link href="/caja" className="text-xs text-blue-600 hover:underline">
+                    Ver todos
+                  </Link>
+                </div>
+                <div className="divide-y divide-[var(--border-color)]">
+                  {data.commitments.upcoming.length === 0 ? (
+                    <p className="px-6 py-8 text-[var(--text-muted)] text-center text-sm">
+                      Sin compromisos pendientes
+                    </p>
+                  ) : (
+                    data.commitments.upcoming.slice(0, 5).map((c) => {
+                      const daysUntil = Math.round(
+                        (new Date(c.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+                      );
+                      const urgencyColor =
+                        daysUntil < 7
+                          ? 'text-red-600'
+                          : daysUntil < 15
+                            ? 'text-yellow-600'
+                            : 'text-[var(--text-secondary)]';
+                      return (
+                        <div key={c.id} className="px-6 py-3 flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-[var(--text-primary)]">
+                              {c.description}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {c.counterparty?.name || c.category?.name || ''} &middot;{' '}
+                              <span className={urgencyColor}>{formatRelativeDate(c.dueDate)}</span>
+                            </p>
+                          </div>
+                          <span className="amount text-sm text-[var(--text-primary)]">
+                            {formatCLP(c.amount)}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Recent Movements */}
+              <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm">
+                <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                  <h2 className="font-semibold text-[var(--text-primary)]">
+                    Movimientos Recientes
+                  </h2>
+                  <Link href="/movimientos" className="text-xs text-blue-600 hover:underline">
+                    Ver todos
+                  </Link>
+                </div>
+                <div className="divide-y divide-[var(--border-color)]">
+                  {data.recentMovements.length === 0 ? (
+                    <p className="px-6 py-8 text-[var(--text-muted)] text-center text-sm">
+                      Sin movimientos confirmados
+                    </p>
+                  ) : (
+                    data.recentMovements.map((m) => (
+                      <Link
+                        key={m.id}
+                        href="/movimientos"
+                        className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition block"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`p-1.5 rounded-md ${m.type === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}`}
+                          >
+                            {m.type === 'INCOME' ? (
+                              <ArrowUpRight size={14} className="text-green-600" />
+                            ) : (
+                              <ArrowDownRight size={14} className="text-red-500" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-[var(--text-primary)]">
+                              {m.description}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+                              <span
+                                className="inline-block w-2 h-2 rounded-full"
+                                style={{ backgroundColor: m.category.color || '#888' }}
+                              />
+                              {m.category.name}
+                              {m.counterparty ? ` · ${m.counterparty.name}` : ''}
+                              {' · '}
+                              {formatDate(m.date)}
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={`amount text-sm ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
+                        >
+                          {m.type === 'INCOME' ? '+' : '-'}
+                          {formatCLP(m.amount)}
+                        </span>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {goalsModalOpen && (
@@ -972,5 +1068,331 @@ export default function DashboardPage() {
         />
       )}
     </div>
+  );
+}
+
+// ───────────────────────── MultiYear components ─────────────────────────
+
+function MultiYearRange({
+  fromYear,
+  toYear,
+  onChange,
+}: {
+  fromYear: number;
+  toYear: number;
+  onChange: (from: number, to: number) => void;
+}) {
+  const currentYear = new Date().getFullYear();
+  const years: number[] = [];
+  for (let y = 2019; y <= currentYear + 1; y++) years.push(y);
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <label className="text-[var(--text-secondary)]">Desde</label>
+      <select
+        value={fromYear}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          onChange(v, Math.max(v, toYear));
+        }}
+        className="px-2 py-1 border border-[var(--border-color)] rounded-md bg-[var(--bg-card)] text-[var(--text-primary)]"
+      >
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+      <label className="text-[var(--text-secondary)]">Hasta</label>
+      <select
+        value={toYear}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          onChange(Math.min(fromYear, v), v);
+        }}
+        className="px-2 py-1 border border-[var(--border-color)] rounded-md bg-[var(--bg-card)] text-[var(--text-primary)]"
+      >
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function MultiYearContent({
+  data,
+  onYearClick,
+  chartMode,
+  onChartModeChange,
+}: {
+  data: MultiYearData | null;
+  onYearClick: (year: number) => void;
+  chartMode: 'year' | 'month';
+  onChartModeChange: (mode: 'year' | 'month') => void;
+}) {
+  if (!data) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    );
+  }
+
+  const { years, totals, monthlyEvolution } = data;
+  const bestYearRow = years.find((y) => y.year === totals.bestYear);
+  const avgMargin =
+    years.filter((y) => y.hasData).reduce((s, y) => s + y.margin, 0) /
+    (years.filter((y) => y.hasData).length || 1);
+
+  // Pre-null months without data so the LineChart renders gaps (connectNulls=false).
+  const monthChartData = monthlyEvolution.map((m) => ({
+    label: m.label,
+    year: m.year,
+    income: m.hasData ? m.income : null,
+    expense: m.hasData ? m.expense : null,
+  }));
+  const yearChartData = years.map((y) => ({
+    year: String(y.year),
+    income: y.income,
+    expense: y.expense,
+    hasData: y.hasData,
+  }));
+
+  return (
+    <>
+      {/* ROW 1 — Historical KPI cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+        <KpiCard
+          title="Ingresos totales históricos"
+          value={formatCLP(totals.income)}
+          icon={TrendingUp}
+          color="text-blue-600"
+          subtitle={`${years.length} años`}
+        />
+        <KpiCard
+          title="Egresos totales históricos"
+          value={formatCLP(totals.expense)}
+          icon={TrendingDown}
+          color="text-red-500"
+          subtitle={`Resultado: ${formatCLP(totals.result)}`}
+        />
+        <KpiCard
+          title="Margen promedio"
+          value={`${avgMargin.toFixed(1)}%`}
+          icon={Percent}
+          color={marginColor(avgMargin)}
+          subtitle="Promedio anual"
+        />
+        <KpiCard
+          title="Mejor año"
+          value={String(totals.bestYear)}
+          icon={Target}
+          color="text-green-600"
+          subtitle={bestYearRow ? formatCLP(bestYearRow.income) : '—'}
+        />
+      </div>
+
+      {/* ROW 2 — Bar chart per year */}
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5 mb-6">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
+          Ingresos y egresos por año
+        </h3>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart
+            data={yearChartData}
+            onClick={(state) => {
+              // recharts gives us the active payload on bar click; fall back
+              // to activeLabel (the X-axis tick) if the payload is empty.
+              const clickedYear = state?.activeLabel;
+              if (clickedYear) onYearClick(Number(clickedYear));
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
+            <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+            <YAxis
+              tick={{ fontSize: 11 }}
+              tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
+            />
+            <Tooltip
+              formatter={(v: unknown) => formatCLP(v as number)}
+              contentStyle={{ borderRadius: 8, fontSize: 12 }}
+            />
+            <Bar dataKey="income" name="Ingresos" fill="#2563EB" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="expense" name="Egresos" fill="#94A3B8" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+        <p className="text-[11px] text-[var(--text-muted)] mt-2">
+          Haz clic en un año para ver su detalle mensual.
+        </p>
+      </div>
+
+      {/* ROW 3 — Chart-mode toggle + continuous timeline */}
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm p-5 mb-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+            {chartMode === 'year' ? 'Evolución por año' : 'Evolución por mes'}
+          </h3>
+          <div className="inline-flex gap-1 bg-gray-100 rounded-lg p-0.5">
+            {[
+              { mode: 'month' as const, label: 'Por mes' },
+              { mode: 'year' as const, label: 'Por año' },
+            ].map(({ mode, label }) => (
+              <button
+                key={mode}
+                onClick={() => onChartModeChange(mode)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                  chartMode === mode
+                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                    : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {chartMode === 'year' ? (
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart
+              data={yearChartData}
+              onClick={(state) => {
+                const clickedYear = state?.activeLabel;
+                if (clickedYear) onYearClick(Number(clickedYear));
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
+              <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
+              />
+              <Tooltip
+                formatter={(v: unknown) => formatCLP(v as number)}
+                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              />
+              <Bar dataKey="income" name="Ingresos" fill="#2563EB" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expense" name="Egresos" fill="#94A3B8" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={monthChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10 }}
+                interval={Math.max(0, Math.floor(monthChartData.length / 12) - 1)}
+              />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
+              />
+              <Tooltip
+                formatter={(v: unknown) => (v == null ? 'Sin datos' : formatCLP(v as number))}
+                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="income"
+                name="Ingresos"
+                stroke="#2563EB"
+                strokeWidth={2}
+                dot={false}
+                connectNulls={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="expense"
+                name="Egresos"
+                stroke="#94A3B8"
+                strokeWidth={2}
+                dot={false}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+        <div className="flex items-center gap-4 mt-3 text-xs text-[var(--text-secondary)]">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: '#2563EB' }}
+            />
+            Ingresos
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: '#94A3B8' }}
+            />
+            Egresos
+          </span>
+        </div>
+      </div>
+
+      {/* ROW 4 — Year summary table */}
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-[var(--border-color)]">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Resumen por año</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-[var(--border-color)]">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Año</th>
+                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Ingresos</th>
+                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Egresos</th>
+                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Margen</th>
+                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Resultado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-color)]">
+              {years.map((y) => {
+                const isBest = y.year === totals.bestYear && y.hasData;
+                return (
+                  <tr
+                    key={y.year}
+                    onClick={() => y.hasData && onYearClick(y.year)}
+                    className={`transition ${
+                      y.hasData ? 'cursor-pointer hover:bg-gray-50' : 'opacity-50'
+                    } ${isBest ? 'bg-green-50' : ''}`}
+                  >
+                    <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
+                      {y.year}
+                      {isBest && (
+                        <span className="ml-2 inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold uppercase">
+                          Mejor
+                        </span>
+                      )}
+                    </td>
+                    <td className="amount px-4 py-2.5 text-right text-[var(--text-primary)]">
+                      {y.hasData ? formatCLP(y.income) : '—'}
+                    </td>
+                    <td className="amount px-4 py-2.5 text-right text-[var(--text-primary)]">
+                      {y.hasData ? formatCLP(y.expense) : '—'}
+                    </td>
+                    <td className={`amount px-4 py-2.5 text-right ${marginColor(y.margin)}`}>
+                      {y.hasData ? `${y.margin.toFixed(1)}%` : '—'}
+                    </td>
+                    <td
+                      className={`amount px-4 py-2.5 text-right ${
+                        y.result >= 0 ? 'text-green-600' : 'text-red-500'
+                      }`}
+                    >
+                      {y.hasData ? formatCLP(y.result) : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }

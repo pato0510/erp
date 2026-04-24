@@ -32,6 +32,19 @@ export class DashboardController {
     return this.dashboardService.getAnnualData(companyId, parsed);
   }
 
+  @Get('multiyear')
+  @CheckPolicies((ability) => ability.can('read', MovementSubject))
+  getMultiYear(
+    @CurrentCompany() companyId: string,
+    @Query('fromYear') fromYear?: string,
+    @Query('toYear') toYear?: string,
+  ) {
+    const currentYear = new Date().getFullYear();
+    const from = fromYear ? parseInt(fromYear, 10) : 2019;
+    const to = toYear ? parseInt(toYear, 10) : currentYear;
+    return this.dashboardService.getMultiYearData(companyId, from, to);
+  }
+
   @Get('goals')
   @CheckPolicies((ability) => ability.can('read', MovementSubject))
   getGoals(@CurrentCompany() companyId: string, @Query('year') year?: string) {
