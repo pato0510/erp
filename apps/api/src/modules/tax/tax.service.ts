@@ -1,11 +1,38 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DocumentDirection, DocumentType, Prisma } from '@prisma/client';
+import {
+  CategoryType,
+  CounterpartyType,
+  DocumentDirection,
+  DocumentType,
+  MovementSource,
+  MovementStatus,
+  MovementType,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { DEFAULT_SII_PROVIDER, SiiProviderFactory } from './providers/sii-provider.factory';
 import { TaxDocumentResult } from './providers/sii-provider.interface';
 import { paginate } from '@erp/utils';
 
 const DEFAULT_PROVIDER = DEFAULT_SII_PROVIDER;
+
+const SALES_INCOME_CATEGORY_NAME = 'Ingresos por Ventas';
+const UNCATEGORIZED_CATEGORY_NAME = 'Productos no categorizados';
+
+const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  FACTURA_ELECTRONICA: 'Factura',
+  BOLETA_ELECTRONICA: 'Boleta',
+  NOTA_CREDITO: 'Nota de Crédito',
+  NOTA_DEBITO: 'Nota de Débito',
+  LIQUIDACION_FACTURA: 'Liquidación',
+  FACTURA_NO_AFECTA: 'Factura no Afecta',
+};
+
+interface DefaultCategoryIds {
+  salesIncome: string;
+  uncategorizedIncome: string;
+  uncategorizedExpense: string;
+}
 
 const EMPTY_SUMMARY = {
   emitidos: { count: 0, netTotal: 0, taxTotal: 0, total: 0 },
@@ -38,7 +65,7 @@ export class TaxService {
 
   async syncDocuments(
     companyId: string,
-    _userId: string,
+    userId: string,
     fiscalPeriodId: string,
     direction: DocumentDirection,
     providerName: string = DEFAULT_PROVIDER,
@@ -79,15 +106,36 @@ export class TaxService {
           ? await provider.getEmitidos(credentials, siiPeriod)
           : await provider.getRecibidos(credentials, siiPeriod);
 
+      // Lazy: only do the work if there are documents to import.
+      const defaultCategories = documents.length
+        ? await this.ensureDefaultCategories(companyId, userId)
+        : null;
+
       let synced = 0;
       let skipped = 0;
+      let movementsCreated = 0;
       const errors: { folio: number; message: string }[] = [];
 
       for (const doc of documents) {
         try {
-          const result = await this.upsertDocument(companyId, fiscalPeriodId, doc);
-          if (result === 'created') synced++;
+          const { id: taxDocId, created } = await this.upsertDocument(
+            companyId,
+            fiscalPeriodId,
+            doc,
+          );
+          if (created) synced++;
           else skipped++;
+
+          if (defaultCategories) {
+            const movementCreated = await this.createMovementFromDocument(
+              companyId,
+              userId,
+              taxDocId,
+              fiscalPeriodId,
+              defaultCategories,
+            );
+            if (movementCreated) movementsCreated++;
+          }
         } catch (err) {
           errors.push({
             folio: doc.folio,
@@ -105,7 +153,7 @@ export class TaxService {
         },
       });
 
-      return { synced, skipped, errors, syncRunId: syncRun.id };
+      return { synced, skipped, movementsCreated, errors, syncRunId: syncRun.id };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       this.logger.warn(
@@ -115,10 +163,13 @@ export class TaxService {
         where: { id: syncRun.id },
         data: { status: 'FAILED', completedAt: new Date(), errorMessage: message },
       });
-      // Returning a structured result (instead of throwing) matches the task's
-      // "handle errors gracefully" directive and keeps sync-all from dying on
-      // the first half.
-      return { synced: 0, skipped: 0, errors: [{ folio: 0, message }], syncRunId: syncRun.id };
+      return {
+        synced: 0,
+        skipped: 0,
+        movementsCreated: 0,
+        errors: [{ folio: 0, message }],
+        syncRunId: syncRun.id,
+      };
     }
   }
 
@@ -138,6 +189,7 @@ export class TaxService {
       recibidos,
       totalSynced: emitidos.synced + recibidos.synced,
       totalSkipped: emitidos.skipped + recibidos.skipped,
+      totalMovementsCreated: emitidos.movementsCreated + recibidos.movementsCreated,
     };
   }
 
@@ -183,6 +235,57 @@ export class TaxService {
     const doc = await this.prisma.taxDocument.findFirst({ where: { id, companyId } });
     if (!doc) throw new NotFoundException('Tax document not found');
     return doc;
+  }
+
+  /**
+   * Tax documents whose linked movement still uses the default
+   * "Productos no categorizados" category. Powers the
+   * "pending categorization" frontend section.
+   */
+  async findPendingCategorization(companyId: string) {
+    const defaults = await this.prisma.category.findMany({
+      where: { companyId, name: UNCATEGORIZED_CATEGORY_NAME },
+      select: { id: true },
+    });
+    const defaultIds = defaults.map((c) => c.id);
+    if (defaultIds.length === 0) return [];
+
+    const linkedMovements = await this.prisma.movement.findMany({
+      where: {
+        companyId,
+        categoryId: { in: defaultIds },
+        source: MovementSource.TAX_SYNC,
+      },
+      select: { id: true, type: true, categoryId: true },
+    });
+    if (linkedMovements.length === 0) return [];
+
+    const movementById = new Map(linkedMovements.map((m) => [m.id, m]));
+    const movementIds = linkedMovements.map((m) => m.id);
+
+    const docs = await this.prisma.taxDocument.findMany({
+      where: { companyId, movementId: { in: movementIds } },
+      orderBy: { issueDate: 'desc' },
+    });
+
+    return docs.map((d) => {
+      const movement = d.movementId ? movementById.get(d.movementId) : undefined;
+      return {
+        id: d.id,
+        type: d.type,
+        direction: d.direction,
+        folio: d.folio,
+        issuerName: d.issuerName,
+        issuerRut: d.issuerRut,
+        receiverName: d.receiverName,
+        receiverRut: d.receiverRut,
+        issueDate: d.issueDate,
+        totalAmount: d.totalAmount,
+        movementId: d.movementId,
+        movementType: movement?.type ?? null,
+        currentCategoryId: movement?.categoryId ?? null,
+      };
+    });
   }
 
   async getSummary(companyId: string, fiscalPeriodId?: string) {
@@ -270,7 +373,7 @@ export class TaxService {
     companyId: string,
     fiscalPeriodId: string,
     doc: TaxDocumentResult,
-  ): Promise<'created' | 'updated'> {
+  ): Promise<{ id: string; created: boolean }> {
     // Unique on (companyId, type, folio, direction) gives us idempotency.
     const existing = await this.prisma.taxDocument.findUnique({
       where: {
@@ -285,10 +388,10 @@ export class TaxService {
     });
 
     if (existing) {
-      return 'updated';
+      return { id: existing.id, created: false };
     }
 
-    await this.prisma.taxDocument.create({
+    const newDoc = await this.prisma.taxDocument.create({
       data: {
         companyId,
         fiscalPeriodId,
@@ -307,7 +410,168 @@ export class TaxService {
         externalId: doc.externalId,
         metadata: (doc.metadata ?? null) as Prisma.InputJsonValue,
       },
+      select: { id: true },
     });
-    return 'created';
+    return { id: newDoc.id, created: true };
+  }
+
+  /**
+   * Upserts the three default categories used by SII auto-import:
+   *  - "Ingresos por Ventas" (INCOME) for EMITIDO documents
+   *  - "Productos no categorizados" (INCOME and EXPENSE) for fallback
+   * Idempotent via @@unique([companyId, name, type]).
+   */
+  async ensureDefaultCategories(companyId: string, _userId: string): Promise<DefaultCategoryIds> {
+    const seeds: { name: string; type: CategoryType; color: string }[] = [
+      { name: SALES_INCOME_CATEGORY_NAME, type: CategoryType.INCOME, color: '#2563EB' },
+      { name: UNCATEGORIZED_CATEGORY_NAME, type: CategoryType.EXPENSE, color: '#94A3B8' },
+      { name: UNCATEGORIZED_CATEGORY_NAME, type: CategoryType.INCOME, color: '#94A3B8' },
+    ];
+
+    const upserted = await Promise.all(
+      seeds.map((s) =>
+        this.prisma.category.upsert({
+          where: {
+            companyId_name_type: { companyId, name: s.name, type: s.type },
+          },
+          create: { companyId, name: s.name, type: s.type, color: s.color },
+          update: {},
+          select: { id: true, name: true, type: true },
+        }),
+      ),
+    );
+
+    const find = (name: string, type: CategoryType) =>
+      upserted.find((c) => c.name === name && c.type === type)!.id;
+
+    return {
+      salesIncome: find(SALES_INCOME_CATEGORY_NAME, CategoryType.INCOME),
+      uncategorizedExpense: find(UNCATEGORIZED_CATEGORY_NAME, CategoryType.EXPENSE),
+      uncategorizedIncome: find(UNCATEGORIZED_CATEGORY_NAME, CategoryType.INCOME),
+    };
+  }
+
+  /**
+   * Stub for the upcoming CategoryRule engine. Today it returns the spec'd
+   * defaults (sales-income for EMITIDO, uncategorized-expense for RECIBIDO);
+   * the next ticket will look up CategoryRule rows by RUT / razón social.
+   */
+  applyCategoryRules(
+    direction: DocumentDirection,
+    defaults: DefaultCategoryIds,
+    _companyId: string,
+    _rut: string,
+    _razonSocial: string,
+  ): string {
+    return direction === 'EMITIDO' ? defaults.salesIncome : defaults.uncategorizedExpense;
+  }
+
+  async findOrCreateCounterparty(
+    companyId: string,
+    _userId: string,
+    rut: string,
+    name: string,
+    direction: DocumentDirection,
+  ): Promise<string> {
+    const existing = await this.prisma.counterparty.findUnique({
+      where: { companyId_taxId: { companyId, taxId: rut } },
+      select: { id: true },
+    });
+    if (existing) return existing.id;
+
+    const created = await this.prisma.counterparty.create({
+      data: {
+        companyId,
+        name,
+        taxId: rut,
+        type: direction === 'EMITIDO' ? CounterpartyType.CLIENT : CounterpartyType.SUPPLIER,
+      },
+      select: { id: true },
+    });
+    return created.id;
+  }
+
+  /**
+   * Creates a Movement from a TaxDocument and links them via taxDoc.movementId.
+   * Idempotent: if movementId is already set, returns false without creating
+   * a duplicate. Returns true when a new movement was created.
+   */
+  async createMovementFromDocument(
+    companyId: string,
+    userId: string,
+    taxDocId: string,
+    fiscalPeriodId: string,
+    defaults: DefaultCategoryIds,
+  ): Promise<boolean> {
+    const taxDoc = await this.prisma.taxDocument.findUnique({
+      where: { id: taxDocId },
+      select: {
+        id: true,
+        type: true,
+        direction: true,
+        folio: true,
+        issuerRut: true,
+        issuerName: true,
+        receiverRut: true,
+        receiverName: true,
+        issueDate: true,
+        totalAmount: true,
+        externalId: true,
+        movementId: true,
+      },
+    });
+    if (!taxDoc) return false;
+    if (taxDoc.movementId) return false; // idempotency: already linked
+
+    const isIncome = taxDoc.direction === DocumentDirection.EMITIDO;
+    const counterpartyRut = isIncome ? taxDoc.receiverRut : taxDoc.issuerRut;
+    const counterpartyName = isIncome ? taxDoc.receiverName : taxDoc.issuerName;
+
+    const counterpartyId = await this.findOrCreateCounterparty(
+      companyId,
+      userId,
+      counterpartyRut,
+      counterpartyName,
+      taxDoc.direction,
+    );
+
+    const categoryId = this.applyCategoryRules(
+      taxDoc.direction,
+      defaults,
+      companyId,
+      counterpartyRut,
+      counterpartyName,
+    );
+
+    const typeLabel = DOCUMENT_TYPE_LABELS[taxDoc.type] ?? taxDoc.type;
+    const description = `${typeLabel} #${taxDoc.folio} - ${counterpartyName}`;
+
+    const movement = await this.prisma.movement.create({
+      data: {
+        companyId,
+        fiscalPeriodId,
+        categoryId,
+        counterpartyId,
+        type: isIncome ? MovementType.INCOME : MovementType.EXPENSE,
+        status: MovementStatus.CONFIRMED,
+        source: MovementSource.TAX_SYNC,
+        amount: taxDoc.totalAmount,
+        date: taxDoc.issueDate,
+        description,
+        reference: taxDoc.externalId ?? undefined,
+        notes: 'Importado desde SII automáticamente',
+        createdBy: userId,
+        confirmedAt: new Date(),
+        confirmedBy: userId,
+      },
+      select: { id: true },
+    });
+
+    await this.prisma.taxDocument.update({
+      where: { id: taxDoc.id },
+      data: { movementId: movement.id, isReconciled: true },
+    });
+
+    return true;
   }
 }

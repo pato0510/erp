@@ -135,4 +135,10 @@ export class TaxController {
   ) {
     return this.taxService.getSummary(companyId, fiscalPeriodId);
   }
+
+  @Get('pending-categorization')
+  @CheckPolicies((ability) => ability.can('read', MovementSubject))
+  findPendingCategorization(@CurrentCompany() companyId: string) {
+    return this.taxService.findPendingCategorization(companyId);
+  }
 }

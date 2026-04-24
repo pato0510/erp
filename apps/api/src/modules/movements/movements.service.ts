@@ -98,9 +98,20 @@ export class MovementsService {
     const movement = await this.findOne(id, companyId);
 
     if (movement.status !== MovementStatus.DRAFT) {
-      throw new BadRequestException('Only DRAFT movements can be edited');
+      // Special case: re-categorizing an auto-imported tax movement is a
+      // metadata-only change, so we allow categoryId-only updates on any
+      // non-DRAFT status. Anything that touches financial fields still requires
+      // the movement to be in DRAFT.
+      const providedKeys = Object.keys(dto).filter(
+        (k) => (dto as Record<string, unknown>)[k] !== undefined,
+      );
+      const isCategoryOnly = providedKeys.length === 1 && providedKeys[0] === 'categoryId';
+      if (!isCategoryOnly) {
+        throw new BadRequestException('Only DRAFT movements can be edited');
+      }
+    } else {
+      await this.assertPeriodOpen(movement.fiscalPeriodId);
     }
-    await this.assertPeriodOpen(movement.fiscalPeriodId);
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.movement.update({
