@@ -12,7 +12,6 @@ import {
   DollarSign,
   TrendingUp,
   TrendingDown,
-  Wallet,
   Clock,
   ArrowUpRight,
   ArrowDownRight,
@@ -70,6 +69,13 @@ interface AnnualData {
     topExpenses: AnnualCategoryRow[];
     topIncome: AnnualCategoryRow[];
   };
+}
+
+interface RealtimeCash {
+  totalCash: number;
+  freeCash: number;
+  committedAmount: number;
+  lastUpdated: string;
 }
 
 interface MultiYearYear {
@@ -272,6 +278,7 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<'month' | 'year' | 'multiyear'>('month');
   const [selectedYear, setSelectedYear] = useState(2026);
   const [annualData, setAnnualData] = useState<AnnualData | null>(null);
+  const [realtimeCash, setRealtimeCash] = useState<RealtimeCash | null>(null);
   const [multiYearData, setMultiYearData] = useState<MultiYearData | null>(null);
   const [multiYearFrom, setMultiYearFrom] = useState(2019);
   const [multiYearTo, setMultiYearTo] = useState(new Date().getFullYear());
@@ -316,6 +323,19 @@ export default function DashboardPage() {
       });
     }
   }, [viewMode, selectedYear]);
+
+  const loadRealtimeCash = useCallback(async () => {
+    try {
+      const res = await apiClient.get<RealtimeCash>('/api/dashboard/realtime-cash');
+      setRealtimeCash(res);
+    } catch {
+      /* non-fatal; the Posición actual cards fall back to a skeleton state */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRealtimeCash();
+  }, [loadRealtimeCash]);
 
   const loadMultiYear = useCallback(async () => {
     if (viewMode !== 'multiyear') return;
@@ -418,6 +438,9 @@ export default function DashboardPage() {
   return (
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* Posición actual — cumulative real-time cash, independent of period selection */}
+      <RealtimeCashSection cash={realtimeCash} />
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -522,11 +545,10 @@ export default function DashboardPage() {
             </Link>
           )}
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 mb-6">
+          {/* Period-scoped KPI Cards — Caja Total/Libre moved to top "Posición actual" section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
             {isLoading ? (
               <>
-                <SkeletonCard />
                 <SkeletonCard />
                 <SkeletonCard />
                 <SkeletonCard />
@@ -535,44 +557,32 @@ export default function DashboardPage() {
             ) : data ? (
               <>
                 <KpiCard
-                  title="Caja Total"
-                  value={formatCLP(data.cash.totalCash)}
-                  icon={DollarSign}
-                  color={Number(data.cash.totalCash) >= 0 ? 'text-green-600' : 'text-red-600'}
-                  subtitle={`Apertura: ${formatCLP(data.cash.openingBalance)}`}
-                />
-                <KpiCard
-                  title="Caja Libre"
-                  value={formatCLP(data.cash.freeCash)}
-                  icon={Wallet}
-                  color={
-                    Number(data.cash.totalCash) > 0 &&
-                    Number(data.cash.freeCash) / Number(data.cash.totalCash) < 0.2
-                      ? 'text-yellow-500'
-                      : 'text-green-600'
-                  }
-                  subtitle={`Comprometido: ${formatCLP(data.cash.committedAmount)}`}
-                />
-                <KpiCard
-                  title="Ingresos"
+                  title="Ingresos del período"
                   value={formatCLP(data.movements.totalIncome)}
                   icon={TrendingUp}
                   color="text-blue-600"
                   subtitle={`${data.movements.confirmedCount} confirmados`}
                 />
                 <KpiCard
-                  title="Egresos"
+                  title="Egresos del período"
                   value={formatCLP(data.movements.totalExpense)}
                   icon={TrendingDown}
                   color="text-red-500"
                   subtitle={`Balance: ${formatCLP(data.movements.balance)}`}
                 />
                 <KpiCard
-                  title="Margen bruto"
+                  title="Margen del período"
                   value={`${marginValue.toFixed(1)}%`}
                   icon={Percent}
                   color={marginColor(marginValue)}
-                  subtitle={viewMode === 'year' ? `Año ${selectedYear}` : 'Período actual'}
+                  subtitle={viewMode === 'year' ? `Año ${selectedYear}` : data.period.name}
+                />
+                <KpiCard
+                  title="Resultado del período"
+                  value={formatCLP(data.movements.balance)}
+                  icon={DollarSign}
+                  color={data.movements.balance >= 0 ? 'text-green-600' : 'text-red-500'}
+                  subtitle={data.movements.balance >= 0 ? 'Ganancia' : 'Pérdida'}
                 />
               </>
             ) : null}
@@ -1067,6 +1077,82 @@ export default function DashboardPage() {
           onError={(message) => setToast({ message, type: 'error' })}
         />
       )}
+    </div>
+  );
+}
+
+// ───────────────────────── Real-time cash section ─────────────────────────
+
+function RealtimeCashSection({ cash }: { cash: RealtimeCash | null }) {
+  if (!cash) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-32 mb-3" />
+          <div className="h-10 bg-gray-200 rounded w-48" />
+        </div>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-32 mb-3" />
+          <div className="h-10 bg-gray-200 rounded w-48" />
+        </div>
+      </div>
+    );
+  }
+
+  const totalColor = cash.totalCash >= 0 ? 'text-green-600' : 'text-red-600';
+  const ratio = cash.totalCash > 0 ? cash.freeCash / cash.totalCash : 0;
+  const freeColor =
+    ratio > 0.5 ? 'text-green-600' : ratio >= 0.2 ? 'text-yellow-500' : 'text-red-500';
+  const freeBarColor = ratio > 0.5 ? '#16a34a' : ratio >= 0.2 ? '#d97706' : '#dc2626';
+  // Clamp width for display; negative/over-100% ratios get pinned but we still
+  // surface the number above the bar so it's not hidden.
+  const freePct = Math.max(0, Math.min(100, ratio * 100));
+  const lastUpdatedLabel = cash.lastUpdated
+    ? formatRelativeDate(
+        typeof cash.lastUpdated === 'string'
+          ? cash.lastUpdated
+          : new Date(cash.lastUpdated).toISOString(),
+      )
+    : 'Actualizado ahora';
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-baseline justify-between mb-2">
+        <h2 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+          Posición actual
+        </h2>
+        <span className="text-[11px] text-[var(--text-muted)]">{lastUpdatedLabel}</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm">
+          <p className="text-sm text-[var(--text-secondary)]" style={{ fontWeight: 500 }}>
+            Caja Total hoy
+          </p>
+          <p className={`amount mt-1 leading-tight ${totalColor}`} style={{ fontSize: 36 }}>
+            {formatCLP(cash.totalCash)}
+          </p>
+          <p className="text-xs text-[var(--text-muted)] mt-1" style={{ fontWeight: 300 }}>
+            Saldo acumulado total · Actualizado ahora
+          </p>
+        </div>
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm">
+          <p className="text-sm text-[var(--text-secondary)]" style={{ fontWeight: 500 }}>
+            Caja Libre hoy
+          </p>
+          <p className={`amount mt-1 leading-tight ${freeColor}`} style={{ fontSize: 36 }}>
+            {formatCLP(cash.freeCash)}
+          </p>
+          <p className="text-xs text-[var(--text-muted)] mt-1" style={{ fontWeight: 300 }}>
+            Disponible tras compromisos · Comprometido {formatCLP(cash.committedAmount)}
+          </p>
+          <div className="mt-3 w-full bg-gray-100 rounded-full h-1.5">
+            <div
+              className="h-1.5 rounded-full"
+              style={{ width: `${freePct}%`, backgroundColor: freeBarColor }}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

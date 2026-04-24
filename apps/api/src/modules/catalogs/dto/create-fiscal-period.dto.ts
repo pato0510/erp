@@ -6,7 +6,7 @@ export class CreateFiscalPeriodDto {
   name: string;
 
   @IsInt()
-  @Min(2020)
+  @Min(2019)
   year: number;
 
   @IsInt()

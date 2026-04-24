@@ -32,6 +32,12 @@ export class DashboardController {
     return this.dashboardService.getAnnualData(companyId, parsed);
   }
 
+  @Get('realtime-cash')
+  @CheckPolicies((ability) => ability.can('read', MovementSubject))
+  getRealtimeCash(@CurrentCompany() companyId: string) {
+    return this.dashboardService.getRealTimeCash(companyId);
+  }
+
   @Get('multiyear')
   @CheckPolicies((ability) => ability.can('read', MovementSubject))
   getMultiYear(

@@ -247,6 +247,52 @@ export class DashboardService {
     };
   }
 
+  /**
+   * Cumulative cash position across ALL periods — the actual bank balance
+   * today, independent of any period selection in the UI. Summed from every
+   * opening balance the company has recorded plus every CONFIRMED movement.
+   */
+  async getRealTimeCash(companyId: string) {
+    try {
+      const [incomeAgg, expenseAgg, openingAgg, pendingCommitments] = await Promise.all([
+        this.prisma.movement.aggregate({
+          where: { companyId, type: 'INCOME', status: MovementStatus.CONFIRMED },
+          _sum: { amount: true },
+        }),
+        this.prisma.movement.aggregate({
+          where: { companyId, type: 'EXPENSE', status: MovementStatus.CONFIRMED },
+          _sum: { amount: true },
+        }),
+        this.prisma.accountBalance.aggregate({
+          where: { companyId },
+          _sum: { openingBalance: true },
+        }),
+        this.prisma.commitment.aggregate({
+          where: { companyId, status: 'PENDING' },
+          _sum: { amount: true },
+        }),
+      ]);
+
+      const totalIncome = Number(incomeAgg._sum.amount || 0);
+      const totalExpense = Number(expenseAgg._sum.amount || 0);
+      const openingBalance = Number(openingAgg._sum.openingBalance || 0);
+      const committedAmount = Number(pendingCommitments._sum.amount || 0);
+      const totalCash = openingBalance + totalIncome - totalExpense;
+
+      return {
+        totalCash,
+        freeCash: totalCash - committedAmount,
+        committedAmount,
+        lastUpdated: new Date(),
+      };
+    } catch (err) {
+      this.logger.error(
+        `getRealTimeCash failed company=${companyId}: ${err instanceof Error ? err.message : err}`,
+      );
+      return { totalCash: 0, freeCash: 0, committedAmount: 0, lastUpdated: new Date() };
+    }
+  }
+
   async getMultiYearData(companyId: string, fromYear: number, toYear: number) {
     if (fromYear > toYear) {
       // Tolerate swapped bounds instead of 400'ing the dashboard.
