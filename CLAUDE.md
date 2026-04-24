@@ -219,26 +219,119 @@ Period format: "YYYY-MM"
 Frontend: https://app.excelsia.cl
 Backend: https://api.excelsia.clLibreDTE
 
-## SII to Movements Integration (in progress)
+## Módulo Operaciones (en desarrollo)
 
-When SII documents are synced, they automatically create Movement records:
+### Concepto central
 
-### Rules
+El objeto principal es el **Activo Operacional**. Equipos y vehículos
+son variantes de un mismo concepto que comparten lógica común.
+Vehículos extienden con campos específicos (patente, VIN, kilometraje).
 
-- EMITIDO (facturas emitidas) → Movement INCOME
-  Default category: "Ingresos por Ventas" (auto-created)
-- RECIBIDO (facturas recibidas) → Movement EXPENSE
-  Default category: "Productos no categorizados" until user confirms
-- All synced movements start as CONFIRMED (affect cash immediately)
-- User must confirm category suggestion in UI
+### Submódulos del Módulo Operaciones
 
-### Categorization priority
+1. Dashboard Operacional
+2. Equipos
+3. Vehículos
+4. Control Documental
+5. Permisos Operacionales (externos + internos de trabajo)
+6. Procedimientos
+7. Alertas y Vencimientos
+8. Calendario Operacional
+9. Reportes
 
-1. RUT rule (if counterparty RUT matches a rule)
-2. Keyword rule (if razón social contains a keyword)
-3. Fallback: "Productos no categorizados"
+### Decisiones arquitectónicas (alineadas al stack actual)
 
-### Historical periods
+- Mantener Prisma (NO migrar a MikroORM) — RLS y migraciones ya consolidadas
+- Reutilizar BullMQ existente para job de vencimientos diario
+- Reutilizar CASL para autorización con nuevos subjects
+- JSONB en PostgreSQL para campos dinámicos por subtipo de activo
+- Jerarquías padre-hijo via self-referencing foreign key
+- Versionado inmutable (supersesión) para documentos críticos
+- Storage en MinIO/R2 con fallback a DB (mismo patrón SII)
 
-Fiscal periods can be created from 2019 onwards to support
-historical SII document sync from company founding date.
+### Tablas principales del módulo
+
+- operational_assets (tabla central — equipos + vehículos)
+- vehicles (extensión con campos de flota)
+- asset_types, asset_subtypes
+- locations (sitios/áreas)
+- document_types (catálogo configurable)
+- document_requirements (matriz: qué documentos exige cada tipo de activo)
+- document_records (documentos cargados con vigencia)
+- document_versions (versionado inmutable)
+- permits, permit_types
+- procedure_documents
+- procedure_acknowledgments (acuses de lectura)
+- alert_rules, alert_instances
+- exceptions (excepciones temporales aprobadas)
+
+### Estados de activo
+
+OPERATIVO, CON_OBSERVACIONES, NO_OPERATIVO, EN_MANTENCION,
+BLOQUEADO_DOCUMENTAL, BLOQUEADO_PERMISO, FUERA_SERVICIO, DADO_BAJA
+
+### Estados de documento
+
+BORRADOR, PENDIENTE_REVISION, APROBADO, RECHAZADO,
+VIGENTE, POR_VENCER, VENCIDO, REEMPLAZADO, ARCHIVADO
+
+### Roles del módulo
+
+- operations_admin — config global del módulo
+- operations_supervisor — gestiona equipos/vehículos/excepciones
+- document_manager — sube/aprueba/rechaza documentos
+- operator — solo ve documentos de sus activos asignados
+- auditor — solo lectura
+
+### Integración con Finanzas
+
+Operaciones publica eventos de dominio que Finanzas escucha:
+
+- DocumentRenewalImminentEvent → crea compromiso futuro automático
+- AssetBlockedEvent → alerta financiera por activo no operativo
+- OperationalCostEvent → registra gasto asociado a activo
+
+### Estructura backend
+
+apps/api/src/modules/operations/
+assets/
+fleet/
+document-control/
+permits/
+procedures/
+alerts/
+reports/
+
+### Estructura frontend
+
+apps/web/src/app/(dashboard)/operaciones/
+page.tsx (dashboard operacional)
+equipos/
+vehiculos/
+documentos/
+permisos/
+procedimientos/
+alertas/
+calendario/
+reportes/
+
+### Plan de sprints
+
+Sprint 1: Panel módulos + estructura base operaciones
+Sprint 2: Equipos
+Sprint 3: Vehículos
+Sprint 4: Control Documental
+Sprint 5: Alertas y Bloqueos
+Sprint 6: Permisos y Procedimientos
+Sprint 7: Calendario, Reportes e Integración Finanzas
+Sprint 8: Hardening (vistas materializadas, QR, QA)
+
+### MVP V1 (lo que va a producción primero)
+
+Dashboard, CRUD equipos/vehículos, tipos documentales, carga,
+matriz, vencimientos, alertas, bloqueos, reportes básicos.
+
+### Roadmap V2 (después del MVP)
+
+OCR, firma electrónica, app móvil PWA con sincronización offline,
+work orders, mantenimiento preventivo, modelado bitemporal completo.
