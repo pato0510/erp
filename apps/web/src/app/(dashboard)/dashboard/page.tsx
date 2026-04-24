@@ -433,7 +433,9 @@ export default function DashboardPage() {
       ? `Categorías de Gasto — ${selectedYear}`
       : `Categorías de Gasto${data ? ` — ${data.period.name}` : ''}`;
 
-  const yearOptions = [2025, 2026, 2027];
+  // Company has data from 2019 onwards; include next year so users can set goals ahead of time.
+  const yearOptions: number[] = [];
+  for (let y = 2019; y <= new Date().getFullYear() + 1; y++) yearOptions.push(y);
 
   return (
     <div>
@@ -481,12 +483,15 @@ export default function DashboardPage() {
           {viewMode === 'month' ? (
             <PeriodSelector value={periodId} onChange={setPeriodId} />
           ) : viewMode === 'year' ? (
-            <div className="inline-flex gap-1 bg-gray-100 rounded-lg p-0.5">
+            <div
+              className="flex gap-2 overflow-x-auto max-w-full pb-1 -mb-1 bg-gray-100 rounded-lg p-0.5"
+              style={{ maxWidth: 'min(100%, 520px)' }}
+            >
               {yearOptions.map((y) => (
                 <button
                   key={y}
                   onClick={() => setSelectedYear(y)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                  className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition ${
                     selectedYear === y
                       ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
                       : 'text-[var(--text-secondary)]'
@@ -546,47 +551,78 @@ export default function DashboardPage() {
           )}
 
           {/* Period-scoped KPI Cards — Caja Total/Libre moved to top "Posición actual" section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-            {isLoading ? (
-              <>
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-              </>
-            ) : data ? (
-              <>
-                <KpiCard
-                  title="Ingresos del período"
-                  value={formatCLP(data.movements.totalIncome)}
-                  icon={TrendingUp}
-                  color="text-blue-600"
-                  subtitle={`${data.movements.confirmedCount} confirmados`}
-                />
-                <KpiCard
-                  title="Egresos del período"
-                  value={formatCLP(data.movements.totalExpense)}
-                  icon={TrendingDown}
-                  color="text-red-500"
-                  subtitle={`Balance: ${formatCLP(data.movements.balance)}`}
-                />
-                <KpiCard
-                  title="Margen del período"
-                  value={`${marginValue.toFixed(1)}%`}
-                  icon={Percent}
-                  color={marginColor(marginValue)}
-                  subtitle={viewMode === 'year' ? `Año ${selectedYear}` : data.period.name}
-                />
-                <KpiCard
-                  title="Resultado del período"
-                  value={formatCLP(data.movements.balance)}
-                  icon={DollarSign}
-                  color={data.movements.balance >= 0 ? 'text-green-600' : 'text-red-500'}
-                  subtitle={data.movements.balance >= 0 ? 'Ganancia' : 'Pérdida'}
-                />
-              </>
-            ) : null}
-          </div>
+          {(() => {
+            // Source of truth flips based on viewMode. Same card layout either
+            // way — we just swap values and labels so the UX is identical.
+            const isYear = viewMode === 'year';
+            const income = isYear
+              ? Number(annualData?.totals.income ?? 0)
+              : Number(data?.movements.totalIncome ?? 0);
+            const expense = isYear
+              ? Number(annualData?.totals.expense ?? 0)
+              : Number(data?.movements.totalExpense ?? 0);
+            const result = isYear
+              ? Number(annualData?.totals.result ?? 0)
+              : Number(data?.movements.balance ?? 0);
+            const margin = isYear ? Number(annualData?.totals.margin ?? 0) : monthMargin;
+            const incomeTitle = isYear ? `Ingresos ${selectedYear}` : 'Ingresos del período';
+            const expenseTitle = isYear ? `Egresos ${selectedYear}` : 'Egresos del período';
+            const marginTitle = isYear ? `Margen ${selectedYear}` : 'Margen del período';
+            const resultTitle = isYear ? `Resultado ${selectedYear}` : 'Resultado del período';
+            const marginSubtitle = isYear
+              ? `Año ${selectedYear}`
+              : (data?.period.name ?? 'Período actual');
+            const incomeSubtitle = isYear
+              ? 'Confirmados en el año'
+              : `${data?.movements.confirmedCount ?? 0} confirmados`;
+            const expenseSubtitle = `Balance: ${formatCLP(result)}`;
+            const resultSubtitle = result >= 0 ? 'Ganancia' : 'Pérdida';
+            const waitingForAnnual = isYear && !annualData;
+            const waitingForMonth = !isYear && isLoading;
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+                {waitingForMonth || waitingForAnnual ? (
+                  <>
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </>
+                ) : (
+                  <>
+                    <KpiCard
+                      title={incomeTitle}
+                      value={formatCLP(income)}
+                      icon={TrendingUp}
+                      color="text-blue-600"
+                      subtitle={incomeSubtitle}
+                    />
+                    <KpiCard
+                      title={expenseTitle}
+                      value={formatCLP(expense)}
+                      icon={TrendingDown}
+                      color="text-red-500"
+                      subtitle={expenseSubtitle}
+                    />
+                    <KpiCard
+                      title={marginTitle}
+                      value={`${margin.toFixed(1)}%`}
+                      icon={Percent}
+                      color={marginColor(margin)}
+                      subtitle={marginSubtitle}
+                    />
+                    <KpiCard
+                      title={resultTitle}
+                      value={formatCLP(result)}
+                      icon={DollarSign}
+                      color={result >= 0 ? 'text-green-600' : 'text-red-500'}
+                      subtitle={resultSubtitle}
+                    />
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Gauges — Ingresos vs Meta y Egresos vs Límite */}
           {hasGoals && annualData ? (
