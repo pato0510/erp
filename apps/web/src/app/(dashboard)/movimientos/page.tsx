@@ -45,6 +45,10 @@ interface FiscalPeriodOption {
 
 export default function MovimientosPage() {
   const [movements, setMovements] = useState<Movement[]>([]);
+  // Separate dataset used only by the category chart. It reflects the current
+  // filters but NOT the current page, so the chart stays stable while the
+  // user pages through the table.
+  const [allMovementsForChart, setAllMovementsForChart] = useState<Movement[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,6 +116,47 @@ export default function MovimientosPage() {
     load();
   }, [load]);
 
+  // Independent fetch for the category chart — mirrors the table's filters
+  // but not its pagination, and runs in parallel with `load`. Uses the
+  // backend's bumped limit=1000 cap, which is enough for even a year's worth
+  // of movements in this app. If a company ever exceeds that, we'll page here.
+  const loadChartData = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filterType) params.set('type', filterType);
+      if (filterStatus) params.set('status', filterStatus);
+      if (filterCategoryId) params.set('categoryId', filterCategoryId);
+      if (filterCounterpartyId) params.set('counterpartyId', filterCounterpartyId);
+      if (filterCostCenterId) params.set('costCenterId', filterCostCenterId);
+      if (filterFiscalPeriodId) params.set('fiscalPeriodId', filterFiscalPeriodId);
+      if (filterDateFrom) params.set('dateFrom', filterDateFrom);
+      if (filterDateTo) params.set('dateTo', filterDateTo);
+      if (filterSearch) params.set('search', filterSearch);
+      params.set('page', '1');
+      params.set('limit', '1000');
+
+      const res = await apiClient.get<PaginatedResult>(`/api/movements?${params}`);
+      setAllMovementsForChart(res.data);
+    } catch {
+      // handled by apiClient; leave previous chart data in place on failure.
+    }
+    // Deliberately omits `page` so changing pages doesn't refire this fetch.
+  }, [
+    filterType,
+    filterStatus,
+    filterCategoryId,
+    filterCounterpartyId,
+    filterCostCenterId,
+    filterFiscalPeriodId,
+    filterDateFrom,
+    filterDateTo,
+    filterSearch,
+  ]);
+
+  useEffect(() => {
+    loadChartData();
+  }, [loadChartData]);
+
   // Load filter options once on mount — these don't change often enough to
   // warrant refetching on every filter tweak.
   useEffect(() => {
@@ -135,7 +180,10 @@ export default function MovimientosPage() {
     ]);
   }, []);
 
-  reloadRef.current = load;
+  reloadRef.current = () => {
+    load();
+    loadChartData();
+  };
 
   const handleConfirm = async (id: string) => {
     await apiClient.post(`/api/movements/${id}/confirm`);
@@ -168,10 +216,9 @@ export default function MovimientosPage() {
     setPage(1);
   };
 
-  // Category distribution derived from the currently-fetched movements so the
-  // chart stays in lock-step with whatever filters are active — no second
-  // API call needed.
-  const categoryTotalsMap = movements.reduce<
+  // Category distribution derived from the filter-wide chart dataset (not the
+  // current page), so pagination never skews the aggregates.
+  const categoryTotalsMap = allMovementsForChart.reduce<
     Record<string, { name: string; income: number; expense: number }>
   >((acc, mov) => {
     const key = mov.category?.name || 'Sin categoría';

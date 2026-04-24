@@ -45,10 +45,14 @@ export class FilterMovementDto {
   @Min(1)
   page?: number = 1;
 
+  // Cap raised to 1000 so the movimientos page can fetch the whole filtered
+  // set in one request for its category-distribution chart (which must not
+  // be affected by table pagination). Regular table views still pass
+  // limit=15 / 20, so the bigger cap only costs us when a caller opts in.
   @IsOptional()
   @Transform(({ value }) => parseInt(value, 10))
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(1000)
   limit?: number = 20;
 }
