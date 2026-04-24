@@ -12,6 +12,7 @@ import {
 import { PrismaService } from '../common/prisma/prisma.service';
 import { DEFAULT_SII_PROVIDER, SiiProviderFactory } from './providers/sii-provider.factory';
 import { TaxDocumentResult } from './providers/sii-provider.interface';
+import { CategoryRulesService } from '../catalogs/category-rules.service';
 import { paginate } from '@erp/utils';
 
 const DEFAULT_PROVIDER = DEFAULT_SII_PROVIDER;
@@ -61,6 +62,7 @@ export class TaxService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly providerFactory: SiiProviderFactory,
+    private readonly categoryRulesService: CategoryRulesService,
   ) {}
 
   async syncDocuments(
@@ -452,18 +454,32 @@ export class TaxService {
   }
 
   /**
-   * Stub for the upcoming CategoryRule engine. Today it returns the spec'd
-   * defaults (sales-income for EMITIDO, uncategorized-expense for RECIBIDO);
-   * the next ticket will look up CategoryRule rows by RUT / razón social.
+   * Resolves the category for an imported tax document. First consults the
+   * CategoryRule engine (RUT match, then keyword match); if no rule fires,
+   * falls back to the spec defaults (sales-income for EMITIDO,
+   * uncategorized-expense for RECIBIDO).
    */
-  applyCategoryRules(
+  async applyCategoryRules(
     direction: DocumentDirection,
     defaults: DefaultCategoryIds,
-    _companyId: string,
-    _rut: string,
-    _razonSocial: string,
-  ): string {
-    return direction === 'EMITIDO' ? defaults.salesIncome : defaults.uncategorizedExpense;
+    companyId: string,
+    rut: string,
+    razonSocial: string,
+  ): Promise<string> {
+    const movementType =
+      direction === DocumentDirection.EMITIDO ? MovementType.INCOME : MovementType.EXPENSE;
+
+    const ruleMatch = await this.categoryRulesService.applyRules(
+      companyId,
+      rut,
+      razonSocial,
+      movementType,
+    );
+    if (ruleMatch) return ruleMatch;
+
+    return direction === DocumentDirection.EMITIDO
+      ? defaults.salesIncome
+      : defaults.uncategorizedExpense;
   }
 
   async findOrCreateCounterparty(
@@ -535,7 +551,7 @@ export class TaxService {
       taxDoc.direction,
     );
 
-    const categoryId = this.applyCategoryRules(
+    const categoryId = await this.applyCategoryRules(
       taxDoc.direction,
       defaults,
       companyId,

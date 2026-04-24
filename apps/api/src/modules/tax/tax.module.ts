@@ -5,8 +5,10 @@ import { SiiProviderFactory } from './providers/sii-provider.factory';
 import { SiiConnectionController } from './sii-connection.controller';
 import { SiiConnectionService } from './sii-connection.service';
 import { LibreDteClient } from './libredte.client';
+import { CatalogsModule } from '../catalogs/catalogs.module';
 
 @Module({
+  imports: [CatalogsModule],
   controllers: [TaxController, SiiConnectionController],
   providers: [TaxService, SiiProviderFactory, SiiConnectionService, LibreDteClient],
   exports: [TaxService, SiiConnectionService, LibreDteClient],

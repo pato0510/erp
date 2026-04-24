@@ -1,0 +1,29 @@
+enum CategoryRuleType {
+  RUT
+  KEYWORD
+  DEFAULT
+}
+
+enum CategoryRuleMovementType {
+  INCOME
+  EXPENSE
+  BOTH
+}
+
+model CategoryRule {
+  id           String                   @id @default(uuid()) @db.Uuid
+  companyId    String                   @db.Uuid
+  name         String
+  priority     Int                      @default(0)
+  ruleType     CategoryRuleType
+  matchValue   String?
+  categoryId   String                   @db.Uuid
+  movementType CategoryRuleMovementType
+  isActive     Boolean                  @default(true)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@unique([companyId, ruleType, matchValue, movementType])
+  @@index([companyId, isActive, priority])
+  @@map("category_rules")
+}

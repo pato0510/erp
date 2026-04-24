@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Pencil, Power, PowerOff, Tag, Trash2, X } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Plus, Pencil, Power, PowerOff, Tag, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { Toast } from '../../../components/shared/Toast';
 
@@ -148,17 +149,26 @@ export default function CategoriasPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h1 className="text-2xl text-[var(--text-primary)]">Categorías</h1>
-        <button
-          onClick={() => setModal({ mode: 'create', type: tab })}
-          className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full transition"
-          style={{
-            background: '#1C1C1E',
-            fontFamily: 'var(--font-outfit), sans-serif',
-            fontWeight: 500,
-          }}
-        >
-          <Plus size={16} /> Nueva Categoría
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href="/categorias/reglas"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--text-primary)] border border-[var(--border-color)] rounded-full hover:bg-gray-50 transition"
+            style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
+          >
+            Reglas de categorización <ArrowRight size={14} />
+          </Link>
+          <button
+            onClick={() => setModal({ mode: 'create', type: tab })}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full transition"
+            style={{
+              background: '#1C1C1E',
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 500,
+            }}
+          >
+            <Plus size={16} /> Nueva Categoría
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
