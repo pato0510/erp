@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Upload, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiClient } from '../../../lib/api';
 import { downloadFile } from '../../../lib/download';
 import { MovementStatusBadge } from '../../../components/movements/MovementStatusBadge';
@@ -167,12 +168,21 @@ export default function MovimientosPage() {
     setPage(1);
   };
 
-  const totalIncome = movements
-    .filter((m) => m.type === 'INCOME' && m.status === 'CONFIRMED')
-    .reduce((s, m) => s + Number(m.amount), 0);
-  const totalExpense = movements
-    .filter((m) => m.type === 'EXPENSE' && m.status === 'CONFIRMED')
-    .reduce((s, m) => s + Number(m.amount), 0);
+  // Category distribution derived from the currently-fetched movements so the
+  // chart stays in lock-step with whatever filters are active — no second
+  // API call needed.
+  const categoryTotalsMap = movements.reduce<
+    Record<string, { name: string; income: number; expense: number }>
+  >((acc, mov) => {
+    const key = mov.category?.name || 'Sin categoría';
+    if (!acc[key]) acc[key] = { name: key, income: 0, expense: 0 };
+    if (mov.type === 'INCOME') acc[key].income += Number(mov.amount);
+    else acc[key].expense += Number(mov.amount);
+    return acc;
+  }, {});
+  const categoryChartData = Object.values(categoryTotalsMap)
+    .sort((a, b) => b.income + b.expense - (a.income + a.expense))
+    .slice(0, 6);
 
   const activeFilterCount = [
     filterType,
@@ -229,20 +239,39 @@ export default function MovimientosPage() {
         </div>
       </div>
 
-      {/* Summary bar */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-          <p className="label text-xs text-green-600 uppercase tracking-wider">Ingresos</p>
-          <p className="amount text-lg text-green-700">{formatCLP(totalIncome)}</p>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-          <p className="label text-xs text-red-600 uppercase tracking-wider">Egresos</p>
-          <p className="amount text-lg text-red-700">{formatCLP(totalExpense)}</p>
-        </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-          <p className="label text-xs text-blue-600 uppercase tracking-wider">Balance</p>
-          <p className="amount text-lg text-blue-700">{formatCLP(totalIncome - totalExpense)}</p>
-        </div>
+      {/* Category distribution */}
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4 mb-6">
+        <h3
+          className="text-[var(--text-primary)] mb-3"
+          style={{
+            fontFamily: 'var(--font-outfit), sans-serif',
+            fontWeight: 500,
+            fontSize: 14,
+          }}
+        >
+          Distribución por categoría
+        </h3>
+        {categoryChartData.length < 2 ? (
+          <p className="text-sm text-[var(--text-muted)] text-center py-8">Sin datos suficientes</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={categoryChartData} layout="vertical" barSize={12}>
+              <XAxis
+                type="number"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(v) => `$${(Number(v) / 1000000).toFixed(1)}M`}
+              />
+              <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 11 }} />
+              <Tooltip
+                formatter={(v: unknown) => formatCLP(v as number)}
+                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="income" name="Ingresos" fill="#2563EB" radius={[0, 3, 3, 0]} />
+              <Bar dataKey="expense" name="Egresos" fill="#94A3B8" radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* Filters */}
