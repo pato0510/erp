@@ -45,6 +45,12 @@ export class FiscalPeriodsController {
     return this.fiscalPeriodsService.findCurrent(companyId);
   }
 
+  @Get('status/:year')
+  @CheckPolicies((ability) => ability.can('read', FiscalPeriodSubject))
+  getPeriodsStatus(@Param('year', ParseIntPipe) year: number, @CurrentCompany() companyId: string) {
+    return this.fiscalPeriodsService.getPeriodsStatus(companyId, year);
+  }
+
   @Get(':id')
   @CheckPolicies((ability) => ability.can('read', FiscalPeriodSubject))
   findOne(@Param('id') id: string, @CurrentCompany() companyId: string) {

@@ -80,6 +80,23 @@ export class FiscalPeriodsService {
     });
   }
 
+  async getPeriodsStatus(companyId: string, year: number) {
+    const existingPeriods = await this.prisma.fiscalPeriod.findMany({
+      where: { companyId, year },
+      select: { month: true },
+    });
+    const existingMonths = new Set(existingPeriods.map((p) => p.month));
+    const missing: number[] = [];
+    for (let month = 1; month <= 12; month++) {
+      if (!existingMonths.has(month)) missing.push(month);
+    }
+    return {
+      total: 12,
+      existing: existingPeriods.length,
+      missing,
+    };
+  }
+
   async generatePeriods(companyId: string, userId: string, year: number) {
     const created: string[] = [];
 

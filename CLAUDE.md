@@ -218,3 +218,27 @@ Period format: "YYYY-MM"
 
 Frontend: https://app.excelsia.cl
 Backend: https://api.excelsia.clLibreDTE
+
+## SII to Movements Integration (in progress)
+
+When SII documents are synced, they automatically create Movement records:
+
+### Rules
+
+- EMITIDO (facturas emitidas) → Movement INCOME
+  Default category: "Ingresos por Ventas" (auto-created)
+- RECIBIDO (facturas recibidas) → Movement EXPENSE
+  Default category: "Productos no categorizados" until user confirms
+- All synced movements start as CONFIRMED (affect cash immediately)
+- User must confirm category suggestion in UI
+
+### Categorization priority
+
+1. RUT rule (if counterparty RUT matches a rule)
+2. Keyword rule (if razón social contains a keyword)
+3. Fallback: "Productos no categorizados"
+
+### Historical periods
+
+Fiscal periods can be created from 2019 onwards to support
+historical SII document sync from company founding date.

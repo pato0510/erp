@@ -357,18 +357,44 @@ function CompanySection({
 
 // ─────────────────────────────── Periods section ───────────────────────────────
 
+interface PeriodsStatus {
+  total: number;
+  existing: number;
+  missing: number[];
+}
+
 function PeriodsSection({
   onToast,
 }: {
   onToast: (t: { message: string; type: 'success' | 'error' | 'info' }) => void;
 }) {
   const currentYear = new Date().getFullYear();
-  const YEAR_OPTIONS = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+  const YEAR_OPTIONS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
 
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
+  const [statusByYear, setStatusByYear] = useState<Record<number, PeriodsStatus>>({});
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+
+  const loadStatuses = useCallback(async () => {
+    try {
+      const entries = await Promise.all(
+        YEAR_OPTIONS.map(async (y) => {
+          const s = await apiClient.get<PeriodsStatus>(`/api/fiscal-periods/status/${y}`);
+          return [y, s] as const;
+        }),
+      );
+      setStatusByYear(Object.fromEntries(entries));
+    } catch (err) {
+      onToast({
+        message: err instanceof Error ? err.message : 'Error cargando estado de períodos',
+        type: 'error',
+      });
+    }
+    // YEAR_OPTIONS is a constant literal; safe to omit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onToast]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -391,6 +417,10 @@ function PeriodsSection({
     load();
   }, [load]);
 
+  useEffect(() => {
+    loadStatuses();
+  }, [loadStatuses]);
+
   const generate = async () => {
     setGenerating(true);
     try {
@@ -405,7 +435,7 @@ function PeriodsSection({
         type: 'success',
       });
       // Immediate refresh so new cards appear without a manual reload.
-      await load();
+      await Promise.all([load(), loadStatuses()]);
     } catch (err) {
       onToast({
         message: err instanceof Error ? err.message : 'Error al generar períodos',
@@ -418,6 +448,8 @@ function PeriodsSection({
 
   // Index existing periods by month so the 12-card grid can look them up in O(1).
   const byMonth = new Map(periods.map((p) => [p.month, p]));
+  const selectedStatus = statusByYear[selectedYear];
+  const hasMissing = !selectedStatus || selectedStatus.missing.length > 0;
 
   return (
     <section
@@ -440,41 +472,56 @@ function PeriodsSection({
 
       {/* Year selector + generate action */}
       <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-2 overflow-x-auto max-w-full pb-1 -mb-1 fiscal-years-scroll">
           {YEAR_OPTIONS.map((y) => {
             const active = selectedYear === y;
+            const status = statusByYear[y];
+            let dotColor: string | null = null;
+            if (status) {
+              if (status.existing === 12)
+                dotColor = '#22C55E'; // green
+              else if (status.existing > 0) dotColor = '#EAB308'; // yellow
+            }
             return (
               <button
                 key={y}
                 onClick={() => setSelectedYear(y)}
-                className={`px-3 py-1.5 text-sm rounded-md transition ${
-                  active
-                    ? 'bg-blue-600 text-white'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                className={`relative shrink-0 px-3 py-1.5 text-sm rounded-md transition border ${
+                  active ? 'text-white' : 'text-[var(--text-primary)] hover:bg-gray-50'
                 }`}
                 style={{
+                  background: active ? '#2563EB' : '#FFFFFF',
+                  borderColor: active ? '#2563EB' : 'var(--border-color)',
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                 }}
               >
                 {y}
+                {dotColor && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-white"
+                    style={{ background: dotColor }}
+                  />
+                )}
               </button>
             );
           })}
         </div>
-        <button
-          onClick={generate}
-          disabled={generating}
-          className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
-          style={{
-            background: '#1C1C1E',
-            fontFamily: 'var(--font-outfit), sans-serif',
-            fontWeight: 500,
-          }}
-        >
-          <Calendar size={14} />
-          {generating ? 'Generando...' : `Generar períodos ${selectedYear}`}
-        </button>
+        {hasMissing && (
+          <button
+            onClick={generate}
+            disabled={generating}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
+            style={{
+              background: '#1C1C1E',
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 500,
+            }}
+          >
+            <Calendar size={14} />
+            {generating ? 'Generando...' : `Generar períodos ${selectedYear}`}
+          </button>
+        )}
       </div>
 
       {/* Grid or empty state */}
