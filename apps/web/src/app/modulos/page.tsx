@@ -344,8 +344,8 @@ const MODULES: ModuleDef[] = [
     name: 'Operaciones',
     description: 'Control de activos, documentos, permisos y procedimientos operacionales',
     gradient: 'linear-gradient(135deg, #FF6B35, #F7931E)',
-    href: null,
-    active: false,
+    href: '/operaciones',
+    active: true,
     svg: <OperacionesSvg />,
   },
   {

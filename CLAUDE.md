@@ -336,6 +336,90 @@ matriz, vencimientos, alertas, bloqueos, reportes básicos.
 OCR, firma electrónica, app móvil PWA con sincronización offline,
 work orders, mantenimiento preventivo, modelado bitemporal completo.
 
-## Actualmente solo estamos rediseñando frontend
+## Frontend Visual Layer (actualizado)
 
-- Login y paginas
+### Páginas con starfield animado (canvas)
+
+- /login — fondo negro + nebulosas + estrellas animadas
+- /modulos — mismo fondo que login
+
+### Páginas con fondo dark gradient estático
+
+Todas las pantallas dentro de (dashboard) layout:
+
+- Background: linear-gradient(135deg, #0F0F14 0%, #1A1A22 50%, #15151E 100%)
+- Overlay: radial gradients sutiles azul/violeta
+- Sin animación, sin estrellas
+- Implementado en componente DarkGradientBackground
+
+### Sidebar gradients
+
+- Light theme: linear-gradient(180deg, #3B5C8A 0%, #284B75 100%)
+  (azul medianoche más claro)
+- Dark theme: linear-gradient(180deg, #0A0A12 0%, #0F1422 100%)
+  (negro profundo con tinte azul)
+- Sidebar texto: blanco en ambos temas
+- Active item: rgba(255,255,255,0.1) bg + #60A5FA border-left
+
+### Cards en dark theme
+
+- Glassmorphism: rgba(28,28,30,0.5) + backdrop-filter blur(12px)
+- Border: rgba(255,255,255,0.08)
+
+### Cards en light theme
+
+- Solid white #ffffff
+- Border: #e8eaed
+
+### Fonts (next/font/google con display:swap, preload:true)
+
+- Outfit (300, 400, 500, 600) — títulos dashboard
+- JetBrains Mono (300, 400, 500) — labels/nav/mono
+- Space Grotesk (300, 400, 500, 600) — login/módulos titulares
+- IBM Plex Sans (300, 400, 500) — body login
+- IBM Plex Mono (300, 400, 500) — topbar/labels login
+- DM Serif Display — login (decorativo)
+
+### FOUC prevention
+
+- Critical CSS inline en layout.tsx: html/body fondo negro
+- .login-page wrapper con fade-in 0.4s ease-out 0.05s
+- .modulos-page-wrapper con mismo fade-in
+- suppressHydrationWarning en <html>
+- Topbar con min-height para evitar layout shift mientras cargan fuentes
+
+## Estructura de sidebars (multi-módulo)
+
+A partir de la integración del módulo Operaciones, el sidebar
+del (dashboard) layout cambia dinámicamente según la ruta:
+
+- /dashboard, /movimientos, /caja, /banco, /tributario,
+  /conciliacion, /cierre, /alertas, /reportes, /categorias,
+  /contrapartes, /configuracion → FinanceSidebar
+  Branding "FINANZAS"
+
+- /operaciones y subrutas → OperationsSidebar
+  Branding "OPERACIONES"
+
+- Futuro: /hsec → HsecSidebar, /comercial → CommercialSidebar,
+  /calendario → CalendarSidebar, /rrhh → HrSidebar
+
+Ambos sidebars comparten:
+
+- Mismo gradient background (sidebar-bg variable)
+- Link "← Volver a módulos" arriba
+- Theme toggle abajo
+- Email usuario + logout abajo
+- Active item: rgba(255,255,255,0.1) + #60A5FA border-left
+
+Cambian:
+
+- Branding del logo top
+- Lista de items de navegación (íconos lucide-react + rutas)
+
+## Decisión: el sidebar permanece sólido
+
+El sidebar NO usa transparencia ni glassmorphism — es siempre
+un gradient sólido para evitar que el fondo dark gradient del
+contenido principal se vea a través de él. Esto da estabilidad
+visual entre rutas.

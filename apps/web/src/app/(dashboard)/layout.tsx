@@ -1,69 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { apiClient } from '../../lib/api';
-import Link from 'next/link';
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  ArrowLeftRight,
-  Wallet,
-  Tag,
-  Users,
-  Settings,
-  LogOut,
-  Bell,
-  FileBarChart,
-  Landmark,
-  Receipt,
-  GitMerge,
-  CheckSquare,
-  Moon,
-  Sun,
-} from 'lucide-react';
-import { ExcelsiaLogo } from '../../components/shared/ExcelsiaLogo';
+import { useAuth } from '../../hooks/useAuth';
 import { DarkGradientBackground } from '../../components/DarkGradientBackground';
-import { useTheme } from '../../lib/theme';
-
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/movimientos', label: 'Movimientos', icon: ArrowLeftRight },
-  { href: '/caja', label: 'Caja', icon: Wallet },
-  { href: '/banco', label: 'Banco', icon: Landmark },
-  { href: '/tributario', label: 'Tributario', icon: Receipt },
-  { href: '/conciliacion', label: 'Conciliación', icon: GitMerge },
-  { href: '/cierre', label: 'Cierre', icon: CheckSquare },
-  { href: '/alertas', label: 'Alertas', icon: Bell },
-  { href: '/reportes', label: 'Reportes', icon: FileBarChart },
-  { href: '/categorias', label: 'Categorías', icon: Tag },
-  { href: '/contrapartes', label: 'Contrapartes', icon: Users },
-  { href: '/configuracion', label: 'Configuración', icon: Settings },
-];
+import { FinanceSidebar } from '../../components/sidebars/FinanceSidebar';
+import { OperationsSidebar } from '../../components/sidebars/OperationsSidebar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { user, isLoading } = useAuth();
   const pathname = usePathname();
-  const [criticalCount, setCriticalCount] = useState(0);
 
   useEffect(() => {
     if (!isLoading && !user) {
       window.location.href = '/login';
     }
   }, [isLoading, user]);
-
-  useEffect(() => {
-    if (user) {
-      apiClient.get<{ critical: number }>('/api/alerts/thresholds').catch(() => undefined);
-      apiClient
-        .get<{ id: string; severity: string }[]>('/api/alerts')
-        .then((alerts) => {
-          setCriticalCount(alerts.filter((a) => a.severity === 'CRITICAL').length);
-        })
-        .catch(() => undefined);
-    }
-  }, [user]);
 
   if (isLoading) {
     return (
@@ -92,63 +44,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) return null;
 
+  const isOperations = pathname?.startsWith('/operaciones') ?? false;
+
   return (
     <>
       <DarkGradientBackground />
       <div className="tn-shell">
-        {/* Sidebar */}
-        <aside className="tn-sidebar">
-          {/* Logo */}
-          <div className="tn-sidebar__head">
-            <Link href="/modulos" className="tn-back-modulos">
-              ← Volver a módulos
-            </Link>
-            <ExcelsiaLogo size={22} variant="light" />
-          </div>
+        {isOperations ? <OperationsSidebar /> : <FinanceSidebar />}
 
-          {/* Nav */}
-          <nav className="tn-sidebar__nav">
-            {navItems.map((item) => {
-              const isActive =
-                pathname === item.href ||
-                (item.href !== '/dashboard' && pathname.startsWith(item.href));
-              const Icon = item.icon;
-              const showBadge = item.href === '/alertas' && criticalCount > 0;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`tn-nav__item${isActive ? ' tn-nav__item--active' : ''}`}
-                >
-                  <Icon size={15} />
-                  <span style={{ flex: 1 }}>{item.label}</span>
-                  {showBadge && <span className="tn-nav__badge">{criticalCount}</span>}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Bottom */}
-          <div className="tn-sidebar__foot">
-            <button
-              onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-              className="tn-theme-toggle"
-            >
-              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-              {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-            </button>
-            <div className="tn-sidebar__email" title={user.email}>
-              {user.email}
-            </div>
-            <button onClick={logout} className="tn-logout">
-              <LogOut size={14} />
-              Cerrar sesión
-            </button>
-          </div>
-        </aside>
-
-        {/* Main content */}
         <main className="tn-main">
           <div style={{ padding: '32px 40px' }}>{children}</div>
         </main>
@@ -203,6 +106,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }
           .tn-back-modulos:hover {
             color: rgba(255, 255, 255, 0.85);
+          }
+          .tn-sidebar__brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+          .tn-sidebar__brand-text {
+            font-family: var(--font-jetbrains-mono), var(--font-mono), monospace;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 0.18em;
+            color: #ffffff;
           }
 
           .tn-sidebar__nav {
