@@ -393,6 +393,7 @@ export default function LoginPage() {
         .sw-logo {
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 12px;
           margin-bottom: 18px;
         }
@@ -418,6 +419,7 @@ export default function LoginPage() {
           color: var(--ink-dim);
           margin-bottom: 30px;
           letter-spacing: 0.01em;
+          text-align: center;
         }
         .sw-tagline__strong {
           font-weight: 500;
