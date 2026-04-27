@@ -24,9 +24,16 @@
   --text-muted: #9aa0ad;
   --border-color: #e8eaed;
   --input-bg: #fafafa;
-  --sidebar-bg: #1c1c1e;
-  --sidebar-text: #8e8e93;
-  --sidebar-border: #2c2c2e;
+
+  /* Sidebar — same color tokens in both themes (sidebar always has a
+     dark/colored background, white text). Only --sidebar-bg changes. */
+  --sidebar-bg: linear-gradient(180deg, #3b5c8a 0%, #284b75 100%);
+  --sidebar-text: rgba(255, 255, 255, 0.65);
+  --sidebar-text-hover: rgba(255, 255, 255, 0.9);
+  --sidebar-text-active: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-active-border: #60a5fa;
 
   /* Typography & radii */
   --font-mono: 'JetBrains Mono', monospace;
@@ -38,16 +45,21 @@
 }
 
 html.dark {
-  /* Theme-aware semantic tokens — DARK mode */
+  /* Theme-aware semantic tokens — DARK mode.
+     bg-secondary is transparent so the fixed-position DarkGradientBackground
+     shows through the dashboard shell. bg-card is semi-transparent and paired
+     with backdrop-filter blur on cards to give a glassmorphism look. */
   --bg-primary: #0f0f0f;
-  --bg-secondary: #1a1a1a;
-  --bg-card: #1c1c1e;
+  --bg-secondary: transparent;
+  --bg-card: rgba(28, 28, 30, 0.5);
+  --bg-card-solid: #1c1c1e;
   --text-primary: #f5f5f5;
   --text-secondary: #a0a0a0;
   --text-muted: #6b6b6b;
-  --border-color: #2c2c2e;
+  --border-color: rgba(255, 255, 255, 0.08);
   --input-bg: #242424;
-  --sidebar-bg: #141414;
-  --sidebar-text: #8e8e93;
-  --sidebar-border: #1c1c1e;
+
+  /* Sidebar — only --sidebar-bg changes in dark mode; the rest of the
+     sidebar tokens stay identical because the sidebar is always dark/colored. */
+  --sidebar-bg: linear-gradient(180deg, #0a0a12 0%, #0f1422 100%);
 }

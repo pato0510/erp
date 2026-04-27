@@ -74,7 +74,9 @@ export function useTheme(): ThemeContextValue {
 }
 
 /**
- * Inline script (string) injected into <head> so the dark class is applied
- * before React hydrates, avoiding a flash of the wrong theme.
+ * Inline script (string) injected into <head> so the dark class — and the
+ * starfield-page class for routes that override the body background — are
+ * applied before React hydrates, avoiding a flash of the wrong theme or a
+ * white flash on the dark "portal" pages.
  */
-export const themeHydrationScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t==='dark'){document.documentElement.classList.add('dark');}}catch(e){}})();`;
+export const themeHydrationScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t==='dark'){document.documentElement.classList.add('dark');}var p=window.location.pathname;if(p==='/login'||p==='/modulos'){document.documentElement.classList.add('starfield-page');}}catch(e){}})();`;

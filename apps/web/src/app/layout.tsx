@@ -62,6 +62,27 @@ export const metadata = {
   description: 'Plataforma financiera gerencial para empresas chilenas',
 };
 
+const criticalCss = `
+html { background: #000; }
+body {
+  background: #000;
+  color: #eef1f7;
+  margin: 0;
+  font-family: var(--font-ibm-plex-sans), system-ui, sans-serif;
+}
+.login-page {
+  opacity: 0;
+  animation: page-fade-in 0.4s ease-out 0.05s forwards;
+}
+.modulos-page-wrapper {
+  opacity: 0;
+  animation: page-fade-in 0.4s ease-out 0.05s forwards;
+  min-height: 100vh;
+  background: #000;
+}
+@keyframes page-fade-in { to { opacity: 1; } }
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" suppressHydrationWarning>
@@ -69,9 +90,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Runs before hydration — applies the persisted theme class so the
             first paint matches the user's preference without a flash. */}
         <script dangerouslySetInnerHTML={{ __html: themeHydrationScript }} />
+        {/* Critical CSS — paints a black backdrop and primes the login fade-in
+            before the rest of the stylesheet bundle resolves, so a hard refresh
+            on /login no longer shows a flash of unstyled content. */}
+        <style dangerouslySetInnerHTML={{ __html: criticalCss }} />
       </head>
       <body
-        className={`min-h-screen ${inter.variable} ${jetbrainsMono.variable} ${dmSerifDisplay.variable} ${outfit.variable} ${spaceGrotesk.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
+        className={`min-h-screen antialiased ${inter.variable} ${jetbrainsMono.variable} ${dmSerifDisplay.variable} ${outfit.variable} ${spaceGrotesk.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
       >
         <ThemeProvider>{children}</ThemeProvider>
       </body>

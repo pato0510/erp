@@ -27,6 +27,27 @@ body {
     color 150ms ease;
 }
 
+/* Starfield/portal routes — paint the html + body with the page's base color
+   before hydration so a hard refresh doesn't flash white before the React
+   layer mounts. The fixed-position page chrome paints over this. */
+html.starfield-page,
+html.starfield-page body {
+  background-color: #1d3358;
+}
+html.starfield-page.dark,
+html.starfield-page.dark body {
+  background-color: #000;
+}
+
+/* Glassmorphism for cards in dark mode — pairs with the rgba --bg-card token
+   and the DarkGradientBackground behind the dashboard. Light mode keeps solid
+   white cards. */
+html.dark .card,
+html.dark [class*='Card'] {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 /* Inputs adapt to theme. Pages can still override per-input via inline styles. */
 input,
 textarea,

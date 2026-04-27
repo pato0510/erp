@@ -23,6 +23,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { ExcelsiaLogo } from '../../components/shared/ExcelsiaLogo';
+import { DarkGradientBackground } from '../../components/DarkGradientBackground';
 import { useTheme } from '../../lib/theme';
 
 const navItems = [
@@ -66,294 +67,275 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'var(--font-jetbrains-mono), monospace',
-          fontSize: 13,
-          letterSpacing: '0.15em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-muted)',
-        }}
-      >
-        › Cargando...
-      </div>
+      <>
+        <DarkGradientBackground />
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'var(--font-jetbrains-mono), monospace',
+            fontSize: 13,
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase',
+            color: 'var(--color-text-muted)',
+          }}
+        >
+          › Cargando...
+        </div>
+      </>
     );
   }
 
   if (!user) return null;
 
   return (
-    <div
-      style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-secondary)' }}
-      className="tn-shell"
-    >
-      {/* Sidebar */}
-      <aside
-        className="tn-sidebar"
-        style={{
-          position: 'relative',
-          width: 244,
-          background: 'var(--sidebar-bg)',
-          color: '#ffffff',
-          display: 'flex',
-          flexDirection: 'column',
-          borderRight: '1px solid var(--sidebar-border)',
-          overflow: 'hidden',
-          transition: 'background-color 150ms ease',
-        }}
-      >
-        {/* Geometric background */}
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 244 900"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.6 }}
-        >
-          <g stroke="var(--sidebar-border)" strokeWidth="1" fill="none">
-            <circle cx="220" cy="80" r="130" />
-            <circle cx="30" cy="720" r="180" />
-            <line x1="0" y1="420" x2="244" y2="420" />
-          </g>
-        </svg>
-
-        {/* Logo */}
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            padding: '24px 20px 20px',
-            borderBottom: '1px solid var(--sidebar-border)',
-          }}
-        >
-          <Link
-            href="/modulos"
-            className="tn-back-modulos"
-            style={{
-              display: 'inline-block',
-              marginBottom: 12,
-              fontFamily: 'var(--font-jetbrains-mono), monospace',
-              fontSize: 10,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: '#8E8E93',
-              textDecoration: 'none',
-              transition: 'color 120ms ease',
-            }}
-          >
-            ← Volver a módulos
-          </Link>
-          <ExcelsiaLogo size={22} />
-        </div>
-
-        {/* Nav */}
-        <nav
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            flex: 1,
-            padding: '16px 0',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
-          }}
-        >
-          {navItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== '/dashboard' && pathname.startsWith(item.href));
-            const Icon = item.icon;
-            const showBadge = item.href === '/alertas' && criticalCount > 0;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`tn-nav__item${isActive ? ' tn-nav__item--active' : ''}`}
-              >
-                <Icon size={15} />
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {showBadge && (
-                  <span
-                    style={{
-                      background: 'var(--color-accent)',
-                      color: 'var(--color-dark)',
-                      fontFamily: 'var(--font-jetbrains-mono), monospace',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: '2px 6px',
-                      borderRadius: 999,
-                      minWidth: 20,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {criticalCount}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Bottom */}
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            padding: '14px 20px 18px',
-            borderTop: '1px solid var(--sidebar-border)',
-          }}
-        >
-          <button
-            onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              color: '#8E8E93',
-              padding: '6px 0',
-              marginBottom: 12,
-              fontFamily: 'var(--font-jetbrains-mono), monospace',
-              fontSize: 10,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-              transition: 'color 120ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#ffffff';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#8E8E93';
-            }}
-          >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-            {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-          </button>
-          <div
-            style={{
-              fontFamily: 'var(--font-jetbrains-mono), monospace',
-              fontSize: 11,
-              color: '#8E8E93',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              marginBottom: 10,
-            }}
-            title={user.email}
-          >
-            {user.email}
+    <>
+      <DarkGradientBackground />
+      <div className="tn-shell">
+        {/* Sidebar */}
+        <aside className="tn-sidebar">
+          {/* Logo */}
+          <div className="tn-sidebar__head">
+            <Link href="/modulos" className="tn-back-modulos">
+              ← Volver a módulos
+            </Link>
+            <ExcelsiaLogo size={22} variant="light" />
           </div>
-          <button
-            onClick={logout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              width: '100%',
-              background: 'transparent',
-              border: '1px solid var(--sidebar-border)',
-              color: '#8E8E93',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-sm)',
-              fontFamily: 'var(--font-jetbrains-mono), monospace',
-              fontSize: 11,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-              transition: 'color 120ms ease, border-color 120ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#ffffff';
-              e.currentTarget.style.borderColor = '#ffffff';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#8E8E93';
-              e.currentTarget.style.borderColor = 'var(--sidebar-border)';
-            }}
-          >
-            <LogOut size={14} />
-            Cerrar sesión
-          </button>
-        </div>
-      </aside>
 
-      {/* Main content */}
-      <main
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          background: 'var(--bg-secondary)',
-          color: 'var(--text-primary)',
-          transition: 'background-color 150ms ease, color 150ms ease',
-        }}
-      >
-        <div style={{ padding: '32px 40px' }}>{children}</div>
-      </main>
+          {/* Nav */}
+          <nav className="tn-sidebar__nav">
+            {navItems.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                (item.href !== '/dashboard' && pathname.startsWith(item.href));
+              const Icon = item.icon;
+              const showBadge = item.href === '/alertas' && criticalCount > 0;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`tn-nav__item${isActive ? ' tn-nav__item--active' : ''}`}
+                >
+                  <Icon size={15} />
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {showBadge && <span className="tn-nav__badge">{criticalCount}</span>}
+                </Link>
+              );
+            })}
+          </nav>
 
-      <style jsx>{`
-        :global(.tn-back-modulos:hover) {
-          color: #ffffff !important;
-        }
-        :global(.tn-nav__item) {
-          position: relative;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 20px 10px 22px;
-          font-family: var(--font-outfit), sans-serif;
-          font-size: 14px;
-          letter-spacing: -0.005em;
-          color: #8e8e93;
-          background-color: transparent;
-          text-decoration: none;
-          border-left: 2px solid transparent;
-          font-weight: 500;
-          transform: scale(1);
-          transform-origin: left center;
-          transition: all 0.15s ease;
-        }
-        :global(.tn-nav__item:hover) {
-          color: #ffffff;
-          background-color: rgba(255, 255, 255, 0.06);
-          font-weight: 600;
-          transform: scale(1.01);
-        }
-        :global(.tn-nav__item--active),
-        :global(.tn-nav__item--active:hover) {
-          color: var(--color-accent);
-          background-color: rgba(37, 99, 235, 0.1);
-          border-left-color: var(--color-accent);
-          font-weight: 600;
-          transform: scale(1);
-        }
+          {/* Bottom */}
+          <div className="tn-sidebar__foot">
+            <button
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+              className="tn-theme-toggle"
+            >
+              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+              {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            </button>
+            <div className="tn-sidebar__email" title={user.email}>
+              {user.email}
+            </div>
+            <button onClick={logout} className="tn-logout">
+              <LogOut size={14} />
+              Cerrar sesión
+            </button>
+          </div>
+        </aside>
 
-        @media (max-width: 768px) {
+        {/* Main content */}
+        <main className="tn-main">
+          <div style={{ padding: '32px 40px' }}>{children}</div>
+        </main>
+
+        <style jsx global>{`
           .tn-shell {
-            flex-direction: column;
+            position: relative;
+            z-index: 2;
+            min-height: 100vh;
+            display: flex;
+            background: var(--bg-secondary);
           }
+          .tn-main {
+            flex: 1;
+            overflow: auto;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition:
+              background-color 150ms ease,
+              color 150ms ease;
+          }
+
           .tn-sidebar {
-            width: 100% !important;
-            flex-direction: row;
-            align-items: center;
-            height: 56px;
-            border-right: none !important;
+            position: relative;
+            z-index: 3;
+            width: 244px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            border-right: 0.5px solid var(--sidebar-border);
+            transition: color 150ms ease;
+          }
+
+          .tn-sidebar__head {
+            position: relative;
+            z-index: 1;
+            padding: 24px 20px 20px;
             border-bottom: 1px solid var(--sidebar-border);
           }
-          .tn-sidebar nav {
-            display: none !important;
+          .tn-back-modulos {
+            display: inline-block;
+            margin-bottom: 12px;
+            font-family: var(--font-jetbrains-mono), monospace;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+            text-decoration: none;
+            transition: color 120ms ease;
           }
-        }
-      `}</style>
-    </div>
+          .tn-back-modulos:hover {
+            color: rgba(255, 255, 255, 0.85);
+          }
+
+          .tn-sidebar__nav {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            padding: 16px 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+          }
+          .tn-nav__item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px 10px 22px;
+            font-family: var(--font-outfit), sans-serif;
+            font-size: 14px;
+            letter-spacing: -0.005em;
+            color: var(--sidebar-text);
+            background-color: transparent;
+            text-decoration: none;
+            border-left: 2px solid transparent;
+            font-weight: 500;
+            transform: scale(1);
+            transform-origin: left center;
+            transition: all 0.15s ease;
+          }
+          .tn-nav__item:hover {
+            color: var(--sidebar-text-hover);
+            background-color: var(--sidebar-active-bg);
+            font-weight: 600;
+            transform: scale(1.01);
+          }
+          .tn-nav__item--active,
+          .tn-nav__item--active:hover {
+            color: var(--sidebar-text-active);
+            background-color: var(--sidebar-active-bg);
+            border-left-color: var(--sidebar-active-border);
+            font-weight: 600;
+            transform: scale(1);
+          }
+          .tn-nav__badge {
+            background: var(--sidebar-active-border);
+            color: #0f1422;
+            font-family: var(--font-jetbrains-mono), monospace;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 999px;
+            min-width: 20px;
+            text-align: center;
+          }
+
+          .tn-sidebar__foot {
+            position: relative;
+            z-index: 1;
+            padding: 14px 20px 18px;
+            border-top: 1px solid var(--sidebar-border);
+          }
+          .tn-theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--sidebar-text);
+            padding: 6px 0;
+            margin-bottom: 12px;
+            font-family: var(--font-jetbrains-mono), monospace;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: color 120ms ease;
+          }
+          .tn-theme-toggle:hover {
+            color: var(--sidebar-text-hover);
+          }
+          .tn-sidebar__email {
+            font-family: var(--font-jetbrains-mono), monospace;
+            font-size: 11px;
+            color: var(--sidebar-text);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 10px;
+          }
+          .tn-logout {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--sidebar-border);
+            color: var(--sidebar-text);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-jetbrains-mono), monospace;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition:
+              color 120ms ease,
+              border-color 120ms ease;
+          }
+          .tn-logout:hover {
+            color: var(--sidebar-text-hover);
+            border-color: rgba(255, 255, 255, 0.25);
+          }
+
+          @media (max-width: 768px) {
+            .tn-shell {
+              flex-direction: column;
+            }
+            .tn-sidebar {
+              width: 100% !important;
+              flex-direction: row;
+              align-items: center;
+              height: 56px;
+              border-right: none !important;
+              border-bottom: 0.5px solid var(--sidebar-border);
+            }
+            .tn-sidebar nav {
+              display: none !important;
+            }
+          }
+        `}</style>
+      </div>
+    </>
   );
 }

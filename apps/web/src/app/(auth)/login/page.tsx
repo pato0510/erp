@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Moon, Sun } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import { Starfield } from '../../../components/Starfield';
+import { useTheme } from '../../../lib/theme';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -13,24 +16,12 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-type Star = {
-  x: number;
-  y: number;
-  r: number;
-  baseAlpha: number;
-  twinkleSpeed: number;
-  twinklePhase: number;
-  color: string;
-  bright: boolean;
-};
-
 export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [info, setInfo] = useState('');
-
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { theme, toggleTheme } = useTheme();
 
   const {
     register,
@@ -57,118 +48,9 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let w = window.innerWidth;
-    let h = window.innerHeight;
-    let dpr = window.devicePixelRatio || 1;
-    let stars: Star[] = [];
-
-    const buildStars = () => {
-      const count = Math.floor((w * h) / 1400);
-      const next: Star[] = [];
-      for (let i = 0; i < count; i++) {
-        const layerRoll = Math.random();
-        const layer = layerRoll < 0.55 ? 0 : layerRoll < 0.88 ? 1 : 2;
-        const colorRoll = Math.random();
-        let color = '#ffffff';
-        if (colorRoll < 0.04) color = '#9bb8e8';
-        else if (colorRoll < 0.1) color = '#ffb27a';
-
-        const r =
-          layer === 0
-            ? 0.4 + Math.random() * 0.4
-            : layer === 1
-              ? 0.8 + Math.random() * 0.7
-              : 1.4 + Math.random() * 1.1;
-        const baseAlpha = layer === 0 ? 0.35 : layer === 1 ? 0.6 : 0.9;
-
-        next.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          r,
-          baseAlpha,
-          twinkleSpeed: 0.4 + Math.random() * 1.6,
-          twinklePhase: Math.random() * Math.PI * 2,
-          color,
-          bright: layer === 2 && Math.random() < 0.35,
-        });
-      }
-      stars = next;
-    };
-
-    const resize = () => {
-      w = window.innerWidth;
-      h = window.innerHeight;
-      dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      canvas.style.width = w + 'px';
-      canvas.style.height = h + 'px';
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(dpr, dpr);
-      buildStars();
-    };
-
-    resize();
-
-    const start = performance.now();
-    let raf = 0;
-
-    const draw = (now: number) => {
-      const t = (now - start) / 1000;
-      ctx.clearRect(0, 0, w, h);
-
-      // Nebulas
-      const g1 = ctx.createRadialGradient(w * 0.85, h * 0.2, 0, w * 0.85, h * 0.2, w * 0.55);
-      g1.addColorStop(0, 'rgba(60, 95, 170, 0.16)');
-      g1.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = g1;
-      ctx.fillRect(0, 0, w, h);
-
-      const g2 = ctx.createRadialGradient(w * 0.15, h * 0.85, 0, w * 0.15, h * 0.85, w * 0.55);
-      g2.addColorStop(0, 'rgba(110, 60, 150, 0.13)');
-      g2.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = g2;
-      ctx.fillRect(0, 0, w, h);
-
-      for (const s of stars) {
-        const tw = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed + s.twinklePhase);
-        const a = s.baseAlpha * (0.55 + 0.45 * tw);
-
-        ctx.globalAlpha = a;
-        ctx.fillStyle = s.color;
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (s.bright && tw > 0.78) {
-          const flareLen = s.r * 6 * tw;
-          ctx.globalAlpha = a * 0.55;
-          ctx.strokeStyle = s.color;
-          ctx.lineWidth = 0.5;
-          ctx.beginPath();
-          ctx.moveTo(s.x - flareLen, s.y);
-          ctx.lineTo(s.x + flareLen, s.y);
-          ctx.moveTo(s.x, s.y - flareLen);
-          ctx.lineTo(s.x, s.y + flareLen);
-          ctx.stroke();
-        }
-      }
-
-      ctx.globalAlpha = 1;
-      raf = requestAnimationFrame(draw);
-    };
-
-    raf = requestAnimationFrame(draw);
-    window.addEventListener('resize', resize);
-
+    document.documentElement.classList.add('starfield-page');
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', resize);
+      document.documentElement.classList.remove('starfield-page');
     };
   }, []);
 
@@ -179,132 +61,144 @@ export default function LoginPage() {
 
   return (
     <div className="sw-root">
-      <canvas ref={canvasRef} id="stars" className="sw-stars" aria-hidden="true" />
-      <div className="sw-vignette" aria-hidden="true" />
+      <Starfield zIndex={0} />
+      <div className="login-page">
+        <div className="sw-vignette" aria-hidden="true" />
 
-      <div className="sw-topbar" aria-hidden="true">
-        <span>PORTAL · ACCESO</span>
-        <span>V1.0</span>
-      </div>
-
-      <main className="sw-stage">
-        <section className="sw-card">
-          {/* Logo */}
-          <div className="sw-logo">
-            <svg
-              width="38"
-              height="38"
-              viewBox="0 0 40 40"
-              fill="none"
-              aria-hidden="true"
-              className="sw-logo__mark"
+        <div className="sw-topbar">
+          <span>PORTAL · ACCESO</span>
+          <div className="sw-topbar__right">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              className="sw-theme-toggle"
             >
-              <defs>
-                <linearGradient id="sw-tri-grad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.88 0.10 220)" />
-                  <stop offset="100%" stopColor="oklch(0.55 0.14 235)" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M20 4 L36 32 L4 32 Z"
-                stroke="url(#sw-tri-grad)"
-                strokeWidth="1.4"
+              {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
+            </button>
+            <span aria-hidden="true">V1.0</span>
+          </div>
+        </div>
+
+        <main className="sw-stage">
+          <section className="sw-card">
+            {/* Logo */}
+            <div className="sw-logo">
+              <svg
+                width="38"
+                height="38"
+                viewBox="0 0 40 40"
                 fill="none"
-                strokeLinejoin="round"
-              />
-              <path d="M20 14 L28 28 L12 28 Z" fill="url(#sw-tri-grad)" opacity="0.85" />
-            </svg>
-            <span className="sw-wordmark">
-              Excelsia<span className="sw-wordmark__dot">.</span>
-            </span>
-          </div>
-
-          <p className="sw-tagline">
-            Gestiona tu empresa <span className="sw-tagline__strong">en un solo lugar</span>.
-          </p>
-
-          <div className="sw-auth-indicator" aria-hidden="true">
-            <span className="sw-pulse" />
-            <span>AUTHENTICATION REQUIRED</span>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="sw-form" noValidate>
-            <div className="sw-field">
-              <label htmlFor="email" className="sw-field__label">
-                user
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="nombre@empresa.cl"
-                className="sw-field__input"
-                {...register('email')}
-              />
-            </div>
-            {errors.email && <p className="sw-field-error">› {errors.email.message}</p>}
-
-            <div className="sw-field">
-              <label htmlFor="password" className="sw-field__label">
-                passwd
-              </label>
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                placeholder="••••••••"
-                className="sw-field__input"
-                {...register('password')}
-              />
-              <button
-                type="button"
-                className="sw-field__toggle"
-                onClick={() => setShowPassword((s) => !s)}
-                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                aria-hidden="true"
+                className="sw-logo__mark"
               >
-                {showPassword ? 'hide' : 'show'}
-              </button>
-            </div>
-            {errors.password && <p className="sw-field-error">› {errors.password.message}</p>}
-
-            <div className="sw-row-actions">
-              <button type="button" onClick={handleForgotPassword} className="sw-link">
-                recuperar acceso
-              </button>
-              <button type="submit" disabled={isLoading} className="sw-submit">
-                <span>{isLoading ? '› verificando...' : 'Iniciar sesión'}</span>
-                {!isLoading && (
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 14 14"
-                    fill="none"
-                    aria-hidden="true"
-                    className="sw-submit__arrow"
-                  >
-                    <path
-                      d="M2 7 H12 M8 3 L12 7 L8 11"
-                      stroke="currentColor"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </button>
+                <defs>
+                  <linearGradient id="sw-tri-grad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="oklch(0.88 0.10 220)" />
+                    <stop offset="100%" stopColor="oklch(0.55 0.14 235)" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M20 4 L36 32 L4 32 Z"
+                  stroke="url(#sw-tri-grad)"
+                  strokeWidth="1.4"
+                  fill="none"
+                  strokeLinejoin="round"
+                />
+                <path d="M20 14 L28 28 L12 28 Z" fill="url(#sw-tri-grad)" opacity="0.85" />
+              </svg>
+              <span className="sw-wordmark">
+                Excelsia<span className="sw-wordmark__dot">.</span>
+              </span>
             </div>
 
-            <div className="sw-log" role="status" aria-live="polite">
-              {error && <span className="err">› {error}</span>}
-              {!error && info && <span className="ok">{info}</span>}
-            </div>
-          </form>
-        </section>
-      </main>
+            <p className="sw-tagline">
+              Gestiona tu empresa <span className="sw-tagline__strong">en un solo lugar</span>.
+            </p>
 
-      <div className="sw-bottombar" aria-hidden="true">
-        <span>CONEXIÓN SEGURA</span>
-        <span>AES-256 · END-TO-END</span>
+            <div className="sw-auth-indicator" aria-hidden="true">
+              <span className="sw-pulse" />
+              <span>AUTHENTICATION REQUIRED</span>
+            </div>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="sw-form" noValidate>
+              <div className="sw-field">
+                <label htmlFor="email" className="sw-field__label">
+                  user
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="nombre@empresa.cl"
+                  className="sw-field__input"
+                  {...register('email')}
+                />
+              </div>
+              {errors.email && <p className="sw-field-error">› {errors.email.message}</p>}
+
+              <div className="sw-field">
+                <label htmlFor="password" className="sw-field__label">
+                  passwd
+                </label>
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="sw-field__input"
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  className="sw-field__toggle"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? 'hide' : 'show'}
+                </button>
+              </div>
+              {errors.password && <p className="sw-field-error">› {errors.password.message}</p>}
+
+              <div className="sw-row-actions">
+                <button type="button" onClick={handleForgotPassword} className="sw-link">
+                  recuperar acceso
+                </button>
+                <button type="submit" disabled={isLoading} className="sw-submit">
+                  <span>{isLoading ? '› verificando...' : 'Iniciar sesión'}</span>
+                  {!isLoading && (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      aria-hidden="true"
+                      className="sw-submit__arrow"
+                    >
+                      <path
+                        d="M2 7 H12 M8 3 L12 7 L8 11"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              <div className="sw-log" role="status" aria-live="polite">
+                {error && <span className="err">› {error}</span>}
+                {!error && info && <span className="ok">{info}</span>}
+              </div>
+            </form>
+          </section>
+        </main>
+
+        <div className="sw-bottombar" aria-hidden="true">
+          <span>CONEXIÓN SEGURA</span>
+          <span>AES-256 · END-TO-END</span>
+        </div>
       </div>
 
       <style jsx global>{`
@@ -326,13 +220,12 @@ export default function LoginPage() {
             radial-gradient(ellipse at 80% 80%, rgba(40, 20, 60, 0.3) 0%, transparent 60%);
           overflow: hidden;
         }
-        .sw-stars {
-          position: fixed;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          z-index: 0;
-          pointer-events: none;
+        html:not(.dark) .sw-root {
+          background-color: #1d3358;
+          background-image:
+            radial-gradient(ellipse at 50% 30%, rgba(110, 170, 230, 0.45) 0%, transparent 60%),
+            radial-gradient(ellipse at 20% 90%, rgba(70, 130, 200, 0.35) 0%, transparent 60%),
+            linear-gradient(180deg, #2a4f82 0%, #1a3158 50%, #142544 100%);
         }
         .sw-vignette {
           position: fixed;
@@ -340,6 +233,13 @@ export default function LoginPage() {
           z-index: 1;
           pointer-events: none;
           background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.55) 95%);
+        }
+        html:not(.dark) .sw-vignette {
+          background: radial-gradient(
+            circle at 50% 50%,
+            transparent 35%,
+            rgba(8, 18, 38, 0.45) 95%
+          );
         }
         .sw-topbar,
         .sw-bottombar {
@@ -365,6 +265,32 @@ export default function LoginPage() {
           bottom: 0;
           font-size: 10px;
         }
+        .sw-topbar__right {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .sw-theme-toggle {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+          background: transparent;
+          border: 1px solid rgba(238, 241, 247, 0.18);
+          color: var(--ink-faint);
+          border-radius: 4px;
+          cursor: pointer;
+          transition:
+            color 150ms ease,
+            border-color 150ms ease,
+            background-color 150ms ease;
+        }
+        .sw-theme-toggle:hover {
+          color: var(--ink);
+          border-color: rgba(238, 241, 247, 0.45);
+          background: rgba(255, 255, 255, 0.06);
+        }
         .sw-stage {
           position: relative;
           z-index: 2;
@@ -377,7 +303,7 @@ export default function LoginPage() {
         @keyframes sw-rise {
           from {
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateY(8px);
           }
           to {
             opacity: 1;
@@ -388,7 +314,18 @@ export default function LoginPage() {
           width: min(440px, 100%);
           background: transparent;
           border: none;
-          animation: sw-rise 1s ease both;
+          animation: sw-rise 450ms ease-out both;
+        }
+        @keyframes sw-stars-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        .sw-root canvas {
+          animation: sw-stars-in 500ms ease-out both;
         }
         .sw-logo {
           display: flex;
