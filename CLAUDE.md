@@ -335,3 +335,7 @@ matriz, vencimientos, alertas, bloqueos, reportes básicos.
 
 OCR, firma electrónica, app móvil PWA con sincronización offline,
 work orders, mantenimiento preventivo, modelado bitemporal completo.
+
+## Actualmente solo estamos rediseñando frontend
+
+- Login y paginas

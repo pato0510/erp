@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowRight } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { ExcelsiaLogo } from '../../../components/shared/ExcelsiaLogo';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -15,64 +13,24 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-const TYPEWRITER_PHRASES = [
-  'iniciando sesión...',
-  'cargando módulos...',
-  'sincronizando datos...',
-  'listo para operar.',
-];
-
-const TYPE_MS = 75;
-const ERASE_MS = 35;
-const HOLD_MS = 1800;
-
-type TypewriterPhase = 'typing' | 'holding' | 'erasing' | 'done';
-
-function useTypewriter(phrases: string[]) {
-  const [phraseIndex, setPhraseIndex] = useState(0);
-  const [text, setText] = useState('');
-  const [phase, setPhase] = useState<TypewriterPhase>('typing');
-
-  useEffect(() => {
-    const current = phrases[phraseIndex];
-    const isLast = phraseIndex === phrases.length - 1;
-
-    if (phase === 'typing') {
-      if (text.length < current.length) {
-        const t = setTimeout(() => setText(current.slice(0, text.length + 1)), TYPE_MS);
-        return () => clearTimeout(t);
-      }
-      if (isLast) {
-        setPhase('done');
-        return undefined;
-      }
-      const t = setTimeout(() => setPhase('holding'), 50);
-      return () => clearTimeout(t);
-    }
-
-    if (phase === 'holding') {
-      const t = setTimeout(() => setPhase('erasing'), HOLD_MS);
-      return () => clearTimeout(t);
-    }
-
-    if (phase === 'erasing') {
-      if (text.length > 0) {
-        const t = setTimeout(() => setText(current.slice(0, text.length - 1)), ERASE_MS);
-        return () => clearTimeout(t);
-      }
-      setPhraseIndex((i) => i + 1);
-      setPhase('typing');
-    }
-    return undefined;
-  }, [text, phase, phraseIndex, phrases]);
-
-  return text;
-}
+type Star = {
+  x: number;
+  y: number;
+  r: number;
+  baseAlpha: number;
+  twinkleSpeed: number;
+  twinklePhase: number;
+  color: string;
+  bright: boolean;
+};
 
 export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const typed = useTypewriter(TYPEWRITER_PHRASES);
+  const [showPassword, setShowPassword] = useState(false);
+  const [info, setInfo] = useState('');
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const {
     register,
@@ -82,6 +40,7 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginForm) => {
     setError('');
+    setInfo('');
     setIsLoading(true);
     try {
       await apiClient.post('/api/auth/login', data);
@@ -97,489 +56,573 @@ export default function LoginPage() {
     }
   };
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let w = window.innerWidth;
+    let h = window.innerHeight;
+    let dpr = window.devicePixelRatio || 1;
+    let stars: Star[] = [];
+
+    const buildStars = () => {
+      const count = Math.floor((w * h) / 1400);
+      const next: Star[] = [];
+      for (let i = 0; i < count; i++) {
+        const layerRoll = Math.random();
+        const layer = layerRoll < 0.55 ? 0 : layerRoll < 0.88 ? 1 : 2;
+        const colorRoll = Math.random();
+        let color = '#ffffff';
+        if (colorRoll < 0.04) color = '#9bb8e8';
+        else if (colorRoll < 0.1) color = '#ffb27a';
+
+        const r =
+          layer === 0
+            ? 0.4 + Math.random() * 0.4
+            : layer === 1
+              ? 0.8 + Math.random() * 0.7
+              : 1.4 + Math.random() * 1.1;
+        const baseAlpha = layer === 0 ? 0.35 : layer === 1 ? 0.6 : 0.9;
+
+        next.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r,
+          baseAlpha,
+          twinkleSpeed: 0.4 + Math.random() * 1.6,
+          twinklePhase: Math.random() * Math.PI * 2,
+          color,
+          bright: layer === 2 && Math.random() < 0.35,
+        });
+      }
+      stars = next;
+    };
+
+    const resize = () => {
+      w = window.innerWidth;
+      h = window.innerHeight;
+      dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      buildStars();
+    };
+
+    resize();
+
+    const start = performance.now();
+    let raf = 0;
+
+    const draw = (now: number) => {
+      const t = (now - start) / 1000;
+      ctx.clearRect(0, 0, w, h);
+
+      // Nebulas
+      const g1 = ctx.createRadialGradient(w * 0.85, h * 0.2, 0, w * 0.85, h * 0.2, w * 0.55);
+      g1.addColorStop(0, 'rgba(60, 95, 170, 0.16)');
+      g1.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g1;
+      ctx.fillRect(0, 0, w, h);
+
+      const g2 = ctx.createRadialGradient(w * 0.15, h * 0.85, 0, w * 0.15, h * 0.85, w * 0.55);
+      g2.addColorStop(0, 'rgba(110, 60, 150, 0.13)');
+      g2.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, 0, w, h);
+
+      for (const s of stars) {
+        const tw = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed + s.twinklePhase);
+        const a = s.baseAlpha * (0.55 + 0.45 * tw);
+
+        ctx.globalAlpha = a;
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (s.bright && tw > 0.78) {
+          const flareLen = s.r * 6 * tw;
+          ctx.globalAlpha = a * 0.55;
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(s.x - flareLen, s.y);
+          ctx.lineTo(s.x + flareLen, s.y);
+          ctx.moveTo(s.x, s.y - flareLen);
+          ctx.lineTo(s.x, s.y + flareLen);
+          ctx.stroke();
+        }
+      }
+
+      ctx.globalAlpha = 1;
+      raf = requestAnimationFrame(draw);
+    };
+
+    raf = requestAnimationFrame(draw);
+    window.addEventListener('resize', resize);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  const handleForgotPassword = () => {
+    setError('');
+    setInfo('› funcionalidad próximamente disponible');
+  };
+
   return (
-    <div
-      className="tn-login"
-      style={{
-        height: '100vh',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        background: '#ffffff',
-      }}
-    >
-      {/* LEFT PANEL ─ Terminal Noir */}
-      <aside
-        className="tn-login__left"
-        style={{
-          position: 'relative',
-          background: '#1C1C1E',
-          color: '#ffffff',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '64px 72px',
-        }}
-      >
-        {/* Geometric SVG background — circles confined to top-right */}
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 800 900"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-        >
-          <g fill="none">
-            <circle cx="720" cy="150" r="220" stroke="#2C2C2E" strokeWidth="0.5" />
-            <circle cx="720" cy="150" r="320" stroke="#2C2C2E" strokeWidth="0.5" />
-            <circle cx="680" cy="110" r="42" stroke="#2563EB" strokeWidth="0.4" opacity="0.3" />
-            <line x1="0" y1="460" x2="800" y2="120" stroke="#2C2C2E" strokeWidth="0.5" />
-            <line x1="0" y1="600" x2="800" y2="260" stroke="#2C2C2E" strokeWidth="0.5" />
-          </g>
-          <circle cx="740" cy="78" r="2" fill="#2563EB" />
-        </svg>
+    <div className="sw-root">
+      <canvas ref={canvasRef} id="stars" className="sw-stars" aria-hidden="true" />
+      <div className="sw-vignette" aria-hidden="true" />
 
-        {/* Top — logo (absolute) */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 64,
-            left: 72,
-            zIndex: 1,
-          }}
-        >
-          <ExcelsiaLogo size={26} variant="light" />
-        </div>
+      <div className="sw-topbar" aria-hidden="true">
+        <span>PORTAL · ACCESO</span>
+        <span>V1.0</span>
+      </div>
 
-        {/* Middle — eyebrow + headline + terminal (centered in panel) */}
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            maxWidth: 520,
-            width: '100%',
-            margin: 'auto',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              marginBottom: 22,
-            }}
-          >
-            <span
-              style={{
-                display: 'inline-block',
-                width: 14,
-                height: 1,
-                background: '#2563EB',
-              }}
-            />
-            <span
-              style={{
-                fontFamily: 'var(--font-jetbrains-mono), monospace',
-                fontSize: 10,
-                letterSpacing: '0.22em',
-                textTransform: 'uppercase',
-                color: '#2563EB',
-              }}
+      <main className="sw-stage">
+        <section className="sw-card">
+          {/* Logo */}
+          <div className="sw-logo">
+            <svg
+              width="38"
+              height="38"
+              viewBox="0 0 40 40"
+              fill="none"
+              aria-hidden="true"
+              className="sw-logo__mark"
             >
-              Plataforma ERP
+              <defs>
+                <linearGradient id="sw-tri-grad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="oklch(0.88 0.10 220)" />
+                  <stop offset="100%" stopColor="oklch(0.55 0.14 235)" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M20 4 L36 32 L4 32 Z"
+                stroke="url(#sw-tri-grad)"
+                strokeWidth="1.4"
+                fill="none"
+                strokeLinejoin="round"
+              />
+              <path d="M20 14 L28 28 L12 28 Z" fill="url(#sw-tri-grad)" opacity="0.85" />
+            </svg>
+            <span className="sw-wordmark">
+              Excelsia<span className="sw-wordmark__dot">.</span>
             </span>
           </div>
 
-          <h1
-            style={{
-              fontFamily: 'var(--font-dm-serif), serif',
-              fontWeight: 400,
-              fontSize: 44,
-              lineHeight: 1.15,
-              color: '#ffffff',
-              marginBottom: 36,
-            }}
-          >
-            Gestiona tu
-            <br />
-            empresa en
-            <br />
-            <span style={{ color: '#1E3A5F', fontStyle: 'italic' }}>un solo lugar.</span>
-          </h1>
+          <p className="sw-tagline">
+            Gestiona tu empresa <span className="sw-tagline__strong">en un solo lugar</span>.
+          </p>
 
-          {/* Terminal block */}
-          <div
-            style={{
-              background: '#141414',
-              border: '0.5px solid #2C2C2E',
-              borderRadius: 6,
-              padding: '14px 16px',
-              maxWidth: 300,
-              fontFamily: 'var(--font-jetbrains-mono), monospace',
-              fontSize: 11,
-              lineHeight: 2,
-            }}
-          >
-            <div style={{ color: '#8E8E93' }}>
-              <span style={{ color: '#2563EB', marginRight: 4 }}>✓</span>
-              finanzas conectadas
-            </div>
-            <div style={{ color: '#8E8E93' }}>
-              <span style={{ color: '#2563EB', marginRight: 4 }}>✓</span>
-              operaciones activas
-            </div>
-            <div style={{ color: '#8E8E93' }}>
-              <span style={{ color: '#2563EB', marginRight: 4 }}>✓</span>
-              reportes en tiempo real
-            </div>
-            <div
-              style={{
-                color: '#8E8E93',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <span style={{ color: '#2563EB', marginRight: 4 }}>›</span>
-              <span>{typed}</span>
-              <span
-                aria-hidden="true"
-                style={{
-                  display: 'inline-block',
-                  width: 7,
-                  height: 11,
-                  background: '#2563EB',
-                  marginLeft: 3,
-                  animation: 'tn-blink 1s step-end infinite',
-                }}
+          <div className="sw-auth-indicator" aria-hidden="true">
+            <span className="sw-pulse" />
+            <span>AUTHENTICATION REQUIRED</span>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="sw-form" noValidate>
+            <div className="sw-field">
+              <label htmlFor="email" className="sw-field__label">
+                user
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="nombre@empresa.cl"
+                className="sw-field__input"
+                {...register('email')}
               />
             </div>
-          </div>
-        </div>
+            {errors.email && <p className="sw-field-error">› {errors.email.message}</p>}
 
-        {/* Bottom — stats (absolute) */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 64,
-            left: 72,
-            right: 72,
-            zIndex: 1,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 24,
-          }}
-        >
-          {[
-            { value: '100%', label: 'Nube segura' },
-            { value: '24/7', label: 'Disponible' },
-            { value: 'v1.0', label: 'Producción' },
-          ].map((s) => (
-            <div key={s.value}>
-              <div
-                style={{
-                  fontFamily: 'var(--font-jetbrains-mono), monospace',
-                  fontSize: 17,
-                  color: '#ffffff',
-                  fontWeight: 500,
-                }}
-              >
-                {s.value}
-              </div>
-              <div
-                style={{
-                  marginTop: 4,
-                  fontFamily: 'var(--font-jetbrains-mono), monospace',
-                  fontSize: 9,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: '#8E8E93',
-                }}
-              >
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </aside>
-
-      {/* RIGHT PANEL ─ Form */}
-      <section
-        className="tn-login__right"
-        style={{
-          background: '#ffffff',
-          padding: '40px 48px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Top logo */}
-        <div className="tn-login__right-logo">
-          <ExcelsiaLogo size={22} variant="dark" />
-        </div>
-
-        {/* Centered form */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <div style={{ width: '100%', maxWidth: 380 }}>
-            <h2
-              style={{
-                fontFamily: 'var(--font-outfit), sans-serif',
-                fontWeight: 600,
-                fontSize: 28,
-                lineHeight: 1.2,
-                letterSpacing: '-0.02em',
-                color: '#1C1C1E',
-              }}
-            >
-              Bienvenido de vuelta.
-            </h2>
-            <p
-              style={{
-                marginTop: 8,
-                fontFamily: 'var(--font-inter), sans-serif',
-                fontWeight: 300,
-                fontSize: 13,
-                color: '#9aa0ad',
-              }}
-            >
-              Ingresa a tu cuenta para continuar
-            </p>
-
-            <form
-              onSubmit={handleSubmit(onSubmit)}
-              style={{
-                marginTop: 28,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-              }}
-            >
-              <div>
-                <label
-                  htmlFor="email"
-                  style={{
-                    display: 'block',
-                    fontFamily: 'var(--font-jetbrains-mono), monospace',
-                    fontSize: 10,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: '#1C1C1E',
-                    marginBottom: 6,
-                  }}
-                >
-                  Correo electrónico
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  {...register('email')}
-                  placeholder="nombre@empresa.cl"
-                  className="tn-input"
-                />
-                {errors.email && (
-                  <p style={{ color: '#dc2626', fontSize: 12, marginTop: 5 }}>
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  style={{
-                    display: 'block',
-                    fontFamily: 'var(--font-jetbrains-mono), monospace',
-                    fontSize: 10,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: '#1C1C1E',
-                    marginBottom: 6,
-                  }}
-                >
-                  Contraseña
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  {...register('password')}
-                  placeholder="••••••••"
-                  className="tn-input"
-                />
-                {errors.password && (
-                  <p style={{ color: '#dc2626', fontSize: 12, marginTop: 5 }}>
-                    {errors.password.message}
-                  </p>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <a
-                  href="/forgot-password"
-                  style={{
-                    fontFamily: 'var(--font-inter), sans-serif',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#2563EB',
-                    textDecoration: 'none',
-                  }}
-                >
-                  ¿Olvidaste tu contraseña?
-                </a>
-              </div>
-
-              {error && (
-                <div
-                  style={{
-                    background: 'rgba(220, 38, 38, 0.08)',
-                    color: '#b91c1c',
-                    border: '1px solid rgba(220, 38, 38, 0.2)',
-                    borderRadius: 6,
-                    padding: '10px 14px',
-                    fontSize: 12,
-                    fontFamily: 'var(--font-jetbrains-mono), monospace',
-                  }}
-                >
-                  › {error}
-                </div>
-              )}
-
+            <div className="sw-field">
+              <label htmlFor="password" className="sw-field__label">
+                passwd
+              </label>
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="sw-field__input"
+                {...register('password')}
+              />
               <button
-                type="submit"
-                disabled={isLoading}
-                style={{
-                  marginTop: 4,
-                  width: '100%',
-                  background: '#1C1C1E',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: 40,
-                  padding: '14px 20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontFamily: 'var(--font-outfit), sans-serif',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  opacity: isLoading ? 0.7 : 1,
-                  transition: 'transform 120ms ease',
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.transform = 'scale(0.985)';
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
+                type="button"
+                className="sw-field__toggle"
+                onClick={() => setShowPassword((s) => !s)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                <span>{isLoading ? 'Ingresando...' : 'Iniciar sesión'}</span>
-                <span
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: '#2563EB',
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <ArrowRight size={14} strokeWidth={2.75} />
-                </span>
+                {showPassword ? 'hide' : 'show'}
               </button>
+            </div>
+            {errors.password && <p className="sw-field-error">› {errors.password.message}</p>}
 
-              <div
-                style={{
-                  marginTop: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  fontFamily: 'var(--font-jetbrains-mono), monospace',
-                  fontSize: 10,
-                  letterSpacing: '0.08em',
-                  color: '#c8cdd6',
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: '50%',
-                    background: '#8E8E93',
-                  }}
-                />
-                conexión segura · cifrado end-to-end
-              </div>
-            </form>
-          </div>
-        </div>
-      </section>
+            <div className="sw-row-actions">
+              <button type="button" onClick={handleForgotPassword} className="sw-link">
+                recuperar acceso
+              </button>
+              <button type="submit" disabled={isLoading} className="sw-submit">
+                <span>{isLoading ? '› verificando...' : 'Iniciar sesión'}</span>
+                {!isLoading && (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden="true"
+                    className="sw-submit__arrow"
+                  >
+                    <path
+                      d="M2 7 H12 M8 3 L12 7 L8 11"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
 
-      <style jsx>{`
-        @keyframes tn-blink {
-          0%,
-          49% {
-            opacity: 1;
-          }
-          50%,
-          100% {
-            opacity: 0;
-          }
+            <div className="sw-log" role="status" aria-live="polite">
+              {error && <span className="err">› {error}</span>}
+              {!error && info && <span className="ok">{info}</span>}
+            </div>
+          </form>
+        </section>
+      </main>
+
+      <div className="sw-bottombar" aria-hidden="true">
+        <span>CONEXIÓN SEGURA</span>
+        <span>AES-256 · END-TO-END</span>
+      </div>
+
+      <style jsx global>{`
+        .sw-root {
+          --ink: #eef1f7;
+          --ink-dim: rgba(238, 241, 247, 0.62);
+          --ink-faint: rgba(238, 241, 247, 0.36);
+          --accent: oklch(0.82 0.12 220);
+          --field-bg: rgba(255, 255, 255, 0.1);
+          --line: rgba(238, 241, 247, 0.12);
+
+          position: fixed;
+          inset: 0;
+          color: var(--ink);
+          font-family: var(--font-space-grotesk), var(--font-outfit), sans-serif;
+          background-color: #000000;
+          background-image:
+            radial-gradient(ellipse at 50% 40%, rgba(20, 30, 55, 0.35) 0%, transparent 55%),
+            radial-gradient(ellipse at 80% 80%, rgba(40, 20, 60, 0.3) 0%, transparent 60%);
+          overflow: hidden;
         }
-        .tn-login__right-logo {
-          display: none;
-        }
-        :global(.tn-input) {
+        .sw-stars {
+          position: fixed;
+          inset: 0;
           width: 100%;
-          padding: 11px 14px;
-          border: 1px solid #e8eaed;
-          border-radius: 8px;
-          background: #fafafa;
-          font-family: var(--font-inter), sans-serif;
-          font-size: 14px;
-          color: #1c1c1e;
-          outline: none;
+          height: 100%;
+          z-index: 0;
+          pointer-events: none;
+        }
+        .sw-vignette {
+          position: fixed;
+          inset: 0;
+          z-index: 1;
+          pointer-events: none;
+          background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.55) 95%);
+        }
+        .sw-topbar,
+        .sw-bottombar {
+          position: fixed;
+          left: 0;
+          right: 0;
+          padding: 30px 40px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          color: var(--ink-faint);
+          font-family: var(--font-ibm-plex-mono), var(--font-jetbrains-mono), monospace;
+          font-weight: 400;
+          text-transform: uppercase;
+          letter-spacing: 0.22em;
+          z-index: 3;
+        }
+        .sw-topbar {
+          top: 0;
+          font-size: 11px;
+        }
+        .sw-bottombar {
+          bottom: 0;
+          font-size: 10px;
+        }
+        .sw-stage {
+          position: relative;
+          z-index: 2;
+          height: 100vh;
+          width: 100vw;
+          display: grid;
+          place-items: center;
+          padding: 80px 24px;
+        }
+        @keyframes sw-rise {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .sw-card {
+          width: min(440px, 100%);
+          background: transparent;
+          border: none;
+          animation: sw-rise 1s ease both;
+        }
+        .sw-logo {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 18px;
+        }
+        .sw-logo__mark {
+          filter: drop-shadow(0 0 12px rgba(120, 170, 230, 0.35));
+        }
+        .sw-wordmark {
+          font-family: var(--font-space-grotesk), sans-serif;
+          font-weight: 500;
+          font-size: 19px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: var(--ink);
+          text-shadow: 0 0 16px rgba(120, 170, 230, 0.18);
+        }
+        .sw-wordmark__dot {
+          color: var(--accent);
+        }
+        .sw-tagline {
+          font-family: var(--font-space-grotesk), sans-serif;
+          font-weight: 300;
+          font-size: 13px;
+          color: var(--ink-dim);
+          margin-bottom: 30px;
+          letter-spacing: 0.01em;
+        }
+        .sw-tagline__strong {
+          font-weight: 500;
+          color: var(--ink);
+        }
+        .sw-auth-indicator {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-family: var(--font-ibm-plex-mono), monospace;
+          font-size: 11.5px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: var(--ink-dim);
+          margin-bottom: 20px;
+        }
+        @keyframes sw-pulse-dot {
+          0%,
+          100% {
+            opacity: 0.45;
+            box-shadow: 0 0 0 0 rgba(120, 200, 255, 0.55);
+          }
+          50% {
+            opacity: 1;
+            box-shadow: 0 0 14px 2px rgba(120, 200, 255, 0.55);
+          }
+        }
+        .sw-pulse {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: var(--accent);
+          animation: sw-pulse-dot 1.6s ease-in-out infinite;
+          flex: none;
+        }
+        .sw-form {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .sw-field {
+          position: relative;
+          height: 50px;
+          padding: 0 16px;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          background: rgba(255, 255, 255, 0.16);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          border-radius: 4px;
           transition:
-            border-color 150ms ease,
-            background-color 150ms ease,
-            box-shadow 150ms ease;
+            background-color 200ms ease,
+            border-color 200ms ease;
         }
-        :global(.tn-input::placeholder) {
-          color: #d0d5dd;
+        .sw-field:hover {
+          background: rgba(255, 255, 255, 0.22);
         }
-        :global(.tn-input:focus) {
-          border-color: #2563eb;
-          background: #ffffff;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        .sw-field:focus-within {
+          background: rgba(255, 255, 255, 0.26);
+          border-color: rgba(255, 255, 255, 0.45);
         }
-        @media (max-width: 768px) {
-          .tn-login {
-            grid-template-columns: 1fr !important;
+        .sw-field__label {
+          font-family: var(--font-ibm-plex-mono), monospace;
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: lowercase;
+          color: var(--ink-faint);
+          flex: none;
+          width: 56px;
+        }
+        .sw-field__input {
+          flex: 1;
+          background: transparent !important;
+          border: none !important;
+          outline: none;
+          color: var(--ink) !important;
+          font-family: var(--font-ibm-plex-mono), monospace;
+          font-size: 13px;
+          letter-spacing: 0.02em;
+          padding: 0;
+          height: 100%;
+        }
+        .sw-field__input::placeholder {
+          color: rgba(238, 241, 247, 0.32);
+        }
+        .sw-field__input:-webkit-autofill,
+        .sw-field__input:-webkit-autofill:hover,
+        .sw-field__input:-webkit-autofill:focus {
+          -webkit-text-fill-color: var(--ink);
+          -webkit-box-shadow: 0 0 0 1000px transparent inset;
+          transition: background-color 5000s ease-in-out 0s;
+        }
+        .sw-field__toggle {
+          background: transparent;
+          border: none;
+          color: var(--ink-faint);
+          cursor: pointer;
+          font-family: var(--font-ibm-plex-mono), monospace;
+          font-size: 10px;
+          letter-spacing: 0.18em;
+          padding: 4px 6px;
+          text-transform: lowercase;
+          transition: color 150ms ease;
+        }
+        .sw-field__toggle:hover {
+          color: var(--ink);
+        }
+        .sw-field-error {
+          font-family: var(--font-ibm-plex-mono), monospace;
+          font-size: 11px;
+          color: oklch(0.78 0.14 22);
+          margin: -4px 4px 0;
+        }
+        .sw-row-actions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          margin-top: 22px;
+        }
+        .sw-link {
+          background: transparent;
+          border: none;
+          padding: 0;
+          color: var(--ink-dim);
+          font-family: var(--font-ibm-plex-mono), monospace;
+          font-size: 11px;
+          letter-spacing: 0.16em;
+          text-transform: lowercase;
+          cursor: pointer;
+          text-decoration: underline dotted;
+          text-underline-offset: 4px;
+          transition: color 150ms ease;
+        }
+        .sw-link:hover {
+          color: var(--ink);
+        }
+        .sw-submit {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          border: 1px solid rgba(255, 255, 255, 0.7);
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          color: #ffffff;
+          font-family: var(--font-space-grotesk), sans-serif;
+          font-weight: 500;
+          font-size: 12px;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          padding: 12px 22px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition:
+            background-color 200ms ease,
+            border-color 200ms ease,
+            transform 120ms ease;
+        }
+        .sw-submit:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.2);
+          border-color: #ffffff;
+        }
+        .sw-submit:active:not(:disabled) {
+          transform: scale(0.985);
+        }
+        .sw-submit:disabled {
+          cursor: not-allowed;
+          opacity: 0.7;
+        }
+        .sw-submit__arrow {
+          transition: transform 200ms ease;
+        }
+        .sw-submit:hover:not(:disabled) .sw-submit__arrow {
+          transform: translateX(2px);
+        }
+        .sw-log {
+          min-height: 22px;
+          margin-top: 14px;
+          font-family: var(--font-ibm-plex-mono), monospace;
+          font-size: 11.5px;
+          letter-spacing: 0.05em;
+        }
+        .sw-log .err {
+          color: oklch(0.78 0.14 22);
+        }
+        .sw-log .ok {
+          color: #9be0b1;
+        }
+
+        @media (max-width: 640px) {
+          .sw-topbar,
+          .sw-bottombar {
+            padding: 20px 22px;
           }
-          .tn-login__left {
-            display: none !important;
+          .sw-stage {
+            padding: 70px 18px;
           }
-          .tn-login__right {
-            padding: 32px 24px !important;
+          .sw-wordmark {
+            font-size: 17px;
           }
-          .tn-login__right-logo {
-            display: flex !important;
-            justify-content: center;
-            padding: 8px 0 24px;
+          .sw-tagline {
+            font-size: 12.5px;
           }
         }
       `}</style>
