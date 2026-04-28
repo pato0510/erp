@@ -3,6 +3,7 @@ import { AssetStatus, Prisma, StatusChangeType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { DocumentRequirementsService } from '../document-requirements/document-requirements.service';
+import { NotificationService } from '../notifications/notification.service';
 import { CompanyAlertSettingsService } from './company-alert-settings.service';
 
 /* OPS-020 — single source of truth for "should this asset be blocked
@@ -55,6 +56,7 @@ export class AssetBlockingService {
     private readonly rlsService: RlsService,
     private readonly requirementsService: DocumentRequirementsService,
     private readonly settingsService: CompanyAlertSettingsService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /* Pure evaluator — never writes. Returns the list of CRITICAL+blocking
@@ -247,6 +249,21 @@ export class AssetBlockingService {
         evaluation.blockingAlertIds,
         null,
       );
+      /* OPS-022 — fan out user notifications about the new block.
+         Failures are logged but don't unwind the transition. */
+      try {
+        await this.notificationService.createForAssetBlocked(
+          companyId,
+          assetId,
+          evaluation.blockingDocumentTypeIds,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Asset-block notification fan-out failed for ${assetId}: ${
+            err instanceof Error ? err.message : err
+          }`,
+        );
+      }
       return {
         action: 'BLOCKED',
         newStatus,

@@ -357,71 +357,51 @@ Sprint 6: Permisos y Procedimientos (OPS-024 a OPS-028)
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
-### OPS-020: Bloqueo operacional automático (✓ completado)
+### OPS-021: Centro de alertas en UI (✓ completado)
 
-Activos con documentos CRITICAL+blocksOperation vencidos pasan
-automáticamente a status BLOCKED_DOCUMENTAL.
+Pantalla completa /operaciones/alertas con KPIs, filtros, vistas y acciones.
 
-### Tabla creada
+### Backend extendido OPS-021
 
-- asset_status_changes — audit trail completo de cambios de estado
-- Enum StatusChangeType: MANUAL/AUTO_BLOCK/AUTO_UNBLOCK/
-  EXCEPTION_GRANTED/EXCEPTION_EXPIRED
+- DTO con search, severities[], statuses[], triggerTypes[],
+  triggeredFrom/triggeredTo
+- Multi-filter con OR de búsqueda en title/message/asset/documentType
+- GET /api/operations/alerts/instances/kpis
+  Retorna { total, active, critical, unattended, resolvedToday }
 
-### Lógica de bloqueo (asset-blocking.service.ts)
+### UI implementada
 
-evaluateAssetBlocking:
+- Header con breadcrumb, título y acciones (Configurar reglas + Recalcular)
+- 4 KPI cards clicables que aplican filtro
+- Filtros: search debounced 300ms, status preset (URL sync),
+  asset/documentType, rango fechas, multi-select severidad y disparador
+- Quick chips: Solo críticas / Últimas 24h / Sin atender / Bloqueando
+- Toggle Lista ↔ Cards (persistido localStorage)
+- Vista lista: checkboxes + select-all, columnas con bulk actions
+- Vista cards: grid con borde de severidad + overlay status
+- Empty states diferenciados (con filtros vs sin alertas)
+- Pagination con selector 25/50/100
+- Bulk action bar sticky cuando hay selección
+- Optimistic updates después de acciones
 
-1. Filtra requirements a CRITICAL+blocksOperation
-2. Busca último APPROVED no-reemplazado
-3. Marca MISSING (sin record) o EXPIRED (vencido)
-4. Respeta enableAutoBlocking de CompanyAlertSettings
-5. Retorna shouldBlock + documentos disparadores
+### Componentes nuevos OPS-021
 
-evaluateAssetUnblocking:
+- AlertDetailModal — asset card, document type, document record con preview,
+  historial, notificaciones
+- AssetActiveAlerts — sección compacta para fichas 360 con auto-hide si vacía
+- ReasonModal reutilizable para Resolver/Descartar
 
-1. Solo aplica si asset.status === BLOCKED_DOCUMENTAL
-2. Re-ejecuta evaluación → si ya no necesita bloqueo: shouldUnblock
+### Integración con fichas 360
 
-processBlocking aplica los cambios + escribe AssetStatusChange.
-
-### Triggers automáticos
-
-- Al final del cron de alertas (processCompanyBlocking)
-- Después de approve de un documento (re-evalúa unblock)
-- Después de manual update de asset (re-evalúa, puede re-bloquear)
-
-### Endpoints OPS-020
-
-- GET /api/operations/assets/blocked
-- GET /api/operations/assets/:id/status-history
-- POST /api/operations/assets/:id/evaluate-blocking (dry-run)
-- POST /api/operations/assets/:id/force-unblock (ADMIN, motivo min 10)
-
-### CASL nueva acción
-
-- 'force-unblock' action: solo ADMIN
-
-### UI agregada
-
-- Banner ROJO en fichas 360 cuando BLOCKED_DOCUMENTAL
-- Lista de documentos disparadores
-- Botones: cargar faltantes / solicitar excepción (disabled OPS-023)
-- AssetStatusHistoryModal con timeline tipo User/Bot/ShieldOff
-- Link "Ver historial de cambios →" en sección Estado
-- Sección "Activos bloqueados" en /operaciones/documentos
-
-### Compliance counts agregados
-
-blockedAssetsCount, assetsAtRiskCount
+Nueva sección "Alertas activas" entre documentos cargados e historial.
+Filtra a assetId=X&statuses=ACTIVE,ESCALATED,ACKNOWLEDGED.
 
 # Ticket actual
 
-- OPS-021: Centro de alertas en UI /operaciones/alertas
-  Pantalla completa con todas las alertas activas
-  Filtros: severidad, tipo de trigger, status, asset, document type, fecha
-  Quick chips: solo críticas, últimas 24h, sin atender
-  Acciones: acknowledge, resolve, dismiss (individual y masivas)
-  Vista cards o tabla togglable
-  Link directo desde cada alerta a la ficha del activo
-  Empty state cuando no hay alertas activas
+- OPS-022: Escalamiento por severidad y notificaciones in-app
+  Sistema de notificaciones in-app cuando se generan alertas
+  Escalamiento automático: si una alerta CRITICAL no se atiende en X días,
+  se escala a roles superiores configurados en la regla
+  Centro de notificaciones (campana) con dropdown
+  Resolución de destinatarios (roles + assigned user + supervisor)
+  Tabla notifications para tracking individual por usuario

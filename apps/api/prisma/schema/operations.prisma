@@ -366,6 +366,7 @@ model AlertInstance {
   documentType   OperationalDocumentType @relation(fields: [documentTypeId], references: [id])
   asset          OperationalAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
   documentRecord DocumentRecord?         @relation(fields: [documentRecordId], references: [id])
+  notifications  UserNotification[]
 
   @@unique([companyId, assetId, documentTypeId, triggerType, daysBeforeExpiration, status])
   @@index([companyId, status, triggeredAt])
@@ -403,6 +404,47 @@ enum StatusChangeType {
   AUTO_UNBLOCK
   EXCEPTION_GRANTED
   EXCEPTION_EXPIRED
+}
+
+/* OPS-022 — per-user notification inbox. RLS enforces a strict
+   companyId AND userId match so notifications stay strictly personal
+   even within the same tenant. The source columns let one inbox row
+   point back to an alert, an asset block, an escalation, etc. */
+enum NotificationSourceType {
+  ALERT_INSTANCE
+  ASSET_BLOCKED
+  ESCALATION
+  DOCUMENT_REJECTED
+  DOCUMENT_APPROVED
+  EXCEPTION_REQUESTED
+  EXCEPTION_GRANTED
+  GENERAL
+}
+
+model UserNotification {
+  id              String                 @id @default(uuid()) @db.Uuid
+  companyId       String                 @db.Uuid
+  userId          String                 @db.Uuid
+  alertInstanceId String?                @db.Uuid
+  sourceType      NotificationSourceType
+  title           String
+  message         String?
+  severity        AlertSeverity
+  linkPath        String?
+  icon            String?
+  isRead          Boolean                @default(false)
+  readAt          DateTime?
+  isDismissed     Boolean                @default(false)
+  dismissedAt     DateTime?
+  createdAt       DateTime               @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertInstance AlertInstance? @relation(fields: [alertInstanceId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, userId, isRead, createdAt])
+  @@index([companyId, userId, isDismissed])
+  @@index([alertInstanceId])
+  @@map("user_notifications")
 }
 
 model AssetStatusChange {

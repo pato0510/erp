@@ -3,6 +3,7 @@ import { AlertSeverity, AlertTriggerType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { DocumentRequirementsService } from '../document-requirements/document-requirements.service';
+import { NotificationService } from '../notifications/notification.service';
 import { AlertRulesService } from './alert-rules.service';
 import { AssetBlockingService } from './asset-blocking.service';
 import { CompanyAlertSettingsService } from './company-alert-settings.service';
@@ -39,6 +40,7 @@ export class AlertEngineService {
     private readonly rulesService: AlertRulesService,
     private readonly settingsService: CompanyAlertSettingsService,
     private readonly blockingService: AssetBlockingService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /* OPS-019 — main entry point. Walks every active asset for the
@@ -316,9 +318,10 @@ export class AlertEngineService {
       summary.alertsCreated++;
       return;
     }
+    let created: { id: string } | null = null;
     try {
-      await this.rlsService.executeWithRls(companyId, ENGINE_USER_ID, async (tx) => {
-        await tx.alertInstance.create({
+      created = await this.rlsService.executeWithRls(companyId, ENGINE_USER_ID, async (tx) =>
+        tx.alertInstance.create({
           data: {
             companyId,
             alertRuleId: data.alertRuleId,
@@ -335,8 +338,9 @@ export class AlertEngineService {
             message: data.message,
             metadata: data.metadata as Prisma.InputJsonValue,
           },
-        });
-      });
+          select: { id: true },
+        }),
+      );
       summary.alertsCreated++;
     } catch (err) {
       /* P2002 = unique constraint violation; means an ACTIVE alert
@@ -347,6 +351,48 @@ export class AlertEngineService {
         return;
       }
       throw err;
+    }
+
+    /* OPS-022 — fan-out notifications only when a brand-new row was
+       written. Re-emitting on dedupe would spam users with the same
+       message every time the cron runs. The fan-out is best-effort:
+       failures get logged but don't fail the alert creation. */
+    if (created) {
+      try {
+        await this.notificationService.createForAlertInstance(companyId, {
+          id: created.id,
+          companyId,
+          alertRuleId: data.alertRuleId,
+          documentTypeId: data.documentTypeId,
+          assetId: data.assetId,
+          documentRecordId: data.documentRecordId,
+          triggerType: data.triggerType,
+          severity: data.severity,
+          daysBeforeExpiration: data.daysBeforeExpiration,
+          expirationDate: data.expirationDate,
+          status: 'ACTIVE',
+          acknowledgedBy: null,
+          acknowledgedAt: null,
+          resolvedBy: null,
+          resolvedAt: null,
+          resolvedReason: null,
+          escalatedAt: null,
+          notifiedRoles: data.notifiedRoles,
+          notifiedUsers: data.notifiedUsers,
+          title: data.title,
+          message: data.message,
+          metadata: data.metadata as Prisma.JsonValue,
+          triggeredAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Notification fan-out failed for alert ${created.id}: ${
+            err instanceof Error ? err.message : err
+          }`,
+        );
+      }
     }
   }
 }

@@ -24,6 +24,10 @@ export class RlsService {
       await tx.$executeRawUnsafe(`SET LOCAL audit.company_id = '${companyId}'`);
       if (userId) {
         await tx.$executeRawUnsafe(`SET LOCAL audit.user_id = '${userId}'`);
+        /* OPS-022 — per-user RLS context. user_notifications uses this
+           to enforce "users only see their own notifications" while
+           still keeping the company-scoped guard. */
+        await tx.$executeRawUnsafe(`SET LOCAL rls.user_id = '${userId}'`);
       }
       return fn(tx);
     });

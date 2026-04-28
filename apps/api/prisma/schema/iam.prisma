@@ -19,7 +19,8 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  memberships Membership[]
+  memberships   Membership[]
+  notifications UserNotification[]
 
   @@map("users")
 }

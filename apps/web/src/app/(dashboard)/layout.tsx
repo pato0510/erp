@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { DarkGradientBackground } from '../../components/DarkGradientBackground';
 import { FinanceSidebar } from '../../components/sidebars/FinanceSidebar';
 import { OperationsSidebar } from '../../components/sidebars/OperationsSidebar';
+import { NotificationCenter } from '../../components/NotificationCenter';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -53,7 +54,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {isOperations ? <OperationsSidebar /> : <FinanceSidebar />}
 
         <main className="tn-main">
-          <div style={{ padding: '32px 40px' }}>{children}</div>
+          {/* OPS-022 — notification bell anchored top-right of the
+              main area. Sticky inside main so it stays visible while
+              the user scrolls long pages. */}
+          <div className="tn-topbar">
+            <NotificationCenter />
+          </div>
+          <div style={{ padding: '12px 40px 32px' }}>{children}</div>
         </main>
 
         <style jsx global>{`
@@ -72,6 +79,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             transition:
               background-color 150ms ease,
               color 150ms ease;
+          }
+          .tn-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 4;
+            display: flex;
+            justify-content: flex-end;
+            padding: 14px 40px 0;
+            background: linear-gradient(180deg, var(--bg-secondary) 70%, transparent 100%);
           }
 
           .tn-sidebar {
