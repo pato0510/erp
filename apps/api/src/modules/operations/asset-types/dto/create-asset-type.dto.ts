@@ -1,4 +1,12 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { AssetCategory } from '@prisma/client';
 
 export class CreateAssetTypeDto {
@@ -22,4 +30,8 @@ export class CreateAssetTypeDto {
   @IsString()
   @Matches(/^#[0-9A-Fa-f]{6}$/, { message: 'color must be a hex color (e.g. #4CAF50)' })
   color?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

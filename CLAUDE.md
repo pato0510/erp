@@ -338,69 +338,8 @@ work orders, mantenimiento preventivo, modelado bitemporal completo.
 
 ## Sprint — Equipos (en desarrollo)
 
-### OPS-005: CRUD de Equipos
-
-Pantalla `/operaciones/equipos` con gestión completa de activos
-operacionales tipo equipo (no vehículos).
-
-### Modelo central usado
-
-OperationalAsset (creado en OPS-003) con:
-
-- AssetType.category = EQUIPMENT (filtro principal)
-- Atributos dinámicos en JSONB (campos específicos por tipo)
-- Jerarquías padre-hijo via parentAssetId (componente → equipo → sitio)
-- Foto en MinIO o fallback a DB blob
-- Status con 8 estados operacionales
-
-### Endpoints REST implementados
-
-- GET /api/operations/assets — lista filtrable y paginada
-- GET /api/operations/assets/:id — detalle con relaciones
-- POST /api/operations/assets — crear
-- PATCH /api/operations/assets/:id — actualizar
-- DELETE /api/operations/assets/:id — soft delete con validación de hijos
-- POST /api/operations/assets/:id/photo — subir foto (max 2MB)
-- GET /api/operations/assets/:id/photo — descargar foto
-
-### Validaciones de negocio
-
-- code único por empresa
-- No se puede eliminar un activo con activos hijos
-- statusChangedAt se actualiza automáticamente al cambiar status
-- Foto: solo jpg/png/webp, máximo 2MB
-
-### Storage de fotos
-
-- Path en MinIO: operations/assets/{assetId}/photo.{ext}
-- Fallback a DB blob igual que SII certificate
-- Thumbnail en lista de equipos viene de GET /:id/photo
-
-### Estados de Activo (traducciones UI)
-
-- OPERATIONAL → "Operativo" (verde)
-- WITH_OBSERVATIONS → "Con observaciones" (amarillo)
-- NON_OPERATIONAL → "No operativo" (rojo)
-- IN_MAINTENANCE → "En mantención" (azul)
-- BLOCKED_DOCUMENTAL → "Bloq. documental" (rojo)
-- BLOCKED_PERMIT → "Bloq. permiso" (rojo)
-- OUT_OF_SERVICE → "Fuera de servicio" (gris)
-- DECOMMISSIONED → "Dado de baja" (gris)
-
-### Componentes frontend nuevos
-
-- apps/web/src/components/operations/AssetFormModal.tsx
-- apps/web/src/components/operations/AssetStatusBadge.tsx
-
-### Permisos CASL
-
-- Subject: 'OperationalAsset' (ya existente desde OPS-003)
-- Read: todos los roles
-- Create/Update: ADMIN, MANAGER
-- Delete: ADMIN solamente
-
 ### Próximos tickets del Sprint 2
 
-- OPS-006: Ficha 360 del equipo (vista detalle completa)
-- OPS-007: CRUD de tipos y subtipos en frontend
+- OPS-006: Ficha 360 del equipo (vista detalle completa) LISTO
+- OPS-007: CRUD de tipos y subtipos en frontend AHORA
 - OPS-008: Importación masiva CSV/Excel de equipos

@@ -1,13 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
+  ArrowRight,
   ChevronLeft,
   ChevronRight,
   MapPin,
   Pencil,
   Plus,
   Search,
+  Settings,
   Trash2,
   Wrench,
   X,
@@ -100,6 +103,7 @@ export default function EquiposPage() {
   const [assetTypes, setAssetTypes] = useState<AssetTypeOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [parentCandidates, setParentCandidates] = useState<AssetForFormParent[]>([]);
+  const [catalogsLoaded, setCatalogsLoaded] = useState(false);
 
   const [modal, setModal] = useState<ModalState>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
@@ -131,6 +135,8 @@ export default function EquiposPage() {
       setParentCandidates(parents.data.map((p) => ({ id: p.id, code: p.code, name: p.name })));
     } catch {
       /* Silent — list load handles its own error state. */
+    } finally {
+      setCatalogsLoaded(true);
     }
   }, []);
 
@@ -239,6 +245,45 @@ export default function EquiposPage() {
           </button>
         </div>
       </div>
+
+      {/* Setup banner — shown when no asset types exist yet */}
+      {catalogsLoaded && assetTypes.length === 0 && (
+        <div
+          className="mb-6 p-4 rounded-xl flex items-start gap-3"
+          style={{
+            background: 'rgba(37, 99, 235, 0.08)',
+            border: '1px solid rgba(37, 99, 235, 0.2)',
+          }}
+        >
+          <Settings size={20} style={{ color: '#1d4ed8', flexShrink: 0, marginTop: 2 }} />
+          <div className="flex-1">
+            <p
+              className="text-[var(--text-primary)] mb-1"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              Aún no has creado tipos de activo.
+            </p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Configura tu módulo primero para poder crear equipos.
+            </p>
+          </div>
+          <Link
+            href="/operaciones/configuracion?tab=tipos"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-full text-white flex-shrink-0"
+            style={{
+              background: '#2563eb',
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 500,
+            }}
+          >
+            Ir a Configuración <ArrowRight size={14} />
+          </Link>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4 mb-6 flex flex-wrap items-center gap-3">

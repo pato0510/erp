@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   Moon,
+  Settings,
   ShieldCheck,
   Sun,
   Truck,
@@ -31,6 +32,8 @@ const navItems = [
   { href: '/operaciones/calendario', label: 'Calendario', icon: Calendar },
   { href: '/operaciones/reportes', label: 'Reportes', icon: BarChart3 },
 ];
+
+const adminItems = [{ href: '/operaciones/configuracion', label: 'Configuración', icon: Settings }];
 
 export function OperationsSidebar() {
   const { user, logout } = useAuth();
@@ -53,6 +56,23 @@ export function OperationsSidebar() {
           const isActive = item.exact
             ? pathname === item.href
             : pathname === item.href || pathname?.startsWith(item.href + '/');
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`tn-nav__item${isActive ? ' tn-nav__item--active' : ''}`}
+            >
+              <Icon size={15} />
+              <span style={{ flex: 1 }}>{item.label}</span>
+            </Link>
+          );
+        })}
+
+        <div className="tn-nav__divider" aria-hidden />
+
+        {adminItems.map((item) => {
+          const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
           const Icon = item.icon;
           return (
             <Link

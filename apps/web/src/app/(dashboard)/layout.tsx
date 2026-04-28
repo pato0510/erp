@@ -173,6 +173,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             min-width: 20px;
             text-align: center;
           }
+          .tn-nav__divider {
+            height: 1px;
+            margin: 12px 20px 8px;
+            background: var(--sidebar-border);
+            opacity: 0.6;
+          }
 
           .tn-sidebar__foot {
             position: relative;

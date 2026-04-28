@@ -66,4 +66,8 @@ export class CreateDocumentTypeDto {
   @IsString()
   @Matches(/^#[0-9A-Fa-f]{6}$/, { message: 'color must be a hex color (e.g. #4CAF50)' })
   color?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
