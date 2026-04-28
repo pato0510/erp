@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   ChevronLeft,
@@ -90,6 +91,7 @@ type ModalState = null | { mode: 'create' } | { mode: 'edit'; asset: AssetForFor
 type ConfirmState = null | { id: string; code: string; name: string };
 
 export default function EquiposPage() {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [assetTypeId, setAssetTypeId] = useState('');
@@ -388,6 +390,7 @@ export default function EquiposPage() {
                     <AssetRowView
                       key={a.id}
                       asset={a}
+                      onOpen={() => router.push(`/operaciones/equipos/${a.id}`)}
                       onEdit={() => setModal({ mode: 'edit', asset: toFormShape(a) })}
                       onDelete={() => setConfirm({ id: a.id, code: a.code, name: a.name })}
                     />
@@ -546,10 +549,12 @@ function Th({
    loads. */
 function AssetRowView({
   asset,
+  onOpen,
   onEdit,
   onDelete,
 }: {
   asset: AssetRow;
+  onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -582,7 +587,10 @@ function AssetRowView({
   const childrenCount = asset._count?.children ?? 0;
 
   return (
-    <tr className="border-b border-[var(--border-color)] last:border-b-0 hover:bg-[var(--input-bg)] transition">
+    <tr
+      onClick={onOpen}
+      className="border-b border-[var(--border-color)] last:border-b-0 hover:bg-[var(--input-bg)] transition cursor-pointer"
+    >
       <td style={{ padding: '8px 16px' }}>
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
@@ -653,16 +661,22 @@ function AssetRowView({
       <td style={{ padding: '8px 16px' }}>
         <AssetStatusBadge status={asset.status} />
       </td>
-      <td style={{ padding: '8px 16px', textAlign: 'right' }}>
+      <td style={{ padding: '8px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
         <button
-          onClick={onEdit}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
           className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
           title="Editar"
         >
           <Pencil size={14} />
         </button>
         <button
-          onClick={onDelete}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
           className="p-2 rounded-md hover:bg-red-50 text-red-600 ml-1"
           title="Eliminar"
         >

@@ -172,15 +172,52 @@ export class AssetsService {
         assetType: true,
         assetSubtype: true,
         location: true,
-        parent: { select: { id: true, code: true, name: true } },
+        parent: { select: { id: true, code: true, name: true, status: true } },
         children: {
-          select: { id: true, code: true, name: true, status: true, isActive: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            status: true,
+            isActive: true,
+            photoPath: true,
+            photoMimeType: true,
+          },
           orderBy: { code: 'asc' },
         },
       },
     });
     if (!row) throw new NotFoundException('Activo no encontrado');
-    return this.withHasPhoto(row);
+
+    /* OperationalAsset stores assignedToUserId / createdBy as bare UUIDs (no
+       Prisma relation), so we fetch the user records separately. Both lookups
+       run in parallel; either may be null if the user was deleted. */
+    const userIds = Array.from(
+      new Set([row.assignedToUserId, row.createdBy].filter((v): v is string => !!v)),
+    );
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, email: true, firstName: true, lastName: true },
+        })
+      : [];
+    const userById = new Map(users.map((u) => [u.id, u]));
+
+    const childrenWithPhoto = row.children.map((c) => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      status: c.status,
+      isActive: c.isActive,
+      hasPhoto: !!(c.photoMimeType || c.photoPath),
+    }));
+
+    return {
+      ...this.withHasPhoto(row),
+      children: childrenWithPhoto,
+      assignedUser: row.assignedToUserId ? (userById.get(row.assignedToUserId) ?? null) : null,
+      createdByUser: userById.get(row.createdBy) ?? null,
+    };
   }
 
   async create(companyId: string, userId: string, dto: CreateAssetDto) {

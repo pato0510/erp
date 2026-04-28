@@ -340,6 +340,6 @@ work orders, mantenimiento preventivo, modelado bitemporal completo.
 
 ### Próximos tickets del Sprint 2
 
-- OPS-006: Ficha 360 del equipo (vista detalle completa) LISTO
-- OPS-007: CRUD de tipos y subtipos en frontend AHORA
+- OPS-006: Ficha 360 del equipo (vista detalle completa)
+- OPS-007: CRUD de tipos y subtipos en frontend
 - OPS-008: Importación masiva CSV/Excel de equipos
