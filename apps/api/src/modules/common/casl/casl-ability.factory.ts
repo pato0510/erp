@@ -22,6 +22,7 @@ type Subjects =
       | typeof DocumentRecordSubject
       | typeof AlertRuleSubject
       | typeof AlertSettingsSubject
+      | typeof AssetExceptionSubject
     >
   | 'all';
 
@@ -79,6 +80,9 @@ class AlertRuleSubject {
 class AlertSettingsSubject {
   static readonly modelName = 'AlertSettings' as const;
 }
+class AssetExceptionSubject {
+  static readonly modelName = 'AssetException' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -96,7 +100,11 @@ export type Action =
   | 'reject'
   | 'resubmit'
   | 'supersede'
-  | 'force-unblock';
+  | 'force-unblock'
+  /* OPS-023 — exception lifecycle. Approve/reject reuse the union
+     names but the AssetExceptionSubject scoping makes them distinct
+     from the DocumentRecord workflow. `revoke` is exception-only. */
+  | 'revoke';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {
@@ -118,6 +126,7 @@ export {
   DocumentRecordSubject,
   AlertRuleSubject,
   AlertSettingsSubject,
+  AssetExceptionSubject,
 };
 
 @Injectable()
@@ -159,6 +168,10 @@ export class CaslAbilityFactory {
            tweak the singleton settings row. Lower roles only read. */
         can(['create', 'update', 'delete'], AlertRuleSubject);
         can(['update'], AlertSettingsSubject);
+        /* OPS-023 — MANAGER can request an exception but cannot
+           approve/reject/revoke it. Only ADMIN (via `manage 'all'`)
+           gets the lifecycle verbs. */
+        can('create', AssetExceptionSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -170,11 +183,15 @@ export class CaslAbilityFactory {
         /* Resubmit is open to any authenticated user — the service layer
            still enforces "only the original uploader". */
         can('resubmit', DocumentRecordSubject);
+        /* OPS-023 — request-only exception flow. Approval still
+           requires ADMIN. */
+        can('create', AssetExceptionSubject);
         break;
 
       case UserRole.ANALYST:
         can('read', 'all');
         can('resubmit', DocumentRecordSubject);
+        can('create', AssetExceptionSubject);
         break;
 
       case UserRole.VIEWER:
@@ -194,6 +211,11 @@ export class CaslAbilityFactory {
         can('resubmit', DocumentRecordSubject);
         can('read', AlertRuleSubject);
         can('read', AlertSettingsSubject);
+        /* OPS-023 — even VIEWER can request an exception (they often
+           are the operator of the blocked asset). Approval gating
+           still happens at the ADMIN level. */
+        can('read', AssetExceptionSubject);
+        can('create', AssetExceptionSubject);
         break;
     }
 

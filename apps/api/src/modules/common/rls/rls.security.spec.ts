@@ -73,6 +73,11 @@ describe('RlsService', () => {
         `SET LOCAL rls.company_id = '11111111-1111-1111-1111-111111111111'`,
         `SET LOCAL audit.company_id = '11111111-1111-1111-1111-111111111111'`,
         `SET LOCAL audit.user_id = 'user-a'`,
+        // OPS-022 — also exposes the userId to per-user RLS policies
+        // (e.g. user_notifications). Set last so audit.user_id keeps
+        // its existing position for back-compat with anything reading
+        // the trigger context first.
+        `SET LOCAL rls.user_id = 'user-a'`,
       ]);
       expect(callback).toHaveBeenCalledTimes(1);
     });
@@ -95,13 +100,17 @@ describe('RlsService', () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(2);
 
       // Company A's block comes first, followed by Company B's — no leakage.
+      // Each block now ends with the OPS-022 rls.user_id SET so per-user
+      // policies see the right user for that transaction.
       expect(rawCalls).toEqual([
         `SET LOCAL rls.company_id = 'company-A'`,
         `SET LOCAL audit.company_id = 'company-A'`,
         `SET LOCAL audit.user_id = 'user-1'`,
+        `SET LOCAL rls.user_id = 'user-1'`,
         `SET LOCAL rls.company_id = 'company-B'`,
         `SET LOCAL audit.company_id = 'company-B'`,
         `SET LOCAL audit.user_id = 'user-2'`,
+        `SET LOCAL rls.user_id = 'user-2'`,
       ]);
     });
 
@@ -112,8 +121,9 @@ describe('RlsService', () => {
       await expect(service.executeWithRls('co-1', 'user-1', callback)).rejects.toBe(boom);
       // The SETs were still issued — this is what we want: a failed callback
       // shouldn't cause RlsService to swallow the error silently. PostgreSQL
-      // rolls the transaction back automatically.
-      expect(rawCalls.length).toBe(3);
+      // rolls the transaction back automatically. Count is 4 since OPS-022:
+      // company_id + audit.company_id + audit.user_id + rls.user_id.
+      expect(rawCalls.length).toBe(4);
     });
   });
 });

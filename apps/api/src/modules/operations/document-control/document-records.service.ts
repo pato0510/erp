@@ -442,28 +442,52 @@ export class DocumentRecordsService {
        distinct assets with ACTIVE BLOCKING alerts that AREN'T yet
        BLOCKED_DOCUMENTAL (i.e. would auto-block if the toggle was
        on). */
-    const [activeAlertsCount, criticalAlertsCount, blockedAssetsCount, atRiskAssets] =
-      await Promise.all([
-        this.prisma.alertInstance.count({
-          where: { companyId, status: 'ACTIVE' },
-        }),
-        this.prisma.alertInstance.count({
-          where: { companyId, status: 'ACTIVE', severity: { in: ['CRITICAL', 'BLOCKING'] } },
-        }),
-        this.prisma.operationalAsset.count({
-          where: { companyId, isActive: true, status: 'BLOCKED_DOCUMENTAL' },
-        }),
-        this.prisma.alertInstance.findMany({
-          where: {
-            companyId,
-            status: 'ACTIVE',
-            severity: 'BLOCKING',
-            asset: { status: { not: 'BLOCKED_DOCUMENTAL' }, isActive: true },
-          },
-          select: { assetId: true },
-          distinct: ['assetId'],
-        }),
-      ]);
+    const sevenDaysAhead = new Date(today);
+    sevenDaysAhead.setUTCDate(sevenDaysAhead.getUTCDate() + 7);
+    const [
+      activeAlertsCount,
+      criticalAlertsCount,
+      blockedAssetsCount,
+      atRiskAssets,
+      assetsWithActiveExceptions,
+      exceptionsAboutToExpire,
+    ] = await Promise.all([
+      this.prisma.alertInstance.count({
+        where: { companyId, status: 'ACTIVE' },
+      }),
+      this.prisma.alertInstance.count({
+        where: { companyId, status: 'ACTIVE', severity: { in: ['CRITICAL', 'BLOCKING'] } },
+      }),
+      this.prisma.operationalAsset.count({
+        where: { companyId, isActive: true, status: 'BLOCKED_DOCUMENTAL' },
+      }),
+      this.prisma.alertInstance.findMany({
+        where: {
+          companyId,
+          status: 'ACTIVE',
+          severity: 'BLOCKING',
+          asset: { status: { not: 'BLOCKED_DOCUMENTAL' }, isActive: true },
+        },
+        select: { assetId: true },
+        distinct: ['assetId'],
+      }),
+      /* OPS-023 — count of assets currently riding on an APPROVED
+         exception (i.e. would be BLOCKED_DOCUMENTAL but for the
+         override). */
+      this.prisma.assetException.count({
+        where: { companyId, status: 'APPROVED' },
+      }),
+      /* APPROVED exceptions whose validUntil falls inside the next 7
+         days — operations supervisors should plan to renew docs
+         before then. */
+      this.prisma.assetException.count({
+        where: {
+          companyId,
+          status: 'APPROVED',
+          validUntil: { gte: today, lt: sevenDaysAhead },
+        },
+      }),
+    ]);
     const assetsAtRiskCount = atRiskAssets.length;
 
     return {
@@ -482,6 +506,8 @@ export class DocumentRecordsService {
       criticalAlertsCount,
       blockedAssetsCount,
       assetsAtRiskCount,
+      assetsWithActiveExceptions,
+      exceptionsAboutToExpire,
     };
   }
 

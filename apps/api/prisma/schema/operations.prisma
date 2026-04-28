@@ -124,6 +124,7 @@ model OperationalAsset {
   documents      DocumentRecord[]
   alertInstances AlertInstance[]
   statusChanges  AssetStatusChange[]
+  exceptions     AssetException[]
 
   @@unique([companyId, code])
   @@index([companyId, assetTypeId])
@@ -466,4 +467,52 @@ model AssetStatusChange {
   @@index([companyId, assetId, createdAt])
   @@index([companyId, changeType])
   @@map("asset_status_changes")
+}
+
+/* OPS-023 — temporary exception that lifts BLOCKED_DOCUMENTAL on an
+   asset for a bounded period. The lifecycle is:
+   PENDING → APPROVED → (EXPIRED via cron OR REVOKED via admin)
+   PENDING → REJECTED. previousStatus snapshots what to revert to so
+   the cron can restore the original state cleanly. */
+enum ExceptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+model AssetException {
+  id                        String          @id @default(uuid()) @db.Uuid
+  companyId                 String          @db.Uuid
+  assetId                   String          @db.Uuid
+  requestedBy               String          @db.Uuid
+  requestedReason           String
+  requestedAt               DateTime        @default(now())
+  requestedDocumentTypeIds  String[]        @default([]) @db.Uuid
+  status                    ExceptionStatus @default(PENDING)
+  approvedBy                String?         @db.Uuid
+  approvedReason            String?
+  approvedAt                DateTime?
+  rejectedBy                String?         @db.Uuid
+  rejectedReason            String?
+  rejectedAt                DateTime?
+  validFrom                 DateTime?
+  validUntil                DateTime?
+  previousStatus            AssetStatus?
+  /* Internal flag set true once the cron has handled expiration so the
+     row isn't re-processed. We still flip status to EXPIRED — this is
+     a belt-and-braces guard against re-runs. */
+  expiresHandled            Boolean         @default(false)
+  revokedBy                 String?         @db.Uuid
+  revokedReason             String?
+  revokedAt                 DateTime?
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+
+  asset OperationalAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status, validUntil])
+  @@index([companyId, assetId, status])
+  @@map("asset_exceptions")
 }

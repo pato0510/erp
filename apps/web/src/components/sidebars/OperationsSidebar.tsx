@@ -14,6 +14,7 @@ import {
   Moon,
   Settings,
   ShieldCheck,
+  ShieldOff,
   Sun,
   Truck,
   Wrench,
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/operaciones/equipos', label: 'Equipos', icon: Wrench },
   { href: '/operaciones/vehiculos', label: 'Vehículos', icon: Truck },
   { href: '/operaciones/documentos', label: 'Documentos', icon: FileText },
+  { href: '/operaciones/excepciones', label: 'Excepciones', icon: ShieldOff },
   { href: '/operaciones/permisos', label: 'Permisos', icon: ShieldCheck },
   { href: '/operaciones/procedimientos', label: 'Procedimientos', icon: BookOpen },
   { href: '/operaciones/alertas', label: 'Alertas', icon: Bell },
@@ -47,6 +49,8 @@ export function OperationsSidebar() {
   /* OPS-019 — only count ACTIVE+CRITICAL/BLOCKING alerts in the badge so
      low-severity warnings don't drown the signal. */
   const [criticalAlertsCount, setCriticalAlertsCount] = useState(0);
+  /* OPS-023 — pending exception requests; badge nudges admins to act. */
+  const [pendingExceptionsCount, setPendingExceptionsCount] = useState(0);
 
   /* Poll the pending-review count on mount and every minute. The endpoint is
      gated to ADMIN/MANAGER (CASL `approve` action) — for any other role the
@@ -73,6 +77,12 @@ export function OperationsSidebar() {
           /* Same forgiving behavior — VIEWER reads via CASL `read` so
              this should always succeed for authenticated users. */
         });
+      apiClient
+        .get<{ count: number }>('/api/operations/exceptions/pending-count')
+        .then((res) => {
+          if (alive) setPendingExceptionsCount(res.count);
+        })
+        .catch(() => undefined);
     };
     fetchCounts();
     const interval = setInterval(fetchCounts, PENDING_REVIEW_POLL_MS);
@@ -101,11 +111,19 @@ export function OperationsSidebar() {
           const Icon = item.icon;
           /* Pending-review badge lives on the Documentos item — capped at "99+"
              so it never breaks the row layout. The Alertas item gets its own
-             badge from OPS-019 with the critical alert count. */
+             badge from OPS-019 with the critical alert count. The Excepciones
+             item (OPS-023) shows pending requests so admins act on them. */
           const isDocumentos = item.href === '/operaciones/documentos';
           const isAlertas = item.href === '/operaciones/alertas';
-          const rawCount = isDocumentos ? pendingReviewCount : isAlertas ? criticalAlertsCount : 0;
-          const showBadge = (isDocumentos || isAlertas) && rawCount > 0;
+          const isExcepciones = item.href === '/operaciones/excepciones';
+          const rawCount = isDocumentos
+            ? pendingReviewCount
+            : isAlertas
+              ? criticalAlertsCount
+              : isExcepciones
+                ? pendingExceptionsCount
+                : 0;
+          const showBadge = (isDocumentos || isAlertas || isExcepciones) && rawCount > 0;
           const badgeText = rawCount > 99 ? '99+' : String(rawCount);
           return (
             <Link

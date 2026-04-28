@@ -357,51 +357,68 @@ Sprint 6: Permisos y Procedimientos (OPS-024 a OPS-028)
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
-### OPS-021: Centro de alertas en UI (✓ completado)
+### OPS-022: Escalamiento por severidad y notificaciones in-app (✓ completado)
 
-Pantalla completa /operaciones/alertas con KPIs, filtros, vistas y acciones.
+Sistema completo de notificaciones in-app con bell icon, dropdown y página.
 
-### Backend extendido OPS-021
+### Tabla creada
 
-- DTO con search, severities[], statuses[], triggerTypes[],
-  triggeredFrom/triggeredTo
-- Multi-filter con OR de búsqueda en title/message/asset/documentType
-- GET /api/operations/alerts/instances/kpis
-  Retorna { total, active, critical, unattended, resolvedToday }
+- user_notifications con FK a User (CASCADE) y AlertInstance (SET NULL)
+- Enum NotificationSourceType: ALERT_INSTANCE, ASSET_BLOCKED, ESCALATION,
+  DOCUMENT_REJECTED, DOCUMENT_APPROVED, EXCEPTION_REQUESTED, EXCEPTION_GRANTED,
+  GENERAL
+- RLS estricta per-user: companyId = rls.company_id AND userId = rls.user_id
+- RlsService extendido para setear SET LOCAL rls.user_id
 
-### UI implementada
+### Endpoints OPS-022
 
-- Header con breadcrumb, título y acciones (Configurar reglas + Recalcular)
-- 4 KPI cards clicables que aplican filtro
-- Filtros: search debounced 300ms, status preset (URL sync),
-  asset/documentType, rango fechas, multi-select severidad y disparador
-- Quick chips: Solo críticas / Últimas 24h / Sin atender / Bloqueando
-- Toggle Lista ↔ Cards (persistido localStorage)
-- Vista lista: checkboxes + select-all, columnas con bulk actions
-- Vista cards: grid con borde de severidad + overlay status
-- Empty states diferenciados (con filtros vs sin alertas)
-- Pagination con selector 25/50/100
-- Bulk action bar sticky cuando hay selección
-- Optimistic updates después de acciones
+- GET /api/operations/notifications (paginado, filtros)
+- GET /api/operations/notifications/unread-count
+- POST /api/operations/notifications/:id/read
+- POST /api/operations/notifications/mark-all-read
+- POST /api/operations/notifications/:id/dismiss
 
-### Componentes nuevos OPS-021
+### Métodos del notification.service.ts
 
-- AlertDetailModal — asset card, document type, document record con preview,
-  historial, notificaciones
-- AssetActiveAlerts — sección compacta para fichas 360 con auto-hide si vacía
-- ReasonModal reutilizable para Resolver/Descartar
+- createForAlertInstance — fan-out a roles + assignedUser, dedup
+- createForAssetBlocked — ADMIN/MANAGER + assigned user
+- createGeneric — broadcast por userIds explícitos
+- Errores de fan-out aislados por usuario (no falla el batch)
 
-### Integración con fichas 360
+### Integraciones automáticas
 
-Nueva sección "Alertas activas" entre documentos cargados e historial.
-Filtra a assetId=X&statuses=ACTIVE,ESCALATED,ACKNOWLEDGED.
+- AlertEngineService.maybeCreateAlert → notifica al crear alerta
+- AssetBlockingService.processBlocking → notifica AUTO_BLOCK
+- AlertEscalationService → escala CRITICAL/BLOCKING no atendidas
+
+### Cron de escalamiento
+
+- Schedule: 0 _/6 _ \* \* (cada 6 horas)
+- Job: alert-escalation-check
+- Marca status=ESCALATED y notifica a escalateToRoles
+
+### Componentes nuevos
+
+- apps/web/src/components/NotificationCenter.tsx
+  Bell + badge con color por severidad más alta no leída
+  Dropdown 360px, polling cada 60s
+  Íconos por tipo (TrendingUp/Ban/Bell)
+  Click marca leída + navega
+- apps/web/src/app/(dashboard)/notificaciones/page.tsx
+  Página completa con tabs, filtros, bulk actions
+
+### Layout actualizado
+
+Topbar sticky en (dashboard)/layout.tsx con NotificationCenter visible
+en todas las pantallas del módulo.
 
 # Ticket actual
 
-- OPS-022: Escalamiento por severidad y notificaciones in-app
-  Sistema de notificaciones in-app cuando se generan alertas
-  Escalamiento automático: si una alerta CRITICAL no se atiende en X días,
-  se escala a roles superiores configurados en la regla
-  Centro de notificaciones (campana) con dropdown
-  Resolución de destinatarios (roles + assigned user + supervisor)
-  Tabla notifications para tracking individual por usuario
+- OPS-023: Excepciones temporales aprobadas
+  Admin puede liberar temporalmente un activo BLOCKED_DOCUMENTAL con
+  justificación y fecha de validez.
+  El activo vuelve a OPERATIONAL durante el período de excepción.
+  Cuando expira la excepción: se re-evalúa el bloqueo automáticamente.
+  Tabla asset_exceptions con audit completo.
+  Workflow: solicitud → aprobación admin → activa → expira o revocada.
+  Notificaciones a interesados al solicitar/aprobar/expirar.

@@ -2,6 +2,7 @@ import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, OnModuleInit } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { OPERATIONS_ALERT_ENGINE_QUEUE } from '../../jobs/queues.constant';
+import { ExceptionsService } from '../exceptions/exceptions.service';
 import { AlertEngineService } from './alert-engine.service';
 import { AlertEscalationService } from './alert-escalation.service';
 
@@ -13,6 +14,7 @@ interface RecalculateJobData {
 
 const REPEATABLE_JOB_NAME = 'daily-alert-recalculation';
 const ESCALATION_JOB_NAME = 'alert-escalation-check';
+const EXCEPTION_EXPIRATION_JOB_NAME = 'exception-expiration-check';
 /* Cron: 06:00 every day. Server timezone — Railway runs UTC, so the user
    sees this fire at 02:00–03:00 local Chile time depending on DST. We
    keep it server-time for now; OPS-021 can move to per-tenant cron. */
@@ -20,6 +22,9 @@ const DAILY_CRON = '0 6 * * *';
 /* OPS-022 — every 6 hours. Catches alerts whose escalateAfterDays
    window just closed without waiting until the next morning. */
 const ESCALATION_CRON = '0 */6 * * *';
+/* OPS-023 — hourly so an exception that expires at e.g. 14:00 only
+   waits at most 60 minutes before the asset is re-blocked. */
+const EXCEPTION_EXPIRATION_CRON = '0 * * * *';
 
 @Processor(OPERATIONS_ALERT_ENGINE_QUEUE)
 export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
@@ -28,6 +33,7 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
   constructor(
     private readonly engine: AlertEngineService,
     private readonly escalation: AlertEscalationService,
+    private readonly exceptions: ExceptionsService,
     @InjectQueue(OPERATIONS_ALERT_ENGINE_QUEUE) private readonly queue: Queue,
   ) {
     super();
@@ -42,7 +48,11 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
          changed cron expression takes effect across deploys. */
       const existing = await this.queue.getRepeatableJobs();
       for (const r of existing) {
-        if (r.name === REPEATABLE_JOB_NAME || r.name === ESCALATION_JOB_NAME) {
+        if (
+          r.name === REPEATABLE_JOB_NAME ||
+          r.name === ESCALATION_JOB_NAME ||
+          r.name === EXCEPTION_EXPIRATION_JOB_NAME
+        ) {
           await this.queue.removeRepeatableByKey(r.key);
         }
       }
@@ -56,8 +66,13 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
         removeOnComplete: 30,
         removeOnFail: 30,
       });
+      await this.queue.add(EXCEPTION_EXPIRATION_JOB_NAME, {} satisfies RecalculateJobData, {
+        repeat: { pattern: EXCEPTION_EXPIRATION_CRON },
+        removeOnComplete: 60,
+        removeOnFail: 30,
+      });
       this.logger.log(
-        `Scheduled alert crons (daily="${DAILY_CRON}", escalation="${ESCALATION_CRON}") on ${OPERATIONS_ALERT_ENGINE_QUEUE}`,
+        `Scheduled alert crons (daily="${DAILY_CRON}", escalation="${ESCALATION_CRON}", exceptions="${EXCEPTION_EXPIRATION_CRON}") on ${OPERATIONS_ALERT_ENGINE_QUEUE}`,
       );
     } catch (err) {
       /* Don't crash startup if Redis is briefly unavailable — the job
@@ -72,6 +87,9 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
     this.logger.log(`Processing alert engine job ${job.id} (${job.name})`);
     if (job.name === ESCALATION_JOB_NAME) {
       return this.escalation.processAllCompaniesEscalations();
+    }
+    if (job.name === EXCEPTION_EXPIRATION_JOB_NAME) {
+      return this.exceptions.processAllCompaniesExpired();
     }
     if (job.data.companyId) {
       return this.engine.processCompany(job.data.companyId, {

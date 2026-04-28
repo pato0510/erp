@@ -36,6 +36,10 @@ import { StatusChangeModal } from '../../../../../components/operations/StatusCh
 import { AssetStatusHistoryModal } from '../../../../../components/operations/AssetStatusHistoryModal';
 import { AssetActiveAlerts } from '../../../../../components/operations/AssetActiveAlerts';
 import {
+  ExceptionRequestModal,
+  ExceptionRevokeModal,
+} from '../../../../../components/operations/ExceptionModals';
+import {
   DocumentStatusBadge,
   type DerivedDocumentStatus,
 } from '../../../../../components/operations/DocumentStatusBadge';
@@ -245,6 +249,15 @@ export default function VehicleDetailPage({ params }: PageProps) {
       state: 'MISSING' | 'EXPIRED';
     }>
   >([]);
+  const [requestExceptionOpen, setRequestExceptionOpen] = useState(false);
+  const [revokeTargetId, setRevokeTargetId] = useState<string | null>(null);
+  const [activeException, setActiveException] = useState<{
+    id: string;
+    validFrom: string | null;
+    validUntil: string | null;
+    requestedReason: string;
+    requestedByUser: { firstName?: string; lastName?: string; email: string } | null;
+  } | null>(null);
 
   /* Document upload + preview state. uploadDoc carries the optional
      pre-selected documentTypeId so the per-requirement "Cargar" button can
@@ -338,6 +351,32 @@ export default function VehicleDetailPage({ params }: PageProps) {
   useEffect(() => {
     loadCatalogs();
   }, [loadCatalogs]);
+
+  /* OPS-023 — load any APPROVED exception for this vehicle's asset. */
+  useEffect(() => {
+    let alive = true;
+    if (!vehicle) {
+      setActiveException(null);
+      return () => undefined;
+    }
+    apiClient
+      .get<{
+        id: string;
+        validFrom: string | null;
+        validUntil: string | null;
+        requestedReason: string;
+        requestedByUser: { firstName?: string; lastName?: string; email: string } | null;
+      } | null>(`/api/operations/exceptions/active-for-asset/${vehicle.assetId}`)
+      .then((res) => {
+        if (alive) setActiveException(res);
+      })
+      .catch(() => {
+        if (alive) setActiveException(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [vehicle?.assetId, vehicle?.asset?.updatedAt]);
 
   /* OPS-020 — fetch blocking docs when vehicle is BLOCKED_DOCUMENTAL.
      Same dry-run evaluator as the equipos page; the assetId is the
@@ -635,6 +674,63 @@ export default function VehicleDetailPage({ params }: PageProps) {
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
+      {/* OPS-023 — active exception banner. */}
+      {activeException && (
+        <div
+          className="mb-4 p-4 rounded-xl flex items-start gap-3"
+          style={{
+            background: 'rgba(234, 179, 8, 0.08)',
+            border: '1px solid rgba(234, 179, 8, 0.3)',
+          }}
+        >
+          <Settings size={18} style={{ color: '#a16207', flexShrink: 0, marginTop: 2 }} />
+          <div className="flex-1">
+            <p
+              className="text-[var(--text-primary)]"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 700,
+                fontSize: 14,
+                color: '#a16207',
+              }}
+            >
+              ⚠ Excepción temporal vigente
+              {activeException.validUntil ? ` hasta ${formatDate(activeException.validUntil)}` : ''}
+            </p>
+            {activeException.requestedByUser && (
+              <p
+                className="text-sm text-[var(--text-secondary)] mt-0.5"
+                style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+              >
+                Solicitada por{' '}
+                {activeException.requestedByUser.firstName
+                  ? `${activeException.requestedByUser.firstName} ${activeException.requestedByUser.lastName ?? ''}`.trim()
+                  : activeException.requestedByUser.email}
+              </p>
+            )}
+            <p
+              className="text-sm text-[var(--text-secondary)] mt-1"
+              style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+            >
+              <strong>Razón:</strong> {activeException.requestedReason}
+            </p>
+            {canReview && (
+              <button
+                onClick={() => setRevokeTargetId(activeException.id)}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white"
+                style={{
+                  background: '#D97706',
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontWeight: 500,
+                }}
+              >
+                Revocar excepción
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* OPS-020 — blocked-vehicle warning banner */}
       {vehicle.asset.status === 'BLOCKED_DOCUMENTAL' && (
         <div
@@ -694,13 +790,12 @@ export default function VehicleDetailPage({ params }: PageProps) {
                 <Upload size={13} /> Cargar documentos faltantes
               </button>
               <button
-                disabled
-                title="Disponible en OPS-023"
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-full opacity-50 cursor-not-allowed"
+                onClick={() => setRequestExceptionOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
                 style={{
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
-                  color: 'var(--text-secondary)',
+                  color: 'var(--text-primary)',
                 }}
               >
                 Solicitar excepción temporal
@@ -1372,6 +1467,41 @@ export default function VehicleDetailPage({ params }: PageProps) {
           assetCode={vehicle.asset.code}
           assetName={vehicle.asset.name}
           onClose={() => setStatusHistoryOpen(false)}
+        />
+      )}
+      {requestExceptionOpen && (
+        <ExceptionRequestModal
+          asset={{
+            id: vehicle.assetId,
+            code: vehicle.asset.code,
+            name: vehicle.asset.name,
+          }}
+          blockingDocs={blockingDocs}
+          onClose={() => setRequestExceptionOpen(false)}
+          onSubmitted={() => {
+            setToast({
+              message: 'Solicitud enviada. Un administrador la revisará y tomará una decisión.',
+              type: 'success',
+            });
+            load();
+          }}
+          onError={(msg) => setToast({ message: msg, type: 'error' })}
+        />
+      )}
+      {revokeTargetId && (
+        <ExceptionRevokeModal
+          exceptionId={revokeTargetId}
+          onClose={() => setRevokeTargetId(null)}
+          onSubmitted={(reblocked) => {
+            setToast({
+              message: reblocked
+                ? 'Excepción revocada. El vehículo fue re-bloqueado automáticamente.'
+                : 'Excepción revocada.',
+              type: 'success',
+            });
+            load();
+          }}
+          onError={(msg) => setToast({ message: msg, type: 'error' })}
         />
       )}
       {kmModal && (

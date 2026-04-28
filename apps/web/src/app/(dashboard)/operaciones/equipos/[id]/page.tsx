@@ -44,6 +44,10 @@ import { StatusChangeModal } from '../../../../../components/operations/StatusCh
 import { AssetStatusHistoryModal } from '../../../../../components/operations/AssetStatusHistoryModal';
 import { AssetActiveAlerts } from '../../../../../components/operations/AssetActiveAlerts';
 import {
+  ExceptionRequestModal,
+  ExceptionRevokeModal,
+} from '../../../../../components/operations/ExceptionModals';
+import {
   DocumentStatusBadge,
   type DerivedDocumentStatus,
 } from '../../../../../components/operations/DocumentStatusBadge';
@@ -233,6 +237,17 @@ export default function AssetDetailPage({ params }: PageProps) {
       state: 'MISSING' | 'EXPIRED';
     }>
   >([]);
+  /* OPS-023 — exception state. `requestOpen` toggles the request modal;
+     `activeException` is hydrated when the asset has an APPROVED row. */
+  const [requestExceptionOpen, setRequestExceptionOpen] = useState(false);
+  const [revokeTargetId, setRevokeTargetId] = useState<string | null>(null);
+  const [activeException, setActiveException] = useState<{
+    id: string;
+    validFrom: string | null;
+    validUntil: string | null;
+    requestedReason: string;
+    requestedByUser: { firstName?: string; lastName?: string; email: string } | null;
+  } | null>(null);
 
   /* Document upload + preview state. uploadDoc carries the optional
      pre-selected documentTypeId so the per-requirement "Cargar" button can
@@ -323,6 +338,34 @@ export default function AssetDetailPage({ params }: PageProps) {
   useEffect(() => {
     loadCatalogs();
   }, [loadCatalogs]);
+
+  /* OPS-023 — load any APPROVED exception for this asset so the
+     "Excepción vigente" banner can render. Re-fires on refresh + every
+     `load()`. */
+  useEffect(() => {
+    let alive = true;
+    if (!asset) {
+      setActiveException(null);
+      return () => undefined;
+    }
+    apiClient
+      .get<{
+        id: string;
+        validFrom: string | null;
+        validUntil: string | null;
+        requestedReason: string;
+        requestedByUser: { firstName?: string; lastName?: string; email: string } | null;
+      } | null>(`/api/operations/exceptions/active-for-asset/${asset.id}`)
+      .then((res) => {
+        if (alive) setActiveException(res);
+      })
+      .catch(() => {
+        if (alive) setActiveException(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [asset?.id, asset?.updatedAt]);
 
   /* OPS-020 — when the asset is blocked, fetch the specific docs that
      caused it so the warning banner can list them. We hit the dry-run
@@ -642,6 +685,65 @@ export default function AssetDetailPage({ params }: PageProps) {
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
+      {/* OPS-023 — active exception banner. Shows above the blocked
+          banner so admins see both: the "active exception" plus the
+          underlying gap that justified it. */}
+      {activeException && (
+        <div
+          className="mb-4 p-4 rounded-xl flex items-start gap-3"
+          style={{
+            background: 'rgba(234, 179, 8, 0.08)',
+            border: '1px solid rgba(234, 179, 8, 0.3)',
+          }}
+        >
+          <Settings size={18} style={{ color: '#a16207', flexShrink: 0, marginTop: 2 }} />
+          <div className="flex-1">
+            <p
+              className="text-[var(--text-primary)]"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 700,
+                fontSize: 14,
+                color: '#a16207',
+              }}
+            >
+              ⚠ Excepción temporal vigente
+              {activeException.validUntil ? ` hasta ${formatDate(activeException.validUntil)}` : ''}
+            </p>
+            {activeException.requestedByUser && (
+              <p
+                className="text-sm text-[var(--text-secondary)] mt-0.5"
+                style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+              >
+                Solicitada por{' '}
+                {activeException.requestedByUser.firstName
+                  ? `${activeException.requestedByUser.firstName} ${activeException.requestedByUser.lastName ?? ''}`.trim()
+                  : activeException.requestedByUser.email}
+              </p>
+            )}
+            <p
+              className="text-sm text-[var(--text-secondary)] mt-1"
+              style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+            >
+              <strong>Razón:</strong> {activeException.requestedReason}
+            </p>
+            {canReview && (
+              <button
+                onClick={() => setRevokeTargetId(activeException.id)}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white"
+                style={{
+                  background: '#D97706',
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontWeight: 500,
+                }}
+              >
+                Revocar excepción
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* OPS-020 — blocked-asset warning banner */}
       {asset.status === 'BLOCKED_DOCUMENTAL' && (
         <div
@@ -701,13 +803,12 @@ export default function AssetDetailPage({ params }: PageProps) {
                 <Upload size={13} /> Cargar documentos faltantes
               </button>
               <button
-                disabled
-                title="Disponible en OPS-023"
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-full opacity-50 cursor-not-allowed"
+                onClick={() => setRequestExceptionOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
                 style={{
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
-                  color: 'var(--text-secondary)',
+                  color: 'var(--text-primary)',
                 }}
               >
                 Solicitar excepción temporal
@@ -1362,6 +1463,37 @@ export default function AssetDetailPage({ params }: PageProps) {
           assetCode={asset.code}
           assetName={asset.name}
           onClose={() => setStatusHistoryOpen(false)}
+        />
+      )}
+      {requestExceptionOpen && (
+        <ExceptionRequestModal
+          asset={{ id: asset.id, code: asset.code, name: asset.name }}
+          blockingDocs={blockingDocs}
+          onClose={() => setRequestExceptionOpen(false)}
+          onSubmitted={() => {
+            setToast({
+              message: 'Solicitud enviada. Un administrador la revisará y tomará una decisión.',
+              type: 'success',
+            });
+            load();
+          }}
+          onError={(msg) => setToast({ message: msg, type: 'error' })}
+        />
+      )}
+      {revokeTargetId && (
+        <ExceptionRevokeModal
+          exceptionId={revokeTargetId}
+          onClose={() => setRevokeTargetId(null)}
+          onSubmitted={(reblocked) => {
+            setToast({
+              message: reblocked
+                ? 'Excepción revocada. El activo fue re-bloqueado automáticamente.'
+                : 'Excepción revocada.',
+              type: 'success',
+            });
+            load();
+          }}
+          onError={(msg) => setToast({ message: msg, type: 'error' })}
         />
       )}
       {childModal && (
