@@ -33,6 +33,7 @@ import {
   type AssetStatus,
 } from '../../../../../components/operations/AssetStatusBadge';
 import { StatusChangeModal } from '../../../../../components/operations/StatusChangeModal';
+import { AssetStatusHistoryModal } from '../../../../../components/operations/AssetStatusHistoryModal';
 import {
   DocumentStatusBadge,
   type DerivedDocumentStatus,
@@ -234,6 +235,15 @@ export default function VehicleDetailPage({ params }: PageProps) {
   const [statusModal, setStatusModal] = useState(false);
   const [kmModal, setKmModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
+  const [blockingDocs, setBlockingDocs] = useState<
+    Array<{
+      documentTypeId: string;
+      documentTypeName: string;
+      documentTypeCode: string;
+      state: 'MISSING' | 'EXPIRED';
+    }>
+  >([]);
 
   /* Document upload + preview state. uploadDoc carries the optional
      pre-selected documentTypeId so the per-requirement "Cargar" button can
@@ -328,6 +338,33 @@ export default function VehicleDetailPage({ params }: PageProps) {
     loadCatalogs();
   }, [loadCatalogs]);
 
+  /* OPS-020 — fetch blocking docs when vehicle is BLOCKED_DOCUMENTAL.
+     Same dry-run evaluator as the equipos page; the assetId is the
+     underlying OperationalAsset.id, not the Vehicle.id. */
+  useEffect(() => {
+    let alive = true;
+    if (!vehicle || vehicle.asset.status !== 'BLOCKED_DOCUMENTAL') {
+      setBlockingDocs([]);
+      return () => undefined;
+    }
+    apiClient
+      .post<{
+        blockingDocuments: Array<{
+          documentTypeId: string;
+          documentTypeName: string;
+          documentTypeCode: string;
+          state: 'MISSING' | 'EXPIRED';
+        }>;
+      }>(`/api/operations/assets/${vehicle.assetId}/evaluate-blocking`)
+      .then((res) => {
+        if (alive) setBlockingDocs(res.blockingDocuments ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [vehicle?.assetId, vehicle?.asset?.status]);
+
   /* Auth-aware photo fetch — photoUrl is a blob: URL we own, so we revoke it
      on cleanup to avoid leaks across reloads. */
   useEffect(() => {
@@ -367,11 +404,22 @@ export default function VehicleDetailPage({ params }: PageProps) {
 
   const handleStatusSave = async (status: AssetStatus, statusReason: string | undefined) => {
     if (!vehicle) return;
-    await apiClient.patch(`/api/operations/fleet/vehicles/${vehicle.id}`, {
-      status,
-      statusReason: statusReason ?? null,
-    });
-    setToast({ message: 'Estado actualizado', type: 'success' });
+    const result = await apiClient.patch<{ reblocked?: boolean; reblockReason?: string }>(
+      `/api/operations/fleet/vehicles/${vehicle.id}`,
+      {
+        status,
+        statusReason: statusReason ?? null,
+      },
+    );
+    if (result?.reblocked) {
+      setToast({
+        message:
+          'El vehículo fue desbloqueado pero el sistema detectó documentos vencidos. Volvió a quedar bloqueado automáticamente.',
+        type: 'error',
+      });
+    } else {
+      setToast({ message: 'Estado actualizado', type: 'success' });
+    }
     setStatusModal(false);
     load();
   };
@@ -585,6 +633,81 @@ export default function VehicleDetailPage({ params }: PageProps) {
   return (
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* OPS-020 — blocked-vehicle warning banner */}
+      {vehicle.asset.status === 'BLOCKED_DOCUMENTAL' && (
+        <div
+          className="mb-4 p-4 rounded-xl flex items-start gap-3"
+          style={{
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+          }}
+        >
+          <XCircle size={22} style={{ color: '#b91c1c', flexShrink: 0, marginTop: 2 }} />
+          <div className="flex-1">
+            <p
+              className="text-[var(--text-primary)]"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 700,
+                fontSize: 14,
+                color: '#b91c1c',
+              }}
+            >
+              🔴 ACTIVO BLOQUEADO POR DOCUMENTACIÓN
+            </p>
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
+              Este vehículo tiene documentos críticos vencidos o faltantes. No puede ser operado
+              hasta resolver:
+            </p>
+            {blockingDocs.length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {blockingDocs.map((d) => (
+                  <li
+                    key={d.documentTypeId}
+                    className="text-sm"
+                    style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+                  >
+                    <strong>{d.documentTypeName}</strong>{' '}
+                    <span className="text-[var(--text-muted)]">
+                      ({d.state === 'MISSING' ? 'falta' : 'vencido'})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : vehicle.asset.statusReason ? (
+              <p className="text-sm text-[var(--text-secondary)] italic mt-1">
+                {vehicle.asset.statusReason}
+              </p>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => setUploadDoc({})}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white"
+                style={{
+                  background: '#1C1C1E',
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontWeight: 500,
+                }}
+              >
+                <Upload size={13} /> Cargar documentos faltantes
+              </button>
+              <button
+                disabled
+                title="Disponible en OPS-023"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-full opacity-50 cursor-not-allowed"
+                style={{
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontWeight: 500,
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Solicitar excepción temporal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="mb-5">
@@ -848,6 +971,17 @@ export default function VehicleDetailPage({ params }: PageProps) {
                   : null
               }
             />
+            <button
+              onClick={() => setStatusHistoryOpen(true)}
+              className="mt-2 inline-flex items-center gap-1 text-blue-600 hover:underline"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              <History size={12} /> Ver historial de cambios →
+            </button>
           </Card>
 
           {/* Location */}
@@ -1224,6 +1358,14 @@ export default function VehicleDetailPage({ params }: PageProps) {
           currentStatus={vehicle.asset.status}
           onClose={() => setStatusModal(false)}
           onSave={handleStatusSave}
+        />
+      )}
+      {statusHistoryOpen && (
+        <AssetStatusHistoryModal
+          assetId={vehicle.assetId}
+          assetCode={vehicle.asset.code}
+          assetName={vehicle.asset.name}
+          onClose={() => setStatusHistoryOpen(false)}
         />
       )}
       {kmModal && (

@@ -357,70 +357,74 @@ Sprint 6: Permisos y Procedimientos (OPS-024 a OPS-028)
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
-### OPS-018: Reglas de alerta configurables (✓ completado)
+### OPS-019: BullMQ scheduler diario (✓ completado)
 
-Sistema de reglas configurables por tipo documental con presets chilenos.
+Motor de alertas que corre cada 24h y a demanda.
 
-### Tablas creadas
+### Tabla creada
 
-- alert_rules — reglas custom por documentType (o globales si null)
-- company_alert_settings — singleton por empresa con defaults
+- alert_instances con FKs a AlertRule, DocumentType, Asset, DocumentRecord
+- Enums: AlertTriggerType (EXPIRING_SOON/EXPIRED/MISSING/BLOCKING)
+- AlertInstanceStatus (ACTIVE/ACKNOWLEDGED/RESOLVED/ESCALATED/DISMISSED)
+- Unique constraint para idempotencia
 
-### Enum AlertSeverity (extendido)
+### Endpoints OPS-019
 
-INFO, WARNING, CRITICAL, BLOCKING
+- GET /api/operations/alerts/instances (paginado con filtros)
+- GET /api/operations/alerts/instances/:id
+- GET /api/operations/alerts/instances/active-count
+- POST /api/operations/alerts/instances/:id/acknowledge
+- POST /api/operations/alerts/instances/:id/resolve
+- POST /api/operations/alerts/instances/:id/dismiss
+- POST /api/operations/alerts/instances/bulk-acknowledge
+- POST /api/operations/alerts/instances/bulk-resolve
+- POST /api/operations/alerts/recalculate (admin only, encola job)
 
-### Endpoints OPS-018
+### Engine de alertas (alert-engine.service.ts)
 
-- GET/POST/PATCH/DELETE /api/operations/alert-rules
-- GET /api/operations/alert-rules/resolve/:documentTypeId
-- POST /api/operations/alert-rules/apply-recommended-chile
-- GET/PATCH /api/operations/alert-settings
+processCompany():
 
-### Resolution engine
+1. Carga todos los activos activos
+2. Para cada activo resuelve sus document requirements
+3. Para cada requerido busca último APPROVED no-reemplazado
+4. Calcula derivedState (FALTANTE/VENCIDO/POR_VENCER/VIGENTE)
+5. Resuelve reglas aplicables y crea AlertInstance si no existe ya
+6. Idempotente via unique constraint
+7. Cuenta assetsToBlock (no ejecuta el bloqueo aún — viene en OPS-020)
 
-resolveRulesForDocumentType merge:
+### Títulos auto-generados en español
 
-1. Defaults dinámicos (derivados de documentType.alertDaysBefore +
-   criticalAlertDaysBefore + blocksOperation, con fallback a
-   CompanyAlertSettings)
-2. Reglas custom globales (documentTypeId=null)
-3. Reglas custom específicas del tipo (sobrescriben en mismo umbral)
+"SOAP de Camioneta AABB12 vence en 30 días"
+"Permiso Circulación de Camión #3 vencido hace 5 días"
+"Manual de Operación falta para Generador GEN-001"
 
-### Preset chileno recomendado
+### Cron job
 
-- SOAP, PERMCIRC: 60d/30d/15d/7d/0d (WARNING→CRITICAL→BLOCKING)
-- REVTEC: 90d/30d/7d/0d
-- Procedimientos: 30d→WARNING, 7d→CRITICAL
-- Idempotente (skip por nombre+documentTypeId)
+- Schedule: 0 6 \* \* \* (todos los días 6 AM)
+- Job name: daily-alert-recalculation
+- Queue: operations-alert-engine
+- OnModuleInit limpia repeatables previos para evitar duplicados
+
+### Sidebar badge
+
+OperationsSidebar muestra badge en "Alertas" con count de
+CRITICAL+BLOCKING activas. Refresh cada 60s.
+
+### Compliance counts agregados
+
+getCompliance() retorna activeAlertsCount y criticalAlertsCount.
 
 ### UI agregada
 
-4to tab "Alertas" en /operaciones/configuracion:
-
-- Configuración general (4 campos + 2 toggles + botón guardar)
-- Tabla de reglas custom con badges de severidad
-- Botón "Cargar reglas recomendadas Chile"
-- Modal de creación/edición con multi-select de roles
-
-### CASL nuevos subjects
-
-- 'AlertRule' y 'AlertSettings'
-- read: todos los roles
-- create/update/delete: ADMIN, MANAGER
-
-### /operaciones/alertas
-
-Placeholder con banner enlazando a configuración (la pantalla real
-viene en OPS-021)
+Botón "Recalcular alertas ahora" en /operaciones/configuracion
+sección "Acciones manuales".
 
 # Ticket actual
 
-- OPS-019: BullMQ scheduler diario para recálculo de vencimientos
-  Job que corre cada 24h con cron schedule
-  Para cada activo + cada documento requerido:
-  - Calcula estado derivado (VIGENTE/POR_VENCER/VENCIDO/FALTANTE)
-  - Aplica reglas resueltas para determinar si dispara alerta
-  - Crea AlertInstance si no existe ya una activa
-    Idempotente, no duplica alertas
-    Manual trigger desde UI para admin (botón "Recalcular ahora")
+- OPS-020: Bloqueo operacional automático
+  Cuando un activo tiene documentos CRITICAL+blocksOperation vencidos,
+  pasa automáticamente a status BLOCKED_DOCUMENTAL.
+  Cuando se resuelve el documento (renovación + aprobación),
+  el activo vuelve a OPERATIONAL automáticamente.
+  Toggle global: enableAutoBlocking en CompanyAlertSettings.
+  Audit completo de cambios automáticos vs manuales.

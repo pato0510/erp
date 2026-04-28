@@ -83,7 +83,9 @@ class AlertSettingsSubject {
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
    stays uniform. `manage` continues to imply all of them
-   (ADMIN/SUPER_ADMIN). */
+   (ADMIN/SUPER_ADMIN). `force-unblock` is OPS-020's ADMIN-only override
+   for taking an asset out of BLOCKED_DOCUMENTAL when docs are still
+   pending — only `manage` grants it, so the spec's "ADMIN only" holds. */
 export type Action =
   | 'create'
   | 'read'
@@ -93,7 +95,8 @@ export type Action =
   | 'approve'
   | 'reject'
   | 'resubmit'
-  | 'supersede';
+  | 'supersede'
+  | 'force-unblock';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {

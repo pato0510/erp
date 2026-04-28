@@ -12,6 +12,7 @@ import { AlertInstancesService } from './alert-instances.service';
 import { AlertRulePresetsService } from './alert-rule-presets.service';
 import { AlertRulesController } from './alert-rules.controller';
 import { AlertRulesService } from './alert-rules.service';
+import { AssetBlockingService } from './asset-blocking.service';
 import { CompanyAlertSettingsController } from './company-alert-settings.controller';
 import { CompanyAlertSettingsService } from './company-alert-settings.service';
 
@@ -37,7 +38,13 @@ import { CompanyAlertSettingsService } from './company-alert-settings.service';
     AlertInstancesService,
     AlertEngineService,
     AlertEngineProcessor,
+    AssetBlockingService,
   ],
-  exports: [AlertRulesService, CompanyAlertSettingsService, AlertEngineService],
+  exports: [
+    AlertRulesService,
+    CompanyAlertSettingsService,
+    AlertEngineService,
+    AssetBlockingService,
+  ],
 })
 export class AlertRulesModule {}

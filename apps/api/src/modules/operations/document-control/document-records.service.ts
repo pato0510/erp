@@ -3,6 +3,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,6 +13,7 @@ import { DocumentCriticality, DocumentRecordStatus, Prisma } from '@prisma/clien
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { AssetBlockingService } from '../alerts/asset-blocking.service';
 import { DocumentRequirementsService } from '../document-requirements/document-requirements.service';
 import { ArchiveDocumentDto } from './dto/archive-document.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
@@ -80,6 +83,11 @@ export class DocumentRecordsService {
     private readonly rlsService: RlsService,
     private readonly storage: StorageService,
     private readonly requirementsService: DocumentRequirementsService,
+    /* forwardRef breaks the AlertRulesModule ↔ DocumentControlModule
+       cycle: alerts depend on requirements (transitively, via the
+       engine) but blocking lives in alerts and is invoked from here. */
+    @Inject(forwardRef(() => AssetBlockingService))
+    private readonly blockingService: AssetBlockingService,
   ) {}
 
   /* Derived UI status — folds expiration windows on top of the persisted
@@ -428,15 +436,35 @@ export class DocumentRecordsService {
 
     /* OPS-019 — surface the active alert workload alongside compliance
        so the central docs dashboard can show "X alertas activas" without
-       a second round-trip. CRITICAL+BLOCKING is the headline number. */
-    const [activeAlertsCount, criticalAlertsCount] = await Promise.all([
-      this.prisma.alertInstance.count({
-        where: { companyId, status: 'ACTIVE' },
-      }),
-      this.prisma.alertInstance.count({
-        where: { companyId, status: 'ACTIVE', severity: { in: ['CRITICAL', 'BLOCKING'] } },
-      }),
-    ]);
+       a second round-trip. CRITICAL+BLOCKING is the headline number.
+       OPS-020 adds the blocked + at-risk asset counts so the same call
+       feeds the "Activos bloqueados" banner. assetsAtRiskCount =
+       distinct assets with ACTIVE BLOCKING alerts that AREN'T yet
+       BLOCKED_DOCUMENTAL (i.e. would auto-block if the toggle was
+       on). */
+    const [activeAlertsCount, criticalAlertsCount, blockedAssetsCount, atRiskAssets] =
+      await Promise.all([
+        this.prisma.alertInstance.count({
+          where: { companyId, status: 'ACTIVE' },
+        }),
+        this.prisma.alertInstance.count({
+          where: { companyId, status: 'ACTIVE', severity: { in: ['CRITICAL', 'BLOCKING'] } },
+        }),
+        this.prisma.operationalAsset.count({
+          where: { companyId, isActive: true, status: 'BLOCKED_DOCUMENTAL' },
+        }),
+        this.prisma.alertInstance.findMany({
+          where: {
+            companyId,
+            status: 'ACTIVE',
+            severity: 'BLOCKING',
+            asset: { status: { not: 'BLOCKED_DOCUMENTAL' }, isActive: true },
+          },
+          select: { assetId: true },
+          distinct: ['assetId'],
+        }),
+      ]);
+    const assetsAtRiskCount = atRiskAssets.length;
 
     return {
       totalAssets: assets.length,
@@ -452,6 +480,8 @@ export class DocumentRecordsService {
       bySeverity,
       activeAlertsCount,
       criticalAlertsCount,
+      blockedAssetsCount,
+      assetsAtRiskCount,
     };
   }
 
@@ -1058,7 +1088,13 @@ export class DocumentRecordsService {
   async approve(id: string, companyId: string, userId: string) {
     const existing = await this.prisma.documentRecord.findFirst({
       where: { id, companyId },
-      select: { id: true, status: true, uploadedBy: true, documentTypeId: true },
+      select: {
+        id: true,
+        status: true,
+        uploadedBy: true,
+        documentTypeId: true,
+        assetId: true,
+      },
     });
     if (!existing) throw new NotFoundException('Documento no encontrado');
     if (existing.status !== 'PENDING_REVIEW') {
@@ -1070,7 +1106,7 @@ export class DocumentRecordsService {
       throw new ForbiddenException('No puedes aprobar un documento que tú mismo cargaste');
     }
     const now = new Date();
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+    const approved = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       const updated = await tx.documentRecord.update({
         where: { id },
         data: {
@@ -1108,6 +1144,23 @@ export class DocumentRecordsService {
         ),
       };
     });
+
+    /* OPS-020 — re-evaluate the asset's blocking state now that a
+       fresh APPROVED row exists. If the asset was BLOCKED_DOCUMENTAL
+       only because this doc was missing/expired, the call flips it
+       back to OPERATIONAL with an AUTO_UNBLOCK audit row. Errors here
+       don't fail the approval — the next cron pass will catch up. */
+    try {
+      await this.blockingService.processBlocking(companyId, existing.assetId, userId);
+    } catch (err) {
+      this.logger.warn(
+        `Blocking re-evaluation after approve failed (doc ${id}): ${
+          err instanceof Error ? err.message : err
+        }`,
+      );
+    }
+
+    return approved;
   }
 
   async reject(id: string, companyId: string, userId: string, dto: RejectDocumentDto) {

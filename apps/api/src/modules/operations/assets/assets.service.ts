@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { AssetBlockingService } from '../alerts/asset-blocking.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { FilterAssetsDto } from './dto/filter-assets.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
@@ -21,6 +22,7 @@ export class AssetsService {
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
     private readonly storage: StorageService,
+    private readonly blockingService: AssetBlockingService,
   ) {}
 
   /* Validates that the related entities (assetType, assetSubtype, location,
@@ -276,47 +278,103 @@ export class AssetsService {
     );
 
     const statusChanged = dto.status && dto.status !== existing.status;
+    const previousStatus = existing.status;
 
     try {
-      return await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
-        const updated = await tx.operationalAsset.update({
-          where: { id },
-          data: {
-            ...(dto.assetTypeId !== undefined ? { assetTypeId: dto.assetTypeId } : {}),
-            ...(dto.assetSubtypeId !== undefined
-              ? { assetSubtypeId: dto.assetSubtypeId ?? null }
-              : {}),
-            ...(dto.locationId !== undefined ? { locationId: dto.locationId ?? null } : {}),
-            ...(dto.parentAssetId !== undefined
-              ? { parentAssetId: dto.parentAssetId ?? null }
-              : {}),
-            ...(dto.code !== undefined ? { code: dto.code } : {}),
-            ...(dto.name !== undefined ? { name: dto.name } : {}),
-            ...(dto.description !== undefined ? { description: dto.description } : {}),
-            ...(dto.serialNumber !== undefined ? { serialNumber: dto.serialNumber } : {}),
-            ...(dto.manufacturer !== undefined ? { manufacturer: dto.manufacturer } : {}),
-            ...(dto.model !== undefined ? { model: dto.model } : {}),
-            ...(dto.acquisitionDate !== undefined
-              ? { acquisitionDate: dto.acquisitionDate ? new Date(dto.acquisitionDate) : null }
-              : {}),
-            ...(dto.acquisitionCost !== undefined
-              ? { acquisitionCost: dto.acquisitionCost ?? null }
-              : {}),
-            ...(dto.status !== undefined ? { status: dto.status } : {}),
-            ...(dto.statusReason !== undefined ? { statusReason: dto.statusReason } : {}),
-            ...(statusChanged ? { statusChangedAt: new Date() } : {}),
-            ...(dto.dynamicAttributes !== undefined
-              ? { dynamicAttributes: dto.dynamicAttributes as Prisma.InputJsonValue }
-              : {}),
-            ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
-            ...(dto.assignedToUserId !== undefined
-              ? { assignedToUserId: dto.assignedToUserId ?? null }
-              : {}),
-          },
-          select: this.assetSelect,
+      let updated;
+      try {
+        updated = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+          const u = await tx.operationalAsset.update({
+            where: { id },
+            data: {
+              ...(dto.assetTypeId !== undefined ? { assetTypeId: dto.assetTypeId } : {}),
+              ...(dto.assetSubtypeId !== undefined
+                ? { assetSubtypeId: dto.assetSubtypeId ?? null }
+                : {}),
+              ...(dto.locationId !== undefined ? { locationId: dto.locationId ?? null } : {}),
+              ...(dto.parentAssetId !== undefined
+                ? { parentAssetId: dto.parentAssetId ?? null }
+                : {}),
+              ...(dto.code !== undefined ? { code: dto.code } : {}),
+              ...(dto.name !== undefined ? { name: dto.name } : {}),
+              ...(dto.description !== undefined ? { description: dto.description } : {}),
+              ...(dto.serialNumber !== undefined ? { serialNumber: dto.serialNumber } : {}),
+              ...(dto.manufacturer !== undefined ? { manufacturer: dto.manufacturer } : {}),
+              ...(dto.model !== undefined ? { model: dto.model } : {}),
+              ...(dto.acquisitionDate !== undefined
+                ? { acquisitionDate: dto.acquisitionDate ? new Date(dto.acquisitionDate) : null }
+                : {}),
+              ...(dto.acquisitionCost !== undefined
+                ? { acquisitionCost: dto.acquisitionCost ?? null }
+                : {}),
+              ...(dto.status !== undefined ? { status: dto.status } : {}),
+              ...(dto.statusReason !== undefined ? { statusReason: dto.statusReason } : {}),
+              ...(statusChanged ? { statusChangedAt: new Date() } : {}),
+              ...(dto.dynamicAttributes !== undefined
+                ? { dynamicAttributes: dto.dynamicAttributes as Prisma.InputJsonValue }
+                : {}),
+              ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
+              ...(dto.assignedToUserId !== undefined
+                ? { assignedToUserId: dto.assignedToUserId ?? null }
+                : {}),
+            },
+            select: this.assetSelect,
+          });
+          return this.withHasPhoto(u);
         });
-        return this.withHasPhoto(updated);
-      });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          throw new BadRequestException('Ya existe un activo con ese código en esta empresa.');
+        }
+        throw err;
+      }
+
+      /* OPS-020 — record the manual transition AND, when the user
+         tries to manually leave BLOCKED_DOCUMENTAL, immediately
+         re-evaluate. If the gap is still there the asset gets flipped
+         back; we surface a `reblocked: true` flag so the frontend can
+         tell the user. */
+      if (statusChanged && dto.status) {
+        try {
+          await this.blockingService.logManualChange(
+            companyId,
+            userId,
+            id,
+            previousStatus,
+            dto.status,
+            dto.statusReason ?? null,
+          );
+        } catch (err) {
+          this.logger.warn(
+            `Manual status change audit failed: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+
+        const leftBlock =
+          previousStatus === 'BLOCKED_DOCUMENTAL' &&
+          (dto.status === 'OPERATIONAL' || dto.status === 'WITH_OBSERVATIONS');
+        if (leftBlock) {
+          try {
+            const result = await this.blockingService.processBlocking(companyId, id, userId);
+            if (result.action === 'BLOCKED') {
+              const refreshed = await this.findOne(id, companyId);
+              return {
+                ...refreshed,
+                reblocked: true,
+                reblockReason: result.reason,
+              };
+            }
+          } catch (err) {
+            this.logger.warn(
+              `Re-block evaluation after manual unblock failed: ${
+                err instanceof Error ? err.message : err
+              }`,
+            );
+          }
+        }
+      }
+
+      return updated;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new BadRequestException('Ya existe un activo con ese código en esta empresa.');

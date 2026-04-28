@@ -67,7 +67,9 @@ export class FleetController {
     @CurrentUser() user: { id: string },
     @Body() dto: UpdateVehicleDto,
   ) {
-    return this.fleetService.update(id, companyId, user.id, dto);
+    /* OPS-020 — go through the blocking-aware wrapper so manual status
+       changes get audited and immediately re-evaluated. */
+    return this.fleetService.updateWithBlocking(id, companyId, user.id, dto);
   }
 
   @Delete(':id')

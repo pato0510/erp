@@ -4,6 +4,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { DocumentRequirementsService } from '../document-requirements/document-requirements.service';
 import { AlertRulesService } from './alert-rules.service';
+import { AssetBlockingService } from './asset-blocking.service';
 import { CompanyAlertSettingsService } from './company-alert-settings.service';
 
 interface ProcessOptions {
@@ -37,6 +38,7 @@ export class AlertEngineService {
     private readonly requirementsService: DocumentRequirementsService,
     private readonly rulesService: AlertRulesService,
     private readonly settingsService: CompanyAlertSettingsService,
+    private readonly blockingService: AssetBlockingService,
   ) {}
 
   /* OPS-019 — main entry point. Walks every active asset for the
@@ -234,6 +236,22 @@ export class AlertEngineService {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.error(`Alert engine failure on asset ${asset.id}: ${msg}`);
         summary.errors.push(`asset ${asset.code}: ${msg}`);
+      }
+    }
+
+    /* OPS-020 — sweep through asset statuses now that today's alert
+       inventory is current. Skipped on dryRun so previews stay
+       side-effect free. */
+    if (!options.dryRun) {
+      try {
+        const blockingResult = await this.blockingService.processCompanyBlocking(companyId);
+        if (blockingResult.errors.length > 0) {
+          summary.errors.push(...blockingResult.errors.map((e) => `blocking: ${e}`));
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Blocking sweep failed for company ${companyId}: ${msg}`);
+        summary.errors.push(`blocking sweep: ${msg}`);
       }
     }
 

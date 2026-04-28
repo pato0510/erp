@@ -95,6 +95,24 @@ interface ComplianceResponse {
   valid: number;
   compliancePercentage: number;
   bySeverity: { critical: number; high: number; medium: number; low: number };
+  /* OPS-019/020 — alert + blocking summary so the page renders the
+     "Activos bloqueados" banner without an extra request. */
+  activeAlertsCount?: number;
+  criticalAlertsCount?: number;
+  blockedAssetsCount?: number;
+  assetsAtRiskCount?: number;
+}
+
+interface BlockedAssetRow {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  statusReason: string | null;
+  blockedSince: string | null;
+  assetType?: { id: string; name: string; category: string } | null;
+  blockingDocumentTypes: Array<{ id: string; name: string; code: string }>;
+  lastChangeType: 'AUTO_BLOCK' | 'MANUAL' | string;
 }
 
 interface AssetOption {
@@ -172,6 +190,7 @@ export default function DocumentosPage() {
 
   const [data, setData] = useState<Paginated<DocumentRow> | null>(null);
   const [compliance, setCompliance] = useState<ComplianceResponse | null>(null);
+  const [blockedAssets, setBlockedAssets] = useState<BlockedAssetRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [assets, setAssets] = useState<AssetOption[]>([]);
@@ -276,6 +295,13 @@ export default function DocumentosPage() {
 
   const load = useCallback(async () => {
     setIsLoading(true);
+    /* Blocked-assets list is independent of the documents query so we
+       fire it in parallel and tolerate a 403 silently for read-only
+       roles that can still see the central docs page. */
+    apiClient
+      .get<BlockedAssetRow[]>('/api/operations/assets/blocked')
+      .then((rows) => setBlockedAssets(rows))
+      .catch(() => setBlockedAssets([]));
     try {
       const [docs, comp] = await Promise.all([
         apiClient.get<Paginated<DocumentRow>>(
@@ -686,6 +712,120 @@ export default function DocumentosPage() {
             <SeverityChip count={compliance.bySeverity.low} label="bajos" tone="low" />
           </div>
         </>
+      )}
+
+      {/* OPS-020 — blocked assets card list. Only renders when there's
+          at least one row so the page stays clean otherwise. */}
+      {blockedAssets.length > 0 && (
+        <div
+          className="mb-6 p-4 rounded-xl"
+          style={{
+            background: 'rgba(239, 68, 68, 0.06)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3
+              className="text-[var(--text-primary)] flex items-center gap-2"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 600,
+                fontSize: 15,
+                color: '#b91c1c',
+              }}
+            >
+              <AlertCircle size={16} /> Activos bloqueados ({blockedAssets.length})
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {blockedAssets.slice(0, 6).map((b) => {
+              const isVehicle = b.assetType?.category === 'VEHICLE';
+              const href = isVehicle ? `/operaciones/vehiculos` : `/operaciones/equipos/${b.id}`;
+              return (
+                <Link
+                  key={b.id}
+                  href={href}
+                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-[var(--bg-card)] transition"
+                  style={{
+                    border: '1px solid rgba(239, 68, 68, 0.18)',
+                    textDecoration: 'none',
+                    background: 'var(--bg-card)',
+                  }}
+                >
+                  {isVehicle ? (
+                    <Settings size={16} style={{ color: '#b91c1c', marginTop: 2 }} />
+                  ) : (
+                    <Settings size={16} style={{ color: '#b91c1c', marginTop: 2 }} />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-jetbrains-mono), monospace',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                        }}
+                      >
+                        {b.code}
+                      </span>
+                      <span
+                        className="text-[var(--text-secondary)] truncate"
+                        style={{
+                          fontFamily: 'var(--font-outfit), sans-serif',
+                          fontSize: 13,
+                        }}
+                      >
+                        {b.name}
+                      </span>
+                    </div>
+                    {b.blockingDocumentTypes.length > 0 ? (
+                      <p
+                        className="text-[var(--text-muted)] mt-1 truncate"
+                        style={{
+                          fontFamily: 'var(--font-outfit), sans-serif',
+                          fontSize: 12,
+                        }}
+                      >
+                        Documentos: {b.blockingDocumentTypes.map((d) => d.code).join(', ')}
+                      </p>
+                    ) : b.statusReason ? (
+                      <p
+                        className="text-[var(--text-muted)] mt-1 truncate"
+                        style={{
+                          fontFamily: 'var(--font-outfit), sans-serif',
+                          fontSize: 12,
+                        }}
+                      >
+                        {b.statusReason}
+                      </p>
+                    ) : null}
+                    {b.blockedSince && (
+                      <p
+                        className="text-[var(--text-muted)] mt-0.5"
+                        style={{
+                          fontFamily: 'var(--font-jetbrains-mono), monospace',
+                          fontSize: 11,
+                        }}
+                      >
+                        Bloqueado {formatDate(b.blockedSince)}
+                      </p>
+                    )}
+                  </div>
+                  <ArrowRight size={14} className="text-[var(--text-muted)] mt-1" />
+                </Link>
+              );
+            })}
+          </div>
+          {blockedAssets.length > 6 && (
+            <p
+              className="text-xs text-[var(--text-muted)] mt-2"
+              style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+            >
+              + {blockedAssets.length - 6} activos bloqueados más.
+            </p>
+          )}
+        </div>
       )}
 
       {/* Filters */}

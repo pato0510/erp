@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
+import { AssetBlockingService } from '../alerts/asset-blocking.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { FilterVehiclesDto } from './dto/filter-vehicles.dto';
 import { UpdateKilometersDto } from './dto/update-kilometers.dto';
@@ -12,9 +13,12 @@ const MAX_LIMIT = 100;
 
 @Injectable()
 export class FleetService {
+  private readonly logger = new Logger(FleetService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
+    private readonly blockingService: AssetBlockingService,
   ) {}
 
   /* Slim selector for list responses — keeps row payloads small. */
@@ -498,6 +502,59 @@ export class FleetService {
       }
       throw err;
     }
+  }
+
+  /* Wrapper around the raw update so the controller can apply OPS-020
+     manual-change tracking + re-block detection after the underlying
+     transaction commits. We can't fold this into update() directly
+     without rewriting its return shape, so we expose this thin wrapper
+     and the controller calls it instead. */
+  async updateWithBlocking(id: string, companyId: string, userId: string, dto: UpdateVehicleDto) {
+    const existing = await this.findOne(id, companyId);
+    const previousStatus = existing.asset.status;
+    const statusWillChange = dto.status && dto.status !== previousStatus;
+
+    const updated = await this.update(id, companyId, userId, dto);
+
+    if (statusWillChange && dto.status) {
+      try {
+        await this.blockingService.logManualChange(
+          companyId,
+          userId,
+          existing.assetId,
+          previousStatus,
+          dto.status,
+          dto.statusReason ?? null,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Manual status audit failed for vehicle ${id}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+
+      const leftBlock =
+        previousStatus === 'BLOCKED_DOCUMENTAL' &&
+        (dto.status === 'OPERATIONAL' || dto.status === 'WITH_OBSERVATIONS');
+      if (leftBlock) {
+        try {
+          const r = await this.blockingService.processBlocking(companyId, existing.assetId, userId);
+          if (r.action === 'BLOCKED') {
+            const refreshed = await this.findOne(id, companyId);
+            return {
+              ...refreshed,
+              reblocked: true,
+              reblockReason: r.reason,
+            };
+          }
+        } catch (err) {
+          this.logger.warn(
+            `Re-block evaluation failed for vehicle ${id}: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+      }
+    }
+
+    return updated;
   }
 
   async remove(id: string, companyId: string, userId: string) {

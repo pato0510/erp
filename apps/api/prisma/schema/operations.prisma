@@ -123,6 +123,7 @@ model OperationalAsset {
   requirements   DocumentRequirement[]
   documents      DocumentRecord[]
   alertInstances AlertInstance[]
+  statusChanges  AssetStatusChange[]
 
   @@unique([companyId, code])
   @@index([companyId, assetTypeId])
@@ -389,4 +390,38 @@ model CompanyAlertSettings {
   updatedBy                   String   @db.Uuid
 
   @@map("company_alert_settings")
+}
+
+/* OPS-020 — audit trail of every status transition. Distinguishes
+   manual edits from system-driven AUTO_BLOCK / AUTO_UNBLOCK. The
+   triggering doc-type IDs and alert IDs are kept as flat arrays so a
+   single row can describe a multi-document trigger without joining
+   another table. */
+enum StatusChangeType {
+  MANUAL
+  AUTO_BLOCK
+  AUTO_UNBLOCK
+  EXCEPTION_GRANTED
+  EXCEPTION_EXPIRED
+}
+
+model AssetStatusChange {
+  id                          String           @id @default(uuid()) @db.Uuid
+  companyId                   String           @db.Uuid
+  assetId                     String           @db.Uuid
+  previousStatus              AssetStatus
+  newStatus                   AssetStatus
+  changeType                  StatusChangeType
+  reason                      String?
+  changedBy                   String?          @db.Uuid
+  triggeringDocumentTypeIds   String[]         @default([]) @db.Uuid
+  triggeringAlertInstanceIds  String[]         @default([]) @db.Uuid
+  metadata                    Json             @default("{}")
+  createdAt                   DateTime         @default(now())
+
+  asset OperationalAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, assetId, createdAt])
+  @@index([companyId, changeType])
+  @@map("asset_status_changes")
 }

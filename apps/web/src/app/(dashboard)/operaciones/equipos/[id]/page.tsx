@@ -41,6 +41,7 @@ import {
   type AssetStatus,
 } from '../../../../../components/operations/AssetStatusBadge';
 import { StatusChangeModal } from '../../../../../components/operations/StatusChangeModal';
+import { AssetStatusHistoryModal } from '../../../../../components/operations/AssetStatusHistoryModal';
 import {
   DocumentStatusBadge,
   type DerivedDocumentStatus,
@@ -219,6 +220,18 @@ export default function AssetDetailPage({ params }: PageProps) {
   const [statusModal, setStatusModal] = useState(false);
   const [childModal, setChildModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [statusHistoryOpen, setStatusHistoryOpen] = useState(false);
+  /* OPS-020 — list of doc types currently blocking this asset; populated
+     when status === BLOCKED_DOCUMENTAL via the evaluate-blocking
+     endpoint. Falls back to statusReason if the call fails. */
+  const [blockingDocs, setBlockingDocs] = useState<
+    Array<{
+      documentTypeId: string;
+      documentTypeName: string;
+      documentTypeCode: string;
+      state: 'MISSING' | 'EXPIRED';
+    }>
+  >([]);
 
   /* Document upload + preview state. uploadDoc carries the optional
      pre-selected documentTypeId so the per-requirement "Cargar" button can
@@ -310,6 +323,37 @@ export default function AssetDetailPage({ params }: PageProps) {
     loadCatalogs();
   }, [loadCatalogs]);
 
+  /* OPS-020 — when the asset is blocked, fetch the specific docs that
+     caused it so the warning banner can list them. We hit the dry-run
+     evaluator instead of the audit history because the audit row only
+     captures what triggered the *original* block; today's gaps may be a
+     different subset. */
+  useEffect(() => {
+    let alive = true;
+    if (!asset || asset.status !== 'BLOCKED_DOCUMENTAL') {
+      setBlockingDocs([]);
+      return () => undefined;
+    }
+    apiClient
+      .post<{
+        blockingDocuments: Array<{
+          documentTypeId: string;
+          documentTypeName: string;
+          documentTypeCode: string;
+          state: 'MISSING' | 'EXPIRED';
+        }>;
+      }>(`/api/operations/assets/${asset.id}/evaluate-blocking`)
+      .then((res) => {
+        if (alive) setBlockingDocs(res.blockingDocuments ?? []);
+      })
+      .catch(() => {
+        /* Banner falls back to statusReason if the eval call fails. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [asset?.id, asset?.status]);
+
   /* Fetch the photo blob via authenticated fetchBlob (auth headers needed). */
   useEffect(() => {
     let alive = true;
@@ -348,11 +392,26 @@ export default function AssetDetailPage({ params }: PageProps) {
 
   const handleStatusSave = async (status: AssetStatus, statusReason: string | undefined) => {
     if (!asset) return;
-    await apiClient.patch(`/api/operations/assets/${asset.id}`, {
-      status,
-      statusReason: statusReason ?? null,
-    });
-    setToast({ message: 'Estado actualizado', type: 'success' });
+    /* OPS-020 — backend may flip the asset right back to
+       BLOCKED_DOCUMENTAL if the user is trying to leave it without
+       resolving the underlying gaps. The response surface includes a
+       `reblocked` flag so we can warn explicitly. */
+    const result = await apiClient.patch<{ reblocked?: boolean; reblockReason?: string }>(
+      `/api/operations/assets/${asset.id}`,
+      {
+        status,
+        statusReason: statusReason ?? null,
+      },
+    );
+    if (result?.reblocked) {
+      setToast({
+        message:
+          'El activo fue desbloqueado pero el sistema detectó documentos vencidos. Volvió a quedar bloqueado automáticamente.',
+        type: 'error',
+      });
+    } else {
+      setToast({ message: 'Estado actualizado', type: 'success' });
+    }
     setStatusModal(false);
     load();
   };
@@ -582,6 +641,81 @@ export default function AssetDetailPage({ params }: PageProps) {
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
+      {/* OPS-020 — blocked-asset warning banner */}
+      {asset.status === 'BLOCKED_DOCUMENTAL' && (
+        <div
+          className="mb-4 p-4 rounded-xl flex items-start gap-3"
+          style={{
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+          }}
+        >
+          <XCircle size={22} style={{ color: '#b91c1c', flexShrink: 0, marginTop: 2 }} />
+          <div className="flex-1">
+            <p
+              className="text-[var(--text-primary)]"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 700,
+                fontSize: 14,
+                color: '#b91c1c',
+              }}
+            >
+              🔴 ACTIVO BLOQUEADO POR DOCUMENTACIÓN
+            </p>
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
+              Este activo tiene documentos críticos vencidos o faltantes. No puede ser operado hasta
+              resolver:
+            </p>
+            {blockingDocs.length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {blockingDocs.map((d) => (
+                  <li
+                    key={d.documentTypeId}
+                    className="text-sm"
+                    style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+                  >
+                    <strong>{d.documentTypeName}</strong>{' '}
+                    <span className="text-[var(--text-muted)]">
+                      ({d.state === 'MISSING' ? 'falta' : 'vencido'})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : asset.statusReason ? (
+              <p className="text-sm text-[var(--text-secondary)] italic mt-1">
+                {asset.statusReason}
+              </p>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => setUploadDoc({})}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white"
+                style={{
+                  background: '#1C1C1E',
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontWeight: 500,
+                }}
+              >
+                <Upload size={13} /> Cargar documentos faltantes
+              </button>
+              <button
+                disabled
+                title="Disponible en OPS-023"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-full opacity-50 cursor-not-allowed"
+                style={{
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontWeight: 500,
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Solicitar excepción temporal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-5">
         <div className="ops-breadcrumb">
@@ -803,6 +937,17 @@ export default function AssetDetailPage({ params }: PageProps) {
                   : null
               }
             />
+            <button
+              onClick={() => setStatusHistoryOpen(true)}
+              className="mt-2 inline-flex items-center gap-1 text-blue-600 hover:underline"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              <History size={12} /> Ver historial de cambios →
+            </button>
           </Card>
 
           {/* Location */}
@@ -1199,6 +1344,14 @@ export default function AssetDetailPage({ params }: PageProps) {
           currentStatus={asset.status}
           onClose={() => setStatusModal(false)}
           onSave={handleStatusSave}
+        />
+      )}
+      {statusHistoryOpen && (
+        <AssetStatusHistoryModal
+          assetId={asset.id}
+          assetCode={asset.code}
+          assetName={asset.name}
+          onClose={() => setStatusHistoryOpen(false)}
         />
       )}
       {childModal && (
