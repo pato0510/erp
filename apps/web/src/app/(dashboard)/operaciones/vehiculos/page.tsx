@@ -38,6 +38,7 @@ import {
   type VehicleFormSubmit,
 } from '../../../../components/operations/VehicleFormModal';
 import { KilometersUpdateModal } from '../../../../components/operations/KilometersUpdateModal';
+import { VehicleImportWizard } from '../../../../components/operations/VehicleImportWizard';
 
 interface VehicleAssetRelation {
   id: string;
@@ -136,6 +137,7 @@ export default function VehiculosPage() {
   const [modal, setModal] = useState<ModalState>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [kmModal, setKmModal] = useState<KmModalState>(null);
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
@@ -290,12 +292,7 @@ export default function VehiculosPage() {
           </h1>
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() =>
-                setToast({
-                  message: 'La importación masiva llega en OPS-012',
-                  type: 'info',
-                })
-              }
+              onClick={() => setImportWizardOpen(true)}
               className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
@@ -593,6 +590,17 @@ export default function VehiculosPage() {
             setKmModal(null);
             setToast({ message: 'Kilometraje actualizado', type: 'success' });
             load();
+          }}
+        />
+      )}
+
+      {importWizardOpen && (
+        <VehicleImportWizard
+          onClose={() => setImportWizardOpen(false)}
+          onImported={() => {
+            setToast({ message: 'Vehículos importados correctamente', type: 'success' });
+            load();
+            loadCatalogs();
           }}
         />
       )}

@@ -328,51 +328,67 @@ Sprint 8: Hardening (vistas materializadas, QR, QA)
 
 ## Sprint 3 — Vehículos (en desarrollo)
 
-### OPS-010: Pack documental Chile (✓ completado)
+### OPS-011: Ficha 360 del Vehículo (✓ completado)
 
-Cuando se crea un AssetType con category=VEHICLE, automáticamente
-se asocian los 4 documentos legales obligatorios para vehículos
-en Chile vía DocumentRequirements.
+Pantalla de detalle completa para vehículos en `/operaciones/vehiculos/[id]`.
 
-### Documentos del pack vehicular Chile
+### Layout
 
-- SOAP (Seguro Obligatorio de Accidentes Personales)
-- PERMCIRC (Permiso de Circulación)
-- REVTEC (Revisión Técnica)
-- PADRON (Padrón)
+2-column responsive grid (colapsa a 1 col en mobile <1024px).
+Header con patente como título principal, breadcrumb y acciones.
 
-Todos marcados como obligatorios (isMandatory=true) con nota
-"Documento legal obligatorio para vehículos en Chile".
+### Secciones implementadas
 
-### Endpoint nuevo OPS-010
+- **Foto + Info del vehículo** — patente, VIN, año, color, combustible, asignado
+- **Kilometraje** — número grande con botón actualizar + placeholder histórico
+- **Identificación adicional** — serie, fabricante, modelo, fechas, costo
+- **Estado y operación** — badge + botón cambiar estado
+- **Ubicación** — dirección + coordenadas
+- **Jerarquía** — solo padre (vehículos no suelen tener hijos)
+- **Tags** — chip list
+- **Documentos legales requeridos** — 4 del pack chileno via resolve endpoint
+- **Historial** — creación y última modificación
 
-- POST /api/operations/asset-types/:id/apply-vehicle-defaults
-  Idempotente. Solo aplica si AssetType.category === VEHICLE.
-  Retorna { created, skipped }.
+### Backend cambios
 
-### Comportamiento automático
+- fleet.service.ts: nuevo `assetDetailSelect` separado del `assetSelect`
+  - findOne usa el detail selector con relaciones completas
+  - findAll mantiene el selector liviano para listas
+- assignedToUserId y createdBy se resuelven con prisma.user.findMany batch
+  (mismo patrón que assets.service.ts)
 
-- Al crear AssetType con category=VEHICLE → applyVehicleDefaultRequirements()
-  se ejecuta automáticamente
-- Si los DocumentTypes no existen aún → log warning, skip silencioso
-- Si ya existen los requirements → skip (idempotente)
+### Componentes reutilizados
 
-### UI agregada
+- VehicleFormModal (editar)
+- StatusChangeModal (cambio de estado)
+- KilometersUpdateModal (actualizar km)
+- AssetStatusBadge
 
-- En AssetTypeFormModal: hint informativo + checkbox "Aplicar pack
-  documental Chile" (default checked) cuando categoría = VEHICLE
-- En /operaciones/configuracion (Tipos de Activo): botón
-  "Aplicar pack documental Chile" por cada tipo VEHICLE
-- Estado del botón cambia a "Pack documental aplicado" cuando
-  los 4 requirements ya están asociados
+### Endpoints consumidos
+
+- GET /api/operations/fleet/vehicles/:id (detalle completo)
+- GET /api/operations/document-requirements/resolve/:assetId (pack chileno)
+- POST /api/operations/assets/:id/photo (foto, reutilizado)
+- PATCH /api/operations/fleet/vehicles/:id/kilometers (actualizar km)
+
+### UX en lista de vehículos
+
+- Filas clickeables → navegan al detalle
+- Botones de acción (km, editar, eliminar) usan e.stopPropagation()
 
 # Ticket actual
 
-- OPS-011: Ficha 360 del vehículo (vista detalle similar a equipos)
-  Reusa el patrón de /operaciones/equipos/[id]
-  Agrega secciones específicas de vehículo (patente, VIN, km, etc)
-  Muestra los 4 documentos del pack via resolve/:assetId
-
-### Próximos tickets del Sprint 3
-
 - OPS-012: Importación masiva CSV/Excel de vehículos
+  Mismo patrón que OPS-008 (importación de equipos)
+  Wizard de 3 pasos: subir → preview → resultado
+  Plantilla CSV con campos de vehículo (patente, VIN, año, etc)
+  Validaciones: AssetType debe ser categoría VEHICLE
+  Reusa ImportLog con entityType='VEHICLE'
+
+### Próximos sprints
+
+- Sprint 4: Control Documental (OPS-013 a OPS-017)
+- Sprint 5: Alertas y Bloqueos automáticos (OPS-018 a OPS-023)
+- Sprint 6: Permisos y Procedimientos
+- Sprint 7: Calendario, Reportes e Integración Finanzas
+- Sprint 8: Hardening
