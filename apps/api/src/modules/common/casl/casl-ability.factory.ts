@@ -29,6 +29,7 @@ type Subjects =
       | typeof WorkPermitSubject
       | typeof PermitApprovalStepSubject
       | typeof PermitApprovalSubject
+      | typeof ProcedureSubject
     >
   | 'all';
 
@@ -107,6 +108,9 @@ class PermitApprovalStepSubject {
 class PermitApprovalSubject {
   static readonly modelName = 'PermitApproval' as const;
 }
+class ProcedureSubject {
+  static readonly modelName = 'Procedure' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -140,7 +144,14 @@ export type Action =
   | 'cancel'
   /* OPS-026 — multi-step approval. `skip` is ADMIN-only override
      to bypass an optional/blocked step with prominent audit. */
-  | 'skip';
+  | 'skip'
+  /* OPS-027 — procedures lifecycle. `publish` is gated to
+     ADMIN/MANAGER, `deprecate` to ADMIN. `review` is the
+     verb that gates the approve/reject sub-actions on a
+     procedure in IN_REVIEW status. */
+  | 'publish'
+  | 'deprecate'
+  | 'review';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {
@@ -169,6 +180,7 @@ export {
   WorkPermitSubject,
   PermitApprovalStepSubject,
   PermitApprovalSubject,
+  ProcedureSubject,
 };
 
 @Injectable()
@@ -242,6 +254,9 @@ export class CaslAbilityFactory {
            record per-step approvals. `skip` stays ADMIN-only. */
         can(['create', 'update', 'delete'], PermitApprovalStepSubject);
         can(['read', 'approve', 'reject'], PermitApprovalSubject);
+        /* OPS-027 — MANAGER authors and publishes procedures.
+           `deprecate` stays ADMIN-only via `manage 'all'`. */
+        can(['create', 'update', 'review', 'publish'], ProcedureSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -302,6 +317,9 @@ export class CaslAbilityFactory {
            record actions. */
         can('read', PermitApprovalStepSubject);
         can('read', PermitApprovalSubject);
+        /* OPS-027 — VIEWER reads procedures (the whole point of the
+           library) but cannot author/edit/publish. */
+        can('read', ProcedureSubject);
         break;
     }
 

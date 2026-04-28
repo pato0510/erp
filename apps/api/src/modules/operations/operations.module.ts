@@ -10,6 +10,7 @@ import { FleetModule } from './fleet/fleet.module';
 import { LocationsModule } from './locations/locations.module';
 import { NotificationModule } from './notifications/notification.module';
 import { PermitsModule } from './permits/permits.module';
+import { ProceduresModule } from './procedures/procedures.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PermitsModule } from './permits/permits.module';
     LocationsModule,
     NotificationModule,
     PermitsModule,
+    ProceduresModule,
   ],
 })
 export class OperationsModule {}

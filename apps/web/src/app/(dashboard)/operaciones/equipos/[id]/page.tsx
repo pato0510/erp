@@ -54,6 +54,7 @@ import {
 import { DocumentUploadModal } from '../../../../../components/operations/DocumentUploadModal';
 import { AssetPermits } from '../../../../../components/operations/AssetPermits';
 import { ActiveWorkPermits } from '../../../../../components/operations/ActiveWorkPermits';
+import { ApplicableProcedures } from '../../../../../components/operations/ApplicableProcedures';
 import { DocumentPreviewModal } from '../../../../../components/operations/DocumentPreviewModal';
 import { DocumentSupersessionModal } from '../../../../../components/operations/DocumentSupersessionModal';
 import { DocumentHistoryModal } from '../../../../../components/operations/DocumentHistoryModal';
@@ -1416,6 +1417,11 @@ export default function AssetDetailPage({ params }: PageProps) {
       {/* OPS-025 — active internal work permits targeting this asset. */}
       <div className="mt-4">
         <ActiveWorkPermits assetId={asset.id} />
+      </div>
+
+      {/* OPS-027 — published procedures applicable to this asset. */}
+      <div className="mt-4">
+        <ApplicableProcedures assetId={asset.id} />
       </div>
 
       {/* OPS-021 — active alerts for this asset. The component

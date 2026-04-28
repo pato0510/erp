@@ -850,6 +850,122 @@ model PermitApprovalStep {
   @@map("permit_approval_steps")
 }
 
+/* OPS-027 — Procedures library. Internal company-published
+   instructional content (operational, safety, maintenance,
+   emergency). Distinct from external Documents (Sprint 4) and
+   Permits (OPS-024/025): procedures don't expire, they are
+   versioned and superseded; they may require user acknowledgment
+   (OPS-028 wires that). */
+enum ProcedureCategory {
+  OPERATION
+  MAINTENANCE
+  EMERGENCY
+  SAFETY
+  QUALITY
+  ENVIRONMENTAL
+  OTHER
+}
+
+enum ProcedureStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  SUPERSEDED
+  DEPRECATED
+}
+
+enum RevisionType {
+  CREATED
+  UPDATED
+  REVIEWED
+  PUBLISHED
+  SUPERSEDED
+  DEPRECATED
+  RESTORED
+}
+
+model Procedure {
+  id                          String            @id @default(uuid()) @db.Uuid
+  companyId                   String            @db.Uuid
+  code                        String
+  title                       String
+  description                 String?
+  category                    ProcedureCategory
+
+  authoredBy                  String            @db.Uuid
+  reviewedBy                  String?           @db.Uuid
+  reviewedAt                  DateTime?
+  publishedBy                 String?           @db.Uuid
+  publishedAt                 DateTime?
+  deprecatedBy                String?           @db.Uuid
+  deprecatedAt                DateTime?
+
+  /* Semantic version string (free-form so users can use 1.0,
+     2024-01, A.0, etc). The (companyId, code, version) unique
+     index enforces no two rows of the same procedure share a
+     version. */
+  version                     String
+  changelog                   String?
+  replacesProcedureId         String?           @db.Uuid
+  replacedByProcedureId       String?           @db.Uuid
+
+  fileName                    String
+  mimeType                    String
+  fileSize                    Int
+  filePath                    String?
+  fileData                    Bytes?
+
+  /* Up to 10 attachment entries; each carries either a MinIO
+     filePath or a base64 fileData fallback. */
+  attachments                 Json              @default("[]")
+
+  keywords                    String[]          @default([])
+  scope                       String?
+  estimatedReadingMinutes     Int?
+  requiresAcknowledgment      Boolean           @default(false)
+  acknowledgmentDeadlineDays  Int?
+
+  applicableAssetTypeIds      String[]          @default([]) @db.Uuid
+  applicableAssetIds          String[]          @default([]) @db.Uuid
+  applicableLocationIds       String[]          @default([]) @db.Uuid
+  applicableRoles             String[]          @default([])
+
+  status                      ProcedureStatus   @default(DRAFT)
+  statusReason                String?
+
+  isActive                    Boolean           @default(true)
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
+
+  replaces       Procedure?           @relation("ProcedureSupersession", fields: [replacesProcedureId], references: [id], onDelete: SetNull)
+  replacedBy     Procedure[]          @relation("ProcedureSupersession")
+  revisions      ProcedureRevision[]
+
+  @@unique([companyId, code, version])
+  @@index([companyId, status, category])
+  @@index([companyId, code])
+  @@map("procedures")
+}
+
+model ProcedureRevision {
+  id            String       @id @default(uuid()) @db.Uuid
+  companyId     String       @db.Uuid
+  procedureId   String       @db.Uuid
+  revisionType  RevisionType
+  changedBy     String       @db.Uuid
+  changeNotes   String?
+  /* Snapshot of the changed fields. JSONB so we don't have to
+     enumerate every column up front. */
+  previousData  Json?
+  newData       Json?
+  createdAt     DateTime     @default(now())
+
+  procedure Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, procedureId, createdAt])
+  @@map("procedure_revisions")
+}
+
 model PermitApproval {
   id              String               @id @default(uuid()) @db.Uuid
   companyId       String               @db.Uuid

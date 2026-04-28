@@ -46,6 +46,7 @@ import {
 import { DocumentUploadModal } from '../../../../../components/operations/DocumentUploadModal';
 import { AssetPermits } from '../../../../../components/operations/AssetPermits';
 import { ActiveWorkPermits } from '../../../../../components/operations/ActiveWorkPermits';
+import { ApplicableProcedures } from '../../../../../components/operations/ApplicableProcedures';
 import { DocumentPreviewModal } from '../../../../../components/operations/DocumentPreviewModal';
 import { DocumentSupersessionModal } from '../../../../../components/operations/DocumentSupersessionModal';
 import { DocumentHistoryModal } from '../../../../../components/operations/DocumentHistoryModal';
@@ -1422,6 +1423,11 @@ export default function VehicleDetailPage({ params }: PageProps) {
       {/* OPS-025 — active internal work permits targeting this vehicle. */}
       <div className="mt-4">
         <ActiveWorkPermits assetId={vehicle.assetId} />
+      </div>
+
+      {/* OPS-027 — published procedures applicable to this vehicle. */}
+      <div className="mt-4">
+        <ApplicableProcedures assetId={vehicle.assetId} />
       </div>
 
       {/* OPS-021 — active alerts for this vehicle. */}

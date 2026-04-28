@@ -55,6 +55,8 @@ export function OperationsSidebar() {
   const [pendingExceptionsCount, setPendingExceptionsCount] = useState(0);
   /* OPS-026 — approval queue items waiting on the current user. */
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  /* OPS-027 — procedures awaiting reviewer attention. */
+  const [proceduresInReviewCount, setProceduresInReviewCount] = useState(0);
 
   /* Poll the pending-review count on mount and every minute. The endpoint is
      gated to ADMIN/MANAGER (CASL `approve` action) — for any other role the
@@ -95,6 +97,14 @@ export function OperationsSidebar() {
           if (alive) setPendingApprovalsCount(res.mine);
         })
         .catch(() => undefined);
+      apiClient
+        .get<{ published: number; inReview: number; draft: number; withAck: number }>(
+          '/api/operations/procedures/kpi',
+        )
+        .then((res) => {
+          if (alive) setProceduresInReviewCount(res.inReview);
+        })
+        .catch(() => undefined);
     };
     fetchCounts();
     const interval = setInterval(fetchCounts, PENDING_REVIEW_POLL_MS);
@@ -129,6 +139,7 @@ export function OperationsSidebar() {
           const isAlertas = item.href === '/operaciones/alertas';
           const isExcepciones = item.href === '/operaciones/excepciones';
           const isAprobaciones = item.href === '/operaciones/aprobaciones';
+          const isProcedimientos = item.href === '/operaciones/procedimientos';
           const rawCount = isDocumentos
             ? pendingReviewCount
             : isAlertas
@@ -137,9 +148,12 @@ export function OperationsSidebar() {
                 ? pendingExceptionsCount
                 : isAprobaciones
                   ? pendingApprovalsCount
-                  : 0;
+                  : isProcedimientos
+                    ? proceduresInReviewCount
+                    : 0;
           const showBadge =
-            (isDocumentos || isAlertas || isExcepciones || isAprobaciones) && rawCount > 0;
+            (isDocumentos || isAlertas || isExcepciones || isAprobaciones || isProcedimientos) &&
+            rawCount > 0;
           const badgeText = rawCount > 99 ? '99+' : String(rawCount);
           return (
             <Link
