@@ -12,6 +12,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { RlsService } from '../../../common/rls/rls.service';
 import { StorageService } from '../../../common/storage/storage.service';
 import { NotificationService } from '../../notifications/notification.service';
+import { ApprovalActionsService } from '../approvals/approval-actions.service';
 import { CreateWorkPermitDto } from './dto/create-work-permit.dto';
 import { FilterWorkPermitsDto } from './dto/filter-work-permits.dto';
 import { UpdateWorkPermitDto } from './dto/update-work-permit.dto';
@@ -73,6 +74,7 @@ export class WorkPermitsService {
     private readonly rlsService: RlsService,
     private readonly storage: StorageService,
     private readonly notifications: NotificationService,
+    private readonly approvalActions: ApprovalActionsService,
   ) {}
 
   /* ---- Read ----------------------------------------------------- */
@@ -290,7 +292,16 @@ export class WorkPermitsService {
     });
 
     if (initialStatus === 'PENDING_AUTHORIZATION') {
-      await this.notifyAuthorizationRequired(companyId, created.id, permitType.requiredRoles);
+      /* OPS-026 — multi-step engine: initializeApprovalChain creates
+         the per-step PermitApproval rows and notifies step 1
+         approvers. Falls back to a synthetic 1-step chain when the
+         permit type has no approval template configured. */
+      await this.approvalActions.initializeApprovalChain(
+        companyId,
+        userId,
+        created.id,
+        'work-permit',
+      );
     }
     return this.findOne(created.id, companyId);
   }
@@ -378,54 +389,48 @@ export class WorkPermitsService {
       );
     }
     await this.transitionStatus(companyId, userId, id, 'PENDING_AUTHORIZATION', null);
-    await this.notifyAuthorizationRequired(companyId, id, permit.permitType.requiredRoles);
+    /* OPS-026 — replaces the OPS-025 single-shot notification with
+       the multi-step chain initialiser. Falls back to a synthetic
+       1-step chain when no template is configured. */
+    await this.approvalActions.initializeApprovalChain(companyId, userId, id, 'work-permit');
     return this.findOne(id, companyId);
   }
 
+  /* OPS-026 — thin wrapper. The single-step "authorize" verb now
+     advances the multi-step chain by one. The engine does role +
+     separation-of-duties checks; we only fail-fast on team-member
+     attempting to self-authorise (a defensive guard preserved from
+     OPS-025 because it would otherwise leak through the fallback
+     1-step chain that doesn't restrict supervisors). */
   async authorize(id: string, companyId: string, userId: string, dto: AuthorizeWorkPermitDto) {
     const permit = await this.findOne(id, companyId);
     if (permit.status !== 'PENDING_AUTHORIZATION') {
       throw new BadRequestException('El permiso no está pendiente de autorización.');
     }
-    if (permit.requestedBy === userId || permit.supervisorId === userId) {
-      throw new ForbiddenException(
-        'El solicitante y el supervisor no pueden autorizar su propio permiso.',
-      );
-    }
     const teamMembers = (permit.workTeam ?? []) as unknown as Array<{ userId?: string }>;
     if (teamMembers.some((m) => m.userId === userId)) {
       throw new ForbiddenException('Un integrante del equipo de trabajo no puede autorizar.');
     }
-    const role = await this.userRoleInCompany(userId, companyId);
-    const required = permit.permitType.requiredRoles;
-    if (!role || (required.length > 0 && !required.includes(role) && role !== 'SUPER_ADMIN')) {
-      throw new ForbiddenException(
-        `Tu rol no autoriza permisos de tipo "${permit.permitType.name}". Se requiere: ${required.join(', ')}.`,
+    await this.approvalActions.approveStep(
+      companyId,
+      userId,
+      id,
+      'work-permit',
+      { stepOrder: permit.currentApprovalStep, notes: dto.authorizationNotes },
+      { ip: null, userAgent: null },
+    );
+    /* The engine sets authorizationNotes on the matching PermitApproval
+       row, but legacy fields on WorkPermit (authorizationNotes column)
+       used by OPS-025 still expect a value. Sync the latest approval
+       notes back so the detail page shows the same string. */
+    if (dto.authorizationNotes) {
+      await this.rlsService.executeWithRls(companyId, userId, (tx) =>
+        tx.workPermit.update({
+          where: { id },
+          data: { authorizationNotes: dto.authorizationNotes?.trim() ?? null },
+        }),
       );
     }
-
-    const now = new Date();
-    await this.rlsService.executeWithRls(companyId, userId, (tx) =>
-      tx.workPermit.update({
-        where: { id },
-        data: {
-          status: 'AUTHORIZED',
-          statusReason: null,
-          statusChangedAt: now,
-          statusChangedBy: userId,
-          authorizedBy: userId,
-          authorizedAt: now,
-          authorizationNotes: dto.authorizationNotes?.trim() ?? null,
-        },
-      }),
-    );
-
-    await this.notifyEvent(companyId, id, 'WORK_PERMIT_AUTHORIZED', {
-      title: `Permiso autorizado: ${permit.permitNumber}`,
-      message: `${permit.title} fue autorizado y queda listo para iniciar.`,
-      severity: 'INFO',
-      audience: this.uniqueIds([permit.requestedBy, permit.supervisorId]),
-    });
     return this.findOne(id, companyId);
   }
 
@@ -434,20 +439,14 @@ export class WorkPermitsService {
     if (permit.status !== 'PENDING_AUTHORIZATION') {
       throw new BadRequestException('El permiso no está pendiente de autorización.');
     }
-    if (permit.requestedBy === userId) {
-      throw new ForbiddenException('El solicitante no puede rechazar su propio permiso.');
-    }
-    if (!(await this.isAdminOrManager(userId, companyId))) {
-      throw new ForbiddenException('Solo un administrador o supervisor puede rechazar el permiso.');
-    }
-
-    await this.transitionStatus(companyId, userId, id, 'DRAFT', dto.reason.trim());
-    await this.notifyEvent(companyId, id, 'WORK_PERMIT_REJECTED', {
-      title: `Permiso rechazado: ${permit.permitNumber}`,
-      message: `${permit.title} fue rechazado. Motivo: ${dto.reason.trim()}`,
-      severity: 'WARNING',
-      audience: this.uniqueIds([permit.requestedBy, permit.supervisorId]),
-    });
+    await this.approvalActions.rejectStep(
+      companyId,
+      userId,
+      id,
+      'work-permit',
+      { stepOrder: permit.currentApprovalStep, notes: dto.reason },
+      { ip: null, userAgent: null },
+    );
     return this.findOne(id, companyId);
   }
 

@@ -598,6 +598,7 @@ model PermitType {
 
   permits        Permit[]
   alertInstances AlertInstance[]
+  approvalSteps  PermitApprovalStep[]
 
   @@unique([companyId, code])
   @@unique([companyId, name])
@@ -640,12 +641,21 @@ model Permit {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
+  /* OPS-026 — multi-step approval workflow. Backwards-compatible
+     defaults (`currentApprovalStep=0`, `totalApprovalSteps=1`,
+     `isFullyApproved=false`) preserve OPS-024's single-step
+     approve/reject for existing rows. */
+  currentApprovalStep Int     @default(0)
+  totalApprovalSteps  Int     @default(1)
+  isFullyApproved     Boolean @default(false)
+
   permitType     PermitType        @relation(fields: [permitTypeId], references: [id])
   asset          OperationalAsset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
   location       Location?         @relation(fields: [locationId], references: [id], onDelete: Cascade)
   replacedBy     Permit?           @relation("PermitSupersession", fields: [replacedByPermitId], references: [id])
   replaces       Permit[]          @relation("PermitSupersession")
   alertInstances AlertInstance[]
+  approvals      PermitApproval[]
 
   @@index([companyId, assetId])
   @@index([companyId, locationId])
@@ -707,7 +717,8 @@ model WorkPermitType {
   updatedAt                DateTime           @updatedAt
   createdBy                String             @db.Uuid
 
-  permits WorkPermit[]
+  permits       WorkPermit[]
+  approvalSteps PermitApprovalStep[]
 
   @@unique([companyId, code])
   @@unique([companyId, name])
@@ -772,9 +783,15 @@ model WorkPermit {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
+  /* OPS-026 — multi-step approval workflow. */
+  currentApprovalStep Int     @default(0)
+  totalApprovalSteps  Int     @default(1)
+  isFullyApproved     Boolean @default(false)
+
   permitType WorkPermitType    @relation(fields: [permitTypeId], references: [id])
   asset      OperationalAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
   location   Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  approvals  PermitApproval[]
 
   @@unique([companyId, permitNumber])
   @@index([companyId, status, plannedStart])
@@ -782,4 +799,92 @@ model WorkPermit {
   @@index([companyId, assetId])
   @@index([companyId, permitNumber])
   @@map("work_permits")
+}
+
+/* OPS-026 — multi-step authorization workflow shared between
+   external permits (OPS-024) and internal work permits (OPS-025).
+   PermitApprovalStep is the *template* (per permit type), and
+   PermitApproval is the *instance* (per permit row). The exact-one
+   target columns are guarded by DB CHECK constraints in the
+   migration so the application layer can't accidentally create
+   ambiguous rows. */
+enum ApprovalActionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+model PermitApprovalStep {
+  id                                String   @id @default(uuid()) @db.Uuid
+  companyId                         String   @db.Uuid
+  /* Exactly one of these two is non-null — DB CHECK enforces. */
+  workPermitTypeId                  String?  @db.Uuid
+  permitTypeId                      String?  @db.Uuid
+
+  stepOrder                         Int
+  name                              String
+  description                       String?
+
+  /* Roles allowed to approve this step. Stored as TEXT[] (UserRole
+     enum values as strings) so the schema stays company-portable
+     without per-tenant enum migrations. */
+  requiredRoles                     String[] @default([])
+  requiresSpecificUserId            String?  @db.Uuid
+  mustBeDifferentFromRequester      Boolean  @default(true)
+  mustBeDifferentFromPreviousApprovers Boolean @default(true)
+
+  isOptional                        Boolean  @default(false)
+  skipConditionsJson                Json?
+
+  createdAt                         DateTime @default(now())
+  updatedAt                         DateTime @updatedAt
+  createdBy                         String?  @db.Uuid
+
+  workPermitType WorkPermitType?  @relation(fields: [workPermitTypeId], references: [id], onDelete: Cascade)
+  permitType     PermitType?      @relation(fields: [permitTypeId], references: [id], onDelete: Cascade)
+  approvals      PermitApproval[]
+
+  @@index([companyId, workPermitTypeId, stepOrder])
+  @@index([companyId, permitTypeId, stepOrder])
+  @@map("permit_approval_steps")
+}
+
+model PermitApproval {
+  id              String               @id @default(uuid()) @db.Uuid
+  companyId       String               @db.Uuid
+  /* Exactly one of these two is non-null — DB CHECK enforces. */
+  workPermitId    String?              @db.Uuid
+  permitId        String?              @db.Uuid
+
+  approvalStepId  String               @db.Uuid
+  stepOrder       Int
+  stepName        String
+
+  approvedBy      String?              @db.Uuid
+  approvedAt      DateTime?
+  rejectedBy      String?              @db.Uuid
+  rejectedAt      DateTime?
+  notes           String?
+
+  /* SHA-256 of (permitId + userId + ISO timestamp + notes). Captured
+     once at the approval action and never recomputed; alongside the
+     audit trigger this gives us non-repudiation. */
+  signatureHash   String?
+  userIp          String?
+  userAgent       String?
+
+  status          ApprovalActionStatus @default(PENDING)
+
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  workPermit     WorkPermit?         @relation(fields: [workPermitId], references: [id], onDelete: Cascade)
+  permit         Permit?             @relation(fields: [permitId], references: [id], onDelete: Cascade)
+  approvalStep   PermitApprovalStep  @relation(fields: [approvalStepId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, workPermitId, stepOrder])
+  @@index([companyId, permitId, stepOrder])
+  @@index([companyId, status, createdAt])
+  @@map("permit_approvals")
 }

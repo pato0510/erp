@@ -356,68 +356,73 @@ documentos críticos vencidos, escala alertas a responsables.
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
-### OPS-024: Permisos externos con vencimientos (✓ completado)
+### OPS-025: Permisos Internos de Trabajo PT (✓ completado)
 
-Catálogo de permisos externos (municipales, sanitarios, ambientales, etc).
+Sistema completo de gestión de permisos de trabajo operacionales.
 
 ### Tablas creadas
 
-- permit_types (catálogo configurable)
-- permits (instancias con archivo, vigencia, autoridad, alcance)
-- Enums: PermitCategory (MUNICIPAL/SANITARY/ENVIRONMENTAL/FIRE_DEPT/
-  LABOR/ELECTRICAL/OTHER), PermitStatus (DRAFT/PENDING_REVIEW/
-  APPROVED/REJECTED/REPLACED/ARCHIVED)
-- CHECK constraint: exactly one of assetId or locationId
+- work_permit_types (catálogo configurable)
+- work_permits (instancias con lifecycle completo)
+- Enums: WorkPermitCategory (9 valores), WorkPermitStatus (8 valores)
+- DB CHECK: plannedStart < plannedEnd
 
-### 7 tipos chilenos por defecto
+### 6 tipos chilenos por defecto
 
-- PMUN — Patente Municipal (365 días)
-- AUTSAN — Autorización Sanitaria (3 años)
-- RCA — Resolución Calificación Ambiental (sin vencimiento)
-- PBOMB — Permiso de Bomberos (365 días)
-- DOM — Recepción Definitiva DOM
-- DEC180 — DS 180 Eléctrico
-- REGEN — Registro Generador de Residuos
+- PT-ALT — Trabajo en Altura (con aptitud médica + entrenamiento)
+- PT-CAL — Trabajo en Caliente
+- PT-EC — Espacio Confinado (requiere medición gases)
+- PT-LOTO — Bloqueo y Tarjeteo (requiere isolation)
+- PT-EXC — Excavación
+- PT-IZJ — Izaje de Cargas
 
-### Endpoints OPS-024
+### Numeración automática
 
-Mismas rutas que documents pero bajo /api/operations/permits/\*
+PT-{YEAR}-{NNNN} con sequence per-company
 
-- CRUD completo, upload, approve/reject, supersede, history, file
-- POST /api/operations/permit-types/seed-defaults
+### Workflow lifecycle
 
-### Storage convention
+DRAFT → PENDING_AUTHORIZATION → AUTHORIZED → IN_EXECUTION →
+CLOSED/CANCELLED/EXPIRED + estado SUSPENDED interrumpible
 
-operations/permits/{companyId}/{permitId}/{filename}
+### Endpoints OPS-025
 
-### Integración con alertas y bloqueos
+- CRUD work-permit-types con seedDefaults
+- CRUD work-permits + acciones lifecycle
+- POST /:id/{submit,authorize,reject,start,suspend,resume,close,cancel}
+- POST /:id/gas-measurement (espacio confinado)
+- POST /:id/attachments (max 5 archivos)
+- GET /work-permits/active-count, /work-permits/in-execution
 
-- AlertInstance extendido con permitId opcional
-- Alert engine procesa permits igual que documents
-- AssetBlockingService incluye permits CRITICAL+blocksOperation
-  en evaluación
+### Cron auto-expiración
 
-### UI agregada
+- Schedule: cada hora
+- Detecta AUTHORIZED/IN_EXECUTION con plannedEnd vencido
+- Marca EXPIRED y notifica supervisor + requester
 
-- /operaciones/permisos con tabs Externos | Permisos de Trabajo (próximamente)
-- 4 KPI cards, filtros, tabla con derived states
-- PermitUploadModal con sección de asociación (asset o location)
-- Tab "Permisos" en /operaciones/configuracion (5to tab)
-- AssetPermits component en fichas 360 (entre documentos y alertas)
+### NotificationSourceType extendido
 
-### Componentes nuevos
+6 valores nuevos para work-permit lifecycle
 
-- PermitUploadModal, PermitTypeFormModal, AssetPermits
+### Componentes UI
+
+- WorkPermitFormModal (8 secciones con auto-fill)
+- WorkPermitsTab con KPIs y filtros
+- /operaciones/permisos/trabajo/[id] detail page con timeline
+- ActiveWorkPermits en fichas 360 de equipos/vehículos
+- WorkPermitTypeFormModal en configuración
+
+### CASL nuevos subjects y acciones
+
+- WorkPermitType: read all, manage ADMIN/MANAGER
+- WorkPermit: lifecycle actions (authorize, start, suspend, resume, close, cancel)
 
 # Ticket actual
 
-- OPS-025: Permisos Internos de Trabajo (PT)
-  Diferentes a permisos externos: NO se renuevan, se emiten y cierran
-  Son instrumentos operacionales de uso diario para tareas específicas
-  Tipos: PT en Altura, en Caliente, Espacio Confinado, Bloqueo y Tarjeteo,
-  Excavaciones, Izaje de Cargas
-  Cada PT tiene: equipo de trabajo, supervisor responsable, duración,
-  ubicación específica, riesgos identificados, medidas de control,
-  estado (BORRADOR/EMITIDO/EN_EJECUCIÓN/SUSPENDIDO/CERRADO)
-  Workflow: solicita supervisor → autoriza jefe → ejecuta equipo → cierra
-  Pantalla con tab "Permisos de Trabajo" en /operaciones/permisos
+- OPS-026: Refinamiento del workflow de aprobación de permisos
+  Doble autorización para permisos críticos (LOTO requiere 2 firmas)
+  Reglas configurables de quién puede autorizar cada tipo de permiso
+  Firmas digitales con timestamp y trazabilidad completa
+  Workflow de aprobación robustecido para permisos externos también
+  Pantalla de cola de pendientes de autorización transversal
+  Notificaciones específicas por nivel de aprobación

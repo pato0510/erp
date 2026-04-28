@@ -57,6 +57,7 @@ import {
   type WorkPermitTypeForForm,
   type WorkPermitTypeSubmit,
 } from '../../../../components/operations/config/WorkPermitTypeFormModal';
+import { ApprovalChainsTab } from '../../../../components/operations/config/ApprovalChainsTab';
 import { AlertsConfigTab } from '../../../../components/operations/config/AlertsConfigTab';
 
 type TabKey = 'tipos' | 'ubicaciones' | 'documentos' | 'permisos' | 'alertas';
@@ -1214,7 +1215,7 @@ function TiposDocumentoTab({ toaster }: { toaster: Toaster }) {
 /*  TAB 4 — Permits sub-router (Externos / De Trabajo)          */
 /* ============================================================ */
 
-type PermisosSubTab = 'externos' | 'trabajo';
+type PermisosSubTab = 'externos' | 'trabajo' | 'cadenas';
 
 function PermisosTabRouter({ toaster }: { toaster: Toaster }) {
   const [sub, setSub] = useState<PermisosSubTab>('externos');
@@ -1230,9 +1231,13 @@ function PermisosTabRouter({ toaster }: { toaster: Toaster }) {
         <SubTabButton active={sub === 'trabajo'} onClick={() => setSub('trabajo')}>
           De Trabajo
         </SubTabButton>
+        <SubTabButton active={sub === 'cadenas'} onClick={() => setSub('cadenas')}>
+          Cadenas de aprobación
+        </SubTabButton>
       </div>
       {sub === 'externos' && <TiposPermisoTab toaster={toaster} />}
       {sub === 'trabajo' && <TiposPermisoDeTrabajoTab toaster={toaster} />}
+      {sub === 'cadenas' && <ApprovalChainsTab toaster={toaster} />}
     </div>
   );
 }

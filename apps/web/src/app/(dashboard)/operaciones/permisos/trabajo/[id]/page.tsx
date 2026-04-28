@@ -25,6 +25,7 @@ import {
 import { apiClient } from '../../../../../../lib/api';
 import { useAuth } from '../../../../../../hooks/useAuth';
 import { Toast } from '../../../../../../components/shared/Toast';
+import { PermitApprovalTimeline } from '../../../../../../components/operations/PermitApprovalTimeline';
 import { formatDate } from '../../../../../../lib/formatters';
 
 type WorkPermitStatus =
@@ -105,6 +106,12 @@ interface WorkPermitDetail {
   status: WorkPermitStatus;
   statusReason?: string | null;
   statusChangedAt?: string | null;
+  /* OPS-026 — multi-step approval state. Optional + defaults
+     because permits created before the migration default to
+     0/1/false on the server side. */
+  currentApprovalStep?: number;
+  totalApprovalSteps?: number;
+  isFullyApproved?: boolean;
   gasMeasurements?: GasMeasurement[] | null;
   isolationPoints?: unknown[] | null;
   attachments: AttachmentRecord[];
@@ -504,6 +511,18 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
 
         {/* RIGHT */}
         <div className="space-y-4">
+          {/* OPS-026 — multi-step approval chain. Refresh key reuses
+              the parent's load() invocations so post-approve actions
+              repaint the chain without a full remount. */}
+          <Card title="Cadena de aprobación" icon={ShieldCheck}>
+            <PermitApprovalTimeline
+              permitId={permit.id}
+              kind="work-permit"
+              users={users}
+              refreshKey={(permit.currentApprovalStep ?? 0) + (permit.isFullyApproved ? 1000 : 0)}
+            />
+          </Card>
+
           <Card title="Estado y fechas" icon={Clock}>
             <Timeline permit={permit} userById={userById} />
           </Card>

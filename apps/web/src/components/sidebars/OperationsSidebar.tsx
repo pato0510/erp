@@ -8,6 +8,7 @@ import {
   Bell,
   BookOpen,
   Calendar,
+  ClipboardCheck,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -31,6 +32,7 @@ const navItems = [
   { href: '/operaciones/documentos', label: 'Documentos', icon: FileText },
   { href: '/operaciones/excepciones', label: 'Excepciones', icon: ShieldOff },
   { href: '/operaciones/permisos', label: 'Permisos', icon: ShieldCheck },
+  { href: '/operaciones/aprobaciones', label: 'Aprobaciones', icon: ClipboardCheck },
   { href: '/operaciones/procedimientos', label: 'Procedimientos', icon: BookOpen },
   { href: '/operaciones/alertas', label: 'Alertas', icon: Bell },
   { href: '/operaciones/calendario', label: 'Calendario', icon: Calendar },
@@ -51,6 +53,8 @@ export function OperationsSidebar() {
   const [criticalAlertsCount, setCriticalAlertsCount] = useState(0);
   /* OPS-023 — pending exception requests; badge nudges admins to act. */
   const [pendingExceptionsCount, setPendingExceptionsCount] = useState(0);
+  /* OPS-026 — approval queue items waiting on the current user. */
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
 
   /* Poll the pending-review count on mount and every minute. The endpoint is
      gated to ADMIN/MANAGER (CASL `approve` action) — for any other role the
@@ -81,6 +85,14 @@ export function OperationsSidebar() {
         .get<{ count: number }>('/api/operations/exceptions/pending-count')
         .then((res) => {
           if (alive) setPendingExceptionsCount(res.count);
+        })
+        .catch(() => undefined);
+      apiClient
+        .get<{ mine: number; pendingCompany: number; approvedTodayByUser: number }>(
+          '/api/operations/permit-approvals/pending-counts',
+        )
+        .then((res) => {
+          if (alive) setPendingApprovalsCount(res.mine);
         })
         .catch(() => undefined);
     };
@@ -116,14 +128,18 @@ export function OperationsSidebar() {
           const isDocumentos = item.href === '/operaciones/documentos';
           const isAlertas = item.href === '/operaciones/alertas';
           const isExcepciones = item.href === '/operaciones/excepciones';
+          const isAprobaciones = item.href === '/operaciones/aprobaciones';
           const rawCount = isDocumentos
             ? pendingReviewCount
             : isAlertas
               ? criticalAlertsCount
               : isExcepciones
                 ? pendingExceptionsCount
-                : 0;
-          const showBadge = (isDocumentos || isAlertas || isExcepciones) && rawCount > 0;
+                : isAprobaciones
+                  ? pendingApprovalsCount
+                  : 0;
+          const showBadge =
+            (isDocumentos || isAlertas || isExcepciones || isAprobaciones) && rawCount > 0;
           const badgeText = rawCount > 99 ? '99+' : String(rawCount);
           return (
             <Link

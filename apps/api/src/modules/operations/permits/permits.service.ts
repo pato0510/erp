@@ -10,6 +10,7 @@ import { PermitStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { ApprovalActionsService } from './approvals/approval-actions.service';
 import { ArchivePermitDto } from './dto/archive-permit.dto';
 import { CreatePermitDto } from './dto/create-permit.dto';
 import { FilterPermitsDto } from './dto/filter-permits.dto';
@@ -64,6 +65,7 @@ export class PermitsService {
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
     private readonly storage: StorageService,
+    private readonly approvalActions: ApprovalActionsService,
   ) {}
 
   /* Mirrors DocumentRecordsService.deriveStatus — same UI semantics so
@@ -452,7 +454,7 @@ export class PermitsService {
     const permitId = randomUUID();
     const { filePath, fileData } = await this.storeFile(companyId, permitId, file);
 
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) =>
+    const created = await this.rlsService.executeWithRls(companyId, userId, async (tx) =>
       tx.permit.create({
         data: {
           id: permitId,
@@ -485,6 +487,19 @@ export class PermitsService {
         },
       }),
     );
+    /* OPS-026 — when a permit is created already in PENDING_REVIEW
+       (the common "I have the file, send it for approval now" flow),
+       initialize the multi-step chain right away so downstream
+       approve/reject calls can advance it. */
+    if (status === 'PENDING_REVIEW') {
+      await this.approvalActions.initializeApprovalChain(
+        companyId,
+        userId,
+        created.id,
+        'external-permit',
+      );
+    }
+    return created;
   }
 
   async update(id: string, companyId: string, userId: string, dto: UpdatePermitDto) {
@@ -574,40 +589,49 @@ export class PermitsService {
     );
   }
 
+  /* OPS-026 — multi-step approval. Calls into the engine, which owns
+     status transitions, signature hashing, and notifications. The
+     legacy "uploader cannot approve" rule is preserved by the
+     engine's `mustBeDifferentFromRequester` flag (defaults to true
+     on every step). */
   async approve(id: string, companyId: string, userId: string) {
     const existing = await this.prisma.permit.findFirst({
       where: { id, companyId },
-      select: { id: true, status: true, uploadedBy: true },
+      select: { id: true, status: true, currentApprovalStep: true },
     });
     if (!existing) throw new NotFoundException('Permiso no encontrado');
     if (existing.status !== 'PENDING_REVIEW') {
       throw new BadRequestException('Solo se pueden aprobar permisos en estado PENDIENTE_REVISION');
     }
-    if (existing.uploadedBy === userId) {
-      throw new ForbiddenException('No puedes aprobar un permiso que tú mismo cargaste');
+    /* Lazy chain init — handles permits created before OPS-026 that
+       reached PENDING_REVIEW without ever calling
+       initializeApprovalChain. Idempotent on re-entry: when the row
+       already has approvals seeded the call is a no-op (the engine
+       deletes prior PENDING rows and re-seeds, but the chain shape
+       is identical so no state is lost). */
+    if (existing.currentApprovalStep === 0) {
+      await this.approvalActions.initializeApprovalChain(companyId, userId, id, 'external-permit');
     }
-    const now = new Date();
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) =>
-      tx.permit.update({
-        where: { id },
-        data: {
-          status: 'APPROVED',
-          approvedBy: userId,
-          approvedAt: now,
-          rejectedBy: null,
-          rejectedAt: null,
-          statusReason: null,
-          statusChangedAt: now,
-          statusChangedBy: userId,
-        },
-      }),
+    const refreshed = await this.prisma.permit.findFirst({
+      where: { id, companyId },
+      select: { currentApprovalStep: true },
+    });
+    const stepOrder = Math.max(1, refreshed?.currentApprovalStep ?? 1);
+    await this.approvalActions.approveStep(
+      companyId,
+      userId,
+      id,
+      'external-permit',
+      { stepOrder },
+      { ip: null, userAgent: null },
     );
+    return this.findOne(id, companyId);
   }
 
   async reject(id: string, companyId: string, userId: string, dto: RejectPermitDto) {
     const existing = await this.prisma.permit.findFirst({
       where: { id, companyId },
-      select: { id: true, status: true, uploadedBy: true },
+      select: { id: true, status: true, currentApprovalStep: true },
     });
     if (!existing) throw new NotFoundException('Permiso no encontrado');
     if (existing.status !== 'PENDING_REVIEW') {
@@ -615,23 +639,23 @@ export class PermitsService {
         'Solo se pueden rechazar permisos en estado PENDIENTE_REVISION',
       );
     }
-    if (existing.uploadedBy === userId) {
-      throw new ForbiddenException('No puedes rechazar un permiso que tú mismo cargaste');
+    if (existing.currentApprovalStep === 0) {
+      await this.approvalActions.initializeApprovalChain(companyId, userId, id, 'external-permit');
     }
-    const now = new Date();
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) =>
-      tx.permit.update({
-        where: { id },
-        data: {
-          status: 'REJECTED',
-          rejectedBy: userId,
-          rejectedAt: now,
-          statusReason: dto.reason,
-          statusChangedAt: now,
-          statusChangedBy: userId,
-        },
-      }),
+    const refreshed = await this.prisma.permit.findFirst({
+      where: { id, companyId },
+      select: { currentApprovalStep: true },
+    });
+    const stepOrder = Math.max(1, refreshed?.currentApprovalStep ?? 1);
+    await this.approvalActions.rejectStep(
+      companyId,
+      userId,
+      id,
+      'external-permit',
+      { stepOrder, notes: dto.reason },
+      { ip: null, userAgent: null },
     );
+    return this.findOne(id, companyId);
   }
 
   async resubmit(id: string, companyId: string, userId: string) {
@@ -651,7 +675,7 @@ export class PermitsService {
       );
     }
     const now = new Date();
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) =>
+    const updated = await this.rlsService.executeWithRls(companyId, userId, async (tx) =>
       tx.permit.update({
         where: { id },
         data: {
@@ -664,6 +688,13 @@ export class PermitsService {
         },
       }),
     );
+    /* OPS-026 — restart the chain on resubmission. The engine deletes
+       the prior approvals before re-seeding, so signature hashes from
+       the first attempt are kept in the audit trail (deletes go
+       through audit triggers) but are no longer queryable through the
+       active timeline. */
+    await this.approvalActions.initializeApprovalChain(companyId, userId, id, 'external-permit');
+    return updated;
   }
 
   async supersede(

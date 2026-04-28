@@ -27,6 +27,8 @@ type Subjects =
       | typeof PermitSubject
       | typeof WorkPermitTypeSubject
       | typeof WorkPermitSubject
+      | typeof PermitApprovalStepSubject
+      | typeof PermitApprovalSubject
     >
   | 'all';
 
@@ -99,6 +101,12 @@ class WorkPermitTypeSubject {
 class WorkPermitSubject {
   static readonly modelName = 'WorkPermit' as const;
 }
+class PermitApprovalStepSubject {
+  static readonly modelName = 'PermitApprovalStep' as const;
+}
+class PermitApprovalSubject {
+  static readonly modelName = 'PermitApproval' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -129,7 +137,10 @@ export type Action =
   | 'suspend'
   | 'resume'
   | 'close'
-  | 'cancel';
+  | 'cancel'
+  /* OPS-026 — multi-step approval. `skip` is ADMIN-only override
+     to bypass an optional/blocked step with prominent audit. */
+  | 'skip';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {
@@ -156,6 +167,8 @@ export {
   PermitSubject,
   WorkPermitTypeSubject,
   WorkPermitSubject,
+  PermitApprovalStepSubject,
+  PermitApprovalSubject,
 };
 
 @Injectable()
@@ -225,6 +238,10 @@ export class CaslAbilityFactory {
           ],
           WorkPermitSubject,
         );
+        /* OPS-026 — MANAGER can author approval-chain templates and
+           record per-step approvals. `skip` stays ADMIN-only. */
+        can(['create', 'update', 'delete'], PermitApprovalStepSubject);
+        can(['read', 'approve', 'reject'], PermitApprovalSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -281,6 +298,10 @@ export class CaslAbilityFactory {
            permits through the lifecycle. */
         can('read', WorkPermitTypeSubject);
         can('read', WorkPermitSubject);
+        /* OPS-026 — VIEWER can read approval chains/audit but cannot
+           record actions. */
+        can('read', PermitApprovalStepSubject);
+        can('read', PermitApprovalSubject);
         break;
     }
 
