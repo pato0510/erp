@@ -44,6 +44,7 @@ import {
   type DerivedDocumentStatus,
 } from '../../../../../components/operations/DocumentStatusBadge';
 import { DocumentUploadModal } from '../../../../../components/operations/DocumentUploadModal';
+import { AssetPermits } from '../../../../../components/operations/AssetPermits';
 import { DocumentPreviewModal } from '../../../../../components/operations/DocumentPreviewModal';
 import { DocumentSupersessionModal } from '../../../../../components/operations/DocumentSupersessionModal';
 import { DocumentHistoryModal } from '../../../../../components/operations/DocumentHistoryModal';
@@ -1410,6 +1411,11 @@ export default function VehicleDetailPage({ params }: PageProps) {
             </div>
           )}
         </Card>
+      </div>
+
+      {/* OPS-024 — external operational permits associated with this vehicle. */}
+      <div className="mt-4">
+        <AssetPermits assetId={vehicle.assetId} />
       </div>
 
       {/* OPS-021 — active alerts for this vehicle. */}

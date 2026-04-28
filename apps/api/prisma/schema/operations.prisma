@@ -39,9 +39,11 @@ model Location {
   updatedAt        DateTime @updatedAt
   createdBy        String   @db.Uuid
 
-  parent   Location?          @relation("LocationTree", fields: [parentLocationId], references: [id])
-  children Location[]         @relation("LocationTree")
-  assets   OperationalAsset[]
+  parent         Location?          @relation("LocationTree", fields: [parentLocationId], references: [id])
+  children       Location[]         @relation("LocationTree")
+  assets         OperationalAsset[]
+  permits        Permit[]
+  alertInstances AlertInstance[]
 
   @@unique([companyId, code])
   @@index([companyId, parentLocationId])
@@ -125,6 +127,7 @@ model OperationalAsset {
   alertInstances AlertInstance[]
   statusChanges  AssetStatusChange[]
   exceptions     AssetException[]
+  permits        Permit[]
 
   @@unique([companyId, code])
   @@index([companyId, assetTypeId])
@@ -337,9 +340,21 @@ model AlertInstance {
   id                   String              @id @default(uuid()) @db.Uuid
   companyId            String              @db.Uuid
   alertRuleId          String?             @db.Uuid
-  documentTypeId       String              @db.Uuid
-  assetId              String              @db.Uuid
+  /* Document-side reference (Sprint 4). Optional from OPS-024
+     onwards because permit-driven alerts use the parallel
+     permitId/permitTypeId pair instead. */
+  documentTypeId       String?             @db.Uuid
+  /* Asset is now nullable too — permits can be attached to a
+     Location with no asset, in which case the engine still tracks
+     expiration but stores locationId rather than assetId. */
+  assetId              String?             @db.Uuid
   documentRecordId     String?             @db.Uuid
+  /* OPS-024 — permit-side references. Either (documentTypeId,
+     documentRecordId) OR (permitTypeId, permitId) is populated for a
+     given alert; the application enforces this rather than the DB. */
+  permitTypeId         String?             @db.Uuid
+  permitId             String?             @db.Uuid
+  locationId           String?             @db.Uuid
   triggerType          AlertTriggerType
   severity             AlertSeverity
   /* Rule threshold that fired this row (e.g. 30, 7, 0). For MISSING/
@@ -363,16 +378,26 @@ model AlertInstance {
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
-  alertRule      AlertRule?              @relation(fields: [alertRuleId], references: [id])
-  documentType   OperationalDocumentType @relation(fields: [documentTypeId], references: [id])
-  asset          OperationalAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  documentRecord DocumentRecord?         @relation(fields: [documentRecordId], references: [id])
+  alertRule      AlertRule?               @relation(fields: [alertRuleId], references: [id])
+  documentType   OperationalDocumentType? @relation(fields: [documentTypeId], references: [id])
+  asset          OperationalAsset?        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  documentRecord DocumentRecord?          @relation(fields: [documentRecordId], references: [id])
+  permitType     PermitType?              @relation(fields: [permitTypeId], references: [id])
+  permit         Permit?                  @relation(fields: [permitId], references: [id], onDelete: SetNull)
+  location       Location?                @relation(fields: [locationId], references: [id])
   notifications  UserNotification[]
 
+  /* Document path keeps its original idempotency key. Permit alerts
+     don't conflict with this because their assetId/documentTypeId
+     are NULL and Postgres treats NULL as distinct under unique
+     constraints. A permit-specific partial index lives in the
+     migration to dedupe (companyId, permitId, triggerType, days,
+     status) — see migration `add_permits_and_types`. */
   @@unique([companyId, assetId, documentTypeId, triggerType, daysBeforeExpiration, status])
   @@index([companyId, status, triggeredAt])
   @@index([companyId, assetId, status])
   @@index([companyId, severity, status])
+  @@index([companyId, permitId, status])
   @@map("alert_instances")
 }
 
@@ -515,4 +540,109 @@ model AssetException {
   @@index([companyId, status, validUntil])
   @@index([companyId, assetId, status])
   @@map("asset_exceptions")
+}
+
+/* OPS-024 — external operational permits. Mirrors DocumentRecord but
+   the target can be either an OperationalAsset OR a Location (mining
+   site, branch office, etc.), so the same permit rows cover patentes
+   municipales (per location) and cosas como Permiso Bomberos (per
+   asset). Exactly one of assetId/locationId must be set — enforced by
+   a CHECK constraint defined in the migration. */
+enum PermitCategory {
+  MUNICIPAL
+  SANITARY
+  ENVIRONMENTAL
+  FIRE_DEPT
+  LABOR
+  ELECTRICAL
+  OTHER
+}
+
+enum PermitStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  REPLACED
+  ARCHIVED
+}
+
+model PermitType {
+  id                      String              @id @default(uuid()) @db.Uuid
+  companyId               String              @db.Uuid
+  name                    String
+  code                    String
+  category                PermitCategory
+  issuingAuthority        String?
+  hasExpiration           Boolean             @default(true)
+  defaultValidityDays     Int?
+  alertDaysBefore         Int                 @default(30)
+  criticalAlertDaysBefore Int                 @default(7)
+  criticality             DocumentCriticality
+  blocksOperation         Boolean             @default(false)
+  description             String?
+  icon                    String?
+  color                   String?
+  isActive                Boolean             @default(true)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  createdBy               String              @db.Uuid
+
+  permits        Permit[]
+  alertInstances AlertInstance[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, name])
+  @@index([companyId, category])
+  @@map("permit_types")
+}
+
+model Permit {
+  id                  String       @id @default(uuid()) @db.Uuid
+  companyId           String       @db.Uuid
+  permitTypeId        String       @db.Uuid
+  /* Exactly one of these two is non-null. The application layer is
+     authoritative; the migration adds a CHECK constraint to back this
+     up at the DB level. */
+  assetId             String?      @db.Uuid
+  locationId          String?      @db.Uuid
+  permitNumber        String
+  issuingAuthority    String?
+  issueDate           DateTime?    @db.Date
+  expirationDate      DateTime?    @db.Date
+  scope               String?
+  fileName            String?
+  mimeType            String?
+  fileSize            Int?
+  filePath            String?
+  fileData            Bytes?
+  status              PermitStatus @default(DRAFT)
+  statusReason        String?
+  statusChangedAt     DateTime?
+  statusChangedBy     String?      @db.Uuid
+  uploadedBy          String       @db.Uuid
+  approvedBy          String?      @db.Uuid
+  approvedAt          DateTime?
+  rejectedBy          String?      @db.Uuid
+  rejectedAt          DateTime?
+  version             Int          @default(1)
+  replacedByPermitId  String?      @db.Uuid
+  notes               String?
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  permitType     PermitType        @relation(fields: [permitTypeId], references: [id])
+  asset          OperationalAsset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  location       Location?         @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  replacedBy     Permit?           @relation("PermitSupersession", fields: [replacedByPermitId], references: [id])
+  replaces       Permit[]          @relation("PermitSupersession")
+  alertInstances AlertInstance[]
+
+  @@index([companyId, assetId])
+  @@index([companyId, locationId])
+  @@index([companyId, permitTypeId])
+  @@index([companyId, status])
+  @@index([companyId, expirationDate])
+  @@map("permits")
 }

@@ -154,6 +154,72 @@ export class AssetBlockingService {
          documentType decides whether expiration is even applicable. */
     }
 
+    /* OPS-024 — also evaluate permits attached to this asset. CRITICAL
+       + blocksOperation permits that are missing or expired count as
+       blocking just like documents. We don't enforce "required permit
+       types" here because there's no equivalent of DocumentRequirement
+       for permits yet — every approved permit is the source of truth. */
+    const permitRows = await this.prisma.permit.findMany({
+      where: {
+        companyId,
+        assetId,
+        isActive: true,
+        replacedByPermitId: null,
+        permitType: {
+          criticality: 'CRITICAL',
+          blocksOperation: true,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        expirationDate: true,
+        permitNumber: true,
+        permitType: { select: { id: true, name: true, code: true, hasExpiration: true } },
+      },
+    });
+    /* For permits we treat "no APPROVED row" as MISSING per type, and
+       APPROVED+expired as EXPIRED. We key by permitTypeId so a single
+       blocking type still surfaces only once even if multiple draft
+       rows exist for it. */
+    const permitsByType = new Map<
+      string,
+      { state: 'MISSING' | 'EXPIRED'; ref: (typeof permitRows)[number] }
+    >();
+    for (const p of permitRows) {
+      const existing = permitsByType.get(p.permitType.id);
+      if (p.status === 'APPROVED') {
+        const exp = p.expirationDate;
+        if (p.permitType.hasExpiration && exp) {
+          const expUtc = new Date(
+            Date.UTC(exp.getUTCFullYear(), exp.getUTCMonth(), exp.getUTCDate()),
+          );
+          if (expUtc.getTime() < today.getTime()) {
+            permitsByType.set(p.permitType.id, { state: 'EXPIRED', ref: p });
+          } else if (!existing) {
+            /* Valid — clear any previous MISSING marker. */
+            permitsByType.delete(p.permitType.id);
+          }
+        } else {
+          permitsByType.delete(p.permitType.id);
+        }
+      } else if (!existing && !permitsByType.has(p.permitType.id)) {
+        /* Non-approved permit row — only marks the type as MISSING if
+           no APPROVED row was seen yet. The loop ordering doesn't
+           matter because we re-evaluate per type at the end. */
+        permitsByType.set(p.permitType.id, { state: 'MISSING', ref: p });
+      }
+    }
+    for (const [, v] of permitsByType) {
+      blockingDocuments.push({
+        documentTypeId: v.ref.permitType.id,
+        documentTypeName: `Permiso: ${v.ref.permitType.name}`,
+        documentTypeCode: v.ref.permitType.code,
+        state: v.state,
+        expirationDate: v.ref.expirationDate,
+      });
+    }
+
     /* Fetch the ACTIVE alert ids that match the blocking types so the
        audit row can link back to them. We don't fail the evaluation if
        this query errors — it's metadata, not the decision. */

@@ -241,6 +241,21 @@ export class AlertEngineService {
       }
     }
 
+    /* OPS-024 — permit pass. Walks every active permit, computes days
+       remaining against permitType.alertDaysBefore, and emits an
+       AlertInstance with the permit-side fields populated. The
+       partial unique index `alert_instances_permit_dedupe` keeps
+       repeat runs idempotent — same as the document path. */
+    if (!options.dryRun) {
+      try {
+        await this.processCompanyPermits(companyId, summary, today);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Permit alert pass failed for company ${companyId}: ${msg}`);
+        summary.errors.push(`permits: ${msg}`);
+      }
+    }
+
     /* OPS-020 — sweep through asset statuses now that today's alert
        inventory is current. Skipped on dryRun so previews stay
        side-effect free. */
@@ -366,6 +381,12 @@ export class AlertEngineService {
           documentTypeId: data.documentTypeId,
           assetId: data.assetId,
           documentRecordId: data.documentRecordId,
+          /* OPS-024 — permit-side fields. The document path leaves them
+             null; permit-driven alerts populate them in the parallel
+             code path. */
+          permitTypeId: null,
+          permitId: null,
+          locationId: null,
           triggerType: data.triggerType,
           severity: data.severity,
           daysBeforeExpiration: data.daysBeforeExpiration,
@@ -392,6 +413,162 @@ export class AlertEngineService {
             err instanceof Error ? err.message : err
           }`,
         );
+      }
+    }
+  }
+
+  /* OPS-024 — permit-side counterpart of the per-asset loop above.
+     Iterates approved+active+non-replaced permits and emits an
+     AlertInstance when the days-remaining crosses the permit type's
+     alertDaysBefore window or when the permit is already expired.
+     Ignores permits without expirationDate / hasExpiration since
+     there's nothing to fire on. */
+  private async processCompanyPermits(companyId: string, summary: ProcessSummary, today: Date) {
+    const permits = await this.prisma.permit.findMany({
+      where: {
+        companyId,
+        isActive: true,
+        replacedByPermitId: null,
+        status: 'APPROVED',
+        expirationDate: { not: null },
+        permitType: { hasExpiration: true },
+      },
+      include: {
+        permitType: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            alertDaysBefore: true,
+            criticalAlertDaysBefore: true,
+            criticality: true,
+            blocksOperation: true,
+          },
+        },
+        asset: { select: { id: true, code: true, name: true, assignedToUserId: true } },
+        location: { select: { id: true, code: true, name: true } },
+      },
+    });
+
+    for (const p of permits) {
+      if (!p.expirationDate) continue;
+      const exp = p.expirationDate;
+      const expUtc = new Date(Date.UTC(exp.getUTCFullYear(), exp.getUTCMonth(), exp.getUTCDate()));
+      const stateDays = Math.floor((expUtc.getTime() - today.getTime()) / 86400000);
+      if (stateDays > p.permitType.alertDaysBefore) continue;
+
+      const isExpired = stateDays < 0;
+      const isCriticalWindow = stateDays <= p.permitType.criticalAlertDaysBefore;
+      const severity: AlertSeverity =
+        isExpired && p.permitType.blocksOperation
+          ? 'BLOCKING'
+          : isCriticalWindow || isExpired
+            ? 'CRITICAL'
+            : 'WARNING';
+      const triggerType: AlertTriggerType =
+        severity === 'BLOCKING' ? 'BLOCKING' : isExpired ? 'EXPIRED' : 'EXPIRING_SOON';
+      /* Threshold to dedupe on — pick the closest fired threshold. */
+      const threshold = isCriticalWindow
+        ? p.permitType.criticalAlertDaysBefore
+        : p.permitType.alertDaysBefore;
+
+      const targetName = p.asset
+        ? `${p.asset.name} (${p.asset.code})`
+        : p.location
+          ? p.location.name
+          : 'Permiso';
+      const title =
+        triggerType === 'BLOCKING'
+          ? `${p.permitType.name} de ${targetName} bloquea operación`
+          : isExpired
+            ? `${p.permitType.name} de ${targetName} vencido hace ${Math.abs(stateDays)} ${
+                Math.abs(stateDays) === 1 ? 'día' : 'días'
+              }`
+            : `${p.permitType.name} de ${targetName} vence en ${stateDays} ${
+                stateDays === 1 ? 'día' : 'días'
+              }`;
+
+      const notifiedUsers: string[] = [];
+      if (p.asset?.assignedToUserId) notifiedUsers.push(p.asset.assignedToUserId);
+
+      try {
+        const created = await this.rlsService.executeWithRls(
+          companyId,
+          ENGINE_USER_ID,
+          async (tx) =>
+            tx.alertInstance.create({
+              data: {
+                companyId,
+                permitTypeId: p.permitType.id,
+                permitId: p.id,
+                assetId: p.assetId,
+                locationId: p.locationId,
+                triggerType,
+                severity,
+                daysBeforeExpiration: threshold,
+                expirationDate: exp,
+                notifiedRoles: ['ADMIN', 'MANAGER'],
+                notifiedUsers,
+                title,
+                message: `Permiso ${p.permitNumber} (${p.permitType.code})`,
+                metadata: {
+                  permitNumber: p.permitNumber,
+                  stateDays,
+                  permitTypeCode: p.permitType.code,
+                } as Prisma.InputJsonValue,
+              },
+              select: { id: true },
+            }),
+        );
+        summary.alertsCreated++;
+        /* Notify recipients for the permit alert via the same
+           NotificationService factory the document path uses — we
+           pass a minimal AlertInstance shape so it doesn't reach
+           into the asset-only fields. */
+        try {
+          await this.notificationService.createForAlertInstance(companyId, {
+            id: created.id,
+            companyId,
+            alertRuleId: null,
+            documentTypeId: null,
+            assetId: p.assetId,
+            documentRecordId: null,
+            permitTypeId: p.permitType.id,
+            permitId: p.id,
+            locationId: p.locationId,
+            triggerType,
+            severity,
+            daysBeforeExpiration: threshold,
+            expirationDate: exp,
+            status: 'ACTIVE',
+            acknowledgedBy: null,
+            acknowledgedAt: null,
+            resolvedBy: null,
+            resolvedAt: null,
+            resolvedReason: null,
+            escalatedAt: null,
+            notifiedRoles: ['ADMIN', 'MANAGER'],
+            notifiedUsers,
+            title,
+            message: `Permiso ${p.permitNumber} (${p.permitType.code})`,
+            metadata: {} as Prisma.JsonValue,
+            triggeredAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Permit alert notification fan-out failed: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          summary.alertsSkippedExisting++;
+          continue;
+        }
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Permit alert insert failed for permit ${p.id}: ${msg}`);
+        summary.errors.push(`permit ${p.id}: ${msg}`);
       }
     }
   }

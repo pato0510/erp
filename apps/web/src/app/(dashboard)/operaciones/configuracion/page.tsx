@@ -42,13 +42,22 @@ import {
   type DocumentTypeForForm,
   type DocumentTypeSubmit,
 } from '../../../../components/operations/config/DocumentTypeFormModal';
+import {
+  PERMIT_CATEGORY_LABELS,
+  PERMIT_CRITICALITY_LABELS,
+  PermitTypeFormModal,
+  type PermitCriticality,
+  type PermitTypeForForm,
+  type PermitTypeSubmit,
+} from '../../../../components/operations/config/PermitTypeFormModal';
 import { AlertsConfigTab } from '../../../../components/operations/config/AlertsConfigTab';
 
-type TabKey = 'tipos' | 'ubicaciones' | 'documentos' | 'alertas';
+type TabKey = 'tipos' | 'ubicaciones' | 'documentos' | 'permisos' | 'alertas';
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Layers }> = [
   { key: 'tipos', label: 'Tipos de Activo', icon: Layers },
   { key: 'ubicaciones', label: 'Ubicaciones', icon: MapPin },
   { key: 'documentos', label: 'Tipos de Documento', icon: FileText },
+  { key: 'permisos', label: 'Tipos de Permiso', icon: ShieldCheck },
   { key: 'alertas', label: 'Alertas', icon: Bell },
 ];
 
@@ -75,6 +84,8 @@ interface LocationRow extends LocationForForm {
 
 type DocumentTypeRow = DocumentTypeForForm;
 
+type PermitTypeRow = PermitTypeForForm;
+
 type Toaster = (message: string, type: 'success' | 'error' | 'info') => void;
 
 export default function ConfiguracionPage() {
@@ -90,7 +101,7 @@ function ConfiguracionContent() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as TabKey | null) ?? 'tipos';
   const [tab, setTab] = useState<TabKey>(
-    (['tipos', 'ubicaciones', 'documentos', 'alertas'] as TabKey[]).includes(initialTab)
+    (['tipos', 'ubicaciones', 'documentos', 'permisos', 'alertas'] as TabKey[]).includes(initialTab)
       ? initialTab
       : 'tipos',
   );
@@ -185,6 +196,7 @@ function ConfiguracionContent() {
       {tab === 'tipos' && <TiposTab toaster={showToast} />}
       {tab === 'ubicaciones' && <UbicacionesTab toaster={showToast} />}
       {tab === 'documentos' && <TiposDocumentoTab toaster={showToast} />}
+      {tab === 'permisos' && <TiposPermisoTab toaster={showToast} />}
       {tab === 'alertas' && <AlertsConfigTab toaster={showToast} />}
 
       <style jsx global>{`
@@ -1181,6 +1193,271 @@ function TiposDocumentoTab({ toaster }: { toaster: Toaster }) {
         <DocumentTypeFormModal
           mode={modal.mode}
           documentType={modal.mode === 'edit' ? modal.type : null}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+        />
+      )}
+    </>
+  );
+}
+
+/* ============================================================ */
+/*  TAB 4 — Permit Types                                        */
+/* ============================================================ */
+
+const PERMIT_CRITICALITY_COLORS: Record<PermitCriticality, { bg: string; fg: string }> = {
+  LOW: { bg: 'rgba(100, 116, 139, 0.14)', fg: '#475569' },
+  MEDIUM: { bg: 'rgba(37, 99, 235, 0.12)', fg: '#1d4ed8' },
+  HIGH: { bg: 'rgba(234, 179, 8, 0.14)', fg: '#a16207' },
+  CRITICAL: { bg: 'rgba(239, 68, 68, 0.12)', fg: '#b91c1c' },
+};
+
+function TiposPermisoTab({ toaster }: { toaster: Toaster }) {
+  const [types, setTypes] = useState<PermitTypeRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [modal, setModal] = useState<
+    null | { mode: 'create' } | { mode: 'edit'; type: PermitTypeRow }
+  >(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await apiClient.get<PermitTypeRow[]>('/api/operations/permit-types');
+      setTypes(rows);
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error cargando tipos de permiso', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [toaster]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleSave = async (dto: PermitTypeSubmit) => {
+    if (modal?.mode === 'edit') {
+      await apiClient.patch(`/api/operations/permit-types/${modal.type.id}`, dto);
+      toaster('Tipo de permiso actualizado', 'success');
+    } else {
+      await apiClient.post('/api/operations/permit-types', dto);
+      toaster('Tipo de permiso creado', 'success');
+    }
+    setModal(null);
+    load();
+  };
+
+  const handleDelete = async (row: PermitTypeRow) => {
+    if (!window.confirm(`¿Eliminar el tipo "${row.name}"?`)) return;
+    try {
+      await apiClient.delete(`/api/operations/permit-types/${row.id}`);
+      toaster('Tipo de permiso eliminado', 'success');
+      load();
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error al eliminar', 'error');
+    }
+  };
+
+  const handleSeedDefaults = async () => {
+    setSeeding(true);
+    try {
+      const result = await apiClient.post<{ createdCount: number; skippedCount: number }>(
+        '/api/operations/permit-types/seed-defaults',
+      );
+      toaster(
+        `${result.createdCount} tipos de permiso creados${
+          result.skippedCount > 0 ? ` · ${result.skippedCount} omitidos (ya existían)` : ''
+        }`,
+        'success',
+      );
+      load();
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error al cargar tipos por defecto', 'error');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  return (
+    <>
+      <section className="config-section">
+        <div className="config-section__head">
+          <div>
+            <h2>Tipos de Permiso</h2>
+            <p>
+              Catálogo de permisos operacionales externos que pueden asociarse a activos o
+              ubicaciones (Patente Municipal, Autorización Sanitaria, RCA, Permiso de Bomberos).
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleSeedDefaults}
+              disabled={seeding}
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+              }}
+            >
+              <Settings size={14} />
+              {seeding ? 'Cargando...' : 'Cargar tipos chilenos por defecto'}
+            </button>
+            <button
+              onClick={() => setModal({ mode: 'create' })}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
+              style={{
+                background: '#1C1C1E',
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+              }}
+            >
+              <Plus size={16} /> Nuevo tipo
+            </button>
+          </div>
+        </div>
+        {loading ? (
+          <SkeletonRows />
+        ) : types.length === 0 ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title="No hay tipos de permiso"
+            description="Carga el catálogo chileno por defecto o crea tipos personalizados."
+          />
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="config-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 56 }}> </th>
+                  <th>Nombre / Código</th>
+                  <th>Categoría</th>
+                  <th>Autoridad</th>
+                  <th>Vigencia</th>
+                  <th>Criticidad</th>
+                  <th>Bloqueante</th>
+                  <th>Estado</th>
+                  <th style={{ width: 100, textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {types.map((pt) => {
+                  const critMeta = PERMIT_CRITICALITY_COLORS[pt.criticality];
+                  return (
+                    <tr key={pt.id}>
+                      <td>
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            background: pt.color || '#475569',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            fontSize: 11,
+                            fontFamily: 'var(--font-jetbrains-mono), monospace',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {pt.code.slice(0, 3)}
+                        </div>
+                      </td>
+                      <td>
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-outfit), sans-serif',
+                            fontWeight: 500,
+                          }}
+                        >
+                          {pt.name}
+                        </div>
+                        <div
+                          className="text-[var(--text-muted)] mt-0.5"
+                          style={{
+                            fontFamily: 'var(--font-jetbrains-mono), monospace',
+                            fontSize: 11,
+                          }}
+                        >
+                          {pt.code}
+                        </div>
+                      </td>
+                      <td>{PERMIT_CATEGORY_LABELS[pt.category]}</td>
+                      <td>
+                        {pt.issuingAuthority ? (
+                          <span style={{ fontSize: 13 }}>{pt.issuingAuthority}</span>
+                        ) : (
+                          <span className="text-[var(--text-muted)]">—</span>
+                        )}
+                      </td>
+                      <td>
+                        {pt.hasExpiration && pt.defaultValidityDays ? (
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-jetbrains-mono), monospace',
+                              fontSize: 12,
+                            }}
+                          >
+                            {pt.defaultValidityDays} días
+                          </span>
+                        ) : (
+                          <span className="text-[var(--text-muted)]">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className="config-chip"
+                          style={{ background: critMeta.bg, color: critMeta.fg }}
+                        >
+                          {PERMIT_CRITICALITY_LABELS[pt.criticality]}
+                        </span>
+                      </td>
+                      <td>
+                        {pt.blocksOperation ? (
+                          <span
+                            className="config-chip"
+                            style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#b91c1c' }}
+                          >
+                            Sí
+                          </span>
+                        ) : (
+                          <span className="text-[var(--text-muted)]">No</span>
+                        )}
+                      </td>
+                      <td>
+                        <ActiveBadge active={pt.isActive} />
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          onClick={() => setModal({ mode: 'edit', type: pt })}
+                          className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                          title="Editar"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(pt)}
+                          className="p-2 rounded-md hover:bg-red-50 text-red-600 ml-1"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {modal && (
+        <PermitTypeFormModal
+          mode={modal.mode}
+          permitType={modal.mode === 'edit' ? modal.type : null}
           onClose={() => setModal(null)}
           onSave={handleSave}
         />

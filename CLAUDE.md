@@ -353,72 +353,94 @@ documentos críticos vencidos, escala alertas a responsables.
 
 ## Próximos sprints
 
-Sprint 6: Permisos y Procedimientos (OPS-024 a OPS-028)
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
-### OPS-022: Escalamiento por severidad y notificaciones in-app (✓ completado)
+### OPS-023: Excepciones temporales aprobadas (✓ completado)
 
-Sistema completo de notificaciones in-app con bell icon, dropdown y página.
+Admin puede liberar temporalmente activos BLOCKED_DOCUMENTAL.
 
 ### Tabla creada
 
-- user_notifications con FK a User (CASCADE) y AlertInstance (SET NULL)
-- Enum NotificationSourceType: ALERT_INSTANCE, ASSET_BLOCKED, ESCALATION,
-  DOCUMENT_REJECTED, DOCUMENT_APPROVED, EXCEPTION_REQUESTED, EXCEPTION_GRANTED,
-  GENERAL
-- RLS estricta per-user: companyId = rls.company_id AND userId = rls.user_id
-- RlsService extendido para setear SET LOCAL rls.user_id
+- asset_exceptions con FK a OperationalAsset (CASCADE)
+- Enum ExceptionStatus: PENDING, APPROVED, REJECTED, EXPIRED, REVOKED
+- Snapshot de docs bloqueantes en requestedDocumentTypeIds
+- previousStatus para revertir, expiresHandled flag para cron
 
-### Endpoints OPS-022
+### Endpoints OPS-023
 
-- GET /api/operations/notifications (paginado, filtros)
-- GET /api/operations/notifications/unread-count
-- POST /api/operations/notifications/:id/read
-- POST /api/operations/notifications/mark-all-read
-- POST /api/operations/notifications/:id/dismiss
+- GET /api/operations/exceptions
+- GET /api/operations/exceptions/pending-count
+- GET /api/operations/exceptions/active-for-asset/:assetId
+- GET /api/operations/exceptions/:id
+- POST /api/operations/exceptions (cualquier user)
+- POST /api/operations/exceptions/:id/approve (ADMIN)
+- POST /api/operations/exceptions/:id/reject (ADMIN)
+- POST /api/operations/exceptions/:id/revoke (ADMIN)
 
-### Métodos del notification.service.ts
+### Workflow
 
-- createForAlertInstance — fan-out a roles + assignedUser, dedup
-- createForAssetBlocked — ADMIN/MANAGER + assigned user
-- createGeneric — broadcast por userIds explícitos
-- Errores de fan-out aislados por usuario (no falla el batch)
+1. Cualquier user puede solicitar excepción si activo BLOCKED_DOCUMENTAL
+2. Validaciones: motivo min 20 chars, max 90 días, único PENDING/APPROVED por activo
+3. Notificación a ADMINs al solicitar
+4. ADMIN aprueba con validFrom + validUntil + razón opcional
+5. Activo se desbloquea + AssetStatusChange con EXCEPTION_GRANTED
+6. Banner amarillo en ficha mostrando vigencia
+7. Cron horario detecta expiraciones y re-bloquea
+8. ADMIN puede revocar manualmente con motivo (re-evaluación inmediata)
 
-### Integraciones automáticas
+### Cron de expiración
 
-- AlertEngineService.maybeCreateAlert → notifica al crear alerta
-- AssetBlockingService.processBlocking → notifica AUTO_BLOCK
-- AlertEscalationService → escala CRITICAL/BLOCKING no atendidas
+- Schedule: 0 \* \* \* \* (cada hora)
+- Job: exception-expiration-check
+- Marca EXPIRED + audit + re-evaluación + notificación
 
-### Cron de escalamiento
+### CASL nueva acción
 
-- Schedule: 0 _/6 _ \* \* (cada 6 horas)
-- Job: alert-escalation-check
-- Marca status=ESCALATED y notifica a escalateToRoles
+- 'AssetException' subject
+- create: cualquier autenticado
+- approve/reject/revoke: ADMIN only
 
-### Componentes nuevos
+### UI agregada
 
-- apps/web/src/components/NotificationCenter.tsx
-  Bell + badge con color por severidad más alta no leída
-  Dropdown 360px, polling cada 60s
-  Íconos por tipo (TrendingUp/Ban/Bell)
-  Click marca leída + navega
-- apps/web/src/app/(dashboard)/notificaciones/page.tsx
-  Página completa con tabs, filtros, bulk actions
+- /operaciones/excepciones con KPIs, filtros, tabla, paginación
+- Sidebar item "Excepciones" (ShieldOff icon) con badge PENDING count
+- ExceptionRequestModal/ApproveModal/RejectModal/RevokeModal/DetailModal
+- Banner amarillo en fichas con APPROVED activa
+- Botón "Solicitar excepción" habilitado en banner rojo de bloqueo
 
-### Layout actualizado
+### Compliance counts agregados
 
-Topbar sticky en (dashboard)/layout.tsx con NotificationCenter visible
-en todas las pantallas del módulo.
+assetsWithActiveExceptions, exceptionsAboutToExpire (7 días)
+
+# Sprint 6 — Permisos y Procedimientos (en desarrollo)
+
+Sprint dedicado a permisos operacionales (externos e internos) y
+biblioteca de procedimientos con acuses de lectura.
+
+### Diferencias clave entre módulos
+
+- DOCUMENTOS (Sprints 4-5): certificados/papeles asociados a activos
+- PERMISOS EXTERNOS: permisos emitidos por terceros (municipalidad,
+  sanitario, ambiental) con vencimientos
+- PERMISOS INTERNOS DE TRABAJO: instrumentos operacionales de seguridad
+  (PT en altura, en caliente, espacio confinado, etc) — son de uso
+  diario, no se renuevan, se emiten y cierran
+- PROCEDIMIENTOS: documentos que personas deben leer y firmar acuse
+
+### Tickets del Sprint 6
+
+- OPS-024: Permisos externos con vencimientos
+- OPS-025: Permisos internos de trabajo (PT)
+- OPS-026: Workflow de aprobación de permisos
+- OPS-027: Biblioteca de procedimientos con versionado
+- OPS-028: Acuse de lectura de procedimientos críticos
 
 # Ticket actual
 
-- OPS-023: Excepciones temporales aprobadas
-  Admin puede liberar temporalmente un activo BLOCKED_DOCUMENTAL con
-  justificación y fecha de validez.
-  El activo vuelve a OPERATIONAL durante el período de excepción.
-  Cuando expira la excepción: se re-evalúa el bloqueo automáticamente.
-  Tabla asset_exceptions con audit completo.
-  Workflow: solicitud → aprobación admin → activa → expira o revocada.
-  Notificaciones a interesados al solicitar/aprobar/expirar.
+- OPS-024: Permisos externos con vencimientos
+  Catálogo de tipos de permiso externo (municipal, sanitario, etc)
+  Modelo Permit con vigencia, autoridad emisora, alcance
+  Asociación con activos o sitios (locations)
+  Mismo motor de alertas y bloqueos que documentos
+  Pantalla /operaciones/permisos con CRUD

@@ -23,6 +23,8 @@ type Subjects =
       | typeof AlertRuleSubject
       | typeof AlertSettingsSubject
       | typeof AssetExceptionSubject
+      | typeof PermitTypeSubject
+      | typeof PermitSubject
     >
   | 'all';
 
@@ -83,6 +85,12 @@ class AlertSettingsSubject {
 class AssetExceptionSubject {
   static readonly modelName = 'AssetException' as const;
 }
+class PermitTypeSubject {
+  static readonly modelName = 'PermitType' as const;
+}
+class PermitSubject {
+  static readonly modelName = 'Permit' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -127,6 +135,8 @@ export {
   AlertRuleSubject,
   AlertSettingsSubject,
   AssetExceptionSubject,
+  PermitTypeSubject,
+  PermitSubject,
 };
 
 @Injectable()
@@ -172,6 +182,11 @@ export class CaslAbilityFactory {
            approve/reject/revoke it. Only ADMIN (via `manage 'all'`)
            gets the lifecycle verbs. */
         can('create', AssetExceptionSubject);
+        /* OPS-024 — same shape as documents: MANAGER manages the
+           catalog and individual permit rows + workflow actions; only
+           ADMIN can outright delete an APPROVED permit (must archive). */
+        can(['create', 'update', 'delete'], PermitTypeSubject);
+        can(['create', 'update', 'approve', 'reject', 'resubmit', 'supersede'], PermitSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -216,6 +231,9 @@ export class CaslAbilityFactory {
            still happens at the ADMIN level. */
         can('read', AssetExceptionSubject);
         can('create', AssetExceptionSubject);
+        /* OPS-024 — read-only on permit catalog/rows for VIEWER. */
+        can('read', PermitTypeSubject);
+        can('read', PermitSubject);
         break;
     }
 
