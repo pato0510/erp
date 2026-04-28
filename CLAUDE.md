@@ -2,10 +2,20 @@
 
 ## What is this project
 
-Excelsia ERP is a financial management platform for Chilean companies.
-It allows visualizing, controlling and anticipating the financial situation
-by consolidating bank movements, tax information (SII), commitments and projections.
-It is a multi-tenant system with strict data isolation per company.
+Excelsia ERP is a multi-module business management platform for
+Chilean companies. It started as a financial management system
+and now expands into operations, HR, commercial, calendar, and HSEC.
+
+It is a multi-tenant SaaS with strict data isolation per company,
+multi-module architecture with dynamic sidebar per module, and
+role-based access control (RBAC) prepared for ABAC.
+
+## Production URLs
+
+- Frontend: https://app.excelsia.cl
+- Backend: https://api.excelsia.cl
+- Modules selector: https://app.excelsia.cl/modulos
+- Current main client: AGS Solutions SPA (RUT 77.004.647-5)
 
 ## Tech stack
 
@@ -15,219 +25,170 @@ It is a multi-tenant system with strict data isolation per company.
 - Database: PostgreSQL with Row Level Security (RLS) for multi-tenancy
 - ORM: Prisma with prismaSchemaFolder (schema split by module)
 - Queues and jobs: Redis + BullMQ
-- Storage: MinIO (S3-compatible)
+- Storage: MinIO (S3-compatible) with DB blob fallback
 - Auth: JWT in HttpOnly cookies + Passport.js in NestJS
 - Authorization: RBAC + CASL (prepared for ABAC)
 - Audit: PostgreSQL triggers (infallible, database level)
 - Observability: Sentry + OpenTelemetry with distributed tracing
 - Local infra: Docker Compose
-- CI/CD: GitHub Actions
+- CI/CD: GitHub Actions → Railway auto-deploy on push to develop
+- Domain: Cloudflare DNS → excelsia.cl
 
 ## Key architectural decisions
 
 1. Modular monolith, NO microservices
 2. Multi-tenancy with shared database + PostgreSQL RLS
-3. JWT never in localStorage, always in HttpOnly Secure SameSite=Strict cookie
+3. JWT never in localStorage, always in HttpOnly Secure SameSite cookie
 4. Audit with PL/pgSQL triggers, not only application AuditService
-5. Next.js acts as BFF (Backend for Frontend): presentation and orchestration
+5. Next.js acts as BFF (Backend for Frontend)
 6. All heavy business logic lives in NestJS, never in frontend
 7. Prisma with schema split by module (prismaSchemaFolder)
 8. Complex transactions always with explicit prisma.$transaction()
-
-## Repository structure (Nx monorepo)
-
-excelsia-erp/
-apps/
-web/ # Frontend Next.js (BFF layer)
-api/ # Backend NestJS
-libs/
-ui/ # Shared UI components (shadcn/ui base)
-config/ # Shared configuration (eslint, tsconfig)
-types/ # Shared TypeScript types between apps
-utils/ # Shared utilities
-infra/
-docker/
-nginx/
-scripts/
-docs/
-.github/
-
-## Backend structure (apps/api/src)
-
-modules/
-iam/ # Auth, sessions, users
-tenancy/ # Multi-company, memberships
-companies/ # Company configuration
-catalogs/ # Categories, counterparties, cost centers
-banking/ # Bank integration, sync, cartola import
-tax/ # SII/fiscal integration
-movements/ # Financial movements
-reconciliation/ # Bank-document reconciliation
-cashflow/ # Cash, treasury, commitments
-alerts/ # Alerts and notifications
-closing/ # Monthly closing
-reports/ # Reports and exports
-audit/ # Audit service
-jobs/ # BullMQ workers
-common/ # Decorators, guards, interceptors
+9. Multi-module architecture with dynamic sidebar per module
+10. Storage with MinIO + DB blob fallback (same pattern across all modules)
 
 ## Code conventions
 
 - Commits in English: type(scope): description
-  Types: feat, fix, chore, refactor, test, docs
 - Always work on develop branch directly
-- Never create git branches or run git commands
-- Every protected endpoint must: (1) validate JWT, (2) extract tenant_id,
-  (3) verify CASL role/permission, (4) execute logic with RLS active
-
-## Architecture reminders
-
-- JWT in HttpOnly cookies ALWAYS
-- RLS active on all financial tables
-- Every new table needs: RLS policy + audit trigger + GRANT to app_user
-- Use RlsService.executeWithRls(companyId, userId, fn) for mutations
+- Every protected endpoint must: validate JWT, extract tenant_id,
+  verify CASL role/permission, execute logic with RLS active
 - Stable useEffect pattern in frontend (primitive deps, no object state)
 - All amounts use formatCLP() from lib/formatters.ts
 - Decimal values from Prisma come as strings — use Number() before arithmetic
 
-## IMPORTANT RULES FOR CLAUDE CODE
+## RULES FOR CLAUDE CODE
 
 - NEVER create git branches
-- NEVER run git commands (no git commit, no git push, no git checkout)
+- NEVER run git commands (no commit, push, checkout)
 - NEVER create pull requests
 - Only write and modify code files
 - The user handles all git operations
 
-## Completed tickets
+═══════════════════════════════════════════════════════════════════
+
+# MÓDULO FINANZAS (V1 COMPLETO EN PRODUCCIÓN)
+
+═══════════════════════════════════════════════════════════════════
+
+## Sprints completados
 
 ### Sprint 1 — Base platform ✓
 
-ARC-001 — Nx monorepo base structure ✓
-ARC-002 — Docker Compose with PostgreSQL, Redis and MinIO ✓
-ARC-003 — Prisma configured with prismaSchemaFolder ✓
-ARC-004 — Redis and BullMQ base queue ✓
-ARC-005 — ESLint, Prettier, Husky and Nx module boundaries ✓
-ARC-006 — Sentry and distributed tracing ✓
-ARC-007 — GitHub Actions CI pipeline ✓
+ARC-001 a ARC-007: Nx monorepo, Docker, Prisma, Redis/BullMQ,
+ESLint, Sentry, GitHub Actions
 
-### Sprint 2 — Identity, security and multi-tenancy ✓
+### Sprint 2 — Identity & multi-tenancy ✓
 
-TEN-001 — Tenant, Company, User and Membership models ✓
-IAM-001 — JWT authentication with HttpOnly cookies ✓
-IAM-002 — Logout, session expiration and refresh token ✓
-IAM-005 — Roles and permissions with CASL ✓
-TEN-003 — PostgreSQL Row Level Security (RLS) ✓
-AUD-001 — PostgreSQL audit triggers ✓
+TEN-001, IAM-001, IAM-002, IAM-005, TEN-003, AUD-001
 
 ### Sprint 3 — Configuration and catalogs ✓
 
-CFG-001 — Company configuration and financial settings ✓
-CAT-001 — Income and expense categories CRUD ✓
-CAT-002 — Counterparties CRUD ✓
-CAT-003 — Cost centers and fiscal periods ✓
+CFG-001, CAT-001, CAT-002, CAT-003
 
 ### Sprint 4 — Financial core ✓
 
-MOV-001 — Financial movements CRUD ✓
-CASH-001 — Bank accounts, opening balances and commitments ✓
-MOV-002 — Bulk import movements from CSV/Excel ✓
-DASH-001 — Main financial dashboard with KPIs ✓
-DASH-002 — Movements frontend screens ✓
-DASH-003 — Fix movements infinite re-render ✓
-CASH-002 — Cashflow frontend screen ✓
+MOV-001, CASH-001, MOV-002, DASH-001, DASH-002, DASH-003, CASH-002
 
 ### Sprint 5 — Dashboard, alerts and reports ✓
 
-DASH-004 — Enhanced dashboard with charts and period selector ✓
-ALR-001 — Alerts system with rules and frontend screen ✓
-REP-001 — Excel export and reports ✓
+DASH-004, ALR-001, REP-001
 
 ### Sprint 6 — Banking integration ✓
 
-BNK-001 — Banking adapter with mock provider ✓
-BNK-002 — Automatic sync with BullMQ and sync history ✓
-BNK-003 — Manual cartola import as fallback ✓
+BNK-001, BNK-002, BNK-003
 
-### Sprint 7 — Tax and reconciliation (in progress)
+### Sprint 7 — Tax and reconciliation ✓
 
-TAX-001 — SII integration with mock provider ✓
-REC-001 — Reconciliation engine with exact matching ✓
+TAX-001, REC-001
 
 ### Sprint 8 — Hardening ✓
 
-CLS-001 — Monthly closing process ✓
-FIX-001 — Dashboard error isolation ✓
-SEC-001 — Security hardening and rate limiting ✓
-QA-001 — Critical test suite 31/31 passing ✓
-REL-001 — Production go-live checklist ✓
+CLS-001, FIX-001, SEC-001, QA-001, REL-001
 
-## Status
-
-V1 COMPLETE — Ready for production
-
-## SII Integration — ## SII Integration — BaseAPI (UPDATED)
+## SII Integration — BaseAPI (FUNCIONAL)
 
 Provider: BaseAPI (baseapi.cl) — GRATUITO
-Previous provider: LibreDTE — DESCARTADO (costo $40.000+IVA/mes)
+Conecta usando RUT + clave SII portal (sin certificado).
+Variables Railway: BASEAPI_KEY, SII_RUT, SII_PASSWORD
+Endpoints:
 
-### How it works
+- POST /sii/rcv/{YYYY-MM}/venta — facturas emitidas
+- POST /sii/rcv/{YYYY-MM}/compra — facturas recibidas
+- POST /sii/contribuyente/informacion — test connection
 
-BaseAPI connects to SII using RUT + SII portal password.
-No certificate needed for reading documents.
-Returns JSON directly (no SOAP, no XML).
+## Auto-creación de movimientos desde SII
 
-### Environment variables (Railway)
+EMITIDO → INCOME categoría "Ingresos por Ventas"
+RECIBIDO → EXPENSE categoría "Productos no categorizados"
+Aplica reglas de categorización (RUT primero, keyword después)
+Estado CONFIRMED, idempotente vía taxDoc.movementId
 
-BASEAPI_KEY=api_key_from_baseapi_dashboard
-SII_RUT=77004647-5
-SII_PASSWORD=client_sii_portal_password
+## Categorización por reglas
 
-### BaseAPI Endpoints used
+Tabla CategoryRule con tipos RUT | KEYWORD | DEFAULT
+Pantalla /categorias/reglas con CRUD + panel de prueba
+Aplicado en sync SII y disponible para uso manual
 
-POST https://api.baseapi.cl/api/v1/sii/rcv/ventas — facturas emitidas
-POST https://api.baseapi.cl/api/v1/sii/rcv/compras — facturas recibidas
-POST https://api.baseapi.cl/api/v1/sii/contribuyente/informacion — test connection
-Auth: Header X-API-Key: {BASEAPI_KEY}
-Period format: "YYYY-MM"
+═══════════════════════════════════════════════════════════════════
 
-### Document types synced
+# DISEÑO VISUAL
 
-- Tipo 33: Factura Electrónica (EMITIDO y RECIBIDO)
-- Tipo 34: Factura No Afecta
-- Tipo 39: Boleta Electrónica
-- Tipo 61: Nota de Crédito
-- Tipo 56: Nota de Débito
-  Direction: EMITIDO (ventas) and RECIBIDO (compras)
+═══════════════════════════════════════════════════════════════════
 
-### Architecture
+## Páginas con starfield animado (canvas)
 
-- BaseApiSiiProvider implements ISiiProvider interface
-- Default provider: 'baseapi' (replaces mock-sii in production)
-- Mock provider kept for local development/testing
-- Sync runs manually from /tributario screen
-- Future: auto-sync every 24h via BullMQ
+- /login — fondo negro + nebulosas + estrellas animadas
+- /modulos — mismo fondo que login
 
-### SiiConnection model
+## Páginas con dark gradient estático (dentro de dashboard)
 
-- Still exists in DB for audit trail
-- certificateData field kept but not used for BaseAPI
-- Provider field: 'baseapi'
-- isActive: true when BASEAPI_KEY + SII_PASSWORD are set
+Background: linear-gradient(135deg, #0F0F14 0%, #1A1A22 50%, #15151E 100%)
+Sin animación, sin estrellas. Componente DarkGradientBackground.
 
-### Production URLs
+## Sidebar gradients
 
-Frontend: https://app.excelsia.cl
-Backend: https://api.excelsia.clLibreDTE
+- Light theme: linear-gradient(180deg, #3B5C8A 0%, #284B75 100%)
+- Dark theme: linear-gradient(180deg, #0A0A12 0%, #0F1422 100%)
+- Sidebar text: blanco en ambos temas
+- Active item: rgba(255,255,255,0.1) bg + #60A5FA border-left
 
-## Módulo Operaciones (en desarrollo)
+## Cards
 
-### Concepto central
+- Dark: glassmorphism rgba(28,28,30,0.5) + backdrop-filter blur(12px)
+- Light: solid white + border #e8eaed
 
-El objeto principal es el **Activo Operacional**. Equipos y vehículos
+## Fonts (next/font/google con display:swap, preload:true)
+
+Outfit, JetBrains Mono, Space Grotesk, IBM Plex Sans, IBM Plex Mono
+
+## FOUC prevention
+
+- Critical CSS inline en layout.tsx
+- .login-page y .modulos-page-wrapper con fade-in 0.4s
+- suppressHydrationWarning en <html>
+
+## Multi-sidebar pattern
+
+El sidebar cambia dinámicamente según la ruta:
+
+- /dashboard, /movimientos, /caja, etc → FinanceSidebar
+- /operaciones y subrutas → OperationsSidebar
+- Futuro: HsecSidebar, CommercialSidebar, etc
+
+═══════════════════════════════════════════════════════════════════
+
+# MÓDULO OPERACIONES (EN DESARROLLO)
+
+═══════════════════════════════════════════════════════════════════
+
+## Concepto central
+
+El objeto principal es el Activo Operacional. Equipos y vehículos
 son variantes de un mismo concepto que comparten lógica común.
 Vehículos extienden con campos específicos (patente, VIN, kilometraje).
 
-### Submódulos del Módulo Operaciones
+## Submódulos del Módulo Operaciones
 
 1. Dashboard Operacional
 2. Equipos
@@ -239,274 +200,159 @@ Vehículos extienden con campos específicos (patente, VIN, kilometraje).
 8. Calendario Operacional
 9. Reportes
 
-### Decisiones arquitectónicas (alineadas al stack actual)
+## Decisiones arquitectónicas alineadas al stack
 
-- Mantener Prisma (NO migrar a MikroORM) — RLS y migraciones ya consolidadas
+- Mantener Prisma (NO MikroORM) — RLS y migraciones consolidadas
 - Reutilizar BullMQ existente para job de vencimientos diario
 - Reutilizar CASL para autorización con nuevos subjects
-- JSONB en PostgreSQL para campos dinámicos por subtipo de activo
-- Jerarquías padre-hijo via self-referencing foreign key
+- JSONB para campos dinámicos por subtipo de activo
+- Jerarquías padre-hijo via self-referencing FK
 - Versionado inmutable (supersesión) para documentos críticos
-- Storage en MinIO/R2 con fallback a DB (mismo patrón SII)
+- Storage MinIO/R2 con fallback a DB blob
 
-### Tablas principales del módulo
+## Tablas principales
 
-- operational_assets (tabla central — equipos + vehículos)
-- vehicles (extensión con campos de flota)
-- asset_types, asset_subtypes
-- locations (sitios/áreas)
-- document_types (catálogo configurable)
-- document_requirements (matriz: qué documentos exige cada tipo de activo)
-- document_records (documentos cargados con vigencia)
-- document_versions (versionado inmutable)
-- permits, permit_types
-- procedure_documents
-- procedure_acknowledgments (acuses de lectura)
-- alert_rules, alert_instances
-- exceptions (excepciones temporales aprobadas)
+operational_assets, vehicles, asset_types, asset_subtypes, locations,
+operational_document_types, document_requirements, document_records,
+permits, permit_types, procedure_documents, procedure_acknowledgments,
+alert_rules, alert_instances, exceptions
 
-### Estados de activo
+## Estados de Activo (AssetStatus)
 
-OPERATIVO, CON_OBSERVACIONES, NO_OPERATIVO, EN_MANTENCION,
-BLOQUEADO_DOCUMENTAL, BLOQUEADO_PERMISO, FUERA_SERVICIO, DADO_BAJA
+OPERATIONAL, WITH_OBSERVATIONS, NON_OPERATIONAL, IN_MAINTENANCE,
+BLOCKED_DOCUMENTAL, BLOCKED_PERMIT, OUT_OF_SERVICE, DECOMMISSIONED
 
-### Estados de documento
+## Estados de Documento (DocumentRecordStatus)
 
-BORRADOR, PENDIENTE_REVISION, APROBADO, RECHAZADO,
-VIGENTE, POR_VENCER, VENCIDO, REEMPLAZADO, ARCHIVADO
+DRAFT, PENDING_REVIEW, APPROVED, REJECTED, REPLACED, ARCHIVED
 
-### Roles del módulo
+- Estados derivados: VIGENTE, POR_VENCER, VENCIDO, FALTANTE
 
-- operations_admin — config global del módulo
-- operations_supervisor — gestiona equipos/vehículos/excepciones
-- document_manager — sube/aprueba/rechaza documentos
-- operator — solo ve documentos de sus activos asignados
-- auditor — solo lectura
-
-### Integración con Finanzas
-
-Operaciones publica eventos de dominio que Finanzas escucha:
-
-- DocumentRenewalImminentEvent → crea compromiso futuro automático
-- AssetBlockedEvent → alerta financiera por activo no operativo
-- OperationalCostEvent → registra gasto asociado a activo
-
-### Estructura backend
+## Estructura backend
 
 apps/api/src/modules/operations/
-assets/
-fleet/
-document-control/
-permits/
-procedures/
-alerts/
-reports/
 
-### Estructura frontend
+- assets/, fleet/, document-control/, permits/, procedures/,
+  alerts/, reports/, asset-types/, locations/, document-types/,
+  document-requirements/
+
+## Estructura frontend
 
 apps/web/src/app/(dashboard)/operaciones/
-page.tsx (dashboard operacional)
-equipos/
-vehiculos/
-documentos/
-permisos/
-procedimientos/
-alertas/
-calendario/
-reportes/
 
-### Plan de sprints
+- page.tsx, equipos/, vehiculos/, documentos/, permisos/,
+  procedimientos/, alertas/, calendario/, reportes/, configuracion/
 
-Sprint 1: Panel módulos + estructura base operaciones
-Sprint 2: Equipos
-Sprint 3: Vehículos
-Sprint 4: Control Documental
-Sprint 5: Alertas y Bloqueos
+## Plan de sprints del módulo
+
+Sprint 1: Fundación — panel módulos + estructura base ✓
+Sprint 2: Equipos ✓
+Sprint 3: Vehículos ✓
+Sprint 4: Control Documental ✓
+Sprint 5: Alertas y Bloqueos automáticos
 Sprint 6: Permisos y Procedimientos
 Sprint 7: Calendario, Reportes e Integración Finanzas
-Sprint 8: Hardening (vistas materializadas, QR, QA)
+Sprint 8: Hardening
 
-## Sprint 3 — Vehículos (en desarrollo)
+═══════════════════════════════════════════════════════════════════
 
-### OPS-011: Ficha 360 del Vehículo (✓ completado)
+# SPRINTS COMPLETADOS DEL MÓDULO OPERACIONES
 
-Pantalla de detalle completa para vehículos en `/operaciones/vehiculos/[id]`.
+═══════════════════════════════════════════════════════════════════
 
-### Layout
+## Sprint 1 — Fundación ✓
 
-2-column responsive grid (colapsa a 1 col en mobile <1024px).
-Header con patente como título principal, breadcrumb y acciones.
+- OPS-001: Panel de selección de módulos al login
+- OPS-002: Estructura del módulo /operaciones (sidebar + rutas)
+- OPS-003: Schema base — operational_assets, asset_types, locations
+- OPS-004: Tipos documentales y matriz de requisitos
+  Resolution engine: asset > subtype > type (más específico gana)
+  12 document types chilenos por defecto via seed-defaults
 
-### Secciones implementadas
+## Sprint 2 — Equipos ✓
 
-- **Foto + Info del vehículo** — patente, VIN, año, color, combustible, asignado
-- **Kilometraje** — número grande con botón actualizar + placeholder histórico
-- **Identificación adicional** — serie, fabricante, modelo, fechas, costo
-- **Estado y operación** — badge + botón cambiar estado
-- **Ubicación** — dirección + coordenadas
-- **Jerarquía** — solo padre (vehículos no suelen tener hijos)
-- **Tags** — chip list
-- **Documentos legales requeridos** — 4 del pack chileno via resolve endpoint
-- **Historial** — creación y última modificación
+- OPS-005: CRUD de Equipos con foto, jerarquía padre-hijo,
+  atributos dinámicos JSONB, tags, asignación a usuarios
+- OPS-006: Ficha 360 del equipo
+- OPS-007: Configuración unificada (/operaciones/configuracion)
+  3 tabs: Tipos+Subtipos, Ubicaciones, Tipos de Documento
+- OPS-008: Importación masiva CSV/Excel de equipos
+  ImportLog con entityType, max 1000 rows, 5MB
 
-### Backend cambios
+## Sprint 3 — Vehículos ✓
 
-- fleet.service.ts: nuevo `assetDetailSelect` separado del `assetSelect`
-  - findOne usa el detail selector con relaciones completas
-  - findAll mantiene el selector liviano para listas
-- assignedToUserId y createdBy se resuelven con prisma.user.findMany batch
-  (mismo patrón que assets.service.ts)
+- OPS-009: CRUD de Vehículos (extiende OperationalAsset)
+  Validación: AssetType debe ser categoría VEHICLE
+  Endpoints en /api/operations/fleet/vehicles
+  KilometersUpdateModal con validación no-decrecer
+- OPS-010: Pack documental Chile automático
+  Auto-asocia SOAP, PERMCIRC, REVTEC, PADRON al crear AssetType VEHICLE
+  Endpoint: POST /asset-types/:id/apply-vehicle-defaults
+- OPS-011: Ficha 360 del Vehículo
+- OPS-012: Importación masiva CSV/Excel de vehículos
+  Mapeo de combustibles ES→enum (Bencina, Diésel, Eléctrico, etc)
 
-### Componentes reutilizados
+## Sprint 4 — Control Documental ✓
 
-- VehicleFormModal (editar)
-- StatusChangeModal (cambio de estado)
-- KilometersUpdateModal (actualizar km)
-- AssetStatusBadge
-
-### Endpoints consumidos
-
-- GET /api/operations/fleet/vehicles/:id (detalle completo)
-- GET /api/operations/document-requirements/resolve/:assetId (pack chileno)
-- POST /api/operations/assets/:id/photo (foto, reutilizado)
-- PATCH /api/operations/fleet/vehicles/:id/kilometers (actualizar km)
-
-### UX en lista de vehículos
-
-- Filas clickeables → navegan al detalle
-- Botones de acción (km, editar, eliminar) usan e.stopPropagation()
-
-### OPS-012: Importación masiva CSV/Excel de vehículos (✓ completado)
-
-Wizard de 3 pasos en `/operaciones/vehiculos`.
-
-- Plantilla CSV con 20 columnas (asset + vehicle fields)
-- Mapeo automático de combustibles en español:
-  Bencina/Gasolina → GASOLINE
-  Diésel/Diesel → DIESEL
-  Eléctrico/Electrico → ELECTRIC
-  Híbrido/Hibrido → HYBRID
-  Gas/GLP → LPG
-  Otro → OTHER
-- Validaciones: AssetType debe ser VEHICLE, patente única, VIN ≤17,
-  año en rango, km ≥ 0
-- Crea OperationalAsset + Vehicle en transacción única
-- Upsert para duplicados de código (skipDuplicates togglable)
-- Hard error en duplicados de patente (no auto-update)
-- ImportLog con entityType='VEHICLE'
-- Max 1000 filas, 5MB
-
-### Endpoints agregados OPS-012
-
-- GET /api/operations/fleet/vehicles/import/template
-- POST /api/operations/fleet/vehicles/import/preview
-- POST /api/operations/fleet/vehicles/import
-
-### Componente nuevo
-
-- apps/web/src/components/operations/VehicleImportWizard.tsx
-
-# Sprint 4 — Control Documental (en desarrollo)
-
-Este sprint es el corazón operacional del módulo. Permite cargar
-documentos reales (PDFs, fotos, certificados) a cada activo,
-con vigencia, vencimientos, versionado inmutable y workflow de
-aprobación.
-
-### Tickets del Sprint 4
-
-- OPS-013: Pantalla central de control documental
-- OPS-014: Carga de documentos a activos con metadatos
+- OPS-013: Pantalla central /operaciones/documentos
+  KPIs de compliance global, filtros, quick chips
+  DocumentStatusBadge component reusable
+- OPS-014: Upload de documentos con metadatos
+  Storage MinIO + DB blob fallback
+  Auto-cálculo de expiration basado en defaultValidityDays
+  Status inicial DRAFT o PENDING_REVIEW
+  Max 10MB, formatos: pdf, jpg, png, webp, doc, docx, xls, xlsx
 - OPS-015: Workflow de aprobación/rechazo
+  approve/reject solo ADMIN/MANAGER, uploader ≠ approver
+  Reject requiere reason min 10 chars
+  Resubmit solo por uploader original
+  /operaciones/documentos/pendientes con cola de revisión
+  Sidebar badge con count
 - OPS-016: Versionado inmutable (supersesión)
-- OPS-017: Cálculo de cumplimiento por activo y carpeta
+  POST /documents/:id/supersede crea nueva + marca vieja REPLACED
+  Conflict 409 en upload duplicado, ofrece supersesión
+  DocumentHistoryModal con timeline de versiones
+  REPLACED son inmutables (no edit, no delete)
+  Compliance engine excluye REPLACED
+- OPS-017: Carpeta documental con compliance detallado
+  /operaciones/equipos/[id]/carpeta y /vehiculos/[id]/carpeta
+  ComplianceGauge con porcentaje visual
+  Documentos agrupados por criticidad
+  Export PDF (reporte) y ZIP (informe.pdf + documentos/)
+  Generación con pdfkit + archiver
 
-### Modelo central — DocumentRecord
+═══════════════════════════════════════════════════════════════════
 
-Esta tabla existe conceptualmente desde OPS-003 pero se
-implementa en este sprint:
+# TICKET ACTUAL
 
-- documentTypeId (qué tipo es)
-- assetId (a qué activo pertenece)
-- fileName, filePath/fileData (en MinIO o DB blob fallback)
-- mimeType, fileSize
-- issueDate (fecha emisión)
-- expirationDate (calculada o manual)
-- status: BORRADOR | PENDIENTE_REVISION | APROBADO | RECHAZADO
-  | VIGENTE | POR_VENCER | VENCIDO | REEMPLAZADO | ARCHIVADO
-- uploadedBy, approvedBy, rejectedBy
-- replacedByDocumentId (si supersesión)
-- version (incremental)
-- notes (notas o motivo de rechazo)
+═══════════════════════════════════════════════════════════════════
 
-### Estados calculados (no persistidos directamente)
+# Sprint 5 — Alertas y Bloqueos automáticos (próximo)
 
-El sistema calcula automáticamente:
+Sprint crítico operacionalmente. Convierte el sistema en proactivo:
+detecta documentos por vencer, bloquea automáticamente activos con
+documentos críticos vencidos, escala alertas a responsables.
 
-- VIGENTE = APROBADO y NO vencido
-- POR_VENCER = VIGENTE y dentro de alertDaysBefore
-- VENCIDO = pasó expirationDate
-- Estos estados se actualizan via job BullMQ diario (en Sprint 5)
+## Tickets del Sprint 5
 
-### OPS-016: Versionado inmutable / supersesión (✓ completado)
+- OPS-018: Reglas de alerta configurables por tipo documental
+  Tabla alert_rules con thresholds, severidad, escalamiento
+- OPS-019: BullMQ scheduler diario que recalcula vencimientos
+  Job que corre cada 24h, calcula derived states, dispara alertas
+- OPS-020: Bloqueo operacional automático
+  Activos con documentos CRITICAL+blocksOperation vencidos pasan a
+  status BLOCKED_DOCUMENTAL automáticamente
+- OPS-021: Centro de alertas en UI
+  /operaciones/alertas con listado, severidad, filtros, acciones
+- OPS-022: Escalamiento por severidad
+  Notificaciones in-app a responsables según severidad
+  Email queue para casos críticos (futuro)
+- OPS-023: Excepciones temporales aprobadas
+  Admin puede liberar bloqueo con justificación + fecha de validez
+  Tabla exceptions con audit completo
 
-Cuando un documento APPROVED es reemplazado, el viejo queda
-automáticamente como REPLACED (inmutable, no editable, no borrable).
+## Próximos sprints
 
-### Endpoints implementados OPS-016
-
-- POST /api/operations/documents/:id/supersede (multipart)
-- GET /api/operations/documents/history?assetId=X&documentTypeId=Y
-
-### Reglas de supersesión
-
-- Solo se puede supersede un documento APPROVED + isActive
-- No se puede supersede un documento ya REPLACED
-- Transacción atómica: crea nueva versión + marca vieja como REPLACED
-- Cadena replacedByDocumentId mantiene historial completo
-- Compliance engine ignora documentos REPLACED
-
-### Conflict handling en upload (409)
-
-Si user intenta subir nuevo doc para asset+type que ya tiene
-APPROVED+activo, API retorna 409 DOCUMENT_ALREADY_EXISTS con
-existingDocumentId. Frontend ofrece:
-
-- "Reemplazar versión existente" → flujo de supersesión
-- "Cargar como nueva (forzar)" → forceNewVersion=true
-- Cancelar
-
-### Componentes nuevos OPS-016
-
-- DocumentSupersessionModal — modal con banner amarillo, contexto
-  bloqueado, vigencia auto-calculada
-- DocumentHistoryModal — timeline con burbujas de versión, info
-  de uploader/approver/rejecter, motivos
-- ApiError class en lib/api.ts — para inspeccionar body de 409
-
-### Cambios en fichas 360
-
-- Lista de "Documentos cargados" oculta REPLACED por default
-- Muestra "+ X versiones anteriores" / "Ver historial" debajo
-- Botón ↻ "Reemplazar versión" solo en filas APPROVED
-- Sección documentos reemplazados accesible via modal historial
-
-### Pantalla central /operaciones/documentos
-
-Toggle "Mostrar documentos reemplazados" (default OFF).
-
-### Inmutabilidad enforced
-
-- update() y remove() rechazan rows REPLACED
-- Solo Ver y Descargar permitidos en REPLACED
-
-# Ticket actual
-
-- OPS-017: Carpeta documental con compliance detallado por activo
-  Pantalla por activo que consolida todo:
-  - % de cumplimiento del activo (visual gauge)
-  - Listado de documentos requeridos con su estado
-  - Listado de documentos cargados (no requeridos pero presentes)
-  - Sección de documentos vencidos / por vencer
-  - Botón exportar carpeta documental a PDF (con todos los archivos zip)
-  - Vista lista para auditorías
+Sprint 6: Permisos y Procedimientos (OPS-024 a OPS-028)
+Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
+Sprint 8: Hardening (OPS-033 a OPS-036)
