@@ -60,8 +60,9 @@ model AssetType {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  subtypes AssetSubtype[]
-  assets   OperationalAsset[]
+  subtypes     AssetSubtype[]
+  assets       OperationalAsset[]
+  requirements DocumentRequirement[]
 
   @@unique([companyId, name])
   @@map("asset_types")
@@ -76,8 +77,9 @@ model AssetSubtype {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  assetType AssetType          @relation(fields: [assetTypeId], references: [id])
-  assets    OperationalAsset[]
+  assetType    AssetType             @relation(fields: [assetTypeId], references: [id])
+  assets       OperationalAsset[]
+  requirements DocumentRequirement[]
 
   @@unique([assetTypeId, name])
   @@map("asset_subtypes")
@@ -110,12 +112,13 @@ model OperationalAsset {
   updatedAt         DateTime    @updatedAt
   createdBy         String      @db.Uuid
 
-  assetType    AssetType          @relation(fields: [assetTypeId], references: [id])
-  assetSubtype AssetSubtype?      @relation(fields: [assetSubtypeId], references: [id])
-  location     Location?          @relation(fields: [locationId], references: [id])
-  parent       OperationalAsset?  @relation("AssetHierarchy", fields: [parentAssetId], references: [id])
-  children     OperationalAsset[] @relation("AssetHierarchy")
+  assetType    AssetType             @relation(fields: [assetTypeId], references: [id])
+  assetSubtype AssetSubtype?         @relation(fields: [assetSubtypeId], references: [id])
+  location     Location?             @relation(fields: [locationId], references: [id])
+  parent       OperationalAsset?     @relation("AssetHierarchy", fields: [parentAssetId], references: [id])
+  children     OperationalAsset[]    @relation("AssetHierarchy")
   vehicle      Vehicle?
+  requirements DocumentRequirement[]
 
   @@unique([companyId, code])
   @@index([companyId, assetTypeId])
@@ -143,4 +146,76 @@ model Vehicle {
 
   @@index([licensePlate])
   @@map("vehicles")
+}
+
+enum DocumentCategory {
+  LEGAL
+  SAFETY
+  OPERATIONAL
+  FINANCIAL
+  TECHNICAL
+  ADMINISTRATIVE
+}
+
+enum DocumentCriticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/* Named OperationalDocumentType to avoid a name collision with the existing
+   tax `DocumentType` enum (FACTURA_ELECTRONICA, BOLETA_ELECTRONICA, ...).
+   Table name stays `document_types`. */
+model OperationalDocumentType {
+  id                      String              @id @default(uuid()) @db.Uuid
+  companyId               String              @db.Uuid
+  name                    String
+  code                    String
+  category                DocumentCategory
+  hasExpiration           Boolean             @default(false)
+  defaultValidityDays     Int?
+  criticality             DocumentCriticality
+  blocksOperation         Boolean             @default(false)
+  alertDaysBefore         Int                 @default(30)
+  criticalAlertDaysBefore Int                 @default(7)
+  description             String?
+  icon                    String?
+  color                   String?
+  isActive                Boolean             @default(true)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  createdBy               String              @db.Uuid
+
+  requirements DocumentRequirement[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, name])
+  @@index([companyId, category])
+  @@map("document_types")
+}
+
+model DocumentRequirement {
+  id             String   @id @default(uuid()) @db.Uuid
+  companyId      String   @db.Uuid
+  documentTypeId String   @db.Uuid
+  assetTypeId    String?  @db.Uuid
+  assetSubtypeId String?  @db.Uuid
+  assetId        String?  @db.Uuid
+  isMandatory    Boolean  @default(true)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String   @db.Uuid
+
+  documentType OperationalDocumentType @relation(fields: [documentTypeId], references: [id])
+  assetType    AssetType?              @relation(fields: [assetTypeId], references: [id])
+  assetSubtype AssetSubtype?     @relation(fields: [assetSubtypeId], references: [id])
+  asset        OperationalAsset? @relation(fields: [assetId], references: [id])
+
+  @@index([companyId, documentTypeId])
+  @@index([companyId, assetTypeId])
+  @@index([companyId, assetSubtypeId])
+  @@index([companyId, assetId])
+  @@map("document_requirements")
 }
