@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Info } from 'lucide-react';
 import { ConfigField, ConfigGrid, ConfigModalShell } from './ConfigModalShell';
 
 export type AssetCategory = 'EQUIPMENT' | 'VEHICLE' | 'TOOL' | 'INFRASTRUCTURE';
@@ -29,6 +30,10 @@ export interface AssetTypeSubmit {
   icon?: string;
   color?: string;
   isActive: boolean;
+  /* Only honored when category=VEHICLE on create. The backend defaults to true
+     so we only send the field when the user explicitly toggled it off, keeping
+     the payload identical for non-vehicle categories. */
+  applyVehiclePack?: boolean;
 }
 
 interface Props {
@@ -47,6 +52,10 @@ export function AssetTypeFormModal({ mode, assetType, onClose, onSave }: Props) 
   const [icon, setIcon] = useState(assetType?.icon ?? '');
   const [color, setColor] = useState(assetType?.color ?? DEFAULT_COLOR);
   const [isActive, setIsActive] = useState(assetType?.isActive ?? true);
+  /* Only meaningful in create mode for VEHICLE category. The user can opt-out
+     of the pack here; existing types reach the apply action via the row button
+     in the configuration screen. */
+  const [applyVehiclePack, setApplyVehiclePack] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +71,9 @@ export function AssetTypeFormModal({ mode, assetType, onClose, onSave }: Props) 
         icon: icon.trim() || undefined,
         color: color || undefined,
         isActive,
+        ...(mode === 'create' && category === 'VEHICLE' && !applyVehiclePack
+          ? { applyVehiclePack: false }
+          : {}),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar.');
@@ -110,6 +122,40 @@ export function AssetTypeFormModal({ mode, assetType, onClose, onSave }: Props) 
           </select>
         </ConfigField>
       </ConfigGrid>
+
+      {mode === 'create' && category === 'VEHICLE' && (
+        <div
+          className="rounded-lg p-3 flex items-start gap-2"
+          style={{
+            background: 'rgba(37, 99, 235, 0.08)',
+            border: '1px solid rgba(37, 99, 235, 0.2)',
+          }}
+        >
+          <Info size={16} style={{ color: '#1d4ed8', flexShrink: 0, marginTop: 2 }} />
+          <div className="flex-1">
+            <p
+              className="text-[var(--text-primary)] text-sm mb-2"
+              style={{ fontFamily: 'var(--font-outfit), sans-serif', lineHeight: 1.45 }}
+            >
+              Al guardar, se asociarán automáticamente los 4 documentos obligatorios para vehículos
+              en Chile (SOAP, Permiso de Circulación, Revisión Técnica, Padrón). Si los tipos de
+              documento aún no existen, se crearán al confirmar.
+            </p>
+            <label
+              className="inline-flex items-start gap-2 cursor-pointer text-sm"
+              style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
+            >
+              <input
+                type="checkbox"
+                checked={applyVehiclePack}
+                onChange={(e) => setApplyVehiclePack(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-[var(--text-primary)]">Aplicar pack documental Chile</span>
+            </label>
+          </div>
+        </div>
+      )}
       <ConfigField label="Descripción">
         <textarea
           value={description}

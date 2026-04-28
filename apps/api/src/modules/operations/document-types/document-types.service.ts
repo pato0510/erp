@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
-import { DEFAULT_DOCUMENT_TYPES } from './document-types.constants';
+import { DEFAULT_DOCUMENT_TYPES, VEHICLE_DEFAULT_DOCUMENT_CODES } from './document-types.constants';
 import { CreateDocumentTypeDto } from './dto/create-document-type.dto';
 import { FilterDocumentTypesDto } from './dto/filter-document-types.dto';
 import { UpdateDocumentTypeDto } from './dto/update-document-type.dto';
@@ -141,6 +141,11 @@ export class DocumentTypesService {
       skippedCount: skipped.length,
       created,
       skipped,
+      /* Surface the vehicle-pack codes so the UI can prompt the user to apply
+         the documental pack on each VEHICLE-category AssetType. */
+      vehicleDocuments: VEHICLE_DEFAULT_DOCUMENT_CODES,
+      message:
+        "Tipos de documento creados. Para aplicarlos automáticamente a vehículos, ve a Tipos de Activo y haz clic en 'Aplicar pack documental Chile' en cada tipo VEHÍCULO.",
     };
   }
 }

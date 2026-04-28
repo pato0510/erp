@@ -10,6 +10,7 @@ import {
   MapPin,
   Pencil,
   Plus,
+  ShieldCheck,
   Settings,
   Trash2,
 } from 'lucide-react';
@@ -50,6 +51,15 @@ const TABS: Array<{ key: TabKey; label: string; icon: typeof Layers }> = [
 
 interface AssetTypeRow extends AssetTypeForForm {
   subtypes?: Array<{ id: string; name: string; isActive: boolean }>;
+  /* Backend computes this for VEHICLE-category types — true when all 4
+     Chilean vehicle documents are already linked as DocumentRequirements. */
+  vehiclePackApplied?: boolean;
+}
+
+interface ApplyVehiclePackResponse {
+  created: string[];
+  skipped: string[];
+  missingDocumentTypes: string[];
 }
 
 interface AssetSubtypeRow extends AssetSubtypeForForm {
@@ -359,6 +369,34 @@ function TiposTab({ toaster }: { toaster: Toaster }) {
     }
   };
 
+  /* Triggers POST /asset-types/:id/apply-vehicle-defaults. The endpoint is
+     idempotent — calling it on a type that already has all 4 documents linked
+     just returns counts without creating duplicates. */
+  const handleApplyVehiclePack = async (row: AssetTypeRow) => {
+    try {
+      const result = await apiClient.post<ApplyVehiclePackResponse>(
+        `/api/operations/asset-types/${row.id}/apply-vehicle-defaults`,
+      );
+      const parts: string[] = [];
+      if (result.created.length > 0) parts.push(`${result.created.length} documentos asociados`);
+      if (result.skipped.length > 0) parts.push(`${result.skipped.length} ya existían`);
+      if (result.missingDocumentTypes.length > 0) {
+        toaster(
+          `Faltan tipos de documento: ${result.missingDocumentTypes.join(', ')}. Ejecuta "Cargar tipos chilenos por defecto" en la pestaña Tipos de Documento.`,
+          'error',
+        );
+      } else {
+        toaster(
+          parts.length > 0 ? parts.join(', ') : 'Pack documental ya estaba aplicado',
+          'success',
+        );
+      }
+      loadTypes();
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'No se pudo aplicar el pack', 'error');
+    }
+  };
+
   const handleSubtypeSave = async (dto: AssetSubtypeSubmit) => {
     if (subtypeModal?.mode === 'edit') {
       await apiClient.patch(`/api/operations/asset-subtypes/${subtypeModal.subtype.id}`, dto);
@@ -398,8 +436,9 @@ function TiposTab({ toaster }: { toaster: Toaster }) {
           <div>
             <h2>Tipos de Activo</h2>
             <p>
-              Define las categorías generales de tus activos operacionales (equipos, vehículos,
-              herramientas).
+              Define las categorías generales de tus activos operacionales. Los tipos VEHÍCULO
+              pueden recibir el pack documental Chile automáticamente (SOAP, Permiso de Circulación,
+              RT, Padrón).
             </p>
           </div>
           <button
@@ -431,6 +470,7 @@ function TiposTab({ toaster }: { toaster: Toaster }) {
                   <th>Nombre</th>
                   <th>Categoría</th>
                   <th>Subtipos</th>
+                  <th>Pack documental</th>
                   <th>Estado</th>
                   <th style={{ width: 100, textAlign: 'right' }}>Acciones</th>
                 </tr>
@@ -486,6 +526,9 @@ function TiposTab({ toaster }: { toaster: Toaster }) {
                       >
                         {t.subtypes?.length ?? 0}
                       </span>
+                    </td>
+                    <td>
+                      <VehiclePackCell type={t} onApply={() => handleApplyVehiclePack(t)} />
                     </td>
                     <td>
                       <ActiveBadge active={t.isActive} />
@@ -1145,6 +1188,39 @@ function TiposDocumentoTab({ toaster }: { toaster: Toaster }) {
 /* ============================================================ */
 /*  Shared bits                                                 */
 /* ============================================================ */
+
+function VehiclePackCell({ type, onApply }: { type: AssetTypeRow; onApply: () => void }) {
+  if (type.category !== 'VEHICLE') {
+    return <span className="text-[var(--text-muted)] text-xs">—</span>;
+  }
+  if (type.vehiclePackApplied) {
+    return (
+      <span
+        className="config-chip"
+        style={{ background: 'rgba(34, 197, 94, 0.12)', color: '#15803d' }}
+        title="SOAP, Permiso de Circulación, Revisión Técnica y Padrón ya están asociados a este tipo."
+      >
+        <CheckCircle2 size={11} /> Pack documental aplicado
+      </span>
+    );
+  }
+  return (
+    <button
+      onClick={onApply}
+      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs hover:bg-blue-100 transition"
+      style={{
+        background: 'rgba(37, 99, 235, 0.1)',
+        color: '#1d4ed8',
+        fontFamily: 'var(--font-outfit), sans-serif',
+        fontWeight: 500,
+        whiteSpace: 'nowrap',
+      }}
+      title="Asocia los 4 documentos legales obligatorios para vehículos en Chile."
+    >
+      <ShieldCheck size={12} /> Aplicar pack documental Chile
+    </button>
+  );
+}
 
 function ActiveBadge({ active }: { active: boolean }) {
   return active ? (

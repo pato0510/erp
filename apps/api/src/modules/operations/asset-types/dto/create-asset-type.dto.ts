@@ -34,4 +34,13 @@ export class CreateAssetTypeDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /* When category=VEHICLE: controls whether the standard Chilean documental
+     pack (SOAP, Permiso de Circulación, Revisión Técnica, Padrón) is auto-
+     applied as DocumentRequirements after the type is created. Defaults to
+     true so the typical "create vehicle type → ready to use" flow works
+     without an extra step. Ignored for non-VEHICLE categories. */
+  @IsOptional()
+  @IsBoolean()
+  applyVehiclePack?: boolean;
 }

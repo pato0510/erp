@@ -326,19 +326,73 @@ Sprint 6: Permisos y Procedimientos
 Sprint 7: Calendario, Reportes e Integración Finanzas
 Sprint 8: Hardening (vistas materializadas, QR, QA)
 
-### MVP V1 (lo que va a producción primero)
+## Sprint 3 — Vehículos (en desarrollo)
 
-Dashboard, CRUD equipos/vehículos, tipos documentales, carga,
-matriz, vencimientos, alertas, bloqueos, reportes básicos.
+### OPS-009: CRUD de Vehículos (ticket listo)
 
-### Roadmap V2 (después del MVP)
+Pantalla `/operaciones/vehiculos` con gestión completa de la flota.
 
-OCR, firma electrónica, app móvil PWA con sincronización offline,
-work orders, mantenimiento preventivo, modelado bitemporal completo.
+### Modelo
 
-## Sprint — Vehiculos (en desarrollo)
+Un vehículo es OperationalAsset + extensión Vehicle (1:1).
 
-OPS-009: CRUD de vehículos (extiende OperationalAsset)
-OPS-010: Pack documental Chile (SOAP, permiso circulación, RT, padrón)
-OPS-011: Ficha 360 del vehículo
-OPS-012: Importación masiva de vehículos
+- AssetType.category debe ser VEHICLE para crear un vehículo
+- Vehicle agrega campos específicos: licensePlate, vin, year,
+  currentKilometers, fuelType, registrationDate, color
+- Creación atómica via Prisma transaction
+
+### Endpoints REST implementados
+
+- GET /api/operations/fleet/vehicles — lista filtrable y paginada
+- GET /api/operations/fleet/vehicles/:id — detalle
+- POST /api/operations/fleet/vehicles — crear (asset+vehicle en transacción)
+- PATCH /api/operations/fleet/vehicles/:id — actualizar
+- PATCH /api/operations/fleet/vehicles/:id/kilometers — actualizar km
+- DELETE /api/operations/fleet/vehicles/:id — soft delete
+
+Foto: reusa los endpoints de assets (POST/GET /api/operations/assets/:id/photo)
+
+### Validaciones de negocio
+
+- AssetType debe ser categoría VEHICLE (rechaza si no)
+- licensePlate única por empresa (case-insensitive)
+- VIN máximo 17 caracteres
+- year entre 1900 y currentYear+1
+- currentKilometers >= 0
+- updateKilometers no permite decrecer (excepto override admin futuro)
+
+### Tipos de combustible (FuelType enum)
+
+- GASOLINE → "Bencina"
+- DIESEL → "Diésel"
+- ELECTRIC → "Eléctrico"
+- HYBRID → "Híbrido"
+- LPG → "Gas (GLP)"
+- OTHER → "Otro"
+
+### Filtros disponibles
+
+search (plate/code/name/vin/model), assetTypeId, locationId,
+status, fuelType, yearFrom, yearTo, page, limit
+
+### Componentes frontend nuevos
+
+- apps/web/src/components/operations/VehicleFormModal.tsx
+- apps/web/src/components/operations/KilometersUpdateModal.tsx
+
+### Permisos CASL
+
+- Subject: 'Vehicle' (registrado en OPS-003)
+- Read: todos los roles
+- Create/Update: ADMIN, MANAGER
+- Delete: ADMIN solamente
+
+# Ticket actual
+
+- OPS-010: Pack documental Chile (SOAP, permiso circulación, RT, padrón)
+  Requirements automáticos cuando se crea un vehículo
+
+### Próximos tickets del Sprint 3
+
+- OPS-011: Ficha 360 del vehículo (vista detalle similar a equipos)
+- OPS-012: Importación masiva CSV/Excel de vehículos

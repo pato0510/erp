@@ -16,6 +16,14 @@ export interface DefaultDocumentTypeSeed {
   criticalAlertDaysBefore?: number;
 }
 
+/* The four documents the law in Chile requires to circulate any vehicle. The
+   AssetTypesService applies these as DocumentRequirements automatically when a
+   VEHICLE-category AssetType is created (or on demand via the
+   /apply-vehicle-defaults endpoint). The codes must match entries in
+   DEFAULT_DOCUMENT_TYPES below. */
+export const VEHICLE_DEFAULT_DOCUMENT_CODES = ['SOAP', 'PERMCIRC', 'REVTEC', 'PADRON'] as const;
+export type VehicleDefaultDocumentCode = (typeof VEHICLE_DEFAULT_DOCUMENT_CODES)[number];
+
 export const DEFAULT_DOCUMENT_TYPES: DefaultDocumentTypeSeed[] = [
   // LEGAL — every LEGAL doc is CRITICAL and blocks operation if missing/expired.
   {
