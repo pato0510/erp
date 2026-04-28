@@ -11,6 +11,7 @@ import { DocumentCriticality, DocumentRecordStatus, Prisma } from '@prisma/clien
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { DocumentRequirementsService } from '../document-requirements/document-requirements.service';
 import { ArchiveDocumentDto } from './dto/archive-document.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { FilterDocumentRecordsDto } from './dto/filter-documents.dto';
@@ -78,6 +79,7 @@ export class DocumentRecordsService {
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
     private readonly storage: StorageService,
+    private readonly requirementsService: DocumentRequirementsService,
   ) {}
 
   /* Derived UI status — folds expiration windows on top of the persisted
@@ -1311,5 +1313,292 @@ export class DocumentRecordsService {
       where: { companyId, isActive: true, status: 'PENDING_REVIEW' },
     });
     return { count };
+  }
+
+  /* OPS-017 — consolidated "carpeta documental" view for one asset.
+     Returns the asset, full compliance breakdown, the per-requirement
+     state, and any uploaded docs that fall outside the requirements
+     matrix. The caller can render this directly without further joins. */
+  async getAssetFolder(companyId: string, assetId: string) {
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+    const asset = await this.prisma.operationalAsset.findFirst({
+      where: { id: assetId, companyId },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        description: true,
+        status: true,
+        statusReason: true,
+        statusChangedAt: true,
+        assetTypeId: true,
+        assetSubtypeId: true,
+        locationId: true,
+        tags: true,
+        createdAt: true,
+        updatedAt: true,
+        assetType: {
+          select: { id: true, name: true, category: true, color: true },
+        },
+        assetSubtype: { select: { id: true, name: true } },
+        location: {
+          select: { id: true, name: true, code: true, address: true },
+        },
+      },
+    });
+    if (!asset) throw new NotFoundException('Activo no encontrado');
+
+    const [requirements, allDocuments] = await Promise.all([
+      this.requirementsService.resolveRequirementsForAsset(companyId, assetId),
+      /* Pull every document for this asset (any status, isActive=true) so we
+         can both pick the latest per (assetId, documentTypeId) AND surface
+         additional uploads that aren't in the requirements matrix. */
+      this.prisma.documentRecord.findMany({
+        where: { companyId, assetId, isActive: true },
+        select: {
+          id: true,
+          assetId: true,
+          documentTypeId: true,
+          fileName: true,
+          mimeType: true,
+          fileSize: true,
+          issueDate: true,
+          expirationDate: true,
+          status: true,
+          statusReason: true,
+          version: true,
+          uploadedBy: true,
+          replacedByDocumentId: true,
+          createdAt: true,
+          updatedAt: true,
+          documentType: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              category: true,
+              criticality: true,
+              blocksOperation: true,
+              alertDaysBefore: true,
+              hasExpiration: true,
+              defaultValidityDays: true,
+              color: true,
+            },
+          },
+        },
+        orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ]);
+
+    /* Per (documentTypeId) pick the row that should drive compliance.
+       APPROVED + non-superseded wins; otherwise we fall back to the
+       newest non-REPLACED row (so the UI can show PENDING_REVIEW or
+       REJECTED in lieu of "missing" when something is uploaded). */
+    const latestApprovedByType = new Map<string, (typeof allDocuments)[number]>();
+    const latestAnyByType = new Map<string, (typeof allDocuments)[number]>();
+    for (const d of allDocuments) {
+      if (d.status === 'REPLACED') continue;
+      if (!latestAnyByType.has(d.documentTypeId)) {
+        latestAnyByType.set(d.documentTypeId, d);
+      }
+      if (
+        d.status === 'APPROVED' &&
+        d.replacedByDocumentId === null &&
+        !latestApprovedByType.has(d.documentTypeId)
+      ) {
+        latestApprovedByType.set(d.documentTypeId, d);
+      }
+    }
+
+    /* Folder-specific derived state: same enum as deriveStatus but with
+       the additional 'FALTANTE' state used only by compliance views. */
+    type FolderState =
+      | 'VIGENTE'
+      | 'POR_VENCER'
+      | 'VENCIDO'
+      | 'FALTANTE'
+      | 'PENDIENTE_REVISION'
+      | 'RECHAZADO'
+      | 'BORRADOR';
+
+    let totalRequired = 0;
+    let valid = 0;
+    let expiringSoon = 0;
+    let expired = 0;
+    let missing = 0;
+    let pendingReview = 0;
+    let rejected = 0;
+    const bySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
+
+    const requiredDocuments = requirements.map((req) => {
+      totalRequired++;
+      const approved = latestApprovedByType.get(req.documentTypeId);
+      const fallback = latestAnyByType.get(req.documentTypeId);
+      const latest = approved ?? fallback ?? null;
+
+      let folderState: FolderState;
+      let daysUntilExpiration: number | null = null;
+      if (approved) {
+        if (approved.expirationDate) {
+          const exp = new Date(approved.expirationDate);
+          daysUntilExpiration = Math.floor((exp.getTime() - today.getTime()) / 86400000);
+          if (daysUntilExpiration < 0) {
+            folderState = 'VENCIDO';
+            expired++;
+          } else if (daysUntilExpiration <= req.documentType.alertDaysBefore) {
+            folderState = 'POR_VENCER';
+            expiringSoon++;
+          } else {
+            folderState = 'VIGENTE';
+            valid++;
+          }
+        } else {
+          folderState = 'VIGENTE';
+          valid++;
+        }
+      } else if (fallback) {
+        if (fallback.status === 'PENDING_REVIEW') {
+          folderState = 'PENDIENTE_REVISION';
+          pendingReview++;
+        } else if (fallback.status === 'REJECTED') {
+          folderState = 'RECHAZADO';
+          rejected++;
+        } else {
+          /* DRAFT / ARCHIVED — count toward "missing" for compliance since
+             they aren't approved. The UI still shows the existing draft so
+             the operator knows there's something in flight. */
+          folderState = fallback.status === 'DRAFT' ? 'BORRADOR' : 'FALTANTE';
+          missing++;
+        }
+      } else {
+        folderState = 'FALTANTE';
+        missing++;
+      }
+
+      /* Severity tally — counted only for problem rows so the UI can warn
+         about CRITICAL gaps that block operation. */
+      const isProblem =
+        folderState === 'FALTANTE' || folderState === 'VENCIDO' || folderState === 'RECHAZADO';
+      if (isProblem) {
+        const sev = req.documentType.criticality.toLowerCase() as keyof typeof bySeverity;
+        bySeverity[sev]++;
+      }
+
+      const enrichedLatest = latest
+        ? {
+            ...latest,
+            derivedStatus: this.deriveStatus(
+              latest.status,
+              latest.expirationDate,
+              latest.documentType.alertDaysBefore,
+              now,
+            ),
+          }
+        : null;
+
+      return {
+        documentType: req.documentType,
+        latestRecord: enrichedLatest,
+        derivedStatus: folderState,
+        daysUntilExpiration,
+        resolvedFrom: req.resolvedFrom,
+        isMandatory: req.isMandatory ?? true,
+      };
+    });
+
+    /* Additional documents — uploaded rows whose documentTypeId isn't in
+       the requirements matrix. Useful for ad-hoc certificates, attached
+       PDFs, etc. Only the latest per type is shown (mirroring the
+       compliance grouping). */
+    const requiredTypeIds = new Set(requirements.map((r) => r.documentTypeId));
+    const additionalDocuments = Array.from(latestAnyByType.values())
+      .filter((d) => !requiredTypeIds.has(d.documentTypeId))
+      .map((d) => ({
+        ...d,
+        derivedStatus: this.deriveStatus(
+          d.status,
+          d.expirationDate,
+          d.documentType.alertDaysBefore,
+          now,
+        ),
+      }));
+
+    const compliancePercentage =
+      totalRequired === 0 ? 100 : Math.round(((valid + expiringSoon) / totalRequired) * 1000) / 10;
+
+    return {
+      asset,
+      compliance: {
+        totalRequired,
+        valid,
+        expiringSoon,
+        expired,
+        missing,
+        pendingReview,
+        rejected,
+        compliancePercentage,
+        bySeverity,
+      },
+      requiredDocuments,
+      additionalDocuments,
+      generatedAt: now.toISOString(),
+    };
+  }
+
+  /* OPS-017 — same folder shape but with the file buffer and storage path
+     for every "current approved" document, ready to be ZIPped by the
+     export endpoint. We don't fold this into getAssetFolder() because the
+     binary fetch is significantly more expensive and pointless for the
+     view-only call. */
+  async getAssetFolderExport(companyId: string, assetId: string) {
+    const folder = await this.getAssetFolder(companyId, assetId);
+
+    /* The exportable set is the latest APPROVED, non-replaced doc per
+       required documentType — plus any additional approved docs. Drafts,
+       rejects and replaced rows are intentionally excluded. */
+    const exportableRecords: Array<{
+      documentTypeCode: string;
+      fileName: string;
+      mimeType: string;
+      buffer: Buffer;
+    }> = [];
+
+    const approvedRequiredDocs = folder.requiredDocuments
+      .map((r) => r.latestRecord)
+      .filter((r): r is NonNullable<typeof r> => r !== null && r.status === 'APPROVED');
+    const approvedAdditionalDocs = folder.additionalDocuments.filter(
+      (d) => d.status === 'APPROVED',
+    );
+
+    const allApproved = [...approvedRequiredDocs, ...approvedAdditionalDocs];
+    /* Dedup by id — a doc could appear in both buckets if compliance and
+       additional use the same record (shouldn't happen, but guard
+       anyway). */
+    const seen = new Set<string>();
+    for (const rec of allApproved) {
+      if (seen.has(rec.id)) continue;
+      seen.add(rec.id);
+      try {
+        const file = await this.downloadFile(rec.id, companyId);
+        exportableRecords.push({
+          documentTypeCode: rec.documentType.code,
+          fileName: file.fileName,
+          mimeType: file.mimeType,
+          buffer: file.buffer,
+        });
+      } catch (err) {
+        /* A missing/unavailable file shouldn't kill the whole export — log
+           and skip so the operator still gets the rest of the bundle. */
+        this.logger.warn(
+          `Failed to fetch document ${rec.id} for ZIP export: ${
+            err instanceof Error ? err.message : err
+          }`,
+        );
+      }
+    }
+
+    return { folder, files: exportableRecords };
   }
 }

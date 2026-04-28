@@ -448,66 +448,65 @@ El sistema calcula automáticamente:
 - VENCIDO = pasó expirationDate
 - Estos estados se actualizan via job BullMQ diario (en Sprint 5)
 
-### OPS-015: Workflow de aprobación/rechazo (✓ completado)
+### OPS-016: Versionado inmutable / supersesión (✓ completado)
 
-Documentos PENDING_REVIEW pueden ser aprobados o rechazados por
-ADMIN/MANAGER. Auto-aprobación bloqueada (uploader ≠ approver).
+Cuando un documento APPROVED es reemplazado, el viejo queda
+automáticamente como REPLACED (inmutable, no editable, no borrable).
 
-### Endpoints implementados OPS-015
+### Endpoints implementados OPS-016
 
-- POST /api/operations/documents/:id/approve
-- POST /api/operations/documents/:id/reject (body: { reason }, min 10 chars)
-- POST /api/operations/documents/:id/resubmit (solo uploader original)
-- GET /api/operations/documents/pending-review
-- GET /api/operations/documents/pending-review/count
+- POST /api/operations/documents/:id/supersede (multipart)
+- GET /api/operations/documents/history?assetId=X&documentTypeId=Y
 
-### Reglas de negocio
+### Reglas de supersesión
 
-- approve/reject: solo ADMIN, MANAGER
-- approver no puede ser uploader (bloqueo de auto-aprobación)
-- resubmit: solo uploader original puede reenviar un REJECTED
-- Reject requiere motivo (min 10 chars)
-- Status transitions:
-  PENDING_REVIEW → APPROVED (registra approvedBy, approvedAt)
-  PENDING_REVIEW → REJECTED (registra rejectedBy, rejectedAt, statusReason)
-  REJECTED → PENDING_REVIEW (resubmit por uploader)
+- Solo se puede supersede un documento APPROVED + isActive
+- No se puede supersede un documento ya REPLACED
+- Transacción atómica: crea nueva versión + marca vieja como REPLACED
+- Cadena replacedByDocumentId mantiene historial completo
+- Compliance engine ignora documentos REPLACED
 
-### Pantalla nueva
+### Conflict handling en upload (409)
 
-- /operaciones/documentos/pendientes — cola de revisión
-  Cards con preview, info de uploader, fecha, vigencia
-  Botones Aprobar (verde) / Rechazar (rojo)
-  Tooltip de bloqueo si current user es uploader
-  Empty state cuando no hay pendientes
+Si user intenta subir nuevo doc para asset+type que ya tiene
+APPROVED+activo, API retorna 409 DOCUMENT_ALREADY_EXISTS con
+existingDocumentId. Frontend ofrece:
 
-### Sidebar badge
+- "Reemplazar versión existente" → flujo de supersesión
+- "Cargar como nueva (forzar)" → forceNewVersion=true
+- Cancelar
 
-OperationsSidebar muestra badge rojo en "Documentos" con count
-de pendientes. Refresh cada 60s. Mismo patrón que alertas en
-FinanceSidebar.
+### Componentes nuevos OPS-016
 
-### Banner en /operaciones/documentos
+- DocumentSupersessionModal — modal con banner amarillo, contexto
+  bloqueado, vigencia auto-calculada
+- DocumentHistoryModal — timeline con burbujas de versión, info
+  de uploader/approver/rejecter, motivos
+- ApiError class en lib/api.ts — para inspeccionar body de 409
 
-Banner azul dismissible cuando hay pendientes, con link a
-/operaciones/documentos/pendientes.
+### Cambios en fichas 360
 
-### Display de rechazos
+- Lista de "Documentos cargados" oculta REPLACED por default
+- Muestra "+ X versiones anteriores" / "Ver historial" debajo
+- Botón ↻ "Reemplazar versión" solo en filas APPROVED
+- Sección documentos reemplazados accesible via modal historial
 
-Documentos REJECTED muestran motivo en preview modal y tablas.
-Si current user es el uploader original, ve botón "Reenviar a revisión".
+### Pantalla central /operaciones/documentos
 
-### CASL nuevas acciones
+Toggle "Mostrar documentos reemplazados" (default OFF).
 
-- 'approve' action en DocumentRecordSubject: ADMIN, MANAGER
-- 'reject' action en DocumentRecordSubject: ADMIN, MANAGER
-- 'resubmit' action en DocumentRecordSubject: any authenticated
+### Inmutabilidad enforced
+
+- update() y remove() rechazan rows REPLACED
+- Solo Ver y Descargar permitidos en REPLACED
 
 # Ticket actual
 
-- OPS-016: Versionado inmutable (supersesión)
-  Cuando un documento APPROVED es reemplazado por una nueva versión,
-  la anterior queda automáticamente como REPLACED (no editable, no eliminable).
-  La cadena replacedByDocumentId mantiene el historial completo.
-  La nueva versión hereda metadata configurable.
-  Solo la versión más reciente (no REPLACED) cuenta para compliance.
-  Pantalla de historial de versiones por (activo, tipo de documento).
+- OPS-017: Carpeta documental con compliance detallado por activo
+  Pantalla por activo que consolida todo:
+  - % de cumplimiento del activo (visual gauge)
+  - Listado de documentos requeridos con su estado
+  - Listado de documentos cargados (no requeridos pero presentes)
+  - Sección de documentos vencidos / por vencer
+  - Botón exportar carpeta documental a PDF (con todos los archivos zip)
+  - Vista lista para auditorías

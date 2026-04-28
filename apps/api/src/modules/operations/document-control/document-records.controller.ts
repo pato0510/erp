@@ -22,6 +22,7 @@ import { CurrentCompany } from '../../common/decorators/current-company.decorato
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PoliciesGuard } from '../../common/guards/policies.guard';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
+import { AssetFolderExportService } from './asset-folder-export.service';
 import { DocumentRecordsService } from './document-records.service';
 import { ArchiveDocumentDto } from './dto/archive-document.dto';
 import { CreateDocumentDto } from './dto/create-document.dto';
@@ -36,7 +37,10 @@ const FILE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 @Controller('operations/documents')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class DocumentRecordsController {
-  constructor(private readonly service: DocumentRecordsService) {}
+  constructor(
+    private readonly service: DocumentRecordsService,
+    private readonly exportService: AssetFolderExportService,
+  ) {}
 
   @Get()
   @CheckPolicies((ability) => ability.can('read', DocumentRecordSubject))
@@ -85,6 +89,54 @@ export class DocumentRecordsController {
       throw new BadRequestException('documentTypeId es obligatorio y debe ser un UUID válido.');
     }
     return this.service.getVersionHistory(companyId, assetId, documentTypeId);
+  }
+
+  /* OPS-017 — asset documents folder. Declared before the `:id` catch-all
+     so the literal `/folder/...` segment matches first. The PDF and ZIP
+     export variants stream binary responses; the JSON variant returns the
+     compliance breakdown ready for the UI. */
+  @Get('folder/:assetId')
+  @CheckPolicies((ability) => ability.can('read', DocumentRecordSubject))
+  getAssetFolder(@Param('assetId') assetId: string, @CurrentCompany() companyId: string) {
+    return this.service.getAssetFolder(companyId, assetId);
+  }
+
+  @Get('folder/:assetId/export-pdf')
+  @CheckPolicies((ability) => ability.can('read', DocumentRecordSubject))
+  async exportFolderPdf(
+    @Param('assetId') assetId: string,
+    @CurrentCompany() companyId: string,
+    @Res() res: Response,
+  ) {
+    const folder = await this.service.getAssetFolder(companyId, assetId);
+    const pdf = await this.exportService.generateCompliancePdf(companyId, folder);
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `carpeta-documental-${folder.asset.code}-${date}.pdf`;
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      'Cache-Control': 'private, no-cache',
+    });
+    res.send(pdf);
+  }
+
+  @Get('folder/:assetId/export-zip')
+  @CheckPolicies((ability) => ability.can('read', DocumentRecordSubject))
+  async exportFolderZip(
+    @Param('assetId') assetId: string,
+    @CurrentCompany() companyId: string,
+    @Res() res: Response,
+  ) {
+    const { folder, files } = await this.service.getAssetFolderExport(companyId, assetId);
+    const zip = await this.exportService.generateZipBundle(companyId, folder, files);
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `carpeta-documental-${folder.asset.code}-${date}.zip`;
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      'Cache-Control': 'private, no-cache',
+    });
+    res.send(zip);
   }
 
   /* File-stream endpoint declared before the catch-all `:id` finder so a path

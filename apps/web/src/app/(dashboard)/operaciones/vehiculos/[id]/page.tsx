@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
   Archive,
   ArrowLeft,
+  ArrowRight,
   Check,
   ChevronRight,
   Download,
   Eye,
   FileText,
+  FolderOpen,
   Gauge,
   History,
   MapPin,
@@ -636,6 +638,18 @@ export default function VehicleDetailPage({ params }: PageProps) {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <AssetStatusBadge status={vehicle.asset.status} />
+            <Link
+              href={`/operaciones/vehiculos/${vehicle.id}/carpeta`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+                textDecoration: 'none',
+              }}
+            >
+              <FolderOpen size={14} /> Ver carpeta documental
+            </Link>
             <button
               onClick={() => setEditModal(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -1090,6 +1104,17 @@ export default function VehicleDetailPage({ params }: PageProps) {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {requirements.length > 0 && (
+            <div className="mt-3 flex justify-end">
+              <Link
+                href={`/operaciones/vehiculos/${vehicle.id}/carpeta`}
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
+              >
+                Ver carpeta completa <ArrowRight size={12} />
+              </Link>
             </div>
           )}
         </Card>
