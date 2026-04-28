@@ -13,6 +13,7 @@ import {
   Search,
   Settings,
   Trash2,
+  Upload,
   Wrench,
   X,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ import {
   AssetStatusBadge,
   type AssetStatus,
 } from '../../../../components/operations/AssetStatusBadge';
+import { AssetImportWizard } from '../../../../components/operations/AssetImportWizard';
 
 interface AssetRow {
   id: string;
@@ -109,6 +111,7 @@ export default function EquiposPage() {
 
   const [modal, setModal] = useState<ModalState>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
@@ -234,17 +237,30 @@ export default function EquiposPage() {
           >
             Equipos
           </h1>
-          <button
-            onClick={() => setModal({ mode: 'create' })}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
-            style={{
-              background: '#1C1C1E',
-              fontFamily: 'var(--font-outfit), sans-serif',
-              fontWeight: 500,
-            }}
-          >
-            <Plus size={16} /> Nuevo equipo
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setImportWizardOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+              }}
+            >
+              <Upload size={16} /> Importar
+            </button>
+            <button
+              onClick={() => setModal({ mode: 'create' })}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
+              style={{
+                background: '#1C1C1E',
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+              }}
+            >
+              <Plus size={16} /> Nuevo equipo
+            </button>
+          </div>
         </div>
       </div>
 
@@ -452,6 +468,17 @@ export default function EquiposPage() {
           confirmLabel="Eliminar"
           onConfirm={handleDelete}
           onCancel={() => setConfirm(null)}
+        />
+      )}
+
+      {importWizardOpen && (
+        <AssetImportWizard
+          onClose={() => setImportWizardOpen(false)}
+          onImported={() => {
+            setToast({ message: 'Equipos importados correctamente', type: 'success' });
+            load();
+            loadCatalogs();
+          }}
         />
       )}
 

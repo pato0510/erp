@@ -59,6 +59,10 @@ model ImportLog {
   id           String   @id @default(uuid()) @db.Uuid
   companyId    String   @db.Uuid
   userId       String   @db.Uuid
+  /* Discriminator: which entity was imported. Defaults to MOVEMENT for
+     backwards-compatibility with existing rows. Allowed values:
+     MOVEMENT, ASSET, VEHICLE, DOCUMENT. */
+  entityType   String   @default("MOVEMENT")
   filename     String
   storagePath  String
   totalRows    Int
@@ -68,5 +72,6 @@ model ImportLog {
   errors       Json?
   createdAt    DateTime @default(now())
 
+  @@index([companyId, entityType, createdAt])
   @@map("import_logs")
 }
