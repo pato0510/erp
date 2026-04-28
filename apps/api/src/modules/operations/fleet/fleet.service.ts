@@ -17,8 +17,7 @@ export class FleetService {
     private readonly rlsService: RlsService,
   ) {}
 
-  /* Standard shape for asset relations exposed alongside the vehicle. Mirrors
-     the AssetsService selector but trimmed for vehicle list/detail responses. */
+  /* Slim selector for list responses — keeps row payloads small. */
   private readonly assetSelect = {
     id: true,
     companyId: true,
@@ -50,6 +49,64 @@ export class FleetService {
     assetSubtype: { select: { id: true, name: true } },
     location: { select: { id: true, name: true, code: true } },
     parent: { select: { id: true, code: true, name: true } },
+  } satisfies Prisma.OperationalAssetSelect;
+
+  /* Detail selector — includes the relations the vehicle 360 view needs
+     (location address/coords, subtype specifications, parent status). User
+     summaries (assigned/createdBy) are fetched separately because the
+     OperationalAsset model stores them as bare UUIDs without Prisma relations. */
+  private readonly assetDetailSelect = {
+    id: true,
+    companyId: true,
+    assetTypeId: true,
+    assetSubtypeId: true,
+    locationId: true,
+    parentAssetId: true,
+    code: true,
+    name: true,
+    description: true,
+    serialNumber: true,
+    manufacturer: true,
+    model: true,
+    acquisitionDate: true,
+    acquisitionCost: true,
+    status: true,
+    statusReason: true,
+    statusChangedAt: true,
+    photoPath: true,
+    photoMimeType: true,
+    dynamicAttributes: true,
+    tags: true,
+    assignedToUserId: true,
+    isActive: true,
+    createdAt: true,
+    updatedAt: true,
+    createdBy: true,
+    assetType: {
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        icon: true,
+        color: true,
+        description: true,
+        isActive: true,
+      },
+    },
+    assetSubtype: {
+      select: { id: true, name: true, specifications: true, isActive: true },
+    },
+    location: {
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+      },
+    },
+    parent: { select: { id: true, code: true, name: true, status: true } },
   } satisfies Prisma.OperationalAssetSelect;
 
   /* Validates that the AssetType, subtype, location and parent all live in the
@@ -208,7 +265,9 @@ export class FleetService {
   }
 
   /* Resolves a vehicle by either its own id OR its asset.id — the controller
-     accepts both since the URL the frontend has on hand might be either. */
+     accepts both since the URL the frontend has on hand might be either.
+     Uses the rich detail selector and attaches assignedUser/createdByUser the
+     same way AssetsService.findOne does. */
   async findOne(id: string, companyId: string) {
     const row = await this.prisma.vehicle.findFirst({
       where: {
@@ -228,11 +287,32 @@ export class FleetService {
         color: true,
         createdAt: true,
         updatedAt: true,
-        asset: { select: this.assetSelect },
+        asset: { select: this.assetDetailSelect },
       },
     });
     if (!row) throw new NotFoundException('Vehículo no encontrado');
-    return this.withHasPhoto(row);
+
+    const userIds = Array.from(
+      new Set([row.asset.assignedToUserId, row.asset.createdBy].filter((v): v is string => !!v)),
+    );
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, email: true, firstName: true, lastName: true },
+        })
+      : [];
+    const userById = new Map(users.map((u) => [u.id, u]));
+
+    return {
+      ...this.withHasPhoto(row),
+      asset: {
+        ...row.asset,
+        assignedUser: row.asset.assignedToUserId
+          ? (userById.get(row.asset.assignedToUserId) ?? null)
+          : null,
+        createdByUser: userById.get(row.asset.createdBy) ?? null,
+      },
+    };
   }
 
   async create(companyId: string, userId: string, dto: CreateVehicleDto) {

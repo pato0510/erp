@@ -328,71 +328,51 @@ Sprint 8: Hardening (vistas materializadas, QR, QA)
 
 ## Sprint 3 — Vehículos (en desarrollo)
 
-### OPS-009: CRUD de Vehículos (ticket listo)
+### OPS-010: Pack documental Chile (✓ completado)
 
-Pantalla `/operaciones/vehiculos` con gestión completa de la flota.
+Cuando se crea un AssetType con category=VEHICLE, automáticamente
+se asocian los 4 documentos legales obligatorios para vehículos
+en Chile vía DocumentRequirements.
 
-### Modelo
+### Documentos del pack vehicular Chile
 
-Un vehículo es OperationalAsset + extensión Vehicle (1:1).
+- SOAP (Seguro Obligatorio de Accidentes Personales)
+- PERMCIRC (Permiso de Circulación)
+- REVTEC (Revisión Técnica)
+- PADRON (Padrón)
 
-- AssetType.category debe ser VEHICLE para crear un vehículo
-- Vehicle agrega campos específicos: licensePlate, vin, year,
-  currentKilometers, fuelType, registrationDate, color
-- Creación atómica via Prisma transaction
+Todos marcados como obligatorios (isMandatory=true) con nota
+"Documento legal obligatorio para vehículos en Chile".
 
-### Endpoints REST implementados
+### Endpoint nuevo OPS-010
 
-- GET /api/operations/fleet/vehicles — lista filtrable y paginada
-- GET /api/operations/fleet/vehicles/:id — detalle
-- POST /api/operations/fleet/vehicles — crear (asset+vehicle en transacción)
-- PATCH /api/operations/fleet/vehicles/:id — actualizar
-- PATCH /api/operations/fleet/vehicles/:id/kilometers — actualizar km
-- DELETE /api/operations/fleet/vehicles/:id — soft delete
+- POST /api/operations/asset-types/:id/apply-vehicle-defaults
+  Idempotente. Solo aplica si AssetType.category === VEHICLE.
+  Retorna { created, skipped }.
 
-Foto: reusa los endpoints de assets (POST/GET /api/operations/assets/:id/photo)
+### Comportamiento automático
 
-### Validaciones de negocio
+- Al crear AssetType con category=VEHICLE → applyVehicleDefaultRequirements()
+  se ejecuta automáticamente
+- Si los DocumentTypes no existen aún → log warning, skip silencioso
+- Si ya existen los requirements → skip (idempotente)
 
-- AssetType debe ser categoría VEHICLE (rechaza si no)
-- licensePlate única por empresa (case-insensitive)
-- VIN máximo 17 caracteres
-- year entre 1900 y currentYear+1
-- currentKilometers >= 0
-- updateKilometers no permite decrecer (excepto override admin futuro)
+### UI agregada
 
-### Tipos de combustible (FuelType enum)
-
-- GASOLINE → "Bencina"
-- DIESEL → "Diésel"
-- ELECTRIC → "Eléctrico"
-- HYBRID → "Híbrido"
-- LPG → "Gas (GLP)"
-- OTHER → "Otro"
-
-### Filtros disponibles
-
-search (plate/code/name/vin/model), assetTypeId, locationId,
-status, fuelType, yearFrom, yearTo, page, limit
-
-### Componentes frontend nuevos
-
-- apps/web/src/components/operations/VehicleFormModal.tsx
-- apps/web/src/components/operations/KilometersUpdateModal.tsx
-
-### Permisos CASL
-
-- Subject: 'Vehicle' (registrado en OPS-003)
-- Read: todos los roles
-- Create/Update: ADMIN, MANAGER
-- Delete: ADMIN solamente
+- En AssetTypeFormModal: hint informativo + checkbox "Aplicar pack
+  documental Chile" (default checked) cuando categoría = VEHICLE
+- En /operaciones/configuracion (Tipos de Activo): botón
+  "Aplicar pack documental Chile" por cada tipo VEHICLE
+- Estado del botón cambia a "Pack documental aplicado" cuando
+  los 4 requirements ya están asociados
 
 # Ticket actual
 
-- OPS-010: Pack documental Chile (SOAP, permiso circulación, RT, padrón)
-  Requirements automáticos cuando se crea un vehículo
+- OPS-011: Ficha 360 del vehículo (vista detalle similar a equipos)
+  Reusa el patrón de /operaciones/equipos/[id]
+  Agrega secciones específicas de vehículo (patente, VIN, km, etc)
+  Muestra los 4 documentos del pack via resolve/:assetId
 
 ### Próximos tickets del Sprint 3
 
-- OPS-011: Ficha 360 del vehículo (vista detalle similar a equipos)
 - OPS-012: Importación masiva CSV/Excel de vehículos

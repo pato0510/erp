@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
   ChevronLeft,
@@ -113,6 +114,7 @@ type KmModalState = null | {
 };
 
 export default function VehiculosPage() {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [assetTypeId, setAssetTypeId] = useState('');
@@ -501,6 +503,7 @@ export default function VehiculosPage() {
                     <VehicleRowView
                       key={v.id}
                       vehicle={v}
+                      onOpen={() => router.push(`/operaciones/vehiculos/${v.id}`)}
                       onEdit={() => setModal({ mode: 'edit', vehicle: toFormShape(v) })}
                       onDelete={() =>
                         setConfirm({
@@ -694,11 +697,13 @@ function Th({
 
 function VehicleRowView({
   vehicle,
+  onOpen,
   onEdit,
   onDelete,
   onUpdateKm,
 }: {
   vehicle: VehicleRow;
+  onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onUpdateKm: () => void;
@@ -730,7 +735,10 @@ function VehicleRowView({
   }, [vehicle.assetId, vehicle.hasPhoto]);
 
   return (
-    <tr className="border-b border-[var(--border-color)] last:border-b-0 hover:bg-[var(--input-bg)] transition">
+    <tr
+      onClick={onOpen}
+      className="border-b border-[var(--border-color)] last:border-b-0 hover:bg-[var(--input-bg)] transition cursor-pointer"
+    >
       <td style={{ padding: '8px 16px' }}>
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
@@ -814,9 +822,12 @@ function VehicleRowView({
           {vehicle.year ?? '—'}
         </span>
       </td>
-      <td style={{ padding: '8px 16px' }}>
+      <td style={{ padding: '8px 16px' }} onClick={(e) => e.stopPropagation()}>
         <button
-          onClick={onUpdateKm}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUpdateKm();
+          }}
           className="inline-flex items-center gap-1.5 px-2 py-1 -mx-2 -my-1 rounded-md hover:bg-[var(--input-bg)] group"
           title="Actualizar kilometraje"
         >
@@ -854,16 +865,22 @@ function VehicleRowView({
       <td style={{ padding: '8px 16px' }}>
         <AssetStatusBadge status={vehicle.asset.status} />
       </td>
-      <td style={{ padding: '8px 16px', textAlign: 'right' }}>
+      <td style={{ padding: '8px 16px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
         <button
-          onClick={onEdit}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
           className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
           title="Editar"
         >
           <Pencil size={14} />
         </button>
         <button
-          onClick={onDelete}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
           className="p-2 rounded-md hover:bg-red-50 text-red-600 ml-1"
           title="Eliminar"
         >
