@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
   Sparkles,
   Trash2,
@@ -81,6 +82,7 @@ export function AlertsConfigTab({ toaster }: { toaster: Toaster }) {
     { mode: 'create' } | { mode: 'edit'; rule: AlertRuleRow } | null
   >(null);
   const [confirmDelete, setConfirmDelete] = useState<AlertRuleRow | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,6 +144,22 @@ export function AlertsConfigTab({ toaster }: { toaster: Toaster }) {
     }
   };
 
+  const recalculateNow = async () => {
+    if (recalculating) return;
+    setRecalculating(true);
+    try {
+      await apiClient.post('/api/operations/alerts/recalculate', {});
+      toaster('Recálculo iniciado. Las alertas se generarán en segundos.', 'success');
+    } catch (err) {
+      toaster(
+        err instanceof Error ? err.message : 'No se pudo iniciar el recálculo de alertas.',
+        'error',
+      );
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const performDelete = async () => {
     if (!confirmDelete) return;
     try {
@@ -172,6 +190,50 @@ export function AlertsConfigTab({ toaster }: { toaster: Toaster }) {
 
   return (
     <div>
+      {/* Section 0 — Manual actions */}
+      <div className="config-section">
+        <div className="config-section__head">
+          <div>
+            <h2
+              className="text-[var(--text-primary)] flex items-center gap-2"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 600,
+                fontSize: 16,
+              }}
+            >
+              <RefreshCw size={16} /> Acciones manuales
+            </h2>
+            <p
+              className="text-sm text-[var(--text-secondary)] mt-1"
+              style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+            >
+              El motor de alertas corre automáticamente cada día a las 06:00 (UTC). Puedes forzar un
+              recálculo desde aquí si acabas de cambiar reglas o cargar documentos.
+            </p>
+          </div>
+        </div>
+        <div style={{ padding: 20 }}>
+          <button
+            onClick={recalculateNow}
+            disabled={recalculating}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-full text-white disabled:opacity-50"
+            style={{
+              background: '#1C1C1E',
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 500,
+            }}
+          >
+            <RefreshCw size={14} />
+            {recalculating ? 'Encolando recálculo...' : 'Recalcular alertas ahora'}
+          </button>
+          <p className="text-xs text-[var(--text-muted)] mt-2">
+            El recálculo se ejecuta en segundo plano. Las alertas aparecerán en{' '}
+            <code>/operaciones/alertas</code> en cuanto el job termine.
+          </p>
+        </div>
+      </div>
+
       {/* Section 1 — Global settings */}
       <SettingsSection settings={settings} saving={savingSettings} onSave={saveSettings} />
 

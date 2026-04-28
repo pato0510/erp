@@ -44,6 +44,9 @@ export function OperationsSidebar() {
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
+  /* OPS-019 — only count ACTIVE+CRITICAL/BLOCKING alerts in the badge so
+     low-severity warnings don't drown the signal. */
+  const [criticalAlertsCount, setCriticalAlertsCount] = useState(0);
 
   /* Poll the pending-review count on mount and every minute. The endpoint is
      gated to ADMIN/MANAGER (CASL `approve` action) — for any other role the
@@ -52,7 +55,7 @@ export function OperationsSidebar() {
   useEffect(() => {
     if (!user) return;
     let alive = true;
-    const fetchCount = () => {
+    const fetchCounts = () => {
       apiClient
         .get<{ count: number }>('/api/operations/documents/pending-review/count')
         .then((res) => {
@@ -61,9 +64,18 @@ export function OperationsSidebar() {
         .catch(() => {
           /* CASL 403 or network blip — leave the badge as-is. */
         });
+      apiClient
+        .get<{ count: number }>('/api/operations/alerts/instances/active-count')
+        .then((res) => {
+          if (alive) setCriticalAlertsCount(res.count);
+        })
+        .catch(() => {
+          /* Same forgiving behavior — VIEWER reads via CASL `read` so
+             this should always succeed for authenticated users. */
+        });
     };
-    fetchCount();
-    const interval = setInterval(fetchCount, PENDING_REVIEW_POLL_MS);
+    fetchCounts();
+    const interval = setInterval(fetchCounts, PENDING_REVIEW_POLL_MS);
     return () => {
       alive = false;
       clearInterval(interval);
@@ -88,9 +100,13 @@ export function OperationsSidebar() {
             : pathname === item.href || pathname?.startsWith(item.href + '/');
           const Icon = item.icon;
           /* Pending-review badge lives on the Documentos item — capped at "99+"
-             so it never breaks the row layout. */
-          const showBadge = item.href === '/operaciones/documentos' && pendingReviewCount > 0;
-          const badgeText = pendingReviewCount > 99 ? '99+' : String(pendingReviewCount);
+             so it never breaks the row layout. The Alertas item gets its own
+             badge from OPS-019 with the critical alert count. */
+          const isDocumentos = item.href === '/operaciones/documentos';
+          const isAlertas = item.href === '/operaciones/alertas';
+          const rawCount = isDocumentos ? pendingReviewCount : isAlertas ? criticalAlertsCount : 0;
+          const showBadge = (isDocumentos || isAlertas) && rawCount > 0;
+          const badgeText = rawCount > 99 ? '99+' : String(rawCount);
           return (
             <Link
               key={item.href}

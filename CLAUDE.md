@@ -357,11 +357,70 @@ Sprint 6: Permisos y Procedimientos (OPS-024 a OPS-028)
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
+### OPS-018: Reglas de alerta configurables (✓ completado)
+
+Sistema de reglas configurables por tipo documental con presets chilenos.
+
+### Tablas creadas
+
+- alert_rules — reglas custom por documentType (o globales si null)
+- company_alert_settings — singleton por empresa con defaults
+
+### Enum AlertSeverity (extendido)
+
+INFO, WARNING, CRITICAL, BLOCKING
+
+### Endpoints OPS-018
+
+- GET/POST/PATCH/DELETE /api/operations/alert-rules
+- GET /api/operations/alert-rules/resolve/:documentTypeId
+- POST /api/operations/alert-rules/apply-recommended-chile
+- GET/PATCH /api/operations/alert-settings
+
+### Resolution engine
+
+resolveRulesForDocumentType merge:
+
+1. Defaults dinámicos (derivados de documentType.alertDaysBefore +
+   criticalAlertDaysBefore + blocksOperation, con fallback a
+   CompanyAlertSettings)
+2. Reglas custom globales (documentTypeId=null)
+3. Reglas custom específicas del tipo (sobrescriben en mismo umbral)
+
+### Preset chileno recomendado
+
+- SOAP, PERMCIRC: 60d/30d/15d/7d/0d (WARNING→CRITICAL→BLOCKING)
+- REVTEC: 90d/30d/7d/0d
+- Procedimientos: 30d→WARNING, 7d→CRITICAL
+- Idempotente (skip por nombre+documentTypeId)
+
+### UI agregada
+
+4to tab "Alertas" en /operaciones/configuracion:
+
+- Configuración general (4 campos + 2 toggles + botón guardar)
+- Tabla de reglas custom con badges de severidad
+- Botón "Cargar reglas recomendadas Chile"
+- Modal de creación/edición con multi-select de roles
+
+### CASL nuevos subjects
+
+- 'AlertRule' y 'AlertSettings'
+- read: todos los roles
+- create/update/delete: ADMIN, MANAGER
+
+### /operaciones/alertas
+
+Placeholder con banner enlazando a configuración (la pantalla real
+viene en OPS-021)
+
 # Ticket actual
 
-Sprint 5 — Alertas y Bloqueos automáticos
-
-OPS-018: Reglas de alerta configurables por tipo documental
-Tabla alert_rules con thresholds personalizables, severidad y
-configuración de escalamiento. Permite override por tipo documental
-(SOAP puede alertar 60 días antes, no 30).
+- OPS-019: BullMQ scheduler diario para recálculo de vencimientos
+  Job que corre cada 24h con cron schedule
+  Para cada activo + cada documento requerido:
+  - Calcula estado derivado (VIGENTE/POR_VENCER/VENCIDO/FALTANTE)
+  - Aplica reglas resueltas para determinar si dispara alerta
+  - Crea AlertInstance si no existe ya una activa
+    Idempotente, no duplica alertas
+    Manual trigger desde UI para admin (botón "Recalcular ahora")

@@ -426,6 +426,18 @@ export class DocumentRecordsService {
         ? 100
         : Math.round(((valid + expiringSoon) / totalRequiredDocuments) * 1000) / 10;
 
+    /* OPS-019 — surface the active alert workload alongside compliance
+       so the central docs dashboard can show "X alertas activas" without
+       a second round-trip. CRITICAL+BLOCKING is the headline number. */
+    const [activeAlertsCount, criticalAlertsCount] = await Promise.all([
+      this.prisma.alertInstance.count({
+        where: { companyId, status: 'ACTIVE' },
+      }),
+      this.prisma.alertInstance.count({
+        where: { companyId, status: 'ACTIVE', severity: { in: ['CRITICAL', 'BLOCKING'] } },
+      }),
+    ]);
+
     return {
       totalAssets: assets.length,
       assetsWithFullCompliance,
@@ -438,6 +450,8 @@ export class DocumentRecordsService {
       valid,
       compliancePercentage,
       bySeverity,
+      activeAlertsCount,
+      criticalAlertsCount,
     };
   }
 
