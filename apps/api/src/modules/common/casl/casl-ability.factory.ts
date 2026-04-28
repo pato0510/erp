@@ -13,6 +13,10 @@ type Subjects =
       | typeof CounterpartySubject
       | typeof CostCenterSubject
       | typeof FiscalPeriodSubject
+      | typeof OperationalAssetSubject
+      | typeof LocationSubject
+      | typeof AssetTypeSubject
+      | typeof VehicleSubject
     >
   | 'all';
 
@@ -43,6 +47,18 @@ class CostCenterSubject {
 class FiscalPeriodSubject {
   static readonly modelName = 'FiscalPeriod' as const;
 }
+class OperationalAssetSubject {
+  static readonly modelName = 'OperationalAsset' as const;
+}
+class LocationSubject {
+  static readonly modelName = 'Location' as const;
+}
+class AssetTypeSubject {
+  static readonly modelName = 'AssetType' as const;
+}
+class VehicleSubject {
+  static readonly modelName = 'Vehicle' as const;
+}
 
 export type Action = 'create' | 'read' | 'update' | 'delete' | 'manage';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
@@ -57,6 +73,10 @@ export {
   CounterpartySubject,
   CostCenterSubject,
   FiscalPeriodSubject,
+  OperationalAssetSubject,
+  LocationSubject,
+  AssetTypeSubject,
+  VehicleSubject,
 };
 
 @Injectable()
@@ -81,6 +101,9 @@ export class CaslAbilityFactory {
         can(['create', 'update'], CounterpartySubject);
         can(['create', 'update'], CostCenterSubject);
         can(['create', 'update'], FiscalPeriodSubject);
+        can(['create', 'update'], OperationalAssetSubject);
+        can(['create', 'update'], LocationSubject);
+        can(['create', 'update'], VehicleSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -102,6 +125,10 @@ export class CaslAbilityFactory {
         can('read', CounterpartySubject);
         can('read', CostCenterSubject);
         can('read', FiscalPeriodSubject);
+        can('read', OperationalAssetSubject);
+        can('read', LocationSubject);
+        can('read', AssetTypeSubject);
+        can('read', VehicleSubject);
         break;
     }
 

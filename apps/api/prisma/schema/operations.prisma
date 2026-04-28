@@ -1,0 +1,146 @@
+enum AssetCategory {
+  EQUIPMENT
+  VEHICLE
+  TOOL
+  INFRASTRUCTURE
+}
+
+enum AssetStatus {
+  OPERATIONAL
+  WITH_OBSERVATIONS
+  NON_OPERATIONAL
+  IN_MAINTENANCE
+  BLOCKED_DOCUMENTAL
+  BLOCKED_PERMIT
+  OUT_OF_SERVICE
+  DECOMMISSIONED
+}
+
+enum FuelType {
+  GASOLINE
+  DIESEL
+  ELECTRIC
+  HYBRID
+  LPG
+  OTHER
+}
+
+model Location {
+  id               String   @id @default(uuid()) @db.Uuid
+  companyId        String   @db.Uuid
+  name             String
+  code             String?
+  parentLocationId String?  @db.Uuid
+  address          String?
+  latitude         Decimal? @db.Decimal(10, 7)
+  longitude        Decimal? @db.Decimal(10, 7)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdBy        String   @db.Uuid
+
+  parent   Location?          @relation("LocationTree", fields: [parentLocationId], references: [id])
+  children Location[]         @relation("LocationTree")
+  assets   OperationalAsset[]
+
+  @@unique([companyId, code])
+  @@index([companyId, parentLocationId])
+  @@map("locations")
+}
+
+model AssetType {
+  id          String        @id @default(uuid()) @db.Uuid
+  companyId   String        @db.Uuid
+  name        String
+  category    AssetCategory
+  description String?
+  icon        String?
+  color       String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  subtypes AssetSubtype[]
+  assets   OperationalAsset[]
+
+  @@unique([companyId, name])
+  @@map("asset_types")
+}
+
+model AssetSubtype {
+  id             String   @id @default(uuid()) @db.Uuid
+  assetTypeId    String   @db.Uuid
+  name           String
+  specifications Json?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assetType AssetType          @relation(fields: [assetTypeId], references: [id])
+  assets    OperationalAsset[]
+
+  @@unique([assetTypeId, name])
+  @@map("asset_subtypes")
+}
+
+model OperationalAsset {
+  id                String      @id @default(uuid()) @db.Uuid
+  companyId         String      @db.Uuid
+  assetTypeId       String      @db.Uuid
+  assetSubtypeId    String?     @db.Uuid
+  locationId        String?     @db.Uuid
+  parentAssetId     String?     @db.Uuid
+  code              String
+  name              String
+  description       String?
+  serialNumber      String?
+  manufacturer      String?
+  model             String?
+  acquisitionDate   DateTime?   @db.Date
+  acquisitionCost   Decimal?    @db.Decimal(18, 2)
+  status            AssetStatus @default(OPERATIONAL)
+  statusReason      String?
+  statusChangedAt   DateTime?
+  photoPath         String?
+  dynamicAttributes Json        @default("{}")
+  tags              String[]    @default([])
+  assignedToUserId  String?     @db.Uuid
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  createdBy         String      @db.Uuid
+
+  assetType    AssetType          @relation(fields: [assetTypeId], references: [id])
+  assetSubtype AssetSubtype?      @relation(fields: [assetSubtypeId], references: [id])
+  location     Location?          @relation(fields: [locationId], references: [id])
+  parent       OperationalAsset?  @relation("AssetHierarchy", fields: [parentAssetId], references: [id])
+  children     OperationalAsset[] @relation("AssetHierarchy")
+  vehicle      Vehicle?
+
+  @@unique([companyId, code])
+  @@index([companyId, assetTypeId])
+  @@index([companyId, locationId])
+  @@index([companyId, status])
+  @@index([companyId, parentAssetId])
+  @@map("operational_assets")
+}
+
+model Vehicle {
+  id                String    @id @default(uuid()) @db.Uuid
+  assetId           String    @unique @db.Uuid
+  licensePlate      String
+  vin               String?
+  year              Int?
+  currentKilometers Int       @default(0)
+  lastKmUpdate      DateTime?
+  fuelType          FuelType
+  registrationDate  DateTime? @db.Date
+  color             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  asset OperationalAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([licensePlate])
+  @@map("vehicles")
+}

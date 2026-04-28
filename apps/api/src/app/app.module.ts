@@ -23,6 +23,7 @@ import { HealthModule } from '../modules/health/health.module';
 import { IamModule } from '../modules/iam/iam.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
 import { MovementsModule } from '../modules/movements/movements.module';
+import { OperationsModule } from '../modules/operations/operations.module';
 import { ReconciliationModule } from '../modules/reconciliation/reconciliation.module';
 import { ReportsModule } from '../modules/reports/reports.module';
 import { TaxModule } from '../modules/tax/tax.module';
@@ -60,6 +61,7 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
     IamModule,
     JobsModule,
     MovementsModule,
+    OperationsModule,
     ReconciliationModule,
     ReportsModule,
     TaxModule,
