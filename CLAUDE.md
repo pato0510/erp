@@ -448,10 +448,72 @@ El sistema calcula automáticamente:
 - VENCIDO = pasó expirationDate
 - Estos estados se actualizan via job BullMQ diario (en Sprint 5)
 
+### OPS-014: Carga de documentos a activos (✓ completado)
+
+Permite subir documentos reales (PDF, imágenes, Office) a cada activo.
+
+### Storage convention
+
+- Path en MinIO: operations/documents/{companyId}/{recordId}/{filename}
+- Bucket: SII_CERT_BUCKET (compartido)
+- Fallback automático a DB blob (fileData column) si MinIO falla
+
+### Validaciones
+
+- Max 10MB
+- MIME types permitidos: pdf, jpg, png, webp, doc, docx, xls, xlsx
+- assetId y documentTypeId deben pertenecer a la empresa
+- Status inicial restringido a DRAFT o PENDING_REVIEW
+
+### Auto-cálculo de vencimiento
+
+Si documentType.hasExpiration && issueDate && defaultValidityDays:
+expirationDate = issueDate + defaultValidityDays
+Usuario puede sobreescribir manualmente.
+
+### Versionado preliminar
+
+Calcula versión via Prisma.aggregate \_max version por (asset, documentType).
+Las archivadas conservan su número (no se reusan).
+NO marca aún la versión anterior como REPLACED — eso viene en OPS-016.
+
+### Endpoints implementados OPS-014
+
+- POST /api/operations/documents (multipart, 10MB cap)
+- PATCH /api/operations/documents/:id (metadata only)
+- POST /api/operations/documents/:id/archive (con reason)
+- DELETE /api/operations/documents/:id (solo DRAFT, soft delete)
+- GET /api/operations/documents/:id/file?download=1
+
+### Componentes nuevos
+
+- apps/web/src/components/operations/DocumentUploadModal.tsx
+  5 secciones: Activo, Tipo, Archivo, Vigencia, Notas
+  Dos botones: "Guardar como borrador" / "Guardar y enviar a revisión"
+- apps/web/src/components/operations/DocumentPreviewModal.tsx
+  Iframe para PDFs, img para imágenes, placeholder para Office
+- apps/web/src/lib/file-icons.tsx
+  getFileIcon(mimeType) + canPreviewInline()
+
+### Integración con fichas 360
+
+- Sección "Documentos requeridos" agrega botón "Cargar" por fila
+- Nueva sección "Documentos cargados" lista todos los DocumentRecord
+  activos del activo
+- Acciones: Ver, Descargar, Archivar (APPROVED), Eliminar (DRAFT)
+
+### Permisos CASL ajustados
+
+- MANAGER: create/update DocumentRecord
+- ADMIN: delete (via manage all)
+- Read: todos los roles
+
 # Ticket actual
 
-- OPS-013: Pantalla central de control documental
-  Vista unificada de todos los documentos cargados en `/operaciones/documentos`
-  Filtros por activo, tipo de documento, estado, vencimiento
-  KPIs de cumplimiento general
-  Acceso rápido a documentos por vencer y vencidos
+- OPS-015: Workflow de aprobación/rechazo
+  Documentos en PENDING_REVIEW pueden ser APROBADOS o RECHAZADOS
+  Aprobación: status → APPROVED, registra approvedBy y approvedAt
+  Rechazo: status → REJECTED, registra rejectedBy, rejectedAt y motivo
+  Vista de cola "Pendientes de revisión" en /operaciones/documentos
+  Notificación visual de documentos pendientes en sidebar (badge)
+  Solo ADMIN/MANAGER pueden aprobar (no pueden auto-aprobar sus propios uploads)

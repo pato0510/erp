@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle,
+  Archive,
   ArrowRight,
+  Check,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -12,19 +14,24 @@ import {
   FileText,
   Layers,
   Search,
+  Send,
   Settings,
   ShieldCheck,
   Trash2,
   Upload,
   Wrench,
   X,
+  XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
+import { useAuth } from '../../../../hooks/useAuth';
 import { Toast } from '../../../../components/shared/Toast';
 import {
   DocumentStatusBadge,
   type DerivedDocumentStatus,
 } from '../../../../components/operations/DocumentStatusBadge';
+import { DocumentUploadModal } from '../../../../components/operations/DocumentUploadModal';
+import { DocumentPreviewModal } from '../../../../components/operations/DocumentPreviewModal';
 import { formatDate } from '../../../../lib/formatters';
 
 type RecordStatus = 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'REPLACED' | 'ARCHIVED';
@@ -39,6 +46,12 @@ interface DocumentRow {
   issueDate?: string | null;
   expirationDate?: string | null;
   status: RecordStatus;
+  /* statusReason carries the rejection text on REJECTED docs and the archive
+     reason on ARCHIVED ones. We render it inline for REJECTED rows so the
+     uploader can fix and resubmit without opening the detail page. */
+  statusReason?: string | null;
+  uploadedBy: string;
+  rejectedAt?: string | null;
   version: number;
   derivedStatus: DerivedDocumentStatus;
   createdAt: string;
@@ -133,6 +146,14 @@ const DOC_CATEGORY_LABELS: Record<string, string> = {
 const PAGE_SIZE = 20;
 
 export default function DocumentosPage() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  /* Active company role drives whether to show inline approve/reject buttons
+     in the table. ADMIN/MANAGER can act; everyone else sees only resubmit on
+     their own rejected uploads. */
+  const activeCompanyId = apiClient.getCompanyId();
+  const userRole = user?.companies.find((c) => c.companyId === activeCompanyId)?.role ?? null;
+  const canReview = userRole === 'ADMIN' || userRole === 'MANAGER' || userRole === 'SUPER_ADMIN';
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [assetId, setAssetId] = useState('');
@@ -158,6 +179,24 @@ export default function DocumentosPage() {
     message: string;
     type: 'success' | 'error' | 'info';
   } | null>(null);
+
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<DocumentRow | null>(null);
+  const [archiveDoc, setArchiveDoc] = useState<DocumentRow | null>(null);
+  const [archiveReason, setArchiveReason] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<DocumentRow | null>(null);
+
+  /* Pending-review banner state. We poll the count alongside the list and
+     persist a per-user dismissal in localStorage so it doesn't reappear after
+     a refresh. */
+  const [pendingCount, setPendingCount] = useState(0);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  /* Inline workflow modals shared across status. confirmApprove handles the
+     PENDING_REVIEW → APPROVED jump and rejectInline handles the REJECTED
+     jump (with reason). */
+  const [confirmApprove, setConfirmApprove] = useState<DocumentRow | null>(null);
+  const [rejectInline, setRejectInline] = useState<DocumentRow | null>(null);
+  const [rejectInlineReason, setRejectInlineReason] = useState('');
 
   /* Debounce search input → search to avoid hitting the API on every keystroke. */
   useEffect(() => {
@@ -238,6 +277,13 @@ export default function DocumentosPage() {
     } finally {
       setIsLoading(false);
     }
+    /* Pending-review count is gated to ADMIN/MANAGER — non-reviewers get a
+       403 here and we silently drop to 0, matching the spec where the banner
+       and badge only surface for users who can act on the queue. */
+    apiClient
+      .get<{ count: number }>('/api/operations/documents/pending-review/count')
+      .then((res) => setPendingCount(res.count))
+      .catch(() => setPendingCount(0));
   }, [buildParams]);
 
   useEffect(() => {
@@ -247,6 +293,137 @@ export default function DocumentosPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /* Read the persistent dismissal flag once on mount. We key it per company
+     so dismissing the banner in one tenant doesn't affect another. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const companyId = apiClient.getCompanyId();
+    if (!companyId) return;
+    const dismissed = localStorage.getItem(`docs-pending-banner-dismissed:${companyId}`);
+    if (dismissed === '1') setBannerDismissed(true);
+  }, []);
+
+  const dismissPendingBanner = () => {
+    setBannerDismissed(true);
+    if (typeof window !== 'undefined') {
+      const companyId = apiClient.getCompanyId();
+      if (companyId) {
+        localStorage.setItem(`docs-pending-banner-dismissed:${companyId}`, '1');
+      }
+    }
+  };
+
+  /* Authenticated download — apiClient adds the company header. We can't link
+     directly to the API URL because cookie-only auth doesn't carry on a raw
+     <a download> click for some browsers. */
+  const triggerDownload = async (doc: DocumentRow) => {
+    try {
+      const blob = await apiClient.fetchBlob(`/api/operations/documents/${doc.id}/file?download=1`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'No se pudo descargar el archivo.',
+        type: 'error',
+      });
+    }
+  };
+
+  const performArchive = async () => {
+    if (!archiveDoc) return;
+    if (!archiveReason.trim()) {
+      setToast({ message: 'Indica el motivo de archivado.', type: 'error' });
+      return;
+    }
+    try {
+      await apiClient.post(`/api/operations/documents/${archiveDoc.id}/archive`, {
+        reason: archiveReason.trim(),
+      });
+      setToast({ message: 'Documento archivado.', type: 'success' });
+      setArchiveDoc(null);
+      setArchiveReason('');
+      load();
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'No se pudo archivar el documento.',
+        type: 'error',
+      });
+    }
+  };
+
+  const performApproveInline = async () => {
+    if (!confirmApprove) return;
+    try {
+      await apiClient.post(`/api/operations/documents/${confirmApprove.id}/approve`);
+      setToast({ message: 'Documento aprobado', type: 'success' });
+      setConfirmApprove(null);
+      load();
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'No se pudo aprobar el documento.',
+        type: 'error',
+      });
+      setConfirmApprove(null);
+    }
+  };
+
+  const performRejectInline = async () => {
+    if (!rejectInline) return;
+    if (rejectInlineReason.trim().length < 10) {
+      setToast({ message: 'El motivo debe tener al menos 10 caracteres.', type: 'error' });
+      return;
+    }
+    try {
+      await apiClient.post(`/api/operations/documents/${rejectInline.id}/reject`, {
+        reason: rejectInlineReason.trim(),
+      });
+      setToast({ message: 'Documento rechazado', type: 'success' });
+      setRejectInline(null);
+      setRejectInlineReason('');
+      load();
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'No se pudo rechazar el documento.',
+        type: 'error',
+      });
+    }
+  };
+
+  const performResubmit = async (doc: DocumentRow) => {
+    try {
+      await apiClient.post(`/api/operations/documents/${doc.id}/resubmit`);
+      setToast({ message: 'Documento reenviado a revisión', type: 'success' });
+      load();
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'No se pudo reenviar el documento.',
+        type: 'error',
+      });
+    }
+  };
+
+  const performDelete = async () => {
+    if (!confirmDelete) return;
+    try {
+      await apiClient.delete(`/api/operations/documents/${confirmDelete.id}`);
+      setToast({ message: 'Documento eliminado.', type: 'success' });
+      setConfirmDelete(null);
+      load();
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'No se pudo eliminar el documento.',
+        type: 'error',
+      });
+      setConfirmDelete(null);
+    }
+  };
 
   const resetFilters = () => {
     setSearchInput('');
@@ -314,14 +491,19 @@ export default function DocumentosPage() {
             </p>
           </div>
           <button
-            disabled
+            onClick={() => setUploadOpen(true)}
+            disabled={isUnconfigured}
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: '#1C1C1E',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
-            title="Disponible próximamente (OPS-014)"
+            title={
+              isUnconfigured
+                ? 'Configura tipos de activo y de documento antes de cargar.'
+                : 'Cargar nuevo documento'
+            }
           >
             <Upload size={16} /> Cargar documento
           </button>
@@ -391,6 +573,48 @@ export default function DocumentosPage() {
               <Wrench size={12} /> Crear primer activo <ArrowRight size={12} />
             </Link>
           </div>
+        </div>
+      )}
+
+      {/* Pending-review banner — appears for ADMIN/MANAGER when there are
+          documents waiting for approval. Dismissal is sticky per company. */}
+      {pendingCount > 0 && !bannerDismissed && (
+        <div
+          className="mb-4 p-3 rounded-xl flex items-center gap-3"
+          style={{
+            background: 'rgba(37, 99, 235, 0.08)',
+            border: '1px solid rgba(37, 99, 235, 0.25)',
+          }}
+        >
+          <FileText size={18} style={{ color: '#1d4ed8', flexShrink: 0 }} />
+          <p
+            className="flex-1 text-sm text-[var(--text-primary)]"
+            style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+          >
+            Tienes <strong>{pendingCount}</strong>{' '}
+            {pendingCount === 1
+              ? 'documento pendiente de revisión'
+              : 'documentos pendientes de revisión'}
+            .
+          </p>
+          <Link
+            href="/operaciones/documentos/pendientes"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full text-white"
+            style={{
+              background: '#2563eb',
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 500,
+            }}
+          >
+            Ver pendientes <ArrowRight size={12} />
+          </Link>
+          <button
+            onClick={dismissPendingBanner}
+            className="p-1 rounded hover:bg-blue-100 text-[#1d4ed8]"
+            aria-label="Cerrar"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
@@ -604,7 +828,25 @@ export default function DocumentosPage() {
                 </thead>
                 <tbody>
                   {data.data.map((d) => (
-                    <DocumentRowView key={d.id} doc={d} />
+                    <DocumentRowView
+                      key={d.id}
+                      doc={d}
+                      currentUserId={userId}
+                      canReview={canReview}
+                      onPreview={() => setPreviewDoc(d)}
+                      onDownload={() => triggerDownload(d)}
+                      onArchive={() => {
+                        setArchiveReason('');
+                        setArchiveDoc(d);
+                      }}
+                      onDelete={() => setConfirmDelete(d)}
+                      onApprove={() => setConfirmApprove(d)}
+                      onReject={() => {
+                        setRejectInlineReason('');
+                        setRejectInline(d);
+                      }}
+                      onResubmit={() => performResubmit(d)}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -669,6 +911,137 @@ export default function DocumentosPage() {
           box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
       `}</style>
+
+      {uploadOpen && (
+        <DocumentUploadModal
+          onClose={() => setUploadOpen(false)}
+          onUploaded={() => {
+            setToast({ message: 'Documento cargado exitosamente', type: 'success' });
+            load();
+          }}
+        />
+      )}
+
+      {previewDoc && (
+        <DocumentPreviewModal
+          documentId={previewDoc.id}
+          fileName={previewDoc.fileName}
+          mimeType={previewDoc.mimeType}
+          documentTypeName={previewDoc.documentType.name}
+          assetCode={previewDoc.asset.code}
+          assetName={previewDoc.asset.name}
+          derivedStatus={previewDoc.derivedStatus}
+          version={previewDoc.version}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
+
+      {archiveDoc && (
+        <ConfirmModal
+          title="Archivar documento"
+          confirmLabel="Archivar"
+          confirmTone="warning"
+          onCancel={() => setArchiveDoc(null)}
+          onConfirm={performArchive}
+        >
+          <p className="text-sm text-[var(--text-secondary)] mb-3">
+            ¿Confirmas archivar el documento{' '}
+            <strong className="text-[var(--text-primary)]">{archiveDoc.documentType.name}</strong>{' '}
+            de{' '}
+            <strong style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}>
+              {archiveDoc.asset.code}
+            </strong>
+            ? Quedará oculto de las listas pero conservará su historial.
+          </p>
+          <label
+            className="block mb-1.5 text-[var(--text-secondary)]"
+            style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500, fontSize: 13 }}
+          >
+            Motivo <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={archiveReason}
+            onChange={(e) => setArchiveReason(e.target.value)}
+            rows={3}
+            maxLength={500}
+            placeholder="Explica por qué archivas este documento..."
+            className="cp-input"
+          />
+        </ConfirmModal>
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title="Eliminar documento"
+          confirmLabel="Eliminar"
+          confirmTone="danger"
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={performDelete}
+        >
+          <p className="text-sm text-[var(--text-secondary)]">
+            ¿Confirmas eliminar el borrador{' '}
+            <strong className="text-[var(--text-primary)]">{confirmDelete.fileName}</strong>? La
+            acción es reversible (soft delete) — pero queda fuera de las listas activas.
+          </p>
+        </ConfirmModal>
+      )}
+
+      {confirmApprove && (
+        <ConfirmModal
+          title="Aprobar documento"
+          confirmLabel="Aprobar"
+          confirmTone="warning"
+          onCancel={() => setConfirmApprove(null)}
+          onConfirm={performApproveInline}
+        >
+          <p className="text-sm text-[var(--text-secondary)]">
+            ¿Confirmas aprobar{' '}
+            <strong className="text-[var(--text-primary)]">
+              {confirmApprove.documentType.name}
+            </strong>{' '}
+            de{' '}
+            <strong style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}>
+              {confirmApprove.asset.code}
+            </strong>
+            ? Pasará a contar como vigente para el cumplimiento.
+          </p>
+        </ConfirmModal>
+      )}
+
+      {rejectInline && (
+        <ConfirmModal
+          title="Rechazar documento"
+          confirmLabel="Confirmar rechazo"
+          confirmTone="danger"
+          onCancel={() => setRejectInline(null)}
+          onConfirm={performRejectInline}
+        >
+          <p className="text-sm text-[var(--text-secondary)] mb-3">
+            Rechazar{' '}
+            <strong className="text-[var(--text-primary)]">{rejectInline.documentType.name}</strong>{' '}
+            de{' '}
+            <strong style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}>
+              {rejectInline.asset.code}
+            </strong>
+            . El uploader verá el motivo y podrá corregir y reenviar.
+          </p>
+          <label
+            className="block mb-1.5 text-[var(--text-secondary)]"
+            style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500, fontSize: 13 }}
+          >
+            Motivo del rechazo <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={rejectInlineReason}
+            onChange={(e) => setRejectInlineReason(e.target.value)}
+            rows={4}
+            minLength={10}
+            maxLength={2000}
+            placeholder="Mínimo 10 caracteres..."
+            className="cp-input"
+          />
+        </ConfirmModal>
+      )}
     </div>
   );
 }
@@ -842,7 +1215,30 @@ function QuickChip({
   );
 }
 
-function DocumentRowView({ doc }: { doc: DocumentRow }) {
+function DocumentRowView({
+  doc,
+  currentUserId,
+  canReview,
+  onPreview,
+  onDownload,
+  onArchive,
+  onDelete,
+  onApprove,
+  onReject,
+  onResubmit,
+}: {
+  doc: DocumentRow;
+  currentUserId: string | null;
+  canReview: boolean;
+  onPreview: () => void;
+  onDownload: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+  onResubmit: () => void;
+}) {
+  const isOwnUpload = currentUserId !== null && doc.uploadedBy === currentUserId;
   /* Hint for "(en X días)" / "(hace X días)" next to the expiration date.
      Computed once per render — these dates change slowly enough that we don't
      need a memo. */
@@ -963,6 +1359,21 @@ function DocumentRowView({ doc }: { doc: DocumentRow }) {
       </td>
       <td style={{ padding: '8px 16px' }}>
         <DocumentStatusBadge status={doc.derivedStatus} />
+        {/* Rejection reason inline. Truncated to one line; the full text
+            lives in the preview modal once OPS-016 ships preview metadata. */}
+        {doc.status === 'REJECTED' && doc.statusReason && (
+          <div
+            className="mt-1 text-[#b91c1c] truncate max-w-[260px]"
+            style={{
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontSize: 11,
+              lineHeight: 1.3,
+            }}
+            title={doc.statusReason}
+          >
+            🔴 {doc.statusReason}
+          </div>
+        )}
       </td>
       <td style={{ padding: '8px 16px' }}>
         <span
@@ -979,30 +1390,72 @@ function DocumentRowView({ doc }: { doc: DocumentRow }) {
         </span>
       </td>
       <td style={{ padding: '8px 16px', textAlign: 'right' }}>
-        <DisabledAction icon={<Eye size={14} />} title="Ver (próximamente)" />
-        <DisabledAction icon={<Download size={14} />} title="Descargar (próximamente)" />
-        <DisabledAction icon={<Trash2 size={14} />} title="Eliminar (próximamente)" tone="danger" />
+        <ActionButton icon={<Eye size={14} />} title="Vista previa" onClick={onPreview} />
+        <ActionButton icon={<Download size={14} />} title="Descargar" onClick={onDownload} />
+        {/* Workflow actions: PENDING_REVIEW gets approve/reject (reviewers
+            only, blocked on self-uploads). REJECTED gets resubmit for the
+            original uploader. APPROVED can be archived; DRAFT can be deleted. */}
+        {doc.status === 'PENDING_REVIEW' && canReview && !isOwnUpload && (
+          <>
+            <ActionButton
+              icon={<Check size={14} />}
+              title="Aprobar"
+              onClick={onApprove}
+              tone="success"
+            />
+            <ActionButton
+              icon={<XCircle size={14} />}
+              title="Rechazar"
+              onClick={onReject}
+              tone="danger"
+            />
+          </>
+        )}
+        {doc.status === 'REJECTED' && isOwnUpload && (
+          <ActionButton
+            icon={<Send size={14} />}
+            title="Reenviar a revisión"
+            onClick={onResubmit}
+          />
+        )}
+        {doc.status === 'APPROVED' && (
+          <ActionButton icon={<Archive size={14} />} title="Archivar" onClick={onArchive} />
+        )}
+        {doc.status === 'DRAFT' && (
+          <ActionButton
+            icon={<Trash2 size={14} />}
+            title="Eliminar borrador"
+            onClick={onDelete}
+            tone="danger"
+          />
+        )}
       </td>
     </tr>
   );
 }
 
-function DisabledAction({
+function ActionButton({
   icon,
   title,
+  onClick,
   tone,
 }: {
   icon: React.ReactNode;
   title: string;
-  tone?: 'danger';
+  onClick: () => void;
+  tone?: 'danger' | 'success';
 }) {
+  const toneClass =
+    tone === 'danger'
+      ? 'text-red-600 hover:bg-red-50'
+      : tone === 'success'
+        ? 'text-green-700 hover:bg-green-50'
+        : 'text-[var(--text-secondary)] hover:bg-gray-100';
   return (
     <button
-      disabled
-      className={`p-2 rounded-md ml-1 first:ml-0 ${
-        tone === 'danger' ? 'text-red-300' : 'text-[var(--text-muted)]'
-      } cursor-not-allowed`}
+      onClick={onClick}
       title={title}
+      className={`p-2 rounded-md ml-1 first:ml-0 transition ${toneClass}`}
     >
       {icon}
     </button>
@@ -1026,9 +1479,69 @@ function EmptyState({ hasFilters }: { hasFilters: boolean }) {
       </p>
       {!hasFilters && (
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          Esta funcionalidad estará disponible en próximas semanas.
+          Usa el botón "Cargar documento" para empezar a controlar la documentación.
         </p>
       )}
+    </div>
+  );
+}
+
+/* Generic two-button confirmation modal used for archive (with reason
+   textarea) and delete (with message). Children render between the title
+   and the action buttons. */
+function ConfirmModal({
+  title,
+  confirmLabel,
+  confirmTone,
+  onCancel,
+  onConfirm,
+  children,
+}: {
+  title: string;
+  confirmLabel: string;
+  confirmTone: 'danger' | 'warning';
+  onCancel: () => void;
+  onConfirm: () => void;
+  children: React.ReactNode;
+}) {
+  const confirmBg = confirmTone === 'danger' ? '#DC2626' : '#D97706';
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+        <div className="px-5 py-4 border-b border-[var(--border-color)]">
+          <h3
+            className="text-[var(--text-primary)]"
+            style={{
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 600,
+              fontSize: 16,
+            }}
+          >
+            {title}
+          </h3>
+        </div>
+        <div className="px-5 py-4">{children}</div>
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm text-white rounded-full"
+            style={{
+              background: confirmBg,
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 500,
+            }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

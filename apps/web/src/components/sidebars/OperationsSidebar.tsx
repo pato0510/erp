@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -17,6 +18,7 @@ import {
   Truck,
   Wrench,
 } from 'lucide-react';
+import { apiClient } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -35,10 +37,38 @@ const navItems = [
 
 const adminItems = [{ href: '/operaciones/configuracion', label: 'Configuración', icon: Settings }];
 
+const PENDING_REVIEW_POLL_MS = 60_000;
+
 export function OperationsSidebar() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
+
+  /* Poll the pending-review count on mount and every minute. The endpoint is
+     gated to ADMIN/MANAGER (CASL `approve` action) — for any other role the
+     fetch silently fails and the badge stays at 0, matching the spec where
+     non-reviewers don't need to see the queue. */
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    const fetchCount = () => {
+      apiClient
+        .get<{ count: number }>('/api/operations/documents/pending-review/count')
+        .then((res) => {
+          if (alive) setPendingReviewCount(res.count);
+        })
+        .catch(() => {
+          /* CASL 403 or network blip — leave the badge as-is. */
+        });
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, PENDING_REVIEW_POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
+  }, [user]);
 
   if (!user) return null;
 
@@ -57,6 +87,10 @@ export function OperationsSidebar() {
             ? pathname === item.href
             : pathname === item.href || pathname?.startsWith(item.href + '/');
           const Icon = item.icon;
+          /* Pending-review badge lives on the Documentos item — capped at "99+"
+             so it never breaks the row layout. */
+          const showBadge = item.href === '/operaciones/documentos' && pendingReviewCount > 0;
+          const badgeText = pendingReviewCount > 99 ? '99+' : String(pendingReviewCount);
           return (
             <Link
               key={item.href}
@@ -65,6 +99,7 @@ export function OperationsSidebar() {
             >
               <Icon size={15} />
               <span style={{ flex: 1 }}>{item.label}</span>
+              {showBadge && <span className="tn-nav__badge">{badgeText}</span>}
             </Link>
           );
         })}

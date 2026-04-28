@@ -72,7 +72,18 @@ class DocumentRecordSubject {
   static readonly modelName = 'DocumentRecord' as const;
 }
 
-export type Action = 'create' | 'read' | 'update' | 'delete' | 'manage';
+/* `approve`/`reject`/`resubmit` are document-workflow specific actions. They
+   ride on the same CASL action union so the policy decorator stays uniform.
+   `manage` continues to imply all of them (ADMIN/SUPER_ADMIN). */
+export type Action =
+  | 'create'
+  | 'read'
+  | 'update'
+  | 'delete'
+  | 'manage'
+  | 'approve'
+  | 'reject'
+  | 'resubmit';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {
@@ -121,7 +132,11 @@ export class CaslAbilityFactory {
         can(['create', 'update'], VehicleSubject);
         can(['create', 'update', 'delete'], DocumentTypeSubject);
         can(['create', 'update', 'delete'], DocumentRequirementSubject);
-        can(['create', 'update', 'delete'], DocumentRecordSubject);
+        /* DocumentRecord delete is ADMIN-only per OPS-014 — APPROVED records
+           must be archived, not deleted, so MANAGER-driven workflows go
+           through `update`/archive endpoints. Approval/rejection (OPS-015)
+           is granted explicitly so MANAGER can clear the review queue. */
+        can(['create', 'update', 'approve', 'reject', 'resubmit'], DocumentRecordSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -130,10 +145,14 @@ export class CaslAbilityFactory {
         can(['create', 'update'], CategorySubject);
         can(['create', 'update'], CounterpartySubject);
         can(['create', 'update'], CostCenterSubject);
+        /* Resubmit is open to any authenticated user — the service layer
+           still enforces "only the original uploader". */
+        can('resubmit', DocumentRecordSubject);
         break;
 
       case UserRole.ANALYST:
         can('read', 'all');
+        can('resubmit', DocumentRecordSubject);
         break;
 
       case UserRole.VIEWER:
@@ -150,6 +169,7 @@ export class CaslAbilityFactory {
         can('read', DocumentTypeSubject);
         can('read', DocumentRequirementSubject);
         can('read', DocumentRecordSubject);
+        can('resubmit', DocumentRecordSubject);
         break;
     }
 
