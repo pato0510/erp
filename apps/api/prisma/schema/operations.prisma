@@ -104,6 +104,8 @@ model OperationalAsset {
   statusReason      String?
   statusChangedAt   DateTime?
   photoPath         String?
+  photoData         Bytes?
+  photoMimeType     String?
   dynamicAttributes Json        @default("{}")
   tags              String[]    @default([])
   assignedToUserId  String?     @db.Uuid

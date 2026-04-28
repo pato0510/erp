@@ -100,6 +100,26 @@ class ApiClient {
     }
     return res.json();
   }
+
+  /* Fetches a binary endpoint with auth headers and returns a Blob.
+     Used for thumbnails / inline images that the browser otherwise can't
+     request because <img src> doesn't carry custom headers. */
+  async fetchBlob(path: string): Promise<Blob> {
+    const headers: Record<string, string> = {};
+    const companyId = this.getCompanyId();
+    if (companyId) headers['x-company-id'] = companyId;
+
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers,
+      credentials: 'include',
+    });
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.blob();
+  }
 }
 
 export const apiClient = new ApiClient();

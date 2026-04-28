@@ -336,90 +336,71 @@ matriz, vencimientos, alertas, bloqueos, reportes básicos.
 OCR, firma electrónica, app móvil PWA con sincronización offline,
 work orders, mantenimiento preventivo, modelado bitemporal completo.
 
-## Frontend Visual Layer (actualizado)
+## Sprint — Equipos (en desarrollo)
 
-### Páginas con starfield animado (canvas)
+### OPS-005: CRUD de Equipos
 
-- /login — fondo negro + nebulosas + estrellas animadas
-- /modulos — mismo fondo que login
+Pantalla `/operaciones/equipos` con gestión completa de activos
+operacionales tipo equipo (no vehículos).
 
-### Páginas con fondo dark gradient estático
+### Modelo central usado
 
-Todas las pantallas dentro de (dashboard) layout:
+OperationalAsset (creado en OPS-003) con:
 
-- Background: linear-gradient(135deg, #0F0F14 0%, #1A1A22 50%, #15151E 100%)
-- Overlay: radial gradients sutiles azul/violeta
-- Sin animación, sin estrellas
-- Implementado en componente DarkGradientBackground
+- AssetType.category = EQUIPMENT (filtro principal)
+- Atributos dinámicos en JSONB (campos específicos por tipo)
+- Jerarquías padre-hijo via parentAssetId (componente → equipo → sitio)
+- Foto en MinIO o fallback a DB blob
+- Status con 8 estados operacionales
 
-### Sidebar gradients
+### Endpoints REST implementados
 
-- Light theme: linear-gradient(180deg, #3B5C8A 0%, #284B75 100%)
-  (azul medianoche más claro)
-- Dark theme: linear-gradient(180deg, #0A0A12 0%, #0F1422 100%)
-  (negro profundo con tinte azul)
-- Sidebar texto: blanco en ambos temas
-- Active item: rgba(255,255,255,0.1) bg + #60A5FA border-left
+- GET /api/operations/assets — lista filtrable y paginada
+- GET /api/operations/assets/:id — detalle con relaciones
+- POST /api/operations/assets — crear
+- PATCH /api/operations/assets/:id — actualizar
+- DELETE /api/operations/assets/:id — soft delete con validación de hijos
+- POST /api/operations/assets/:id/photo — subir foto (max 2MB)
+- GET /api/operations/assets/:id/photo — descargar foto
 
-### Cards en dark theme
+### Validaciones de negocio
 
-- Glassmorphism: rgba(28,28,30,0.5) + backdrop-filter blur(12px)
-- Border: rgba(255,255,255,0.08)
+- code único por empresa
+- No se puede eliminar un activo con activos hijos
+- statusChangedAt se actualiza automáticamente al cambiar status
+- Foto: solo jpg/png/webp, máximo 2MB
 
-### Cards en light theme
+### Storage de fotos
 
-- Solid white #ffffff
-- Border: #e8eaed
+- Path en MinIO: operations/assets/{assetId}/photo.{ext}
+- Fallback a DB blob igual que SII certificate
+- Thumbnail en lista de equipos viene de GET /:id/photo
 
-### Fonts (next/font/google con display:swap, preload:true)
+### Estados de Activo (traducciones UI)
 
-- Outfit (300, 400, 500, 600) — títulos dashboard
-- JetBrains Mono (300, 400, 500) — labels/nav/mono
-- Space Grotesk (300, 400, 500, 600) — login/módulos titulares
-- IBM Plex Sans (300, 400, 500) — body login
-- IBM Plex Mono (300, 400, 500) — topbar/labels login
-- DM Serif Display — login (decorativo)
+- OPERATIONAL → "Operativo" (verde)
+- WITH_OBSERVATIONS → "Con observaciones" (amarillo)
+- NON_OPERATIONAL → "No operativo" (rojo)
+- IN_MAINTENANCE → "En mantención" (azul)
+- BLOCKED_DOCUMENTAL → "Bloq. documental" (rojo)
+- BLOCKED_PERMIT → "Bloq. permiso" (rojo)
+- OUT_OF_SERVICE → "Fuera de servicio" (gris)
+- DECOMMISSIONED → "Dado de baja" (gris)
 
-### FOUC prevention
+### Componentes frontend nuevos
 
-- Critical CSS inline en layout.tsx: html/body fondo negro
-- .login-page wrapper con fade-in 0.4s ease-out 0.05s
-- .modulos-page-wrapper con mismo fade-in
-- suppressHydrationWarning en <html>
-- Topbar con min-height para evitar layout shift mientras cargan fuentes
+- apps/web/src/components/operations/AssetFormModal.tsx
+- apps/web/src/components/operations/AssetStatusBadge.tsx
 
-## Estructura de sidebars (multi-módulo)
+### Permisos CASL
 
-A partir de la integración del módulo Operaciones, el sidebar
-del (dashboard) layout cambia dinámicamente según la ruta:
+- Subject: 'OperationalAsset' (ya existente desde OPS-003)
+- Read: todos los roles
+- Create/Update: ADMIN, MANAGER
+- Delete: ADMIN solamente
 
-- /dashboard, /movimientos, /caja, /banco, /tributario,
-  /conciliacion, /cierre, /alertas, /reportes, /categorias,
-  /contrapartes, /configuracion → FinanceSidebar
-  Branding "FINANZAS"
+### Próximos tickets del Sprint 2
 
-- /operaciones y subrutas → OperationsSidebar
-  Branding "OPERACIONES"
-
-- Futuro: /hsec → HsecSidebar, /comercial → CommercialSidebar,
-  /calendario → CalendarSidebar, /rrhh → HrSidebar
-
-Ambos sidebars comparten:
-
-- Mismo gradient background (sidebar-bg variable)
-- Link "← Volver a módulos" arriba
-- Theme toggle abajo
-- Email usuario + logout abajo
-- Active item: rgba(255,255,255,0.1) + #60A5FA border-left
-
-Cambian:
-
-- Branding del logo top
-- Lista de items de navegación (íconos lucide-react + rutas)
-
-## Decisión: el sidebar permanece sólido
-
-El sidebar NO usa transparencia ni glassmorphism — es siempre
-un gradient sólido para evitar que el fondo dark gradient del
-contenido principal se vea a través de él. Esto da estabilidad
-visual entre rutas.
+- OPS-006: Ficha 360 del equipo (vista detalle completa)
+- OPS-007: CRUD de tipos y subtipos en frontend
+- OPS-008: Importación masiva CSV/Excel de equipos

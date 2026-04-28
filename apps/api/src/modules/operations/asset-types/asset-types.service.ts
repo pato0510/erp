@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { CreateAssetTypeDto } from './dto/create-asset-type.dto';
 import { UpdateAssetTypeDto } from './dto/update-asset-type.dto';
 
-/* Stub service for OPS-002 — full CRUD lands in OPS-005. */
 @Injectable()
 export class AssetTypesService {
   constructor(
@@ -13,27 +13,67 @@ export class AssetTypesService {
   ) {}
 
   async findAll(companyId: string) {
-    void [this.prisma, this.rlsService, companyId];
-    return [];
+    return this.prisma.assetType.findMany({
+      where: { companyId, isActive: true },
+      include: { subtypes: { where: { isActive: true }, orderBy: { name: 'asc' } } },
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+    });
   }
 
   async findOne(id: string, companyId: string) {
-    void [this.prisma, this.rlsService, companyId];
-    return { id, message: 'Stub — implement in OPS-005' };
+    const t = await this.prisma.assetType.findFirst({
+      where: { id, companyId },
+      include: { subtypes: { orderBy: { name: 'asc' } } },
+    });
+    if (!t) throw new NotFoundException('Tipo de activo no encontrado');
+    return t;
   }
 
   async create(companyId: string, userId: string, dto: CreateAssetTypeDto) {
-    void [this.prisma, this.rlsService, companyId, userId];
-    return { ...dto, message: 'Stub — implement in OPS-005' };
+    try {
+      return await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+        return tx.assetType.create({ data: { ...dto, companyId } });
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new BadRequestException(
+          'Ya existe un tipo de activo con ese nombre en esta empresa.',
+        );
+      }
+      throw err;
+    }
   }
 
   async update(id: string, companyId: string, userId: string, dto: UpdateAssetTypeDto) {
-    void [this.prisma, this.rlsService, companyId, userId];
-    return { id, ...dto, message: 'Stub — implement in OPS-005' };
+    await this.findOne(id, companyId);
+    try {
+      return await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+        return tx.assetType.update({ where: { id }, data: dto });
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new BadRequestException(
+          'Ya existe un tipo de activo con ese nombre en esta empresa.',
+        );
+      }
+      throw err;
+    }
   }
 
   async remove(id: string, companyId: string, userId: string) {
-    void [this.prisma, this.rlsService, companyId, userId];
-    return { id, success: true, message: 'Stub — implement in OPS-005' };
+    await this.findOne(id, companyId);
+    const usage = await this.prisma.operationalAsset.count({
+      where: { assetTypeId: id, companyId },
+    });
+    /* Soft-delete when in use to preserve referential context. Hard delete if
+       no asset still points to it. */
+    if (usage > 0) {
+      return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+        return tx.assetType.update({ where: { id }, data: { isActive: false } });
+      });
+    }
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.assetType.delete({ where: { id } });
+    });
   }
 }
