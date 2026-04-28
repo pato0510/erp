@@ -376,19 +376,82 @@ Header con patente como título principal, breadcrumb y acciones.
 - Filas clickeables → navegan al detalle
 - Botones de acción (km, editar, eliminar) usan e.stopPropagation()
 
+### OPS-012: Importación masiva CSV/Excel de vehículos (✓ completado)
+
+Wizard de 3 pasos en `/operaciones/vehiculos`.
+
+- Plantilla CSV con 20 columnas (asset + vehicle fields)
+- Mapeo automático de combustibles en español:
+  Bencina/Gasolina → GASOLINE
+  Diésel/Diesel → DIESEL
+  Eléctrico/Electrico → ELECTRIC
+  Híbrido/Hibrido → HYBRID
+  Gas/GLP → LPG
+  Otro → OTHER
+- Validaciones: AssetType debe ser VEHICLE, patente única, VIN ≤17,
+  año en rango, km ≥ 0
+- Crea OperationalAsset + Vehicle en transacción única
+- Upsert para duplicados de código (skipDuplicates togglable)
+- Hard error en duplicados de patente (no auto-update)
+- ImportLog con entityType='VEHICLE'
+- Max 1000 filas, 5MB
+
+### Endpoints agregados OPS-012
+
+- GET /api/operations/fleet/vehicles/import/template
+- POST /api/operations/fleet/vehicles/import/preview
+- POST /api/operations/fleet/vehicles/import
+
+### Componente nuevo
+
+- apps/web/src/components/operations/VehicleImportWizard.tsx
+
+# Sprint 4 — Control Documental (en desarrollo)
+
+Este sprint es el corazón operacional del módulo. Permite cargar
+documentos reales (PDFs, fotos, certificados) a cada activo,
+con vigencia, vencimientos, versionado inmutable y workflow de
+aprobación.
+
+### Tickets del Sprint 4
+
+- OPS-013: Pantalla central de control documental
+- OPS-014: Carga de documentos a activos con metadatos
+- OPS-015: Workflow de aprobación/rechazo
+- OPS-016: Versionado inmutable (supersesión)
+- OPS-017: Cálculo de cumplimiento por activo y carpeta
+
+### Modelo central — DocumentRecord
+
+Esta tabla existe conceptualmente desde OPS-003 pero se
+implementa en este sprint:
+
+- documentTypeId (qué tipo es)
+- assetId (a qué activo pertenece)
+- fileName, filePath/fileData (en MinIO o DB blob fallback)
+- mimeType, fileSize
+- issueDate (fecha emisión)
+- expirationDate (calculada o manual)
+- status: BORRADOR | PENDIENTE_REVISION | APROBADO | RECHAZADO
+  | VIGENTE | POR_VENCER | VENCIDO | REEMPLAZADO | ARCHIVADO
+- uploadedBy, approvedBy, rejectedBy
+- replacedByDocumentId (si supersesión)
+- version (incremental)
+- notes (notas o motivo de rechazo)
+
+### Estados calculados (no persistidos directamente)
+
+El sistema calcula automáticamente:
+
+- VIGENTE = APROBADO y NO vencido
+- POR_VENCER = VIGENTE y dentro de alertDaysBefore
+- VENCIDO = pasó expirationDate
+- Estos estados se actualizan via job BullMQ diario (en Sprint 5)
+
 # Ticket actual
 
-- OPS-012: Importación masiva CSV/Excel de vehículos
-  Mismo patrón que OPS-008 (importación de equipos)
-  Wizard de 3 pasos: subir → preview → resultado
-  Plantilla CSV con campos de vehículo (patente, VIN, año, etc)
-  Validaciones: AssetType debe ser categoría VEHICLE
-  Reusa ImportLog con entityType='VEHICLE'
-
-### Próximos sprints
-
-- Sprint 4: Control Documental (OPS-013 a OPS-017)
-- Sprint 5: Alertas y Bloqueos automáticos (OPS-018 a OPS-023)
-- Sprint 6: Permisos y Procedimientos
-- Sprint 7: Calendario, Reportes e Integración Finanzas
-- Sprint 8: Hardening
+- OPS-013: Pantalla central de control documental
+  Vista unificada de todos los documentos cargados en `/operaciones/documentos`
+  Filtros por activo, tipo de documento, estado, vencimiento
+  KPIs de cumplimiento general
+  Acceso rápido a documentos por vencer y vencidos

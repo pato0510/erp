@@ -23,6 +23,10 @@ import {
 } from '../../../../../components/operations/AssetStatusBadge';
 import { StatusChangeModal } from '../../../../../components/operations/StatusChangeModal';
 import {
+  DocumentStatusBadge,
+  type DerivedDocumentStatus,
+} from '../../../../../components/operations/DocumentStatusBadge';
+import {
   FUEL_TYPE_LABELS,
   VehicleFormModal,
   type FuelType,
@@ -131,6 +135,16 @@ interface ResolvedRequirement {
   };
 }
 
+interface DocumentRecordSummary {
+  id: string;
+  documentTypeId: string;
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'REPLACED' | 'ARCHIVED';
+  expirationDate?: string | null;
+  version: number;
+  createdAt: string;
+  derivedStatus: DerivedDocumentStatus;
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   EQUIPMENT: 'Equipo',
   VEHICLE: 'Vehículo',
@@ -168,6 +182,7 @@ export default function VehicleDetailPage({ params }: PageProps) {
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [requirements, setRequirements] = useState<ResolvedRequirement[]>([]);
+  const [documentRecords, setDocumentRecords] = useState<DocumentRecordSummary[]>([]);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -195,11 +210,22 @@ export default function VehicleDetailPage({ params }: PageProps) {
       setVehicle(v);
       /* Resolve requirements against the underlying asset.id (not vehicle.id).
          The endpoint returns the full DocumentType including hasExpiration and
-         defaultValidityDays so we can render the validity column. */
-      const reqs = await apiClient
-        .get<ResolvedRequirement[]>(`/api/operations/document-requirements/resolve/${v.asset.id}`)
-        .catch(() => [] as ResolvedRequirement[]);
+         defaultValidityDays so we can render the validity column.
+         In parallel pull the asset's uploaded documents so each requirement
+         row shows its real compliance state (vigente / por vencer / vencido /
+         faltante) instead of a hardcoded placeholder. */
+      const [reqs, docs] = await Promise.all([
+        apiClient
+          .get<ResolvedRequirement[]>(`/api/operations/document-requirements/resolve/${v.asset.id}`)
+          .catch(() => [] as ResolvedRequirement[]),
+        apiClient
+          .get<{
+            data: DocumentRecordSummary[];
+          }>(`/api/operations/documents?assetId=${v.asset.id}&limit=100`)
+          .catch(() => ({ data: [] as DocumentRecordSummary[] })),
+      ]);
       setRequirements(reqs);
+      setDocumentRecords(docs.data);
       setNotFound(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error cargando el vehículo';
@@ -343,6 +369,33 @@ export default function VehicleDetailPage({ params }: PageProps) {
      formatRelativeDate helper returns days/weeks but we always show it in days
      here to match how operators read the dashboard. */
   const lastKmRelative = vehicle.lastKmUpdate ? formatRelativeDate(vehicle.lastKmUpdate) : null;
+
+  /* Pick the most recent document per documentTypeId — APPROVED records win,
+     ties broken by version then createdAt. Used to overlay compliance state
+     on each requirement row. */
+  const latestDocByType = (() => {
+    const map = new Map<string, DocumentRecordSummary>();
+    for (const d of documentRecords) {
+      const current = map.get(d.documentTypeId);
+      if (!current) {
+        map.set(d.documentTypeId, d);
+        continue;
+      }
+      const aIsApproved = d.status === 'APPROVED';
+      const bIsApproved = current.status === 'APPROVED';
+      if (aIsApproved && !bIsApproved) {
+        map.set(d.documentTypeId, d);
+      } else if (aIsApproved === bIsApproved) {
+        if (
+          d.version > current.version ||
+          (d.version === current.version && d.createdAt > current.createdAt)
+        ) {
+          map.set(d.documentTypeId, d);
+        }
+      }
+    }
+    return map;
+  })();
   /* Whether the vehicle is currently extending a VEHICLE-category type. Always
      should be true for vehicles, but we render a soft fallback if mismatched. */
   const fuelLabel = FUEL_TYPE_LABELS[vehicle.fuelType] ?? vehicle.fuelType;
@@ -835,12 +888,7 @@ export default function VehicleDetailPage({ params }: PageProps) {
                           )}
                         </td>
                         <td>
-                          <span
-                            className="req-chip"
-                            style={{ background: 'rgba(234, 179, 8, 0.14)', color: '#a16207' }}
-                          >
-                            Pendiente de cargar
-                          </span>
+                          <ComplianceCell record={latestDocByType.get(r.documentTypeId)} />
                         </td>
                       </tr>
                     );
@@ -998,6 +1046,29 @@ function formatUser(u: UserSummary): string {
   const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
   if (fullName) return `${fullName} · ${u.email}`;
   return u.email;
+}
+
+/* Renders the compliance pill for one (vehicle, documentType) pair. Uses the
+   API-derived status; decorates VENCIDO / POR_VENCER with day counts so
+   urgency is visible at a glance. */
+function ComplianceCell({ record }: { record: DocumentRecordSummary | undefined }) {
+  if (!record) {
+    return <DocumentStatusBadge status="FALTANTE" />;
+  }
+  let hint: string | undefined;
+  if (record.expirationDate) {
+    const exp = new Date(record.expirationDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    exp.setHours(0, 0, 0, 0);
+    const days = Math.round((exp.getTime() - today.getTime()) / 86400000);
+    if (record.derivedStatus === 'VENCIDO' && days < 0) {
+      hint = `(hace ${Math.abs(days)} días)`;
+    } else if (record.derivedStatus === 'POR_VENCER' && days >= 0) {
+      hint = `(en ${days} días)`;
+    }
+  }
+  return <DocumentStatusBadge status={record.derivedStatus} hint={hint} />;
 }
 
 function Card({ children }: { children: React.ReactNode }) {

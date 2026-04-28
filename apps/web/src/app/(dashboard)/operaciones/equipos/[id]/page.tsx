@@ -30,6 +30,10 @@ import {
   type AssetStatus,
 } from '../../../../../components/operations/AssetStatusBadge';
 import { StatusChangeModal } from '../../../../../components/operations/StatusChangeModal';
+import {
+  DocumentStatusBadge,
+  type DerivedDocumentStatus,
+} from '../../../../../components/operations/DocumentStatusBadge';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../../../lib/formatters';
 
 interface UserSummary {
@@ -112,8 +116,19 @@ interface ResolvedRequirement {
     category: string;
     criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
     blocksOperation: boolean;
+    alertDaysBefore?: number;
     color?: string | null;
   };
+}
+
+interface DocumentRecordSummary {
+  id: string;
+  documentTypeId: string;
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'REPLACED' | 'ARCHIVED';
+  expirationDate?: string | null;
+  version: number;
+  createdAt: string;
+  derivedStatus: DerivedDocumentStatus;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -151,6 +166,7 @@ export default function AssetDetailPage({ params }: PageProps) {
 
   const [asset, setAsset] = useState<AssetDetail | null>(null);
   const [requirements, setRequirements] = useState<ResolvedRequirement[]>([]);
+  const [documentRecords, setDocumentRecords] = useState<DocumentRecordSummary[]>([]);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -174,14 +190,20 @@ export default function AssetDetailPage({ params }: PageProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, r] = await Promise.all([
+      const [a, r, docs] = await Promise.all([
         apiClient.get<AssetDetail>(`/api/operations/assets/${id}`),
         apiClient
           .get<ResolvedRequirement[]>(`/api/operations/document-requirements/resolve/${id}`)
           .catch(() => [] as ResolvedRequirement[]),
+        apiClient
+          .get<{
+            data: DocumentRecordSummary[];
+          }>(`/api/operations/documents?assetId=${id}&limit=100`)
+          .catch(() => ({ data: [] as DocumentRecordSummary[] })),
       ]);
       setAsset(a);
       setRequirements(r);
+      setDocumentRecords(docs.data);
       setNotFound(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error cargando el activo';
@@ -335,6 +357,35 @@ export default function AssetDetailPage({ params }: PageProps) {
   }
 
   const dynamicEntries = asset.dynamicAttributes ? Object.entries(asset.dynamicAttributes) : [];
+
+  /* Pick the most recent document per documentTypeId (highest version, then
+     latest createdAt). Used to overlay compliance state on each requirement
+     row. APPROVED records win over other statuses for a given type — but if
+     only e.g. a PENDING_REVIEW exists we still show that state, not "faltante",
+     since the user has uploaded something. */
+  const latestDocByType = (() => {
+    const map = new Map<string, DocumentRecordSummary>();
+    for (const d of documentRecords) {
+      const current = map.get(d.documentTypeId);
+      if (!current) {
+        map.set(d.documentTypeId, d);
+        continue;
+      }
+      const aIsApproved = d.status === 'APPROVED';
+      const bIsApproved = current.status === 'APPROVED';
+      if (aIsApproved && !bIsApproved) {
+        map.set(d.documentTypeId, d);
+      } else if (aIsApproved === bIsApproved) {
+        if (
+          d.version > current.version ||
+          (d.version === current.version && d.createdAt > current.createdAt)
+        ) {
+          map.set(d.documentTypeId, d);
+        }
+      }
+    }
+    return map;
+  })();
 
   return (
     <div>
@@ -807,12 +858,7 @@ export default function AssetDetailPage({ params }: PageProps) {
                           </span>
                         </td>
                         <td>
-                          <span
-                            className="req-chip"
-                            style={{ background: 'rgba(234, 179, 8, 0.14)', color: '#a16207' }}
-                          >
-                            Pendiente de cargar
-                          </span>
+                          <ComplianceCell record={latestDocByType.get(r.documentTypeId)} />
                         </td>
                       </tr>
                     );
@@ -968,6 +1014,29 @@ function formatUser(u: UserSummary): string {
   const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
   if (fullName) return `${fullName} · ${u.email}`;
   return u.email;
+}
+
+/* Renders the compliance pill for one (asset, documentType) pair. Uses the
+   API-derived status and decorates VENCIDO / POR_VENCER with day counts so
+   operators see urgency at a glance. */
+function ComplianceCell({ record }: { record: DocumentRecordSummary | undefined }) {
+  if (!record) {
+    return <DocumentStatusBadge status="FALTANTE" />;
+  }
+  let hint: string | undefined;
+  if (record.expirationDate) {
+    const exp = new Date(record.expirationDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    exp.setHours(0, 0, 0, 0);
+    const days = Math.round((exp.getTime() - today.getTime()) / 86400000);
+    if (record.derivedStatus === 'VENCIDO' && days < 0) {
+      hint = `(hace ${Math.abs(days)} días)`;
+    } else if (record.derivedStatus === 'POR_VENCER' && days >= 0) {
+      hint = `(en ${days} días)`;
+    }
+  }
+  return <DocumentStatusBadge status={record.derivedStatus} hint={hint} />;
 }
 
 function Card({ children }: { children: React.ReactNode }) {

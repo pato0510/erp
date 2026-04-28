@@ -121,6 +121,7 @@ model OperationalAsset {
   children     OperationalAsset[]    @relation("AssetHierarchy")
   vehicle      Vehicle?
   requirements DocumentRequirement[]
+  documents    DocumentRecord[]
 
   @@unique([companyId, code])
   @@index([companyId, assetTypeId])
@@ -190,11 +191,61 @@ model OperationalDocumentType {
   createdBy               String              @db.Uuid
 
   requirements DocumentRequirement[]
+  records      DocumentRecord[]
 
   @@unique([companyId, code])
   @@unique([companyId, name])
   @@index([companyId, category])
   @@map("document_types")
+}
+
+enum DocumentRecordStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  REPLACED
+  ARCHIVED
+}
+
+model DocumentRecord {
+  id                   String               @id @default(uuid()) @db.Uuid
+  companyId            String               @db.Uuid
+  documentTypeId       String               @db.Uuid
+  assetId              String               @db.Uuid
+  fileName             String
+  mimeType             String
+  fileSize             Int
+  filePath             String?
+  fileData             Bytes?
+  issueDate            DateTime?            @db.Date
+  expirationDate       DateTime?            @db.Date
+  status               DocumentRecordStatus @default(DRAFT)
+  statusReason         String?
+  statusChangedAt      DateTime?
+  statusChangedBy      String?              @db.Uuid
+  uploadedBy           String               @db.Uuid
+  approvedBy           String?              @db.Uuid
+  approvedAt           DateTime?
+  rejectedBy           String?              @db.Uuid
+  rejectedAt           DateTime?
+  version              Int                  @default(1)
+  replacedByDocumentId String?              @db.Uuid
+  notes                String?
+  isActive             Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  documentType OperationalDocumentType @relation(fields: [documentTypeId], references: [id])
+  asset        OperationalAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  replacedBy   DocumentRecord?         @relation("DocumentSupersession", fields: [replacedByDocumentId], references: [id])
+  replaces     DocumentRecord[]        @relation("DocumentSupersession")
+
+  @@index([companyId, assetId])
+  @@index([companyId, documentTypeId])
+  @@index([companyId, status])
+  @@index([companyId, expirationDate])
+  @@map("document_records")
 }
 
 model DocumentRequirement {

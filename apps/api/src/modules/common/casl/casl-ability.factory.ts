@@ -19,6 +19,7 @@ type Subjects =
       | typeof VehicleSubject
       | typeof DocumentTypeSubject
       | typeof DocumentRequirementSubject
+      | typeof DocumentRecordSubject
     >
   | 'all';
 
@@ -67,6 +68,9 @@ class DocumentTypeSubject {
 class DocumentRequirementSubject {
   static readonly modelName = 'DocumentRequirement' as const;
 }
+class DocumentRecordSubject {
+  static readonly modelName = 'DocumentRecord' as const;
+}
 
 export type Action = 'create' | 'read' | 'update' | 'delete' | 'manage';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
@@ -87,6 +91,7 @@ export {
   VehicleSubject,
   DocumentTypeSubject,
   DocumentRequirementSubject,
+  DocumentRecordSubject,
 };
 
 @Injectable()
@@ -116,6 +121,7 @@ export class CaslAbilityFactory {
         can(['create', 'update'], VehicleSubject);
         can(['create', 'update', 'delete'], DocumentTypeSubject);
         can(['create', 'update', 'delete'], DocumentRequirementSubject);
+        can(['create', 'update', 'delete'], DocumentRecordSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -143,6 +149,7 @@ export class CaslAbilityFactory {
         can('read', VehicleSubject);
         can('read', DocumentTypeSubject);
         can('read', DocumentRequirementSubject);
+        can('read', DocumentRecordSubject);
         break;
     }
 
