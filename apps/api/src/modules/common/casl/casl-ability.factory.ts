@@ -20,6 +20,8 @@ type Subjects =
       | typeof DocumentTypeSubject
       | typeof DocumentRequirementSubject
       | typeof DocumentRecordSubject
+      | typeof AlertRuleSubject
+      | typeof AlertSettingsSubject
     >
   | 'all';
 
@@ -71,6 +73,12 @@ class DocumentRequirementSubject {
 class DocumentRecordSubject {
   static readonly modelName = 'DocumentRecord' as const;
 }
+class AlertRuleSubject {
+  static readonly modelName = 'AlertRule' as const;
+}
+class AlertSettingsSubject {
+  static readonly modelName = 'AlertSettings' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -105,6 +113,8 @@ export {
   DocumentTypeSubject,
   DocumentRequirementSubject,
   DocumentRecordSubject,
+  AlertRuleSubject,
+  AlertSettingsSubject,
 };
 
 @Injectable()
@@ -142,6 +152,10 @@ export class CaslAbilityFactory {
           ['create', 'update', 'approve', 'reject', 'resubmit', 'supersede'],
           DocumentRecordSubject,
         );
+        /* OPS-018 — alert config: MANAGER + ADMIN can author rules and
+           tweak the singleton settings row. Lower roles only read. */
+        can(['create', 'update', 'delete'], AlertRuleSubject);
+        can(['update'], AlertSettingsSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -175,6 +189,8 @@ export class CaslAbilityFactory {
         can('read', DocumentRequirementSubject);
         can('read', DocumentRecordSubject);
         can('resubmit', DocumentRecordSubject);
+        can('read', AlertRuleSubject);
+        can('read', AlertSettingsSubject);
         break;
     }
 

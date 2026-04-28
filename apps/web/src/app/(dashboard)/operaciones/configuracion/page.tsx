@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
+  Bell,
   CheckCircle2,
   FileText,
   Layers,
@@ -41,12 +42,14 @@ import {
   type DocumentTypeForForm,
   type DocumentTypeSubmit,
 } from '../../../../components/operations/config/DocumentTypeFormModal';
+import { AlertsConfigTab } from '../../../../components/operations/config/AlertsConfigTab';
 
-type TabKey = 'tipos' | 'ubicaciones' | 'documentos';
+type TabKey = 'tipos' | 'ubicaciones' | 'documentos' | 'alertas';
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Layers }> = [
   { key: 'tipos', label: 'Tipos de Activo', icon: Layers },
   { key: 'ubicaciones', label: 'Ubicaciones', icon: MapPin },
   { key: 'documentos', label: 'Tipos de Documento', icon: FileText },
+  { key: 'alertas', label: 'Alertas', icon: Bell },
 ];
 
 interface AssetTypeRow extends AssetTypeForForm {
@@ -87,7 +90,7 @@ function ConfiguracionContent() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as TabKey | null) ?? 'tipos';
   const [tab, setTab] = useState<TabKey>(
-    (['tipos', 'ubicaciones', 'documentos'] as TabKey[]).includes(initialTab)
+    (['tipos', 'ubicaciones', 'documentos', 'alertas'] as TabKey[]).includes(initialTab)
       ? initialTab
       : 'tipos',
   );
@@ -182,6 +185,7 @@ function ConfiguracionContent() {
       {tab === 'tipos' && <TiposTab toaster={showToast} />}
       {tab === 'ubicaciones' && <UbicacionesTab toaster={showToast} />}
       {tab === 'documentos' && <TiposDocumentoTab toaster={showToast} />}
+      {tab === 'alertas' && <AlertsConfigTab toaster={showToast} />}
 
       <style jsx global>{`
         .ops-breadcrumb {

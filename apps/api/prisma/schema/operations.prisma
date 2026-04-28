@@ -192,6 +192,7 @@ model OperationalDocumentType {
 
   requirements DocumentRequirement[]
   records      DocumentRecord[]
+  alertRules   AlertRule[]
 
   @@unique([companyId, code])
   @@unique([companyId, name])
@@ -271,4 +272,54 @@ model DocumentRequirement {
   @@index([companyId, assetSubtypeId])
   @@index([companyId, assetId])
   @@map("document_requirements")
+}
+
+/* OPS-018 — per-document-type alert rule. When `documentTypeId` is null
+   the row is a global override applicable to every type whose default
+   would otherwise fire at the same threshold; when set, it's specific to
+   that document type. The resolver in AlertRulesService merges these
+   rows with dynamic defaults derived from
+   OperationalDocumentType.alertDaysBefore / criticalAlertDaysBefore. */
+model AlertRule {
+  id                          String        @id @default(uuid()) @db.Uuid
+  companyId                   String        @db.Uuid
+  documentTypeId              String?       @db.Uuid
+  name                        String
+  isActive                    Boolean       @default(true)
+  daysBeforeExpiration        Int
+  severity                    AlertSeverity
+  channels                    Json          @default("{\"inApp\":true,\"email\":false}")
+  targetRoles                 String[]      @default([])
+  notifyAssignedUser          Boolean       @default(true)
+  notifyOperationalSupervisor Boolean       @default(false)
+  escalateAfterDays           Int?
+  escalateToRoles             String[]      @default([])
+  description                 String?
+  createdAt                   DateTime      @default(now())
+  updatedAt                   DateTime      @updatedAt
+  createdBy                   String        @db.Uuid
+
+  documentType OperationalDocumentType? @relation(fields: [documentTypeId], references: [id])
+
+  @@index([companyId, documentTypeId, isActive])
+  @@index([companyId, daysBeforeExpiration])
+  @@map("alert_rules")
+}
+
+/* OPS-018 — singleton-per-company. Houses the global defaults that the
+   alert resolver falls back to when no AlertRule overrides apply.
+   `enableAutoBlocking` is also consumed by OPS-020. */
+model CompanyAlertSettings {
+  id                          String   @id @default(uuid()) @db.Uuid
+  companyId                   String   @unique @db.Uuid
+  defaultDaysBefore           Int      @default(30)
+  defaultCriticalDaysBefore   Int      @default(7)
+  defaultBlockingDaysBefore   Int      @default(0)
+  enableAutoBlocking          Boolean  @default(true)
+  enableEmailNotifications    Boolean  @default(false)
+  defaultEscalationDays       Int      @default(7)
+  updatedAt                   DateTime @updatedAt
+  updatedBy                   String   @db.Uuid
+
+  @@map("company_alert_settings")
 }

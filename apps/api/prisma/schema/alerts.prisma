@@ -6,10 +6,14 @@ enum AlertType {
   RECONCILIATION
 }
 
+/* OPS-018 added BLOCKING for the operational alert engine. The financial
+   alerts module only emits INFO/WARNING/CRITICAL — BLOCKING is reserved
+   for document-driven asset blocking (OPS-020). */
 enum AlertSeverity {
   INFO
   WARNING
   CRITICAL
+  BLOCKING
 }
 
 enum AlertStatus {

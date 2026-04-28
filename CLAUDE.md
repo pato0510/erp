@@ -356,3 +356,12 @@ documentos críticos vencidos, escala alertas a responsables.
 Sprint 6: Permisos y Procedimientos (OPS-024 a OPS-028)
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
+
+# Ticket actual
+
+Sprint 5 — Alertas y Bloqueos automáticos
+
+OPS-018: Reglas de alerta configurables por tipo documental
+Tabla alert_rules con thresholds personalizables, severidad y
+configuración de escalamiento. Permite override por tipo documental
+(SOAP puede alertar 60 días antes, no 30).

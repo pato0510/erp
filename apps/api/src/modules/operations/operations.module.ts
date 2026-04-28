@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AlertRulesModule } from './alerts/alert-rules.module';
 import { AssetsModule } from './assets/assets.module';
 import { AssetTypesModule } from './asset-types/asset-types.module';
 import { DocumentControlModule } from './document-control/document-control.module';
@@ -9,6 +10,7 @@ import { LocationsModule } from './locations/locations.module';
 
 @Module({
   imports: [
+    AlertRulesModule,
     AssetsModule,
     AssetTypesModule,
     DocumentControlModule,
