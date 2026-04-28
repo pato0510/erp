@@ -88,7 +88,15 @@ export function AssetTypeFormModal({ mode, assetType, onClose, onSave }: Props) 
             className="cp-input"
           />
         </ConfigField>
-        <ConfigField label="Categoría" required>
+        <ConfigField
+          label="Categoría"
+          required
+          hint={
+            category === 'VEHICLE'
+              ? 'Los tipos VEHÍCULO pueden ser usados en /operaciones/vehiculos para gestionar tu flota.'
+              : undefined
+          }
+        >
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as AssetCategory)}

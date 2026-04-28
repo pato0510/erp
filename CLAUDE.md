@@ -336,10 +336,9 @@ matriz, vencimientos, alertas, bloqueos, reportes básicos.
 OCR, firma electrónica, app móvil PWA con sincronización offline,
 work orders, mantenimiento preventivo, modelado bitemporal completo.
 
-## Sprint — Equipos (en desarrollo)
+## Sprint — Vehiculos (en desarrollo)
 
-### Próximos tickets del Sprint 2
-
-- OPS-006: Ficha 360 del equipo (vista detalle completa)
-- OPS-007: CRUD de tipos y subtipos en frontend
-- OPS-008: Importación masiva CSV/Excel de equipos
+OPS-009: CRUD de vehículos (extiende OperationalAsset)
+OPS-010: Pack documental Chile (SOAP, permiso circulación, RT, padrón)
+OPS-011: Ficha 360 del vehículo
+OPS-012: Importación masiva de vehículos
