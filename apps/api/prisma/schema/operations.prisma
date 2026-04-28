@@ -937,9 +937,10 @@ model Procedure {
   createdAt                   DateTime          @default(now())
   updatedAt                   DateTime          @updatedAt
 
-  replaces       Procedure?           @relation("ProcedureSupersession", fields: [replacesProcedureId], references: [id], onDelete: SetNull)
-  replacedBy     Procedure[]          @relation("ProcedureSupersession")
-  revisions      ProcedureRevision[]
+  replaces        Procedure?                @relation("ProcedureSupersession", fields: [replacesProcedureId], references: [id], onDelete: SetNull)
+  replacedBy      Procedure[]               @relation("ProcedureSupersession")
+  revisions       ProcedureRevision[]
+  acknowledgments ProcedureAcknowledgment[]
 
   @@unique([companyId, code, version])
   @@index([companyId, status, category])
@@ -964,6 +965,60 @@ model ProcedureRevision {
 
   @@index([companyId, procedureId, createdAt])
   @@map("procedure_revisions")
+}
+
+/* OPS-028 — required readings per user. Created automatically when
+   a procedure with requiresAcknowledgment=true is published. The
+   user is the subject of record (signature hash binds the ack to
+   them) and the procedure is what they're acknowledging. */
+enum AcknowledgmentStatus {
+  PENDING
+  READ
+  ACKNOWLEDGED
+  EXPIRED
+  EXEMPTED
+}
+
+model ProcedureAcknowledgment {
+  id                     String               @id @default(uuid()) @db.Uuid
+  companyId              String               @db.Uuid
+  procedureId            String               @db.Uuid
+  userId                 String               @db.Uuid
+
+  status                 AcknowledgmentStatus @default(PENDING)
+
+  /* Reading evidence — incremented each time the user opens the
+     procedure file. The first view also flips the row from PENDING
+     to READ. */
+  firstViewedAt          DateTime?
+  viewCount              Int                  @default(0)
+  acknowledgedAt         DateTime?
+  /* SHA-256 of (procedureId + userId + ISO timestamp + notes). */
+  signatureHash          String?
+  acknowledgedFromIp     String?
+  acknowledgedUserAgent  String?
+  acknowledgmentNotes    String?
+
+  /* Lifecycle dates — dueDate is computed from the procedure's
+     acknowledgmentDeadlineDays at create time. */
+  createdAt              DateTime             @default(now())
+  dueDate                DateTime?
+  reminderCount          Int                  @default(0)
+  lastReminderSentAt     DateTime?
+
+  exemptedBy             String?              @db.Uuid
+  exemptedAt             DateTime?
+  exemptionReason        String?
+
+  updatedAt              DateTime             @updatedAt
+
+  procedure Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, procedureId, userId])
+  @@index([companyId, userId, status])
+  @@index([companyId, procedureId, status])
+  @@index([companyId, status, dueDate])
+  @@map("procedure_acknowledgments")
 }
 
 model PermitApproval {

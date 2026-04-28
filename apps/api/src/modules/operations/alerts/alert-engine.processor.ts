@@ -3,6 +3,7 @@ import { Logger, OnModuleInit } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { OPERATIONS_ALERT_ENGINE_QUEUE } from '../../jobs/queues.constant';
 import { ExceptionsService } from '../exceptions/exceptions.service';
+import { AcknowledgmentsService } from '../procedures/acknowledgments/acknowledgments.service';
 import { AlertEngineService } from './alert-engine.service';
 import { AlertEscalationService } from './alert-escalation.service';
 
@@ -15,6 +16,12 @@ interface RecalculateJobData {
 const REPEATABLE_JOB_NAME = 'daily-alert-recalculation';
 const ESCALATION_JOB_NAME = 'alert-escalation-check';
 const EXCEPTION_EXPIRATION_JOB_NAME = 'exception-expiration-check';
+/* OPS-028 — daily 09:00 reminder fan-out for procedures that need
+   reading. Different from the 06:00 daily alert recalc so we don't
+   clobber that worker. */
+const ACK_REMINDERS_JOB_NAME = 'procedure-acknowledgment-reminders';
+/* OPS-028 — daily 01:00 sweep that flips overdue rows to EXPIRED. */
+const ACK_EXPIRATION_JOB_NAME = 'procedure-acknowledgment-expiration';
 /* Cron: 06:00 every day. Server timezone — Railway runs UTC, so the user
    sees this fire at 02:00–03:00 local Chile time depending on DST. We
    keep it server-time for now; OPS-021 can move to per-tenant cron. */
@@ -25,6 +32,8 @@ const ESCALATION_CRON = '0 */6 * * *';
 /* OPS-023 — hourly so an exception that expires at e.g. 14:00 only
    waits at most 60 minutes before the asset is re-blocked. */
 const EXCEPTION_EXPIRATION_CRON = '0 * * * *';
+const ACK_REMINDERS_CRON = '0 9 * * *';
+const ACK_EXPIRATION_CRON = '0 1 * * *';
 
 @Processor(OPERATIONS_ALERT_ENGINE_QUEUE)
 export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
@@ -34,6 +43,7 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
     private readonly engine: AlertEngineService,
     private readonly escalation: AlertEscalationService,
     private readonly exceptions: ExceptionsService,
+    private readonly acknowledgments: AcknowledgmentsService,
     @InjectQueue(OPERATIONS_ALERT_ENGINE_QUEUE) private readonly queue: Queue,
   ) {
     super();
@@ -51,7 +61,9 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
         if (
           r.name === REPEATABLE_JOB_NAME ||
           r.name === ESCALATION_JOB_NAME ||
-          r.name === EXCEPTION_EXPIRATION_JOB_NAME
+          r.name === EXCEPTION_EXPIRATION_JOB_NAME ||
+          r.name === ACK_REMINDERS_JOB_NAME ||
+          r.name === ACK_EXPIRATION_JOB_NAME
         ) {
           await this.queue.removeRepeatableByKey(r.key);
         }
@@ -71,8 +83,18 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
         removeOnComplete: 60,
         removeOnFail: 30,
       });
+      await this.queue.add(ACK_REMINDERS_JOB_NAME, {} satisfies RecalculateJobData, {
+        repeat: { pattern: ACK_REMINDERS_CRON },
+        removeOnComplete: 30,
+        removeOnFail: 30,
+      });
+      await this.queue.add(ACK_EXPIRATION_JOB_NAME, {} satisfies RecalculateJobData, {
+        repeat: { pattern: ACK_EXPIRATION_CRON },
+        removeOnComplete: 30,
+        removeOnFail: 30,
+      });
       this.logger.log(
-        `Scheduled alert crons (daily="${DAILY_CRON}", escalation="${ESCALATION_CRON}", exceptions="${EXCEPTION_EXPIRATION_CRON}") on ${OPERATIONS_ALERT_ENGINE_QUEUE}`,
+        `Scheduled alert crons (daily="${DAILY_CRON}", escalation="${ESCALATION_CRON}", exceptions="${EXCEPTION_EXPIRATION_CRON}", ackReminders="${ACK_REMINDERS_CRON}", ackExpiration="${ACK_EXPIRATION_CRON}") on ${OPERATIONS_ALERT_ENGINE_QUEUE}`,
       );
     } catch (err) {
       /* Don't crash startup if Redis is briefly unavailable — the job
@@ -90,6 +112,12 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
     }
     if (job.name === EXCEPTION_EXPIRATION_JOB_NAME) {
       return this.exceptions.processAllCompaniesExpired();
+    }
+    if (job.name === ACK_REMINDERS_JOB_NAME) {
+      return this.acknowledgments.sendRemindersForAllCompanies();
+    }
+    if (job.name === ACK_EXPIRATION_JOB_NAME) {
+      return this.acknowledgments.processExpiredForAllCompanies();
     }
     if (job.data.companyId) {
       return this.engine.processCompany(job.data.companyId, {

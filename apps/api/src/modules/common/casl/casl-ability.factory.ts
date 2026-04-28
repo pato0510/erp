@@ -30,6 +30,7 @@ type Subjects =
       | typeof PermitApprovalStepSubject
       | typeof PermitApprovalSubject
       | typeof ProcedureSubject
+      | typeof ProcedureAcknowledgmentSubject
     >
   | 'all';
 
@@ -111,6 +112,9 @@ class PermitApprovalSubject {
 class ProcedureSubject {
   static readonly modelName = 'Procedure' as const;
 }
+class ProcedureAcknowledgmentSubject {
+  static readonly modelName = 'ProcedureAcknowledgment' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -151,7 +155,13 @@ export type Action =
      procedure in IN_REVIEW status. */
   | 'publish'
   | 'deprecate'
-  | 'review';
+  | 'review'
+  /* OPS-028 — procedure acknowledgments. Any authenticated user
+     can acknowledge their own pending readings (the service still
+     scopes to userId so they can't ack someone else's). `exempt`
+     is ADMIN-only. */
+  | 'acknowledge'
+  | 'exempt';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {
@@ -181,6 +191,7 @@ export {
   PermitApprovalStepSubject,
   PermitApprovalSubject,
   ProcedureSubject,
+  ProcedureAcknowledgmentSubject,
 };
 
 @Injectable()
@@ -257,6 +268,10 @@ export class CaslAbilityFactory {
         /* OPS-027 — MANAGER authors and publishes procedures.
            `deprecate` stays ADMIN-only via `manage 'all'`. */
         can(['create', 'update', 'review', 'publish'], ProcedureSubject);
+        /* OPS-028 — MANAGER reads global ack coverage and can
+           acknowledge their own readings. `exempt` stays
+           ADMIN-only via `manage 'all'`. */
+        can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -275,6 +290,9 @@ export class CaslAbilityFactory {
            (typical workflow: a contractor's supervisor lodges the
            request and waits for MANAGER authorization). */
         can(['create', 'update'], WorkPermitSubject);
+        /* OPS-028 — every authenticated user can acknowledge their
+           own readings; the service still scopes to userId. */
+        can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
         break;
 
       case UserRole.ANALYST:
@@ -282,6 +300,7 @@ export class CaslAbilityFactory {
         can('resubmit', DocumentRecordSubject);
         can('create', AssetExceptionSubject);
         can(['create', 'update'], WorkPermitSubject);
+        can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
         break;
 
       case UserRole.VIEWER:
@@ -320,6 +339,9 @@ export class CaslAbilityFactory {
         /* OPS-027 — VIEWER reads procedures (the whole point of the
            library) but cannot author/edit/publish. */
         can('read', ProcedureSubject);
+        /* OPS-028 — VIEWER can acknowledge their own readings.
+           Coverage dashboards stay gated by the service. */
+        can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
         break;
     }
 

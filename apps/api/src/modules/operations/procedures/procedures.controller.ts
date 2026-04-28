@@ -81,10 +81,12 @@ export class ProceduresController {
   async downloadFile(
     @Param('id') id: string,
     @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
     @Query('download') download: string | undefined,
     @Res() res: Response,
   ) {
-    const file = await this.service.downloadFile(id, companyId);
+    /* Pass userId so OPS-028 view tracking can fire. */
+    const file = await this.service.downloadFile(id, companyId, user.id);
     const disposition = download === '1' ? 'attachment' : 'inline';
     res.set({
       'Content-Type': file.mimeType,

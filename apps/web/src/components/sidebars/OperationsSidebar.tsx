@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   Bell,
+  BookMarked,
   BookOpen,
   Calendar,
   ClipboardCheck,
@@ -18,6 +19,7 @@ import {
   ShieldOff,
   Sun,
   Truck,
+  Users,
   Wrench,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -34,6 +36,7 @@ const navItems = [
   { href: '/operaciones/permisos', label: 'Permisos', icon: ShieldCheck },
   { href: '/operaciones/aprobaciones', label: 'Aprobaciones', icon: ClipboardCheck },
   { href: '/operaciones/procedimientos', label: 'Procedimientos', icon: BookOpen },
+  { href: '/operaciones/mis-lecturas', label: 'Mis lecturas', icon: BookMarked },
   { href: '/operaciones/alertas', label: 'Alertas', icon: Bell },
   { href: '/operaciones/calendario', label: 'Calendario', icon: Calendar },
   { href: '/operaciones/reportes', label: 'Reportes', icon: BarChart3 },
@@ -57,6 +60,8 @@ export function OperationsSidebar() {
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   /* OPS-027 — procedures awaiting reviewer attention. */
   const [proceduresInReviewCount, setProceduresInReviewCount] = useState(0);
+  /* OPS-028 — current user's pending readings. */
+  const [myPendingReadingsCount, setMyPendingReadingsCount] = useState(0);
 
   /* Poll the pending-review count on mount and every minute. The endpoint is
      gated to ADMIN/MANAGER (CASL `approve` action) — for any other role the
@@ -105,6 +110,12 @@ export function OperationsSidebar() {
           if (alive) setProceduresInReviewCount(res.inReview);
         })
         .catch(() => undefined);
+      apiClient
+        .get<{ count: number }>('/api/operations/acknowledgments/my-pending-count')
+        .then((res) => {
+          if (alive) setMyPendingReadingsCount(res.count);
+        })
+        .catch(() => undefined);
     };
     fetchCounts();
     const interval = setInterval(fetchCounts, PENDING_REVIEW_POLL_MS);
@@ -140,6 +151,7 @@ export function OperationsSidebar() {
           const isExcepciones = item.href === '/operaciones/excepciones';
           const isAprobaciones = item.href === '/operaciones/aprobaciones';
           const isProcedimientos = item.href === '/operaciones/procedimientos';
+          const isMisLecturas = item.href === '/operaciones/mis-lecturas';
           const rawCount = isDocumentos
             ? pendingReviewCount
             : isAlertas
@@ -150,9 +162,16 @@ export function OperationsSidebar() {
                   ? pendingApprovalsCount
                   : isProcedimientos
                     ? proceduresInReviewCount
-                    : 0;
+                    : isMisLecturas
+                      ? myPendingReadingsCount
+                      : 0;
           const showBadge =
-            (isDocumentos || isAlertas || isExcepciones || isAprobaciones || isProcedimientos) &&
+            (isDocumentos ||
+              isAlertas ||
+              isExcepciones ||
+              isAprobaciones ||
+              isProcedimientos ||
+              isMisLecturas) &&
             rawCount > 0;
           const badgeText = rawCount > 99 ? '99+' : String(rawCount);
           return (
@@ -170,20 +189,39 @@ export function OperationsSidebar() {
 
         <div className="tn-nav__divider" aria-hidden />
 
-        {adminItems.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`tn-nav__item${isActive ? ' tn-nav__item--active' : ''}`}
-            >
-              <Icon size={15} />
-              <span style={{ flex: 1 }}>{item.label}</span>
-            </Link>
-          );
-        })}
+        {/* OPS-028 — Cobertura acuses is a manager-level admin tool;
+            we hide it from VIEWER/ANALYST/ACCOUNTANT to declutter
+            their sidebar. Configuración stays admin-only as before. */}
+        {(() => {
+          const role = (user as { role?: string } | null)?.role;
+          const isAdminOrManager = role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'MANAGER';
+          const items = [
+            ...(isAdminOrManager
+              ? [
+                  {
+                    href: '/operaciones/cobertura-acuses',
+                    label: 'Cobertura acuses',
+                    icon: Users,
+                  },
+                ]
+              : []),
+            ...adminItems,
+          ];
+          return items.map((item) => {
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`tn-nav__item${isActive ? ' tn-nav__item--active' : ''}`}
+              >
+                <Icon size={15} />
+                <span style={{ flex: 1 }}>{item.label}</span>
+              </Link>
+            );
+          });
+        })()}
       </nav>
 
       <div className="tn-sidebar__foot">

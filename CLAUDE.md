@@ -356,73 +356,73 @@ documentos críticos vencidos, escala alertas a responsables.
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
-### OPS-025: Permisos Internos de Trabajo PT (✓ completado)
+### OPS-027: Biblioteca de procedimientos con versionado (✓ completado)
 
-Sistema completo de gestión de permisos de trabajo operacionales.
+Repositorio centralizado de procedimientos internos en formato PDF.
 
 ### Tablas creadas
 
-- work_permit_types (catálogo configurable)
-- work_permits (instancias con lifecycle completo)
-- Enums: WorkPermitCategory (9 valores), WorkPermitStatus (8 valores)
-- DB CHECK: plannedStart < plannedEnd
+- procedures (con versionado replacesProcedureId/replacedByProcedureId)
+- procedure_revisions (audit log con snapshots JSONB)
+- Enums: ProcedureCategory (7 valores), ProcedureStatus (5), RevisionType (7)
 
-### 6 tipos chilenos por defecto
+### Lifecycle
 
-- PT-ALT — Trabajo en Altura (con aptitud médica + entrenamiento)
-- PT-CAL — Trabajo en Caliente
-- PT-EC — Espacio Confinado (requiere medición gases)
-- PT-LOTO — Bloqueo y Tarjeteo (requiere isolation)
-- PT-EXC — Excavación
-- PT-IZJ — Izaje de Cargas
+DRAFT → IN_REVIEW → PUBLISHED → SUPERSEDED/DEPRECATED
 
-### Numeración automática
+### Endpoints OPS-027
 
-PT-{YEAR}-{NNNN} con sequence per-company
+- CRUD completo con multipart upload
+- Workflow: submit, review, publish, new-version, deprecate
+- Attachments: max 10 por procedimiento, max 10MB c/u
+- GET /:id/file, /:id/attachments/:idx, /:id/revisions
+- GET /applicable?assetId=X (filtra por aplicabilidad)
+- GET /kpi, /category-counts
 
-### Workflow lifecycle
+### Versionado formal
 
-DRAFT → PENDING_AUTHORIZATION → AUTHORIZED → IN_EXECUTION →
-CLOSED/CANCELLED/EXPIRED + estado SUSPENDED interrumpible
+- @@unique([companyId, code, version]) permite mismo code en versiones
+- Al publicar nueva versión: original pasa a SUPERSEDED automáticamente
+- replacesProcedureId conecta versiones
+- Changelog requerido min 20 chars en nuevas versiones
+- Bump auto-sugerido (1.0 → 2.0)
 
-### Endpoints OPS-025
+### Aplicabilidad
 
-- CRUD work-permit-types con seedDefaults
-- CRUD work-permits + acciones lifecycle
-- POST /:id/{submit,authorize,reject,start,suspend,resume,close,cancel}
-- POST /:id/gas-measurement (espacio confinado)
-- POST /:id/attachments (max 5 archivos)
-- GET /work-permits/active-count, /work-permits/in-execution
+- applicableAssetIds, applicableAssetTypeIds, applicableLocationIds
+- applicableRoles
+- requiresAcknowledgment, acknowledgmentDeadlineDays (para OPS-028)
 
-### Cron auto-expiración
+### UI agregada
 
-- Schedule: cada hora
-- Detecta AUTHORIZED/IN_EXECUTION con plannedEnd vencido
-- Marca EXPIRED y notifica supervisor + requester
+- /operaciones/procedimientos con KPIs, 7 cards de categoría, filtros
+- Toggle table/cards view persistido en localStorage
+- /operaciones/procedimientos/[id] con PDF embebido (PDF.js)
+- ProcedureFormModal (6 secciones)
+- ProcedureNewVersionModal con bump auto-sugerido
+- ProcedureRevisionsTimeline con expand JSONB
+- ApplicableProcedures component en fichas 360
+- Sidebar badge con count "in-review"
 
-### NotificationSourceType extendido
+### CASL nuevo subject
 
-6 valores nuevos para work-permit lifecycle
+- Procedure: read all, create/update/review/publish MANAGER+,
+  deprecate ADMIN
 
-### Componentes UI
+### Notificaciones
 
-- WorkPermitFormModal (8 secciones con auto-fill)
-- WorkPermitsTab con KPIs y filtros
-- /operaciones/permisos/trabajo/[id] detail page con timeline
-- ActiveWorkPermits en fichas 360 de equipos/vehículos
-- WorkPermitTypeFormModal en configuración
-
-### CASL nuevos subjects y acciones
-
-- WorkPermitType: read all, manage ADMIN/MANAGER
-- WorkPermit: lifecycle actions (authorize, start, suspend, resume, close, cancel)
+- Submit for review → notifica reviewers
+- Published → notifica usuarios con roles aplicables
+- New version → notifica usuarios que acuse anterior
 
 # Ticket actual
 
-- OPS-026: Refinamiento del workflow de aprobación de permisos
-  Doble autorización para permisos críticos (LOTO requiere 2 firmas)
-  Reglas configurables de quién puede autorizar cada tipo de permiso
-  Firmas digitales con timestamp y trazabilidad completa
-  Workflow de aprobación robustecido para permisos externos también
-  Pantalla de cola de pendientes de autorización transversal
-  Notificaciones específicas por nivel de aprobación
+- OPS-028: Acuse de lectura de procedimientos críticos
+  Cuando se publica un procedimiento con requiresAcknowledgment=true,
+  el sistema crea acuses pendientes para todos los usuarios aplicables
+  Acuse simple: "Leído y entendido" + firma digital + IP + timestamp
+  Notificaciones recordatorias al usuario antes del deadline
+  Reporte de cobertura por procedimiento, por activo, por usuario
+  Bloqueo opcional: usuarios sin acuse no pueden operar el activo
+  Vista personal "Mis lecturas pendientes"
+  Vista de gestión "Cobertura de acuses"

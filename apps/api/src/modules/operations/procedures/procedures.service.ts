@@ -19,6 +19,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { StorageService } from '../../common/storage/storage.service';
 import { NotificationService } from '../notifications/notification.service';
+import { AcknowledgmentsService } from './acknowledgments/acknowledgments.service';
 import { CreateProcedureDto } from './dto/create-procedure.dto';
 import { FilterProceduresDto } from './dto/filter-procedures.dto';
 import { CreateNewVersionDto } from './dto/new-version-procedure.dto';
@@ -74,6 +75,7 @@ export class ProceduresService {
     private readonly rlsService: RlsService,
     private readonly storage: StorageService,
     private readonly notifications: NotificationService,
+    private readonly acknowledgments: AcknowledgmentsService,
   ) {}
 
   /* ---- Read ----------------------------------------------------- */
@@ -545,6 +547,14 @@ export class ProceduresService {
     if (!(await this.isAdminOrManager(userId, companyId))) {
       throw new ForbiddenException('Solo administradores o gerentes pueden publicar.');
     }
+    /* Need this for the OPS-028 ack hook below — pulled now to
+       avoid a second findFirst after the transition. */
+    const requiresAck = await this.prisma.procedure
+      .findFirst({
+        where: { id, companyId },
+        select: { requiresAcknowledgment: true },
+      })
+      .then((r) => r?.requiresAcknowledgment ?? false);
     const effective = dto.effectiveDate ? new Date(dto.effectiveDate) : new Date();
 
     await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
@@ -611,6 +621,27 @@ export class ProceduresService {
           linkPath: `/operaciones/procedimientos/${id}`,
           icon: 'CheckCircle2',
         });
+      }
+    }
+    /* OPS-028 — when the published procedure requires acknowledgment,
+       fan out PENDING rows to every applicable user. New-version
+       publish also re-targets users who acknowledged the previous
+       version so they're forced to read the changes. */
+    if (requiresAck) {
+      try {
+        await this.acknowledgments.createPendingForProcedure(companyId, id, userId);
+        if (existing.replacesProcedureId) {
+          await this.acknowledgments.createPendingForNewVersion(
+            companyId,
+            userId,
+            id,
+            existing.replacesProcedureId,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to seed acknowledgments for ${id}: ${err instanceof Error ? err.message : err}`,
+        );
       }
     }
     return this.findOne(id, companyId);
@@ -825,7 +856,7 @@ export class ProceduresService {
     return { removed: attachmentIndex };
   }
 
-  async downloadFile(id: string, companyId: string) {
+  async downloadFile(id: string, companyId: string, userId?: string) {
     const proc = await this.prisma.procedure.findFirst({
       where: { id, companyId },
       select: { fileName: true, mimeType: true, filePath: true, fileData: true },
@@ -838,6 +869,17 @@ export class ProceduresService {
       buffer = Buffer.from(proc.fileData);
     } else {
       throw new NotFoundException('Archivo no disponible.');
+    }
+    /* OPS-028 — fire-and-forget view tracking. The hook is
+       no-op for procedures that don't require acknowledgment.
+       We swallow errors so a tracker hiccup never blocks the
+       file from being served. */
+    if (userId) {
+      this.acknowledgments.trackView(companyId, userId, id).catch((err) => {
+        this.logger.warn(
+          `trackView failed for procedure ${id} / user ${userId}: ${err instanceof Error ? err.message : err}`,
+        );
+      });
     }
     return { fileName: proc.fileName, mimeType: proc.mimeType, buffer };
   }

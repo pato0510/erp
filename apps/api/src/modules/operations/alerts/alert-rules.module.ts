@@ -4,6 +4,7 @@ import { OPERATIONS_ALERT_ENGINE_QUEUE } from '../../jobs/queues.constant';
 import { DocumentRequirementsModule } from '../document-requirements/document-requirements.module';
 import { ExceptionsModule } from '../exceptions/exceptions.module';
 import { NotificationModule } from '../notifications/notification.module';
+import { AcknowledgmentsModule } from '../procedures/acknowledgments/acknowledgments.module';
 import { AlertEngineProcessor } from './alert-engine.processor';
 import { AlertEngineService } from './alert-engine.service';
 import { AlertEscalationService } from './alert-escalation.service';
@@ -33,6 +34,10 @@ import { CompanyAlertSettingsService } from './company-alert-settings.service';
     DocumentRequirementsModule,
     NotificationModule,
     forwardRef(() => ExceptionsModule),
+    /* OPS-028 — the alert-engine processor hosts the daily ack
+       reminder + expiration cron jobs, so it needs the
+       AcknowledgmentsService in scope. */
+    AcknowledgmentsModule,
     BullModule.registerQueue({ name: OPERATIONS_ALERT_ENGINE_QUEUE }),
   ],
   controllers: [

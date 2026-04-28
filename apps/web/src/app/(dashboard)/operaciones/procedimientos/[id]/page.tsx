@@ -31,6 +31,7 @@ import { useAuth } from '../../../../../hooks/useAuth';
 import { Toast } from '../../../../../components/shared/Toast';
 import { ProcedureNewVersionModal } from '../../../../../components/operations/ProcedureNewVersionModal';
 import { ProcedureRevisionsTimeline } from '../../../../../components/operations/ProcedureRevisionsTimeline';
+import { ProcedureAcknowledgmentSection } from '../../../../../components/operations/ProcedureAcknowledgmentSection';
 
 type ProcedureStatus = 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'SUPERSEDED' | 'DEPRECATED';
 type ProcedureCategory =
@@ -482,6 +483,17 @@ export default function ProcedureDetailPage(props: { params: Promise<{ id: strin
           )}
         </div>
       </div>
+
+      {/* OPS-028 — banner / chip / coverage card depending on the
+          caller's relationship to the procedure. */}
+      <ProcedureAcknowledgmentSection
+        procedureId={procedure.id}
+        procedureCode={procedure.code}
+        procedureTitle={procedure.title}
+        procedureVersion={procedure.version}
+        requiresAcknowledgment={procedure.requiresAcknowledgment}
+        isAdminOrManager={isAdminOrManager}
+      />
 
       {/* Two-column grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
