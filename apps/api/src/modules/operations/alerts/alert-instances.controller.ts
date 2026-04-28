@@ -31,6 +31,15 @@ export class AlertInstancesController {
     return this.service.getActiveCount(companyId, severity);
   }
 
+  /* OPS-021 — KPI tile counts (total / active / critical / unattended /
+     resolvedToday) for the alert center header. Single endpoint so the
+     UI stays snappy. */
+  @Get('kpis')
+  @CheckPolicies((ability) => ability.can('read', AlertRuleSubject))
+  getKpis(@CurrentCompany() companyId: string) {
+    return this.service.getKpis(companyId);
+  }
+
   @Post('bulk-acknowledge')
   @CheckPolicies((ability) => ability.can('update', AlertRuleSubject))
   bulkAcknowledge(

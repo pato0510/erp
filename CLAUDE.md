@@ -357,74 +357,71 @@ Sprint 6: Permisos y Procedimientos (OPS-024 a OPS-028)
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
-### OPS-019: BullMQ scheduler diario (✓ completado)
+### OPS-020: Bloqueo operacional automático (✓ completado)
 
-Motor de alertas que corre cada 24h y a demanda.
+Activos con documentos CRITICAL+blocksOperation vencidos pasan
+automáticamente a status BLOCKED_DOCUMENTAL.
 
 ### Tabla creada
 
-- alert_instances con FKs a AlertRule, DocumentType, Asset, DocumentRecord
-- Enums: AlertTriggerType (EXPIRING_SOON/EXPIRED/MISSING/BLOCKING)
-- AlertInstanceStatus (ACTIVE/ACKNOWLEDGED/RESOLVED/ESCALATED/DISMISSED)
-- Unique constraint para idempotencia
+- asset_status_changes — audit trail completo de cambios de estado
+- Enum StatusChangeType: MANUAL/AUTO_BLOCK/AUTO_UNBLOCK/
+  EXCEPTION_GRANTED/EXCEPTION_EXPIRED
 
-### Endpoints OPS-019
+### Lógica de bloqueo (asset-blocking.service.ts)
 
-- GET /api/operations/alerts/instances (paginado con filtros)
-- GET /api/operations/alerts/instances/:id
-- GET /api/operations/alerts/instances/active-count
-- POST /api/operations/alerts/instances/:id/acknowledge
-- POST /api/operations/alerts/instances/:id/resolve
-- POST /api/operations/alerts/instances/:id/dismiss
-- POST /api/operations/alerts/instances/bulk-acknowledge
-- POST /api/operations/alerts/instances/bulk-resolve
-- POST /api/operations/alerts/recalculate (admin only, encola job)
+evaluateAssetBlocking:
 
-### Engine de alertas (alert-engine.service.ts)
+1. Filtra requirements a CRITICAL+blocksOperation
+2. Busca último APPROVED no-reemplazado
+3. Marca MISSING (sin record) o EXPIRED (vencido)
+4. Respeta enableAutoBlocking de CompanyAlertSettings
+5. Retorna shouldBlock + documentos disparadores
 
-processCompany():
+evaluateAssetUnblocking:
 
-1. Carga todos los activos activos
-2. Para cada activo resuelve sus document requirements
-3. Para cada requerido busca último APPROVED no-reemplazado
-4. Calcula derivedState (FALTANTE/VENCIDO/POR_VENCER/VIGENTE)
-5. Resuelve reglas aplicables y crea AlertInstance si no existe ya
-6. Idempotente via unique constraint
-7. Cuenta assetsToBlock (no ejecuta el bloqueo aún — viene en OPS-020)
+1. Solo aplica si asset.status === BLOCKED_DOCUMENTAL
+2. Re-ejecuta evaluación → si ya no necesita bloqueo: shouldUnblock
 
-### Títulos auto-generados en español
+processBlocking aplica los cambios + escribe AssetStatusChange.
 
-"SOAP de Camioneta AABB12 vence en 30 días"
-"Permiso Circulación de Camión #3 vencido hace 5 días"
-"Manual de Operación falta para Generador GEN-001"
+### Triggers automáticos
 
-### Cron job
+- Al final del cron de alertas (processCompanyBlocking)
+- Después de approve de un documento (re-evalúa unblock)
+- Después de manual update de asset (re-evalúa, puede re-bloquear)
 
-- Schedule: 0 6 \* \* \* (todos los días 6 AM)
-- Job name: daily-alert-recalculation
-- Queue: operations-alert-engine
-- OnModuleInit limpia repeatables previos para evitar duplicados
+### Endpoints OPS-020
 
-### Sidebar badge
+- GET /api/operations/assets/blocked
+- GET /api/operations/assets/:id/status-history
+- POST /api/operations/assets/:id/evaluate-blocking (dry-run)
+- POST /api/operations/assets/:id/force-unblock (ADMIN, motivo min 10)
 
-OperationsSidebar muestra badge en "Alertas" con count de
-CRITICAL+BLOCKING activas. Refresh cada 60s.
+### CASL nueva acción
 
-### Compliance counts agregados
-
-getCompliance() retorna activeAlertsCount y criticalAlertsCount.
+- 'force-unblock' action: solo ADMIN
 
 ### UI agregada
 
-Botón "Recalcular alertas ahora" en /operaciones/configuracion
-sección "Acciones manuales".
+- Banner ROJO en fichas 360 cuando BLOCKED_DOCUMENTAL
+- Lista de documentos disparadores
+- Botones: cargar faltantes / solicitar excepción (disabled OPS-023)
+- AssetStatusHistoryModal con timeline tipo User/Bot/ShieldOff
+- Link "Ver historial de cambios →" en sección Estado
+- Sección "Activos bloqueados" en /operaciones/documentos
+
+### Compliance counts agregados
+
+blockedAssetsCount, assetsAtRiskCount
 
 # Ticket actual
 
-- OPS-020: Bloqueo operacional automático
-  Cuando un activo tiene documentos CRITICAL+blocksOperation vencidos,
-  pasa automáticamente a status BLOCKED_DOCUMENTAL.
-  Cuando se resuelve el documento (renovación + aprobación),
-  el activo vuelve a OPERATIONAL automáticamente.
-  Toggle global: enableAutoBlocking en CompanyAlertSettings.
-  Audit completo de cambios automáticos vs manuales.
+- OPS-021: Centro de alertas en UI /operaciones/alertas
+  Pantalla completa con todas las alertas activas
+  Filtros: severidad, tipo de trigger, status, asset, document type, fecha
+  Quick chips: solo críticas, últimas 24h, sin atender
+  Acciones: acknowledge, resolve, dismiss (individual y masivas)
+  Vista cards o tabla togglable
+  Link directo desde cada alerta a la ficha del activo
+  Empty state cuando no hay alertas activas

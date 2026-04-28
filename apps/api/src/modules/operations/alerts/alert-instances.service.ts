@@ -24,11 +24,41 @@ export class AlertInstancesService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.AlertInstanceWhereInput = { companyId };
-    if (filters.status) where.status = filters.status;
-    if (filters.severity) where.severity = filters.severity;
-    if (filters.triggerType) where.triggerType = filters.triggerType;
+    /* OPS-021 — array filters win over the legacy single-value fields. */
+    if (filters.statuses && filters.statuses.length > 0) {
+      where.status = { in: filters.statuses };
+    } else if (filters.status) {
+      where.status = filters.status;
+    }
+    if (filters.severities && filters.severities.length > 0) {
+      where.severity = { in: filters.severities };
+    } else if (filters.severity) {
+      where.severity = filters.severity;
+    }
+    if (filters.triggerTypes && filters.triggerTypes.length > 0) {
+      where.triggerType = { in: filters.triggerTypes };
+    } else if (filters.triggerType) {
+      where.triggerType = filters.triggerType;
+    }
     if (filters.assetId) where.assetId = filters.assetId;
     if (filters.documentTypeId) where.documentTypeId = filters.documentTypeId;
+    if (filters.triggeredFrom || filters.triggeredTo) {
+      const range: Prisma.DateTimeFilter = {};
+      if (filters.triggeredFrom) range.gte = new Date(filters.triggeredFrom);
+      if (filters.triggeredTo) range.lte = new Date(filters.triggeredTo);
+      where.triggeredAt = range;
+    }
+    if (filters.search?.trim()) {
+      const s = filters.search.trim();
+      where.OR = [
+        { title: { contains: s, mode: 'insensitive' } },
+        { message: { contains: s, mode: 'insensitive' } },
+        { asset: { code: { contains: s, mode: 'insensitive' } } },
+        { asset: { name: { contains: s, mode: 'insensitive' } } },
+        { documentType: { name: { contains: s, mode: 'insensitive' } } },
+        { documentType: { code: { contains: s, mode: 'insensitive' } } },
+      ];
+    }
 
     const [rows, total] = await Promise.all([
       this.prisma.alertInstance.findMany({
@@ -179,6 +209,36 @@ export class AlertInstancesService {
       });
       return { updated: result.count };
     });
+  }
+
+  /* OPS-021 — KPI cards for the alert center. Returns the 5 numbers
+     the page renders at the top in a single round-trip. We use
+     count() with five different filter shapes — Postgres handles this
+     cheaply via the (companyId, status, triggeredAt) index. */
+  async getKpis(companyId: string) {
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 3600_000);
+    const startOfToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const [total, active, critical, unattended, resolvedToday] = await Promise.all([
+      this.prisma.alertInstance.count({ where: { companyId } }),
+      this.prisma.alertInstance.count({ where: { companyId, status: 'ACTIVE' } }),
+      this.prisma.alertInstance.count({
+        where: { companyId, status: 'ACTIVE', severity: { in: ['CRITICAL', 'BLOCKING'] } },
+      }),
+      this.prisma.alertInstance.count({
+        where: { companyId, status: 'ACTIVE', triggeredAt: { lt: dayAgo } },
+      }),
+      this.prisma.alertInstance.count({
+        where: {
+          companyId,
+          status: 'RESOLVED',
+          resolvedAt: { gte: startOfToday },
+        },
+      }),
+    ]);
+    return { total, active, critical, unattended, resolvedToday };
   }
 
   /* Used by the sidebar badge — defaults to ACTIVE+CRITICAL+BLOCKING so

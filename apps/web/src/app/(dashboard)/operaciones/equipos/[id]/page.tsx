@@ -42,6 +42,7 @@ import {
 } from '../../../../../components/operations/AssetStatusBadge';
 import { StatusChangeModal } from '../../../../../components/operations/StatusChangeModal';
 import { AssetStatusHistoryModal } from '../../../../../components/operations/AssetStatusHistoryModal';
+import { AssetActiveAlerts } from '../../../../../components/operations/AssetActiveAlerts';
 import {
   DocumentStatusBadge,
   type DerivedDocumentStatus,
@@ -1302,6 +1303,15 @@ export default function AssetDetailPage({ params }: PageProps) {
             </div>
           )}
         </Card>
+      </div>
+
+      {/* OPS-021 — active alerts for this asset. The component
+          self-hides when there are no actionable alerts. */}
+      <div className="mt-4">
+        <AssetActiveAlerts
+          assetId={asset.id}
+          assetTypeCategory={asset.assetType?.category ?? 'EQUIPMENT'}
+        />
       </div>
 
       {/* History */}

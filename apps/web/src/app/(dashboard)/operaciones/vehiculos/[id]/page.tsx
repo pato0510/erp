@@ -34,6 +34,7 @@ import {
 } from '../../../../../components/operations/AssetStatusBadge';
 import { StatusChangeModal } from '../../../../../components/operations/StatusChangeModal';
 import { AssetStatusHistoryModal } from '../../../../../components/operations/AssetStatusHistoryModal';
+import { AssetActiveAlerts } from '../../../../../components/operations/AssetActiveAlerts';
 import {
   DocumentStatusBadge,
   type DerivedDocumentStatus,
@@ -1314,6 +1315,11 @@ export default function VehicleDetailPage({ params }: PageProps) {
             </div>
           )}
         </Card>
+      </div>
+
+      {/* OPS-021 — active alerts for this vehicle. */}
+      <div className="mt-4">
+        <AssetActiveAlerts assetId={vehicle.assetId} assetTypeCategory="VEHICLE" />
       </div>
 
       {/* History */}
