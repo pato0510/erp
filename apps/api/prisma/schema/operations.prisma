@@ -43,6 +43,7 @@ model Location {
   children       Location[]         @relation("LocationTree")
   assets         OperationalAsset[]
   permits        Permit[]
+  workPermits    WorkPermit[]
   alertInstances AlertInstance[]
 
   @@unique([companyId, code])
@@ -128,6 +129,7 @@ model OperationalAsset {
   statusChanges  AssetStatusChange[]
   exceptions     AssetException[]
   permits        Permit[]
+  workPermits    WorkPermit[]
 
   @@unique([companyId, code])
   @@index([companyId, assetTypeId])
@@ -444,6 +446,12 @@ enum NotificationSourceType {
   DOCUMENT_APPROVED
   EXCEPTION_REQUESTED
   EXCEPTION_GRANTED
+  WORK_PERMIT_AUTHORIZATION
+  WORK_PERMIT_AUTHORIZED
+  WORK_PERMIT_REJECTED
+  WORK_PERMIT_STARTED
+  WORK_PERMIT_CLOSED
+  WORK_PERMIT_EXPIRED
   GENERAL
 }
 
@@ -645,4 +653,133 @@ model Permit {
   @@index([companyId, status])
   @@index([companyId, expirationDate])
   @@map("permits")
+}
+
+/* OPS-025 — Internal work permits (Permisos de Trabajo). Unlike the
+   external Permit model above (regulatory papers, renewed yearly),
+   work permits are short-lived safety instruments emitted for ONE
+   specific high-risk task and CLOSED when the task ends. */
+enum WorkPermitCategory {
+  HEIGHT_WORK
+  HOT_WORK
+  CONFINED_SPACE
+  LOCKOUT_TAGOUT
+  EXCAVATION
+  LIFTING
+  ELECTRICAL_WORK
+  CHEMICAL_HANDLING
+  OTHER
+}
+
+enum WorkPermitStatus {
+  DRAFT
+  PENDING_AUTHORIZATION
+  AUTHORIZED
+  IN_EXECUTION
+  SUSPENDED
+  CLOSED
+  CANCELLED
+  EXPIRED
+}
+
+model WorkPermitType {
+  id                       String             @id @default(uuid()) @db.Uuid
+  companyId                String             @db.Uuid
+  name                     String
+  code                     String
+  category                 WorkPermitCategory
+  description              String?
+  maxDurationHours         Int                @default(8)
+  /* Roles required to authorize this permit (subset of UserRole values
+     stored as strings — no FK to enum since Prisma can't constrain
+     array elements). */
+  requiredRoles            String[]           @default([])
+  requiresMedicalAptitude  Boolean            @default(false)
+  requiresSpecificTraining Boolean            @default(false)
+  requiresGasMeasurement   Boolean            @default(false)
+  requiresIsolation        Boolean            @default(false)
+  defaultRisks             String[]           @default([])
+  defaultControls          String[]           @default([])
+  icon                     String?
+  color                    String?
+  isActive                 Boolean            @default(true)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  createdBy                String             @db.Uuid
+
+  permits WorkPermit[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, name])
+  @@index([companyId, category])
+  @@map("work_permit_types")
+}
+
+model WorkPermit {
+  id                  String           @id @default(uuid()) @db.Uuid
+  companyId           String           @db.Uuid
+  permitTypeId        String           @db.Uuid
+  /* Auto-generated per-company sequence "PT-{YEAR}-{0000}". */
+  permitNumber        String
+  title               String
+  description         String
+  workLocation        String?
+  assetId             String?          @db.Uuid
+  locationId          String?          @db.Uuid
+
+  plannedStart        DateTime
+  plannedEnd          DateTime
+  actualStart         DateTime?
+  actualEnd           DateTime?
+
+  requestedBy         String           @db.Uuid
+  supervisorId        String           @db.Uuid
+  /* Array of { userId?, name, role, signature? } — supports external
+     workers without an internal user account. */
+  workTeam            Json             @default("[]")
+
+  identifiedRisks     String[]         @default([])
+  controlMeasures     String[]         @default([])
+  additionalNotes     String?
+
+  authorizedBy        String?          @db.Uuid
+  authorizedAt        DateTime?
+  authorizationNotes  String?
+
+  closedBy            String?          @db.Uuid
+  closedAt            DateTime?
+  closureNotes        String?
+  incidentsReported   Boolean          @default(false)
+  incidentDescription String?
+
+  status              WorkPermitStatus @default(DRAFT)
+  statusReason        String?
+  statusChangedAt     DateTime?
+  statusChangedBy     String?          @db.Uuid
+
+  /* Category-specific structured payloads. gasMeasurements is an
+     append-only log of readings; isolationPoints is the live LOTO
+     state of the lock-and-tag operation. */
+  gasMeasurements     Json?
+  isolationPoints     Json?
+
+  /* Inline attachments, max 5 entries. Each entry mirrors the
+     storage convention used by Documents/Permits — fileData is the
+     DB blob fallback when MinIO is not configured. */
+  attachments         Json             @default("[]")
+
+  isActive            Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  permitType WorkPermitType    @relation(fields: [permitTypeId], references: [id])
+  asset      OperationalAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  location   Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, permitNumber])
+  @@index([companyId, status, plannedStart])
+  @@index([companyId, supervisorId])
+  @@index([companyId, assetId])
+  @@index([companyId, permitNumber])
+  @@map("work_permits")
 }

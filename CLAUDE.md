@@ -356,91 +356,68 @@ documentos críticos vencidos, escala alertas a responsables.
 Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
 Sprint 8: Hardening (OPS-033 a OPS-036)
 
-### OPS-023: Excepciones temporales aprobadas (✓ completado)
+### OPS-024: Permisos externos con vencimientos (✓ completado)
 
-Admin puede liberar temporalmente activos BLOCKED_DOCUMENTAL.
+Catálogo de permisos externos (municipales, sanitarios, ambientales, etc).
 
-### Tabla creada
+### Tablas creadas
 
-- asset_exceptions con FK a OperationalAsset (CASCADE)
-- Enum ExceptionStatus: PENDING, APPROVED, REJECTED, EXPIRED, REVOKED
-- Snapshot de docs bloqueantes en requestedDocumentTypeIds
-- previousStatus para revertir, expiresHandled flag para cron
+- permit_types (catálogo configurable)
+- permits (instancias con archivo, vigencia, autoridad, alcance)
+- Enums: PermitCategory (MUNICIPAL/SANITARY/ENVIRONMENTAL/FIRE_DEPT/
+  LABOR/ELECTRICAL/OTHER), PermitStatus (DRAFT/PENDING_REVIEW/
+  APPROVED/REJECTED/REPLACED/ARCHIVED)
+- CHECK constraint: exactly one of assetId or locationId
 
-### Endpoints OPS-023
+### 7 tipos chilenos por defecto
 
-- GET /api/operations/exceptions
-- GET /api/operations/exceptions/pending-count
-- GET /api/operations/exceptions/active-for-asset/:assetId
-- GET /api/operations/exceptions/:id
-- POST /api/operations/exceptions (cualquier user)
-- POST /api/operations/exceptions/:id/approve (ADMIN)
-- POST /api/operations/exceptions/:id/reject (ADMIN)
-- POST /api/operations/exceptions/:id/revoke (ADMIN)
+- PMUN — Patente Municipal (365 días)
+- AUTSAN — Autorización Sanitaria (3 años)
+- RCA — Resolución Calificación Ambiental (sin vencimiento)
+- PBOMB — Permiso de Bomberos (365 días)
+- DOM — Recepción Definitiva DOM
+- DEC180 — DS 180 Eléctrico
+- REGEN — Registro Generador de Residuos
 
-### Workflow
+### Endpoints OPS-024
 
-1. Cualquier user puede solicitar excepción si activo BLOCKED_DOCUMENTAL
-2. Validaciones: motivo min 20 chars, max 90 días, único PENDING/APPROVED por activo
-3. Notificación a ADMINs al solicitar
-4. ADMIN aprueba con validFrom + validUntil + razón opcional
-5. Activo se desbloquea + AssetStatusChange con EXCEPTION_GRANTED
-6. Banner amarillo en ficha mostrando vigencia
-7. Cron horario detecta expiraciones y re-bloquea
-8. ADMIN puede revocar manualmente con motivo (re-evaluación inmediata)
+Mismas rutas que documents pero bajo /api/operations/permits/\*
 
-### Cron de expiración
+- CRUD completo, upload, approve/reject, supersede, history, file
+- POST /api/operations/permit-types/seed-defaults
 
-- Schedule: 0 \* \* \* \* (cada hora)
-- Job: exception-expiration-check
-- Marca EXPIRED + audit + re-evaluación + notificación
+### Storage convention
 
-### CASL nueva acción
+operations/permits/{companyId}/{permitId}/{filename}
 
-- 'AssetException' subject
-- create: cualquier autenticado
-- approve/reject/revoke: ADMIN only
+### Integración con alertas y bloqueos
+
+- AlertInstance extendido con permitId opcional
+- Alert engine procesa permits igual que documents
+- AssetBlockingService incluye permits CRITICAL+blocksOperation
+  en evaluación
 
 ### UI agregada
 
-- /operaciones/excepciones con KPIs, filtros, tabla, paginación
-- Sidebar item "Excepciones" (ShieldOff icon) con badge PENDING count
-- ExceptionRequestModal/ApproveModal/RejectModal/RevokeModal/DetailModal
-- Banner amarillo en fichas con APPROVED activa
-- Botón "Solicitar excepción" habilitado en banner rojo de bloqueo
+- /operaciones/permisos con tabs Externos | Permisos de Trabajo (próximamente)
+- 4 KPI cards, filtros, tabla con derived states
+- PermitUploadModal con sección de asociación (asset o location)
+- Tab "Permisos" en /operaciones/configuracion (5to tab)
+- AssetPermits component en fichas 360 (entre documentos y alertas)
 
-### Compliance counts agregados
+### Componentes nuevos
 
-assetsWithActiveExceptions, exceptionsAboutToExpire (7 días)
-
-# Sprint 6 — Permisos y Procedimientos (en desarrollo)
-
-Sprint dedicado a permisos operacionales (externos e internos) y
-biblioteca de procedimientos con acuses de lectura.
-
-### Diferencias clave entre módulos
-
-- DOCUMENTOS (Sprints 4-5): certificados/papeles asociados a activos
-- PERMISOS EXTERNOS: permisos emitidos por terceros (municipalidad,
-  sanitario, ambiental) con vencimientos
-- PERMISOS INTERNOS DE TRABAJO: instrumentos operacionales de seguridad
-  (PT en altura, en caliente, espacio confinado, etc) — son de uso
-  diario, no se renuevan, se emiten y cierran
-- PROCEDIMIENTOS: documentos que personas deben leer y firmar acuse
-
-### Tickets del Sprint 6
-
-- OPS-024: Permisos externos con vencimientos
-- OPS-025: Permisos internos de trabajo (PT)
-- OPS-026: Workflow de aprobación de permisos
-- OPS-027: Biblioteca de procedimientos con versionado
-- OPS-028: Acuse de lectura de procedimientos críticos
+- PermitUploadModal, PermitTypeFormModal, AssetPermits
 
 # Ticket actual
 
-- OPS-024: Permisos externos con vencimientos
-  Catálogo de tipos de permiso externo (municipal, sanitario, etc)
-  Modelo Permit con vigencia, autoridad emisora, alcance
-  Asociación con activos o sitios (locations)
-  Mismo motor de alertas y bloqueos que documentos
-  Pantalla /operaciones/permisos con CRUD
+- OPS-025: Permisos Internos de Trabajo (PT)
+  Diferentes a permisos externos: NO se renuevan, se emiten y cierran
+  Son instrumentos operacionales de uso diario para tareas específicas
+  Tipos: PT en Altura, en Caliente, Espacio Confinado, Bloqueo y Tarjeteo,
+  Excavaciones, Izaje de Cargas
+  Cada PT tiene: equipo de trabajo, supervisor responsable, duración,
+  ubicación específica, riesgos identificados, medidas de control,
+  estado (BORRADOR/EMITIDO/EN_EJECUCIÓN/SUSPENDIDO/CERRADO)
+  Workflow: solicita supervisor → autoriza jefe → ejecuta equipo → cierra
+  Pantalla con tab "Permisos de Trabajo" en /operaciones/permisos

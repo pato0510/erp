@@ -50,6 +50,13 @@ import {
   type PermitTypeForForm,
   type PermitTypeSubmit,
 } from '../../../../components/operations/config/PermitTypeFormModal';
+import {
+  WORK_PERMIT_CATEGORY_LABELS,
+  WorkPermitTypeFormModal,
+  type WorkPermitCategory,
+  type WorkPermitTypeForForm,
+  type WorkPermitTypeSubmit,
+} from '../../../../components/operations/config/WorkPermitTypeFormModal';
 import { AlertsConfigTab } from '../../../../components/operations/config/AlertsConfigTab';
 
 type TabKey = 'tipos' | 'ubicaciones' | 'documentos' | 'permisos' | 'alertas';
@@ -85,6 +92,8 @@ interface LocationRow extends LocationForForm {
 type DocumentTypeRow = DocumentTypeForForm;
 
 type PermitTypeRow = PermitTypeForForm;
+
+type WorkPermitTypeRow = WorkPermitTypeForForm;
 
 type Toaster = (message: string, type: 'success' | 'error' | 'info') => void;
 
@@ -196,7 +205,7 @@ function ConfiguracionContent() {
       {tab === 'tipos' && <TiposTab toaster={showToast} />}
       {tab === 'ubicaciones' && <UbicacionesTab toaster={showToast} />}
       {tab === 'documentos' && <TiposDocumentoTab toaster={showToast} />}
-      {tab === 'permisos' && <TiposPermisoTab toaster={showToast} />}
+      {tab === 'permisos' && <PermisosTabRouter toaster={showToast} />}
       {tab === 'alertas' && <AlertsConfigTab toaster={showToast} />}
 
       <style jsx global>{`
@@ -1202,8 +1211,56 @@ function TiposDocumentoTab({ toaster }: { toaster: Toaster }) {
 }
 
 /* ============================================================ */
-/*  TAB 4 — Permit Types                                        */
+/*  TAB 4 — Permits sub-router (Externos / De Trabajo)          */
 /* ============================================================ */
+
+type PermisosSubTab = 'externos' | 'trabajo';
+
+function PermisosTabRouter({ toaster }: { toaster: Toaster }) {
+  const [sub, setSub] = useState<PermisosSubTab>('externos');
+  return (
+    <div>
+      <div
+        className="flex gap-1 mb-4 p-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg"
+        style={{ width: 'fit-content' }}
+      >
+        <SubTabButton active={sub === 'externos'} onClick={() => setSub('externos')}>
+          Externos
+        </SubTabButton>
+        <SubTabButton active={sub === 'trabajo'} onClick={() => setSub('trabajo')}>
+          De Trabajo
+        </SubTabButton>
+      </div>
+      {sub === 'externos' && <TiposPermisoTab toaster={toaster} />}
+      {sub === 'trabajo' && <TiposPermisoDeTrabajoTab toaster={toaster} />}
+    </div>
+  );
+}
+
+function SubTabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-4 py-1.5 text-sm rounded-md transition"
+      style={{
+        background: active ? '#2563EB' : 'transparent',
+        color: active ? '#fff' : 'var(--text-secondary)',
+        fontFamily: 'var(--font-outfit), sans-serif',
+        fontWeight: active ? 600 : 500,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 const PERMIT_CRITICALITY_COLORS: Record<PermitCriticality, { bg: string; fg: string }> = {
   LOW: { bg: 'rgba(100, 116, 139, 0.14)', fg: '#475569' },
@@ -1458,6 +1515,301 @@ function TiposPermisoTab({ toaster }: { toaster: Toaster }) {
         <PermitTypeFormModal
           mode={modal.mode}
           permitType={modal.mode === 'edit' ? modal.type : null}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+        />
+      )}
+    </>
+  );
+}
+
+/* ============================================================ */
+/*  TAB 4b — Work Permit Types                                  */
+/* ============================================================ */
+
+function TiposPermisoDeTrabajoTab({ toaster }: { toaster: Toaster }) {
+  const [types, setTypes] = useState<WorkPermitTypeRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [modal, setModal] = useState<
+    null | { mode: 'create' } | { mode: 'edit'; type: WorkPermitTypeRow }
+  >(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await apiClient.get<WorkPermitTypeRow[]>('/api/operations/work-permit-types');
+      setTypes(rows);
+    } catch (err) {
+      toaster(
+        err instanceof Error ? err.message : 'Error cargando tipos de permiso de trabajo',
+        'error',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [toaster]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleSave = async (dto: WorkPermitTypeSubmit) => {
+    if (modal?.mode === 'edit') {
+      await apiClient.patch(`/api/operations/work-permit-types/${modal.type.id}`, dto);
+      toaster('Tipo de permiso de trabajo actualizado', 'success');
+    } else {
+      await apiClient.post('/api/operations/work-permit-types', dto);
+      toaster('Tipo de permiso de trabajo creado', 'success');
+    }
+    setModal(null);
+    load();
+  };
+
+  const handleDelete = async (row: WorkPermitTypeRow) => {
+    if (!window.confirm(`¿Desactivar el tipo "${row.name}"?`)) return;
+    try {
+      await apiClient.delete(`/api/operations/work-permit-types/${row.id}`);
+      toaster('Tipo desactivado', 'success');
+      load();
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error al desactivar', 'error');
+    }
+  };
+
+  const handleSeedDefaults = async () => {
+    setSeeding(true);
+    try {
+      const result = await apiClient.post<{ createdCount: number; skippedCount: number }>(
+        '/api/operations/work-permit-types/seed-defaults',
+      );
+      toaster(
+        `${result.createdCount} tipos creados${
+          result.skippedCount > 0 ? ` · ${result.skippedCount} omitidos (ya existían)` : ''
+        }`,
+        'success',
+      );
+      load();
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error al cargar tipos por defecto', 'error');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  return (
+    <>
+      <section className="config-section">
+        <div className="config-section__head">
+          <div>
+            <h2>Tipos de Permiso de Trabajo</h2>
+            <p>
+              Catálogo de instrumentos operacionales internos (Trabajo en Altura, en Caliente,
+              Espacio Confinado, LOTO, etc). Los riesgos y medidas por defecto se pre-llenan al
+              emitir un permiso de este tipo.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleSeedDefaults}
+              disabled={seeding}
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+              }}
+            >
+              <Settings size={14} />
+              {seeding ? 'Cargando...' : 'Cargar tipos chilenos por defecto'}
+            </button>
+            <button
+              onClick={() => setModal({ mode: 'create' })}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
+              style={{
+                background: '#1C1C1E',
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+              }}
+            >
+              <Plus size={16} /> Nuevo tipo
+            </button>
+          </div>
+        </div>
+        {loading ? (
+          <SkeletonRows />
+        ) : types.length === 0 ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title="No hay tipos de permiso de trabajo"
+            description="Carga el catálogo chileno por defecto o crea tipos personalizados."
+          />
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="config-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 56 }}> </th>
+                  <th>Nombre / Código</th>
+                  <th>Categoría</th>
+                  <th>Duración máx.</th>
+                  <th>Roles autorizadores</th>
+                  <th>Requisitos</th>
+                  <th>Estado</th>
+                  <th style={{ width: 100, textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {types.map((wt) => (
+                  <tr key={wt.id}>
+                    <td>
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: wt.color || '#475569',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontSize: 11,
+                          fontFamily: 'var(--font-jetbrains-mono), monospace',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {wt.code.slice(0, 3)}
+                      </div>
+                    </td>
+                    <td>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-outfit), sans-serif',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {wt.name}
+                      </div>
+                      <div
+                        className="text-[var(--text-muted)] mt-0.5"
+                        style={{
+                          fontFamily: 'var(--font-jetbrains-mono), monospace',
+                          fontSize: 11,
+                        }}
+                      >
+                        {wt.code}
+                      </div>
+                    </td>
+                    <td>{WORK_PERMIT_CATEGORY_LABELS[wt.category as WorkPermitCategory]}</td>
+                    <td>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-jetbrains-mono), monospace',
+                          fontSize: 12,
+                        }}
+                      >
+                        {wt.maxDurationHours}h
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap gap-1">
+                        {wt.requiredRoles.length === 0 ? (
+                          <span className="text-[var(--text-muted)]">—</span>
+                        ) : (
+                          wt.requiredRoles.map((r) => (
+                            <span
+                              key={r}
+                              className="config-chip"
+                              style={{
+                                background: 'rgba(37, 99, 235, 0.1)',
+                                color: '#1d4ed8',
+                              }}
+                            >
+                              {r}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap gap-1">
+                        {wt.requiresMedicalAptitude && (
+                          <span
+                            className="config-chip"
+                            style={{
+                              background: 'rgba(34, 197, 94, 0.12)',
+                              color: '#15803d',
+                            }}
+                          >
+                            Médica
+                          </span>
+                        )}
+                        {wt.requiresSpecificTraining && (
+                          <span
+                            className="config-chip"
+                            style={{
+                              background: 'rgba(34, 197, 94, 0.12)',
+                              color: '#15803d',
+                            }}
+                          >
+                            Capac.
+                          </span>
+                        )}
+                        {wt.requiresGasMeasurement && (
+                          <span
+                            className="config-chip"
+                            style={{
+                              background: 'rgba(124, 58, 237, 0.12)',
+                              color: '#6d28d9',
+                            }}
+                          >
+                            Gases
+                          </span>
+                        )}
+                        {wt.requiresIsolation && (
+                          <span
+                            className="config-chip"
+                            style={{
+                              background: 'rgba(234, 179, 8, 0.14)',
+                              color: '#a16207',
+                            }}
+                          >
+                            LOTO
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <ActiveBadge active={wt.isActive} />
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        onClick={() => setModal({ mode: 'edit', type: wt })}
+                        className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                        title="Editar"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(wt)}
+                        className="p-2 rounded-md hover:bg-red-50 text-red-600 ml-1"
+                        title="Desactivar"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {modal && (
+        <WorkPermitTypeFormModal
+          mode={modal.mode}
+          workPermitType={modal.mode === 'edit' ? modal.type : null}
           onClose={() => setModal(null)}
           onSave={handleSave}
         />

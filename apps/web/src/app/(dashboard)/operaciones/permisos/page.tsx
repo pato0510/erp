@@ -24,6 +24,7 @@ import {
   type DerivedDocumentStatus,
 } from '../../../../components/operations/DocumentStatusBadge';
 import { PermitUploadModal } from '../../../../components/operations/PermitUploadModal';
+import { WorkPermitsTab } from '../../../../components/operations/WorkPermitsTab';
 import { formatDate } from '../../../../lib/formatters';
 
 type PermitStatus = 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'REPLACED' | 'ARCHIVED';
@@ -340,26 +341,7 @@ export default function PermisosPage() {
         </button>
       </div>
 
-      {tab === 'trabajo' && (
-        <div
-          className="rounded-xl p-8 text-center"
-          style={{
-            background: 'var(--bg-card)',
-            border: '1px dashed var(--border-color)',
-          }}
-        >
-          <ShieldCheck size={36} className="mx-auto mb-3 text-gray-300" />
-          <p
-            className="text-[var(--text-primary)]"
-            style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 600 }}
-          >
-            Próximamente OPS-025
-          </p>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Los permisos internos de trabajo se gestionarán aquí en una próxima entrega.
-          </p>
-        </div>
-      )}
+      {tab === 'trabajo' && user?.id && <WorkPermitsTab currentUserId={user.id} />}
 
       {tab === 'externos' && (
         <>

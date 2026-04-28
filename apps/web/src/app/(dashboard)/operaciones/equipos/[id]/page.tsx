@@ -53,6 +53,7 @@ import {
 } from '../../../../../components/operations/DocumentStatusBadge';
 import { DocumentUploadModal } from '../../../../../components/operations/DocumentUploadModal';
 import { AssetPermits } from '../../../../../components/operations/AssetPermits';
+import { ActiveWorkPermits } from '../../../../../components/operations/ActiveWorkPermits';
 import { DocumentPreviewModal } from '../../../../../components/operations/DocumentPreviewModal';
 import { DocumentSupersessionModal } from '../../../../../components/operations/DocumentSupersessionModal';
 import { DocumentHistoryModal } from '../../../../../components/operations/DocumentHistoryModal';
@@ -1410,6 +1411,11 @@ export default function AssetDetailPage({ params }: PageProps) {
       {/* OPS-024 — external operational permits associated with this asset. */}
       <div className="mt-4">
         <AssetPermits assetId={asset.id} />
+      </div>
+
+      {/* OPS-025 — active internal work permits targeting this asset. */}
+      <div className="mt-4">
+        <ActiveWorkPermits assetId={asset.id} />
       </div>
 
       {/* OPS-021 — active alerts for this asset. The component

@@ -25,6 +25,8 @@ type Subjects =
       | typeof AssetExceptionSubject
       | typeof PermitTypeSubject
       | typeof PermitSubject
+      | typeof WorkPermitTypeSubject
+      | typeof WorkPermitSubject
     >
   | 'all';
 
@@ -91,6 +93,12 @@ class PermitTypeSubject {
 class PermitSubject {
   static readonly modelName = 'Permit' as const;
 }
+class WorkPermitTypeSubject {
+  static readonly modelName = 'WorkPermitType' as const;
+}
+class WorkPermitSubject {
+  static readonly modelName = 'WorkPermit' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -112,7 +120,16 @@ export type Action =
   /* OPS-023 — exception lifecycle. Approve/reject reuse the union
      names but the AssetExceptionSubject scoping makes them distinct
      from the DocumentRecord workflow. `revoke` is exception-only. */
-  | 'revoke';
+  | 'revoke'
+  /* OPS-025 — work permit lifecycle. authorize/reject reuse the verbs
+     used by document workflow but the subject scoping isolates them.
+     start/suspend/resume/close/cancel are work-permit-specific. */
+  | 'authorize'
+  | 'start'
+  | 'suspend'
+  | 'resume'
+  | 'close'
+  | 'cancel';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {
@@ -137,6 +154,8 @@ export {
   AssetExceptionSubject,
   PermitTypeSubject,
   PermitSubject,
+  WorkPermitTypeSubject,
+  WorkPermitSubject,
 };
 
 @Injectable()
@@ -187,6 +206,25 @@ export class CaslAbilityFactory {
            ADMIN can outright delete an APPROVED permit (must archive). */
         can(['create', 'update', 'delete'], PermitTypeSubject);
         can(['create', 'update', 'approve', 'reject', 'resubmit', 'supersede'], PermitSubject);
+        /* OPS-025 — MANAGER manages the work-permit catalog, can author
+           and edit permits, and runs the full lifecycle (authorize, start,
+           suspend, resume, close, cancel). Required-role guards are
+           layered on top of this in the service. */
+        can(['create', 'update', 'delete'], WorkPermitTypeSubject);
+        can(
+          [
+            'create',
+            'update',
+            'authorize',
+            'reject',
+            'start',
+            'suspend',
+            'resume',
+            'close',
+            'cancel',
+          ],
+          WorkPermitSubject,
+        );
         break;
 
       case UserRole.ACCOUNTANT:
@@ -201,12 +239,17 @@ export class CaslAbilityFactory {
         /* OPS-023 — request-only exception flow. Approval still
            requires ADMIN. */
         can('create', AssetExceptionSubject);
+        /* OPS-025 — anyone authenticated can request a work permit
+           (typical workflow: a contractor's supervisor lodges the
+           request and waits for MANAGER authorization). */
+        can(['create', 'update'], WorkPermitSubject);
         break;
 
       case UserRole.ANALYST:
         can('read', 'all');
         can('resubmit', DocumentRecordSubject);
         can('create', AssetExceptionSubject);
+        can(['create', 'update'], WorkPermitSubject);
         break;
 
       case UserRole.VIEWER:
@@ -234,6 +277,10 @@ export class CaslAbilityFactory {
         /* OPS-024 — read-only on permit catalog/rows for VIEWER. */
         can('read', PermitTypeSubject);
         can('read', PermitSubject);
+        /* OPS-025 — VIEWER reads but cannot author or move work
+           permits through the lifecycle. */
+        can('read', WorkPermitTypeSubject);
+        can('read', WorkPermitSubject);
         break;
     }
 
