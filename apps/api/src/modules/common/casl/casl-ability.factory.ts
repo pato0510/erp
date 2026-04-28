@@ -72,9 +72,10 @@ class DocumentRecordSubject {
   static readonly modelName = 'DocumentRecord' as const;
 }
 
-/* `approve`/`reject`/`resubmit` are document-workflow specific actions. They
-   ride on the same CASL action union so the policy decorator stays uniform.
-   `manage` continues to imply all of them (ADMIN/SUPER_ADMIN). */
+/* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
+   actions. They ride on the same CASL action union so the policy decorator
+   stays uniform. `manage` continues to imply all of them
+   (ADMIN/SUPER_ADMIN). */
 export type Action =
   | 'create'
   | 'read'
@@ -83,7 +84,8 @@ export type Action =
   | 'manage'
   | 'approve'
   | 'reject'
-  | 'resubmit';
+  | 'resubmit'
+  | 'supersede';
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {
@@ -136,7 +138,10 @@ export class CaslAbilityFactory {
            must be archived, not deleted, so MANAGER-driven workflows go
            through `update`/archive endpoints. Approval/rejection (OPS-015)
            is granted explicitly so MANAGER can clear the review queue. */
-        can(['create', 'update', 'approve', 'reject', 'resubmit'], DocumentRecordSubject);
+        can(
+          ['create', 'update', 'approve', 'reject', 'resubmit', 'supersede'],
+          DocumentRecordSubject,
+        );
         break;
 
       case UserRole.ACCOUNTANT:

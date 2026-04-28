@@ -55,6 +55,16 @@ export class FilterDocumentRecordsDto {
   @IsBoolean()
   isActive?: boolean;
 
+  /* When false (default), REPLACED versions are hidden from the list so the
+     central documents page only shows current versions. The frontend
+     toggle "Mostrar documentos reemplazados" sets this to true. An explicit
+     status=REPLACED filter overrides this default — operators querying the
+     replaced bucket directly should always see what they asked for. */
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  includeReplaced?: boolean;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

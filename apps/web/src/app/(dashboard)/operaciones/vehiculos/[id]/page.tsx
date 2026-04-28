@@ -12,6 +12,7 @@ import {
   Eye,
   FileText,
   Gauge,
+  History,
   MapPin,
   Pencil,
   RefreshCw,
@@ -36,6 +37,8 @@ import {
 } from '../../../../../components/operations/DocumentStatusBadge';
 import { DocumentUploadModal } from '../../../../../components/operations/DocumentUploadModal';
 import { DocumentPreviewModal } from '../../../../../components/operations/DocumentPreviewModal';
+import { DocumentSupersessionModal } from '../../../../../components/operations/DocumentSupersessionModal';
+import { DocumentHistoryModal } from '../../../../../components/operations/DocumentHistoryModal';
 import { getFileIcon } from '../../../../../lib/file-icons';
 import {
   FUEL_TYPE_LABELS,
@@ -168,6 +171,16 @@ interface DocumentRecordSummary {
   };
 }
 
+/* Lightweight catalog used to resolve hasExpiration/defaultValidityDays
+   when opening the supersession modal. */
+interface DocumentTypeOption {
+  id: string;
+  name: string;
+  code: string;
+  hasExpiration: boolean;
+  defaultValidityDays?: number | null;
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   EQUIPMENT: 'Equipo',
   VEHICLE: 'Vehículo',
@@ -231,6 +244,12 @@ export default function VehicleDetailPage({ params }: PageProps) {
   const [confirmApproveDoc, setConfirmApproveDoc] = useState<DocumentRecordSummary | null>(null);
   const [rejectDoc, setRejectDoc] = useState<DocumentRecordSummary | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [supersedeDoc, setSupersedeDoc] = useState<DocumentRecordSummary | null>(null);
+  const [historyContext, setHistoryContext] = useState<{
+    documentTypeId: string;
+    documentTypeName: string;
+  } | null>(null);
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
 
   const [vehicleAssetTypes, setVehicleAssetTypes] = useState<AssetTypeOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -284,14 +303,16 @@ export default function VehicleDetailPage({ params }: PageProps) {
      before being passed to VehicleFormModal. */
   const loadCatalogs = useCallback(async () => {
     try {
-      const [types, locs, parents] = await Promise.all([
+      const [types, locs, parents, docTypes] = await Promise.all([
         apiClient.get<AssetTypeOption[]>('/api/operations/asset-types'),
         apiClient.get<LocationOption[]>('/api/operations/locations'),
         apiClient.get<{ data: AssetForFormParent[] }>('/api/operations/assets?limit=100'),
+        apiClient.get<DocumentTypeOption[]>('/api/operations/document-types'),
       ]);
       setVehicleAssetTypes(types.filter((t) => t.category === 'VEHICLE'));
       setLocations(locs);
       setParentCandidates(parents.data.map((p) => ({ id: p.id, code: p.code, name: p.name })));
+      setDocumentTypes(docTypes);
     } catch {
       /* Non-critical — modal selectors will simply be empty. */
     }
@@ -518,6 +539,16 @@ export default function VehicleDetailPage({ params }: PageProps) {
      formatRelativeDate helper returns days/weeks but we always show it in days
      here to match how operators read the dashboard. */
   const lastKmRelative = vehicle.lastKmUpdate ? formatRelativeDate(vehicle.lastKmUpdate) : null;
+
+  /* OPS-016 — exclude REPLACED versions from the visible list and prepare
+     the "+ X versiones anteriores" hint for each remaining row. */
+  const visibleDocuments = documentRecords.filter((d) => d.status !== 'REPLACED');
+  const replacedCountByType = documentRecords.reduce<Record<string, number>>((acc, d) => {
+    if (d.status === 'REPLACED') {
+      acc[d.documentTypeId] = (acc[d.documentTypeId] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
 
   /* Pick the most recent document per documentTypeId — APPROVED records win,
      ties broken by version then createdAt. Used to overlay compliance state
@@ -1071,7 +1102,7 @@ export default function VehicleDetailPage({ params }: PageProps) {
             <FileText size={14} style={{ display: 'inline', marginRight: 6, verticalAlign: -2 }} />
             Documentos cargados
           </SectionTitle>
-          {documentRecords.length === 0 ? (
+          {visibleDocuments.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]" style={{ padding: '8px 0' }}>
               Aún no hay documentos cargados para este vehículo. Usa el botón "Cargar" en la tabla
               de requerimientos para empezar.
@@ -1086,16 +1117,17 @@ export default function VehicleDetailPage({ params }: PageProps) {
                     <th>Vigencia</th>
                     <th>Estado</th>
                     <th>Versión</th>
-                    <th style={{ width: 130, textAlign: 'right' }}>Acciones</th>
+                    <th style={{ width: 160, textAlign: 'right' }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {documentRecords.map((d) => (
+                  {visibleDocuments.map((d) => (
                     <DocumentRow
                       key={d.id}
                       doc={d}
                       currentUserId={userId}
                       canReview={canReview}
+                      replacedSiblings={replacedCountByType[d.documentTypeId] ?? 0}
                       onPreview={() => setPreviewDoc(d)}
                       onDownload={() => triggerDocDownload(d)}
                       onArchive={() => {
@@ -1109,6 +1141,13 @@ export default function VehicleDetailPage({ params }: PageProps) {
                         setRejectDoc(d);
                       }}
                       onResubmit={() => performResubmitDoc(d)}
+                      onSupersede={() => setSupersedeDoc(d)}
+                      onShowHistory={() =>
+                        setHistoryContext({
+                          documentTypeId: d.documentTypeId,
+                          documentTypeName: d.documentType.name,
+                        })
+                      }
                     />
                   ))}
                 </tbody>
@@ -1229,6 +1268,60 @@ export default function VehicleDetailPage({ params }: PageProps) {
             setToast({ message: 'Documento cargado exitosamente', type: 'success' });
             load();
           }}
+          onConflictSupersede={async (existingDocumentId) => {
+            try {
+              const existing = await apiClient.get<DocumentRecordSummary>(
+                `/api/operations/documents/${existingDocumentId}`,
+              );
+              setUploadDoc(null);
+              setSupersedeDoc(existing);
+            } catch (err) {
+              setToast({
+                message:
+                  err instanceof Error ? err.message : 'No se pudo cargar el documento existente.',
+                type: 'error',
+              });
+            }
+          }}
+        />
+      )}
+      {supersedeDoc &&
+        (() => {
+          const dt = documentTypes.find((t) => t.id === supersedeDoc.documentTypeId);
+          return (
+            <DocumentSupersessionModal
+              oldDocument={{
+                id: supersedeDoc.id,
+                fileName: supersedeDoc.fileName,
+                version: supersedeDoc.version,
+                assetId: vehicle.assetId,
+                assetCode: vehicle.asset.code,
+                assetName: vehicle.asset.name,
+                documentTypeId: supersedeDoc.documentTypeId,
+                documentTypeName: supersedeDoc.documentType.name,
+                documentTypeCode: supersedeDoc.documentType.code,
+                hasExpiration: dt?.hasExpiration ?? !!supersedeDoc.expirationDate,
+                defaultValidityDays: dt?.defaultValidityDays ?? null,
+              }}
+              onClose={() => setSupersedeDoc(null)}
+              onSuperseded={(newVersion) => {
+                setToast({
+                  message: `Versión reemplazada. Nueva versión v${newVersion} creada.`,
+                  type: 'success',
+                });
+                load();
+              }}
+            />
+          );
+        })()}
+      {historyContext && (
+        <DocumentHistoryModal
+          assetId={vehicle.assetId}
+          documentTypeId={historyContext.documentTypeId}
+          documentTypeName={historyContext.documentTypeName}
+          assetCode={vehicle.asset.code}
+          assetName={vehicle.asset.name}
+          onClose={() => setHistoryContext(null)}
         />
       )}
       {previewDoc && (
@@ -1413,6 +1506,7 @@ function DocumentRow({
   doc,
   currentUserId,
   canReview,
+  replacedSiblings,
   onPreview,
   onDownload,
   onArchive,
@@ -1420,10 +1514,13 @@ function DocumentRow({
   onApprove,
   onReject,
   onResubmit,
+  onSupersede,
+  onShowHistory,
 }: {
   doc: DocumentRecordSummary;
   currentUserId: string | null;
   canReview: boolean;
+  replacedSiblings: number;
   onPreview: () => void;
   onDownload: () => void;
   onArchive: () => void;
@@ -1431,9 +1528,12 @@ function DocumentRow({
   onApprove: () => void;
   onReject: () => void;
   onResubmit: () => void;
+  onSupersede: () => void;
+  onShowHistory: () => void;
 }) {
   const isOwnUpload = currentUserId !== null && doc.uploadedBy === currentUserId;
   const sizeKb = (doc.fileSize / 1024).toFixed(1);
+  const hasHistory = replacedSiblings > 0 || doc.version > 1;
   let dateHint: { text: string; tone: 'warning' | 'danger' | null } = { text: '', tone: null };
   if (doc.expirationDate) {
     const exp = new Date(doc.expirationDate);
@@ -1468,7 +1568,7 @@ function DocumentRow({
           {getFileIcon(doc.mimeType)}
           <div>
             <div
-              className="truncate max-w-[200px]"
+              className="truncate max-w-[220px]"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontSize: 13,
@@ -1484,6 +1584,25 @@ function DocumentRow({
             >
               {sizeKb} KB
             </div>
+            {hasHistory && (
+              <button
+                onClick={onShowHistory}
+                className="mt-1 inline-flex items-center gap-1 text-blue-600 hover:underline"
+                style={{
+                  fontFamily: 'var(--font-outfit), sans-serif',
+                  fontSize: 11,
+                  fontWeight: 500,
+                }}
+                title="Ver historial de versiones"
+              >
+                <History size={11} />
+                {replacedSiblings > 0
+                  ? `+ ${replacedSiblings} ${
+                      replacedSiblings === 1 ? 'versión anterior' : 'versiones anteriores'
+                    }`
+                  : 'Ver historial'}
+              </button>
+            )}
           </div>
         </div>
       </td>
@@ -1571,10 +1690,16 @@ function DocumentRow({
             <Send size={13} />
           </DocActionButton>
         )}
+        {/* OPS-016 — supersession lives on APPROVED rows. */}
         {doc.status === 'APPROVED' && (
-          <DocActionButton onClick={onArchive} title="Archivar">
-            <Archive size={13} />
-          </DocActionButton>
+          <>
+            <DocActionButton onClick={onSupersede} title="Reemplazar versión">
+              <RefreshCw size={13} />
+            </DocActionButton>
+            <DocActionButton onClick={onArchive} title="Archivar">
+              <Archive size={13} />
+            </DocActionButton>
+          </>
         )}
         {doc.status === 'DRAFT' && (
           <DocActionButton onClick={onDelete} title="Eliminar borrador" tone="danger">

@@ -1,4 +1,12 @@
-import { IsEnum, IsISO8601, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsBooleanString,
+  IsEnum,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { DocumentRecordStatus } from '@prisma/client';
 
 /* The body of POST /api/operations/documents (multipart). The file itself
@@ -30,4 +38,12 @@ export class CreateDocumentDto {
   @IsOptional()
   @IsEnum(DocumentRecordStatus)
   setStatus?: DocumentRecordStatus;
+
+  /* When 'true', skip the "already-approved" 409 conflict guard (OPS-016)
+     and create a new version side-by-side with the existing approved one.
+     Multipart bodies always arrive as strings, so we accept the string form
+     and parse it in the service. */
+  @IsOptional()
+  @IsBooleanString()
+  forceNewVersion?: string;
 }

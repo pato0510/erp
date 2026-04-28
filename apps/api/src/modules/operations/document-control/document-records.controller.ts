@@ -1,5 +1,6 @@
 import 'multer';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -27,6 +28,7 @@ import { CreateDocumentDto } from './dto/create-document.dto';
 import { FilterDocumentRecordsDto } from './dto/filter-documents.dto';
 import { FilterPendingReviewDto } from './dto/filter-pending-review.dto';
 import { RejectDocumentDto } from './dto/reject-document.dto';
+import { SupersedeDocumentDto } from './dto/supersede-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 
 const FILE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -62,6 +64,27 @@ export class DocumentRecordsController {
   @CheckPolicies((ability) => ability.can('approve', DocumentRecordSubject))
   getPendingReview(@CurrentCompany() companyId: string, @Query() filters: FilterPendingReviewDto) {
     return this.service.getPendingReview(companyId, filters);
+  }
+
+  /* OPS-016 — version history for one (asset, documentType) pair. Declared
+     before `:id` so the literal `/history` segment matches first. Both query
+     params are required; we validate UUID shape here so the service can
+     trust the inputs. */
+  @Get('history')
+  @CheckPolicies((ability) => ability.can('read', DocumentRecordSubject))
+  getVersionHistory(
+    @CurrentCompany() companyId: string,
+    @Query('assetId') assetId: string,
+    @Query('documentTypeId') documentTypeId: string,
+  ) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!assetId || !uuidRegex.test(assetId)) {
+      throw new BadRequestException('assetId es obligatorio y debe ser un UUID válido.');
+    }
+    if (!documentTypeId || !uuidRegex.test(documentTypeId)) {
+      throw new BadRequestException('documentTypeId es obligatorio y debe ser un UUID válido.');
+    }
+    return this.service.getVersionHistory(companyId, assetId, documentTypeId);
   }
 
   /* File-stream endpoint declared before the catch-all `:id` finder so a path
@@ -113,6 +136,23 @@ export class DocumentRecordsController {
     @Body() dto: UpdateDocumentDto,
   ) {
     return this.service.update(id, companyId, user.id, dto);
+  }
+
+  /* OPS-016 — replace an APPROVED document with a new version. The old row
+     becomes REPLACED (immutable) and the new row inherits asset+type. CASL
+     reuses the `supersede` action so MANAGER/ADMIN can do it; the service
+     enforces "old must be APPROVED and not already superseded". */
+  @Post(':id/supersede')
+  @CheckPolicies((ability) => ability.can('supersede', DocumentRecordSubject))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: FILE_MAX_BYTES } }))
+  supersede(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: SupersedeDocumentDto,
+  ) {
+    return this.service.supersedeDocument(companyId, user.id, id, dto, file);
   }
 
   @Post(':id/archive')

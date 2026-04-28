@@ -448,72 +448,66 @@ El sistema calcula automáticamente:
 - VENCIDO = pasó expirationDate
 - Estos estados se actualizan via job BullMQ diario (en Sprint 5)
 
-### OPS-014: Carga de documentos a activos (✓ completado)
+### OPS-015: Workflow de aprobación/rechazo (✓ completado)
 
-Permite subir documentos reales (PDF, imágenes, Office) a cada activo.
+Documentos PENDING_REVIEW pueden ser aprobados o rechazados por
+ADMIN/MANAGER. Auto-aprobación bloqueada (uploader ≠ approver).
 
-### Storage convention
+### Endpoints implementados OPS-015
 
-- Path en MinIO: operations/documents/{companyId}/{recordId}/{filename}
-- Bucket: SII_CERT_BUCKET (compartido)
-- Fallback automático a DB blob (fileData column) si MinIO falla
+- POST /api/operations/documents/:id/approve
+- POST /api/operations/documents/:id/reject (body: { reason }, min 10 chars)
+- POST /api/operations/documents/:id/resubmit (solo uploader original)
+- GET /api/operations/documents/pending-review
+- GET /api/operations/documents/pending-review/count
 
-### Validaciones
+### Reglas de negocio
 
-- Max 10MB
-- MIME types permitidos: pdf, jpg, png, webp, doc, docx, xls, xlsx
-- assetId y documentTypeId deben pertenecer a la empresa
-- Status inicial restringido a DRAFT o PENDING_REVIEW
+- approve/reject: solo ADMIN, MANAGER
+- approver no puede ser uploader (bloqueo de auto-aprobación)
+- resubmit: solo uploader original puede reenviar un REJECTED
+- Reject requiere motivo (min 10 chars)
+- Status transitions:
+  PENDING_REVIEW → APPROVED (registra approvedBy, approvedAt)
+  PENDING_REVIEW → REJECTED (registra rejectedBy, rejectedAt, statusReason)
+  REJECTED → PENDING_REVIEW (resubmit por uploader)
 
-### Auto-cálculo de vencimiento
+### Pantalla nueva
 
-Si documentType.hasExpiration && issueDate && defaultValidityDays:
-expirationDate = issueDate + defaultValidityDays
-Usuario puede sobreescribir manualmente.
+- /operaciones/documentos/pendientes — cola de revisión
+  Cards con preview, info de uploader, fecha, vigencia
+  Botones Aprobar (verde) / Rechazar (rojo)
+  Tooltip de bloqueo si current user es uploader
+  Empty state cuando no hay pendientes
 
-### Versionado preliminar
+### Sidebar badge
 
-Calcula versión via Prisma.aggregate \_max version por (asset, documentType).
-Las archivadas conservan su número (no se reusan).
-NO marca aún la versión anterior como REPLACED — eso viene en OPS-016.
+OperationsSidebar muestra badge rojo en "Documentos" con count
+de pendientes. Refresh cada 60s. Mismo patrón que alertas en
+FinanceSidebar.
 
-### Endpoints implementados OPS-014
+### Banner en /operaciones/documentos
 
-- POST /api/operations/documents (multipart, 10MB cap)
-- PATCH /api/operations/documents/:id (metadata only)
-- POST /api/operations/documents/:id/archive (con reason)
-- DELETE /api/operations/documents/:id (solo DRAFT, soft delete)
-- GET /api/operations/documents/:id/file?download=1
+Banner azul dismissible cuando hay pendientes, con link a
+/operaciones/documentos/pendientes.
 
-### Componentes nuevos
+### Display de rechazos
 
-- apps/web/src/components/operations/DocumentUploadModal.tsx
-  5 secciones: Activo, Tipo, Archivo, Vigencia, Notas
-  Dos botones: "Guardar como borrador" / "Guardar y enviar a revisión"
-- apps/web/src/components/operations/DocumentPreviewModal.tsx
-  Iframe para PDFs, img para imágenes, placeholder para Office
-- apps/web/src/lib/file-icons.tsx
-  getFileIcon(mimeType) + canPreviewInline()
+Documentos REJECTED muestran motivo en preview modal y tablas.
+Si current user es el uploader original, ve botón "Reenviar a revisión".
 
-### Integración con fichas 360
+### CASL nuevas acciones
 
-- Sección "Documentos requeridos" agrega botón "Cargar" por fila
-- Nueva sección "Documentos cargados" lista todos los DocumentRecord
-  activos del activo
-- Acciones: Ver, Descargar, Archivar (APPROVED), Eliminar (DRAFT)
-
-### Permisos CASL ajustados
-
-- MANAGER: create/update DocumentRecord
-- ADMIN: delete (via manage all)
-- Read: todos los roles
+- 'approve' action en DocumentRecordSubject: ADMIN, MANAGER
+- 'reject' action en DocumentRecordSubject: ADMIN, MANAGER
+- 'resubmit' action en DocumentRecordSubject: any authenticated
 
 # Ticket actual
 
-- OPS-015: Workflow de aprobación/rechazo
-  Documentos en PENDING_REVIEW pueden ser APROBADOS o RECHAZADOS
-  Aprobación: status → APPROVED, registra approvedBy y approvedAt
-  Rechazo: status → REJECTED, registra rejectedBy, rejectedAt y motivo
-  Vista de cola "Pendientes de revisión" en /operaciones/documentos
-  Notificación visual de documentos pendientes en sidebar (badge)
-  Solo ADMIN/MANAGER pueden aprobar (no pueden auto-aprobar sus propios uploads)
+- OPS-016: Versionado inmutable (supersesión)
+  Cuando un documento APPROVED es reemplazado por una nueva versión,
+  la anterior queda automáticamente como REPLACED (no editable, no eliminable).
+  La cadena replacedByDocumentId mantiene el historial completo.
+  La nueva versión hereda metadata configurable.
+  Solo la versión más reciente (no REPLACED) cuenta para compliance.
+  Pantalla de historial de versiones por (activo, tipo de documento).

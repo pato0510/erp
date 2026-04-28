@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -15,6 +16,7 @@ import { CreateDocumentDto } from './dto/create-document.dto';
 import { FilterDocumentRecordsDto } from './dto/filter-documents.dto';
 import { FilterPendingReviewDto } from './dto/filter-pending-review.dto';
 import { RejectDocumentDto } from './dto/reject-document.dto';
+import { SupersedeDocumentDto } from './dto/supersede-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 
 const DEFAULT_LIMIT = 20;
@@ -118,6 +120,13 @@ export class DocumentRecordsService {
     if (filters.assetId) where.assetId = filters.assetId;
     if (filters.documentTypeId) where.documentTypeId = filters.documentTypeId;
     if (filters.status) where.status = filters.status;
+    /* OPS-016 — by default REPLACED versions are hidden so the central list
+       only surfaces current versions. The toggle on the frontend flips
+       includeReplaced=true; an explicit status=REPLACED filter takes
+       precedence either way (operator chose that bucket on purpose). */
+    if (!filters.includeReplaced && filters.status !== 'REPLACED') {
+      where.status = where.status ?? { not: 'REPLACED' };
+    }
     /* Build the expirationDate filter in a local variable, then assign once.
        Prisma's `expirationDate` is `Date | DateTimeFilter` so spreading on it
        isn't safe — we keep it as a plain DateTimeFilter object here. */
@@ -283,11 +292,19 @@ export class DocumentRecordsService {
           },
         },
       }),
-      /* Pull every APPROVED, isActive doc once and bucket them by
-         (assetId, documentTypeId) keeping only the latest createdAt — much
-         cheaper than N+1 queries per asset. */
+      /* Pull every APPROVED, isActive, non-superseded doc once and bucket
+         them by (assetId, documentTypeId) keeping only the latest createdAt
+         — much cheaper than N+1 queries per asset. The status='APPROVED'
+         filter already excludes REPLACED rows (status flips on
+         supersession), but we also require replacedByDocumentId=null as a
+         belt-and-braces guard against any out-of-band updates. */
       this.prisma.documentRecord.findMany({
-        where: { companyId, isActive: true, status: 'APPROVED' },
+        where: {
+          companyId,
+          isActive: true,
+          status: 'APPROVED',
+          replacedByDocumentId: null,
+        },
         select: {
           assetId: true,
           documentTypeId: true,
@@ -466,6 +483,47 @@ export class DocumentRecordsService {
     return { documentType };
   }
 
+  /* Persist a file via MinIO when configured, falling back to a DB blob.
+     Returns the (filePath, fileData) pair to embed on a DocumentRecord row.
+     The recordId is provided by the caller so the storage key is stable
+     regardless of insert ordering. */
+  private async storeFile(
+    companyId: string,
+    recordId: string,
+    file: Express.Multer.File,
+  ): Promise<{ filePath: string | null; fileData: Uint8Array<ArrayBuffer> | null }> {
+    const safeFileName = file.originalname.replace(/[^\w.-]+/g, '_');
+    const storageKey = `operations/documents/${companyId}/${recordId}/${safeFileName}`;
+    if (this.storage.isConfigured()) {
+      try {
+        await this.storage.uploadFile(DOCUMENTS_BUCKET, storageKey, file.buffer, file.mimetype);
+        return { filePath: storageKey, fileData: null };
+      } catch (err) {
+        this.logger.warn(
+          `MinIO upload failed (${err instanceof Error ? err.message : err}); falling back to DB blob`,
+        );
+        return { filePath: null, fileData: Uint8Array.from(file.buffer) };
+      }
+    }
+    this.logger.warn('MinIO not available, storing document in DB blob');
+    return { filePath: null, fileData: Uint8Array.from(file.buffer) };
+  }
+
+  /* Computes the next version number for a given (asset, documentType) pair.
+     Walks every existing record (including archived/replaced) so we never
+     reuse a number — version is monotonic per pair, even across resets. */
+  private async nextVersion(
+    companyId: string,
+    assetId: string,
+    documentTypeId: string,
+  ): Promise<number> {
+    const latest = await this.prisma.documentRecord.aggregate({
+      where: { companyId, assetId, documentTypeId },
+      _max: { version: true },
+    });
+    return (latest._max.version ?? 0) + 1;
+  }
+
   async create(
     companyId: string,
     userId: string,
@@ -487,6 +545,34 @@ export class DocumentRecordsService {
       );
     }
 
+    /* OPS-016 — refuse silent re-uploads when an APPROVED, non-superseded
+       document of the same type already exists for this asset. The frontend
+       intercepts the 409 to offer the supersession flow; clients that really
+       want a parallel new draft can pass forceNewVersion=true. Multipart
+       arrives as strings so we accept either truthy form. */
+    const force = dto.forceNewVersion === 'true' || (dto.forceNewVersion as unknown) === true;
+    if (!force) {
+      const existingApproved = await this.prisma.documentRecord.findFirst({
+        where: {
+          companyId,
+          assetId: dto.assetId,
+          documentTypeId: dto.documentTypeId,
+          status: 'APPROVED',
+          isActive: true,
+          replacedByDocumentId: null,
+        },
+        select: { id: true },
+      });
+      if (existingApproved) {
+        throw new ConflictException({
+          error: 'DOCUMENT_ALREADY_EXISTS',
+          message:
+            "Ya existe un documento aprobado de este tipo para este activo. Para reemplazarlo, usa la acción 'Reemplazar versión' desde el documento existente.",
+          existingDocumentId: existingApproved.id,
+        });
+      }
+    }
+
     const issueDate = dto.issueDate ? new Date(dto.issueDate) : null;
     /* Auto-calculate expiration when the user didn't supply one — only when
        the document type expires AND we have an issueDate to anchor on. */
@@ -499,38 +585,14 @@ export class DocumentRecordsService {
       expirationDate = exp;
     }
 
-    /* Version comes from the highest existing version for this (asset, type)
-       pair — works even if older versions have been archived (isActive=false)
-       so we never reuse a number. OPS-016 will hook supersession in here. */
-    const latestVersion = await this.prisma.documentRecord.aggregate({
-      where: { companyId, assetId: dto.assetId, documentTypeId: dto.documentTypeId },
-      _max: { version: true },
-    });
-    const version = (latestVersion._max.version ?? 0) + 1;
+    const version = await this.nextVersion(companyId, dto.assetId, dto.documentTypeId);
 
-    /* Storage strategy — same MinIO-first/DB-blob fallback used for asset
-     photos and SII certs. The recordId is generated upfront so the storage
-     path is stable. */
     const recordId = randomUUID();
-    const safeFileName = file.originalname.replace(/[^\w.-]+/g, '_');
-    const storageKey = `operations/documents/${companyId}/${recordId}/${safeFileName}`;
-
-    let storedPath: string | null = null;
-    let storedData: Uint8Array<ArrayBuffer> | null = null;
-    if (this.storage.isConfigured()) {
-      try {
-        await this.storage.uploadFile(DOCUMENTS_BUCKET, storageKey, file.buffer, file.mimetype);
-        storedPath = storageKey;
-      } catch (err) {
-        this.logger.warn(
-          `MinIO upload failed (${err instanceof Error ? err.message : err}); falling back to DB blob`,
-        );
-        storedData = Uint8Array.from(file.buffer);
-      }
-    } else {
-      this.logger.warn('MinIO not available, storing document in DB blob');
-      storedData = Uint8Array.from(file.buffer);
-    }
+    const { filePath: storedPath, fileData: storedData } = await this.storeFile(
+      companyId,
+      recordId,
+      file,
+    );
 
     const created = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.documentRecord.create({
@@ -579,12 +641,260 @@ export class DocumentRecordsService {
     };
   }
 
+  /* OPS-016 — supersede an APPROVED document with a new version. The old row
+     becomes immutable (status=REPLACED, replacedByDocumentId set), the new
+     row inherits asset+type and bumps version by one. Both writes happen in
+     a single transaction so partial failures don't leave the chain broken. */
+  async supersedeDocument(
+    companyId: string,
+    userId: string,
+    oldDocumentId: string,
+    dto: SupersedeDocumentDto,
+    file: Express.Multer.File | undefined,
+  ) {
+    this.validateFile(file);
+    if (!file) throw new BadRequestException('Falta el archivo a cargar.');
+
+    const old = await this.prisma.documentRecord.findFirst({
+      where: { id: oldDocumentId, companyId },
+      select: {
+        id: true,
+        assetId: true,
+        documentTypeId: true,
+        status: true,
+        isActive: true,
+        replacedByDocumentId: true,
+        version: true,
+      },
+    });
+    if (!old) throw new NotFoundException('Documento no encontrado');
+    /* Only APPROVED docs can be superseded — drafts/pending/rejected can be
+       edited or replaced via the regular flow without breaking compliance. */
+    if (old.status !== 'APPROVED') {
+      throw new BadRequestException(
+        'Solo se pueden reemplazar documentos APROBADOS. Para otros estados, edita o sube un nuevo documento.',
+      );
+    }
+    if (!old.isActive) {
+      throw new BadRequestException('No se puede reemplazar un documento inactivo.');
+    }
+    if (old.replacedByDocumentId) {
+      throw new BadRequestException('Este documento ya fue reemplazado por una versión más nueva.');
+    }
+
+    const { documentType } = await this.validateRefs(companyId, old.assetId, old.documentTypeId);
+
+    const status: DocumentRecordStatus = dto.setStatus ?? 'DRAFT';
+    if (status !== 'DRAFT' && status !== 'PENDING_REVIEW') {
+      throw new BadRequestException(
+        'El estado inicial debe ser DRAFT o PENDING_REVIEW. Otros estados se gestionan en el workflow.',
+      );
+    }
+
+    const issueDate = dto.issueDate ? new Date(dto.issueDate) : null;
+    let expirationDate: Date | null = null;
+    if (dto.expirationDate) {
+      expirationDate = new Date(dto.expirationDate);
+    } else if (documentType.hasExpiration && issueDate && documentType.defaultValidityDays) {
+      const exp = new Date(issueDate);
+      exp.setDate(exp.getDate() + documentType.defaultValidityDays);
+      expirationDate = exp;
+    }
+
+    const version = await this.nextVersion(companyId, old.assetId, old.documentTypeId);
+
+    const newRecordId = randomUUID();
+    const { filePath: storedPath, fileData: storedData } = await this.storeFile(
+      companyId,
+      newRecordId,
+      file,
+    );
+
+    const now = new Date();
+    const result = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      const newRecord = await tx.documentRecord.create({
+        data: {
+          id: newRecordId,
+          companyId,
+          assetId: old.assetId,
+          documentTypeId: old.documentTypeId,
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          fileSize: file.size,
+          filePath: storedPath,
+          fileData: storedData,
+          issueDate,
+          expirationDate,
+          status,
+          statusChangedAt: now,
+          statusChangedBy: userId,
+          uploadedBy: userId,
+          version,
+          notes: dto.notes,
+          isActive: true,
+        },
+        include: {
+          asset: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              assetType: { select: { id: true, name: true, category: true } },
+            },
+          },
+          documentType: true,
+        },
+      });
+      const replaced = await tx.documentRecord.update({
+        where: { id: old.id },
+        data: {
+          status: 'REPLACED',
+          replacedByDocumentId: newRecord.id,
+          statusReason: `Reemplazado por versión v${version}`,
+          statusChangedAt: now,
+          statusChangedBy: userId,
+          /* isActive stays true so the row remains visible in history. */
+        },
+        include: {
+          asset: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              assetType: { select: { id: true, name: true, category: true } },
+            },
+          },
+          documentType: true,
+        },
+      });
+      return { newRecord, replaced };
+    });
+
+    return {
+      newDocument: {
+        ...result.newRecord,
+        derivedStatus: this.deriveStatus(
+          result.newRecord.status,
+          result.newRecord.expirationDate,
+          result.newRecord.documentType.alertDaysBefore,
+          now,
+        ),
+      },
+      replacedDocument: {
+        ...result.replaced,
+        derivedStatus: this.deriveStatus(
+          result.replaced.status,
+          result.replaced.expirationDate,
+          result.replaced.documentType.alertDaysBefore,
+          now,
+        ),
+      },
+    };
+  }
+
+  /* OPS-016 — version history for one (asset, documentType) pair. Returns
+     every record ever created (including REPLACED, ARCHIVED, REJECTED) in
+     descending version order, with uploader/approver names hydrated via a
+     single batched user lookup. */
+  async getVersionHistory(companyId: string, assetId: string, documentTypeId: string) {
+    /* Validate refs first so we don't leak existence info across tenants. */
+    await this.validateRefs(companyId, assetId, documentTypeId);
+
+    const rows = await this.prisma.documentRecord.findMany({
+      where: { companyId, assetId, documentTypeId },
+      select: {
+        id: true,
+        fileName: true,
+        mimeType: true,
+        fileSize: true,
+        issueDate: true,
+        expirationDate: true,
+        status: true,
+        statusReason: true,
+        statusChangedAt: true,
+        version: true,
+        uploadedBy: true,
+        approvedBy: true,
+        approvedAt: true,
+        rejectedBy: true,
+        rejectedAt: true,
+        replacedByDocumentId: true,
+        notes: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        documentType: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            category: true,
+            criticality: true,
+            blocksOperation: true,
+            alertDaysBefore: true,
+            hasExpiration: true,
+            color: true,
+          },
+        },
+        asset: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            assetType: { select: { id: true, name: true, category: true } },
+          },
+        },
+      },
+      orderBy: { version: 'desc' },
+    });
+
+    /* Resolve uploader/approver/rejector users in a single query — same
+       pattern used by getPendingReview since DocumentRecord doesn't model
+       these as relations. */
+    const userIds = new Set<string>();
+    for (const r of rows) {
+      userIds.add(r.uploadedBy);
+      if (r.approvedBy) userIds.add(r.approvedBy);
+      if (r.rejectedBy) userIds.add(r.rejectedBy);
+    }
+    const users = userIds.size
+      ? await this.prisma.user.findMany({
+          where: { id: { in: Array.from(userIds) } },
+          select: { id: true, email: true, firstName: true, lastName: true },
+        })
+      : [];
+    const userById = new Map(users.map((u) => [u.id, u]));
+
+    const now = new Date();
+    return rows.map((r) => ({
+      ...r,
+      derivedStatus: this.deriveStatus(
+        r.status,
+        r.expirationDate,
+        r.documentType.alertDaysBefore,
+        now,
+      ),
+      uploader: userById.get(r.uploadedBy) ?? null,
+      approver: r.approvedBy ? (userById.get(r.approvedBy) ?? null) : null,
+      rejecter: r.rejectedBy ? (userById.get(r.rejectedBy) ?? null) : null,
+    }));
+  }
+
   async update(id: string, companyId: string, userId: string, dto: UpdateDocumentDto) {
     const existing = await this.prisma.documentRecord.findFirst({
       where: { id, companyId },
       select: { id: true, status: true },
     });
     if (!existing) throw new NotFoundException('Documento no encontrado');
+
+    /* OPS-016 — REPLACED rows are immutable so the version chain stays a
+       reliable audit trail. The same applies to ARCHIVED for the same
+       reason. */
+    if (existing.status === 'REPLACED') {
+      throw new ForbiddenException(
+        'No se puede editar un documento reemplazado. La versión vigente es la única editable.',
+      );
+    }
 
     /* Workflow transitions live in OPS-015. The only one allowed here is the
        DRAFT → PENDING_REVIEW "submit for review" jump that the upload modal
@@ -649,6 +959,11 @@ export class DocumentRecordsService {
     if (existing.status === 'APPROVED') {
       throw new ForbiddenException(
         'No se puede eliminar un documento APROBADO. Usa archivar en su lugar.',
+      );
+    }
+    if (existing.status === 'REPLACED') {
+      throw new ForbiddenException(
+        'No se puede eliminar un documento reemplazado: forma parte del historial inmutable.',
       );
     }
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {

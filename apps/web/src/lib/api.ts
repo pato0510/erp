@@ -1,5 +1,21 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+/* Error class used by the api client when an HTTP request fails. Carries the
+   numeric status and parsed response body so callers can inspect domain-
+   specific payloads (e.g. the 409 supersession-conflict envelope) without
+   re-parsing the response. The `message` is the server's `message` when
+   present so existing `instanceof Error` consumers keep working. */
+export class ApiError<TData = unknown> extends Error {
+  status: number;
+  data: TData | null;
+  constructor(message: string, status: number, data: TData | null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+  }
+}
+
 class ApiClient {
   private companyId: string | null = null;
 
@@ -47,7 +63,7 @@ class ApiClient {
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: 'Request failed' }));
-      throw new Error(error.message || `HTTP ${res.status}`);
+      throw new ApiError(error.message || `HTTP ${res.status}`, res.status, error);
     }
 
     if (res.headers.get('content-type')?.includes('application/json')) {
@@ -78,13 +94,13 @@ class ApiClient {
     return this.request<T>(path, { method: 'DELETE' });
   }
 
-  async uploadFile<T>(path: string, formData: FormData): Promise<T> {
+  async uploadFile<T>(path: string, formData: FormData, method = 'POST'): Promise<T> {
     const headers: Record<string, string> = {};
     const companyId = this.getCompanyId();
     if (companyId) headers['x-company-id'] = companyId;
 
     const res = await fetch(`${API_BASE}${path}`, {
-      method: 'POST',
+      method,
       headers,
       body: formData,
       credentials: 'include',
@@ -92,11 +108,11 @@ class ApiClient {
 
     if (res.status === 401) {
       if (typeof window !== 'undefined') window.location.href = '/login';
-      throw new Error('Unauthorized');
+      throw new ApiError('Unauthorized', 401, null);
     }
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: 'Upload failed' }));
-      throw new Error(error.message || `HTTP ${res.status}`);
+      throw new ApiError(error.message || `HTTP ${res.status}`, res.status, error);
     }
     return res.json();
   }

@@ -1,146 +1,73 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, AlertTriangle, RefreshCw, Upload, X } from 'lucide-react';
-import { ApiError, apiClient } from '../../lib/api';
+import { useEffect, useRef, useState } from 'react';
+import { AlertCircle, RefreshCw, Upload, X } from 'lucide-react';
+import { apiClient } from '../../lib/api';
 import { canPreviewInline, getFileIcon } from '../../lib/file-icons';
 
-interface AssetOption {
+interface OldDocumentContext {
   id: string;
-  code: string;
-  name: string;
-}
-
-interface DocumentTypeOption {
-  id: string;
-  name: string;
-  code: string;
-  category: string;
-  criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  blocksOperation: boolean;
+  fileName: string;
+  version: number;
+  assetId: string;
+  assetCode: string;
+  assetName: string;
+  documentTypeId: string;
+  documentTypeName: string;
+  documentTypeCode: string;
   hasExpiration: boolean;
   defaultValidityDays?: number | null;
-  alertDaysBefore: number;
 }
 
-const CRITICALITY_LABELS: Record<DocumentTypeOption['criticality'], string> = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  CRITICAL: 'Crítica',
-};
-
-const DOC_CATEGORY_LABELS: Record<string, string> = {
-  LEGAL: 'Legal',
-  SAFETY: 'Seguridad',
-  OPERATIONAL: 'Operacional',
-  FINANCIAL: 'Financiero',
-  TECHNICAL: 'Técnico',
-  ADMINISTRATIVE: 'Administrativo',
-};
+interface Props {
+  oldDocument: OldDocumentContext;
+  onSuperseded: (newVersion: number) => void;
+  onClose: () => void;
+}
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXT = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'doc', 'docx', 'xls', 'xlsx'];
 
-interface Props {
-  /* Pre-selected (and locks the selector) when supplied. */
-  assetId?: string;
-  documentTypeId?: string;
-  /* Called after a successful upload — caller should refresh its data. */
-  onUploaded: () => void;
-  /* OPS-016 — fired when the API returns a 409 conflict and the user picks
-     "Reemplazar versión existente". Caller is responsible for closing this
-     modal and opening DocumentSupersessionModal with the existing doc's id.
-     If undefined, the conflict UI omits the supersession button. */
-  onConflictSupersede?: (existingDocumentId: string) => void;
-  onClose: () => void;
-}
-
-export function DocumentUploadModal({
-  assetId,
-  documentTypeId,
-  onUploaded,
-  onConflictSupersede,
-  onClose,
-}: Props) {
-  const [assets, setAssets] = useState<AssetOption[]>([]);
-  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
-  const [catalogsLoaded, setCatalogsLoaded] = useState(false);
-
-  const [selectedAssetId, setSelectedAssetId] = useState(assetId ?? '');
-  const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState(documentTypeId ?? '');
+/* OPS-016 — supersedes an APPROVED document with a new version. Asset and
+   document type are inherited from the old row (the backend rejects any
+   mismatch), so the form only collects file + new validity dates + optional
+   notes. After success the parent receives the new version number for a
+   confirmation toast. */
+export function DocumentSupersessionModal({ oldDocument, onSuperseded, onClose }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [issueDate, setIssueDate] = useState('');
+  const today = new Date().toISOString().slice(0, 10);
+  const [issueDate, setIssueDate] = useState(today);
   const [expirationDate, setExpirationDate] = useState('');
-  /* True once the user has overridden the auto-calculated expirationDate.
-     Once true, subsequent issueDate changes won't clobber their manual edit. */
   const [expirationManuallyEdited, setExpirationManuallyEdited] = useState(false);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState<false | 'draft' | 'review'>(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  /* OPS-016 — populated when the API returns 409 DOCUMENT_ALREADY_EXISTS.
-     The user can then choose to switch to the supersession flow or keep
-     uploading as a new parallel version. */
-  const [conflict, setConflict] = useState<{
-    existingDocumentId: string;
-    target: 'draft' | 'review';
-  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  /* Catalogs are needed unless both selectors come pre-locked from props.
-     We still fetch them — the form might want to display the pre-selected
-     entity's full name. */
-  useEffect(() => {
-    let alive = true;
-    Promise.all([
-      apiClient.get<{ data: AssetOption[] }>('/api/operations/assets?limit=100'),
-      apiClient.get<DocumentTypeOption[]>('/api/operations/document-types'),
-    ])
-      .then(([a, dt]) => {
-        if (!alive) return;
-        setAssets(a.data);
-        setDocumentTypes(dt);
-      })
-      .catch(() => {
-        /* Catalogs failing isn't fatal — the user will just see fewer
-           selector options. */
-      })
-      .finally(() => {
-        if (alive) setCatalogsLoaded(true);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const selectedDocumentType = useMemo(
-    () => documentTypes.find((d) => d.id === selectedDocumentTypeId),
-    [documentTypes, selectedDocumentTypeId],
-  );
-
-  /* Auto-calc expiration when the user hasn't manually overridden it. We only
-     run when documentType.hasExpiration is true and we have an issueDate +
-     defaultValidityDays — otherwise the field stays empty. */
+  /* Auto-calc expiration unless the user manually overrode it. We re-run
+     whenever the issueDate changes — the document type is fixed for the
+     supersession flow so its validity-days never change here. */
   useEffect(() => {
     if (expirationManuallyEdited) return;
-    if (
-      selectedDocumentType?.hasExpiration &&
-      issueDate &&
-      selectedDocumentType.defaultValidityDays
-    ) {
+    if (oldDocument.hasExpiration && issueDate && oldDocument.defaultValidityDays) {
       const d = new Date(issueDate);
       if (Number.isNaN(d.getTime())) return;
-      d.setDate(d.getDate() + selectedDocumentType.defaultValidityDays);
+      d.setDate(d.getDate() + oldDocument.defaultValidityDays);
       setExpirationDate(d.toISOString().slice(0, 10));
-    } else if (!selectedDocumentType?.hasExpiration) {
+    } else if (!oldDocument.hasExpiration) {
       setExpirationDate('');
     }
-  }, [issueDate, selectedDocumentType, expirationManuallyEdited]);
+  }, [
+    issueDate,
+    expirationManuallyEdited,
+    oldDocument.hasExpiration,
+    oldDocument.defaultValidityDays,
+  ]);
 
   /* Image preview — only meaningful for image MIME types. We own the blob
-     URL, so we revoke it on file change/unmount to avoid leaks. */
+     URL so revoke it on file change/unmount. */
   useEffect(() => {
     if (file && canPreviewInline(file.type) === 'image') {
       const url = URL.createObjectURL(file);
@@ -169,39 +96,25 @@ export function DocumentUploadModal({
     setFile(f);
   };
 
-  const submit = async (target: 'draft' | 'review', forceNewVersion = false) => {
+  const submit = async (target: 'draft' | 'review') => {
     setError(null);
-    setConflict(null);
-    if (!selectedAssetId) return setError('Selecciona un activo.');
-    if (!selectedDocumentTypeId) return setError('Selecciona un tipo de documento.');
-    if (!file) return setError('Adjunta el archivo del documento.');
+    if (!file) return setError('Adjunta el archivo de la nueva versión.');
 
     setSubmitting(target);
     try {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('assetId', selectedAssetId);
-      fd.append('documentTypeId', selectedDocumentTypeId);
       if (issueDate) fd.append('issueDate', issueDate);
       if (expirationDate) fd.append('expirationDate', expirationDate);
       if (notes.trim()) fd.append('notes', notes.trim());
       fd.append('setStatus', target === 'review' ? 'PENDING_REVIEW' : 'DRAFT');
-      if (forceNewVersion) fd.append('forceNewVersion', 'true');
-      await apiClient.uploadFile('/api/operations/documents', fd);
-      onUploaded();
+      const res = await apiClient.uploadFile<{
+        newDocument: { version: number };
+      }>(`/api/operations/documents/${oldDocument.id}/supersede`, fd);
+      onSuperseded(res.newDocument.version);
       onClose();
     } catch (err) {
-      /* 409 + DOCUMENT_ALREADY_EXISTS → flip to the conflict UI so the user
-         can pick supersession or force-create. Any other failure becomes a
-         normal error message. */
-      if (err instanceof ApiError && err.status === 409) {
-        const data = err.data as { error?: string; existingDocumentId?: string } | null;
-        if (data?.error === 'DOCUMENT_ALREADY_EXISTS' && data.existingDocumentId) {
-          setConflict({ existingDocumentId: data.existingDocumentId, target });
-          return;
-        }
-      }
-      setError(err instanceof Error ? err.message : 'No se pudo cargar el documento.');
+      setError(err instanceof Error ? err.message : 'No se pudo reemplazar la versión.');
     } finally {
       setSubmitting(false);
     }
@@ -211,62 +124,54 @@ export function DocumentUploadModal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">Cargar documento</h3>
+          <h3 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <RefreshCw size={16} /> Reemplazar documento
+          </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
             <X size={16} />
           </button>
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Section 1 — Asset */}
-          <Section title="Activo">
-            <Field label="Activo" required>
-              <select
-                value={selectedAssetId}
-                onChange={(e) => setSelectedAssetId(e.target.value)}
-                disabled={!!assetId || !catalogsLoaded}
-                className="cp-input"
-              >
-                <option value="">
-                  {catalogsLoaded ? 'Selecciona un activo...' : 'Cargando...'}
-                </option>
-                {assets.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.code} · {a.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </Section>
+          {/* Banner — explains the consequences of supersession */}
+          <div
+            className="rounded-lg p-3 flex items-start gap-2"
+            style={{
+              background: 'rgba(234, 179, 8, 0.08)',
+              border: '1px solid rgba(234, 179, 8, 0.25)',
+            }}
+          >
+            <AlertCircle size={16} style={{ color: '#a16207', flexShrink: 0, marginTop: 2 }} />
+            <p className="text-sm text-[var(--text-primary)]" style={{ lineHeight: 1.45 }}>
+              Estás reemplazando el documento <strong>{oldDocument.fileName}</strong> versión{' '}
+              <strong>v{oldDocument.version}</strong> de <strong>{oldDocument.assetName}</strong>.
+              La versión anterior quedará marcada como <strong>REEMPLAZADA</strong> pero seguirá
+              disponible en el historial.
+            </p>
+          </div>
 
-          {/* Section 2 — Document type */}
-          <Section title="Tipo de documento">
-            <Field label="Tipo" required>
-              <select
-                value={selectedDocumentTypeId}
-                onChange={(e) => {
-                  setSelectedDocumentTypeId(e.target.value);
-                  /* When the user changes type, reset the manual override flag
-                     so auto-calc runs again with the new validity. */
-                  setExpirationManuallyEdited(false);
-                }}
-                disabled={!!documentTypeId || !catalogsLoaded}
-                className="cp-input"
-              >
-                <option value="">{catalogsLoaded ? 'Selecciona un tipo...' : 'Cargando...'}</option>
-                {documentTypes.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                    {DOC_CATEGORY_LABELS[d.category] ? ` · ${DOC_CATEGORY_LABELS[d.category]}` : ''}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {selectedDocumentType && <DocumentTypeInfo type={selectedDocumentType} />}
-          </Section>
+          {/* Locked context — asset + document type are inherited */}
+          <div
+            className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-lg"
+            style={{
+              background: 'rgba(37, 99, 235, 0.04)',
+              border: '1px dashed rgba(37, 99, 235, 0.2)',
+            }}
+          >
+            <LockedField
+              label="Activo"
+              code={oldDocument.assetCode}
+              value={oldDocument.assetName}
+            />
+            <LockedField
+              label="Tipo de documento"
+              code={oldDocument.documentTypeCode}
+              value={oldDocument.documentTypeName}
+            />
+          </div>
 
-          {/* Section 3 — File */}
-          <Section title="Archivo">
+          {/* File */}
+          <Section title="Archivo de la nueva versión">
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -352,7 +257,7 @@ export function DocumentUploadModal({
                       color: 'var(--text-primary)',
                     }}
                   >
-                    Arrastra tu archivo aquí o haz clic para seleccionar
+                    Arrastra el nuevo archivo aquí o haz clic para seleccionar
                   </p>
                   <p className="text-xs text-[var(--text-muted)] mt-1">
                     PDF, JPG, PNG, WEBP, DOC, DOCX, XLS, XLSX · máx 10 MB
@@ -373,7 +278,7 @@ export function DocumentUploadModal({
             </div>
           </Section>
 
-          {/* Section 4 — Validity */}
+          {/* Validity */}
           <Section title="Vigencia">
             <Grid cols={2}>
               <Field label="Fecha de emisión">
@@ -387,12 +292,12 @@ export function DocumentUploadModal({
               <Field
                 label="Fecha de vencimiento"
                 hint={
-                  selectedDocumentType?.hasExpiration &&
+                  oldDocument.hasExpiration &&
                   issueDate &&
-                  selectedDocumentType.defaultValidityDays &&
+                  oldDocument.defaultValidityDays &&
                   !expirationManuallyEdited
-                    ? `Calculada automáticamente (+${selectedDocumentType.defaultValidityDays} días). Editar manualmente.`
-                    : !selectedDocumentType?.hasExpiration && selectedDocumentType
+                    ? `Calculada automáticamente (+${oldDocument.defaultValidityDays} días). Editar manualmente.`
+                    : !oldDocument.hasExpiration
                       ? 'Este tipo de documento no tiene vencimiento.'
                       : undefined
                 }
@@ -404,84 +309,25 @@ export function DocumentUploadModal({
                     setExpirationDate(e.target.value);
                     setExpirationManuallyEdited(true);
                   }}
-                  disabled={selectedDocumentType ? !selectedDocumentType.hasExpiration : false}
+                  disabled={!oldDocument.hasExpiration}
                   className="cp-input"
                 />
               </Field>
             </Grid>
           </Section>
 
-          {/* Section 5 — Notes */}
+          {/* Notes — explicitly empty by default per spec, so users don't
+              accidentally carry over context that no longer applies. */}
           <Section title="Notas (opcional)">
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               maxLength={2000}
-              placeholder="Comentarios, número de folio, observaciones..."
+              placeholder="Comentarios sobre la nueva versión..."
               className="cp-input"
             />
           </Section>
-
-          {conflict && (
-            <div
-              className="rounded-lg p-3 space-y-3"
-              style={{
-                background: 'rgba(234, 179, 8, 0.08)',
-                border: '1px solid rgba(234, 179, 8, 0.3)',
-              }}
-            >
-              <div className="flex items-start gap-2">
-                <AlertTriangle
-                  size={16}
-                  style={{ color: '#a16207', flexShrink: 0, marginTop: 2 }}
-                />
-                <p className="text-sm text-[var(--text-primary)]" style={{ lineHeight: 1.45 }}>
-                  Ya existe un documento aprobado de este tipo para este activo. ¿Deseas
-                  reemplazarlo?
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {onConflictSupersede && (
-                  <button
-                    type="button"
-                    onClick={() => onConflictSupersede(conflict.existingDocumentId)}
-                    disabled={submitting !== false}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white disabled:opacity-50"
-                    style={{
-                      background: '#1C1C1E',
-                      fontFamily: 'var(--font-outfit), sans-serif',
-                      fontWeight: 500,
-                    }}
-                  >
-                    <RefreshCw size={13} /> Reemplazar versión existente
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => submit(conflict.target, true)}
-                  disabled={submitting !== false}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
-                  style={{
-                    fontFamily: 'var(--font-outfit), sans-serif',
-                    fontWeight: 500,
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  Cargar como nueva (forzar)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConflict(null)}
-                  disabled={submitting !== false}
-                  className="px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
-                  style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
 
           {error && (
             <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200 flex items-start gap-2">
@@ -514,14 +360,15 @@ export function DocumentUploadModal({
           <button
             onClick={() => submit('review')}
             disabled={submitting !== false}
-            className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
+            className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50 inline-flex items-center gap-1.5"
             style={{
               background: '#1C1C1E',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
           >
-            {submitting === 'review' ? 'Guardando...' : 'Guardar y enviar a revisión'}
+            <RefreshCw size={14} />
+            {submitting === 'review' ? 'Reemplazando...' : 'Reemplazar versión'}
           </button>
         </div>
       </div>
@@ -556,47 +403,40 @@ export function DocumentUploadModal({
 
 /* --------------------------------------------------------------------- */
 
-function DocumentTypeInfo({ type }: { type: DocumentTypeOption }) {
+function LockedField({ label, code, value }: { label: string; code: string; value: string }) {
   return (
-    <div
-      className="rounded-lg p-3 mt-2 space-y-1.5"
-      style={{
-        background: 'rgba(37, 99, 235, 0.06)',
-        border: '1px solid rgba(37, 99, 235, 0.18)',
-      }}
-    >
-      <p
-        className="text-xs text-[var(--text-secondary)]"
-        style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+    <div>
+      <div
+        className="text-[var(--text-secondary)] mb-1"
+        style={{
+          fontFamily: 'var(--font-ibm-plex-mono), monospace',
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+        }}
       >
-        Vigencia por defecto:{' '}
-        {type.hasExpiration && type.defaultValidityDays ? (
-          <strong className="text-[var(--text-primary)]">{type.defaultValidityDays} días</strong>
-        ) : (
-          <strong className="text-[var(--text-primary)]">Sin vencimiento</strong>
-        )}
-      </p>
-      <p
-        className="text-xs text-[var(--text-secondary)]"
-        style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-jetbrains-mono), monospace',
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--text-secondary)',
+        }}
       >
-        Criticidad:{' '}
-        <strong className="text-[var(--text-primary)]">
-          {CRITICALITY_LABELS[type.criticality]}
-        </strong>
-      </p>
-      {type.blocksOperation && (
-        <p
-          className="inline-flex items-center gap-1.5 text-xs"
-          style={{
-            color: '#b91c1c',
-            fontFamily: 'var(--font-outfit), sans-serif',
-            fontWeight: 500,
-          }}
-        >
-          <AlertTriangle size={12} /> Este documento bloquea operación si vence.
-        </p>
-      )}
+        {code}
+      </div>
+      <div
+        style={{
+          fontFamily: 'var(--font-outfit), sans-serif',
+          fontWeight: 500,
+          fontSize: 14,
+          color: 'var(--text-primary)',
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -650,8 +490,6 @@ function Field({
   );
 }
 
-/* Best-effort MIME guess from filename — used when the browser hands us an
-   octet-stream for office docs so the icon picker still chooses correctly. */
 function guessMimeFromName(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   if (ext === 'pdf') return 'application/pdf';
@@ -664,4 +502,4 @@ function guessMimeFromName(name: string): string {
   return 'application/octet-stream';
 }
 
-export default DocumentUploadModal;
+export default DocumentSupersessionModal;

@@ -165,6 +165,9 @@ export default function DocumentosPage() {
      params and the chip's pressed state. 'missing' has no DB representation
      (no record exists), so it surfaces an info banner. */
   const [quickFilter, setQuickFilter] = useState<'' | 'expiring30' | 'expired' | 'missing'>('');
+  /* OPS-016 — default OFF: REPLACED versions stay hidden so users see only
+     current ones. Toggle in the filters bar opts them back in. */
+  const [includeReplaced, setIncludeReplaced] = useState(false);
   const [page, setPage] = useState(1);
 
   const [data, setData] = useState<Paginated<DocumentRow> | null>(null);
@@ -207,7 +210,16 @@ export default function DocumentosPage() {
   /* Reset to page 1 when filters change. */
   useEffect(() => {
     setPage(1);
-  }, [search, assetId, documentTypeId, statusFilter, expirationFrom, expirationTo, quickFilter]);
+  }, [
+    search,
+    assetId,
+    documentTypeId,
+    statusFilter,
+    expirationFrom,
+    expirationTo,
+    quickFilter,
+    includeReplaced,
+  ]);
 
   const loadCatalogs = useCallback(async () => {
     try {
@@ -244,6 +256,9 @@ export default function DocumentosPage() {
     if (expirationTo) params.set('expirationTo', expirationTo);
     if (quickFilter === 'expiring30') params.set('expiringInDays', '30');
     if (quickFilter === 'expired') params.set('isExpired', 'true');
+    /* OPS-016 — only opt in when the user toggles the filter; default
+       behavior on the API is to hide REPLACED. */
+    if (includeReplaced) params.set('includeReplaced', 'true');
     params.set('page', String(page));
     params.set('limit', String(PAGE_SIZE));
     return params;
@@ -255,6 +270,7 @@ export default function DocumentosPage() {
     expirationFrom,
     expirationTo,
     quickFilter,
+    includeReplaced,
     page,
   ]);
 
@@ -434,6 +450,7 @@ export default function DocumentosPage() {
     setExpirationFrom('');
     setExpirationTo('');
     setQuickFilter('');
+    setIncludeReplaced(false);
   };
 
   const hasFilters = !!(
@@ -443,7 +460,8 @@ export default function DocumentosPage() {
     statusFilter ||
     expirationFrom ||
     expirationTo ||
-    quickFilter
+    quickFilter ||
+    includeReplaced
   );
 
   /* Setup state — show actionable empty state when nothing is configured yet. */
@@ -739,6 +757,26 @@ export default function DocumentosPage() {
           style={{ width: 160 }}
           title="Vencimiento hasta"
         />
+        {/* OPS-016 — show/hide REPLACED rows. Default OFF so the list
+            naturally surfaces only current versions. */}
+        <label
+          className="inline-flex items-center gap-2 select-none cursor-pointer"
+          style={{
+            fontFamily: 'var(--font-outfit), sans-serif',
+            fontSize: 13,
+            color: 'var(--text-secondary)',
+            paddingLeft: 4,
+          }}
+          title="Incluir documentos reemplazados en el listado"
+        >
+          <input
+            type="checkbox"
+            checked={includeReplaced}
+            onChange={(e) => setIncludeReplaced(e.target.checked)}
+            style={{ accentColor: '#2563eb' }}
+          />
+          Mostrar documentos reemplazados
+        </label>
         {hasFilters && (
           <button
             onClick={resetFilters}
