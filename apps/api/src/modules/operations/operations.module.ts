@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AlertRulesModule } from './alerts/alert-rules.module';
 import { AssetsModule } from './assets/assets.module';
 import { AssetTypesModule } from './asset-types/asset-types.module';
+import { AuditPackageModule } from './audit/audit-package.module';
 import { OperationsCalendarModule } from './calendar/operations-calendar.module';
 import { CommitmentTemplatesModule } from './commitment-templates/commitment-templates.module';
 import { OperationsDashboardModule } from './dashboard/operations-dashboard.module';
@@ -21,6 +22,7 @@ import { OperationsReportsModule } from './reports/operations-reports.module';
     AlertRulesModule,
     AssetsModule,
     AssetTypesModule,
+    AuditPackageModule,
     CommitmentTemplatesModule,
     DocumentControlModule,
     DocumentRequirementsModule,

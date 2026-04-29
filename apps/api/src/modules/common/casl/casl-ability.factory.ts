@@ -34,6 +34,7 @@ type Subjects =
       | typeof DomainEventSubject
       | typeof CommitmentTemplateSubject
       | typeof OperationsDashboardSubject
+      | typeof AuditPackageSubject
     >
   | 'all';
 
@@ -137,6 +138,13 @@ class CommitmentTemplateSubject {
 class OperationsDashboardSubject {
   static readonly modelName = 'OperationsDashboard' as const;
 }
+/* OPS-036 — packaged compliance evidence (audit packages).
+   ADMIN + MANAGER can generate (create) and read; only ADMIN can
+   delete. Reading the snapshot KPIs and listing previous packages
+   piggybacks on `read all` for MANAGER. */
+class AuditPackageSubject {
+  static readonly modelName = 'AuditPackage' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -217,6 +225,7 @@ export {
   DomainEventSubject,
   CommitmentTemplateSubject,
   OperationsDashboardSubject,
+  AuditPackageSubject,
 };
 
 @Injectable()
@@ -301,6 +310,10 @@ export class CaslAbilityFactory {
            acknowledge their own readings. `exempt` stays
            ADMIN-only via `manage 'all'`. */
         can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
+        /* OPS-036 — MANAGER can generate audit packages (and
+           read existing ones via blanket `read all`). `delete`
+           stays ADMIN-only via `manage all`. */
+        can('create', AuditPackageSubject);
         break;
 
       case UserRole.ACCOUNTANT:

@@ -20,5 +20,13 @@ import { OperationsReportsService } from './operations-reports.service';
     AlertsHistoryReportGenerator,
     WorkPermitsReportGenerator,
   ],
+  /* OPS-036 — re-exported so the audit-package module can inject
+     the same singletons rather than instantiate parallel ones. */
+  exports: [
+    AssetComplianceReportGenerator,
+    AcknowledgmentCoverageReportGenerator,
+    AlertsHistoryReportGenerator,
+    WorkPermitsReportGenerator,
+  ],
 })
 export class OperationsReportsModule {}

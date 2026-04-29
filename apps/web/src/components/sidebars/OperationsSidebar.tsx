@@ -10,6 +10,7 @@ import {
   BookOpen,
   Calendar,
   ClipboardCheck,
+  FileCheck2,
   FileText,
   GitBranch,
   LayoutDashboard,
@@ -210,6 +211,14 @@ export function OperationsSidebar() {
                     href: '/operaciones/eventos',
                     label: 'Eventos de dominio',
                     icon: GitBranch,
+                  },
+                  /* OPS-036 — packaged compliance evidence for
+                     external auditors. Same role gate as the rest
+                     of this group. */
+                  {
+                    href: '/operaciones/auditoria',
+                    label: 'Auditoría',
+                    icon: FileCheck2,
                   },
                 ]
               : []),
