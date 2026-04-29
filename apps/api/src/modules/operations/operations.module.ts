@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AlertRulesModule } from './alerts/alert-rules.module';
 import { AssetsModule } from './assets/assets.module';
 import { AssetTypesModule } from './asset-types/asset-types.module';
+import { OperationsCalendarModule } from './calendar/operations-calendar.module';
 import { OperationsDashboardModule } from './dashboard/operations-dashboard.module';
 import { DocumentControlModule } from './document-control/document-control.module';
 import { DocumentRequirementsModule } from './document-requirements/document-requirements.module';
@@ -25,6 +26,7 @@ import { ProceduresModule } from './procedures/procedures.module';
     FleetModule,
     LocationsModule,
     NotificationModule,
+    OperationsCalendarModule,
     OperationsDashboardModule,
     PermitsModule,
     ProceduresModule,

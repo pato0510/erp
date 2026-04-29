@@ -327,114 +327,73 @@ Sprint 8: Hardening
 
 ═══════════════════════════════════════════════════════════════════
 
-### OPS-028: Acuses de lectura de procedimientos (✓ completado)
+### OPS-029: Dashboard Operacional unificado (✓ completado)
 
-Sistema de acuse electrónico con firma digital y reportes de cobertura.
+Pantalla de aterrizaje del módulo /operaciones con vista 30s del estado.
 
-### Tabla creada
+### Endpoints OPS-029
 
-- procedure_acknowledgments con FK a Procedure (CASCADE) + User
-- Enum AcknowledgmentStatus: PENDING/READ/ACKNOWLEDGED/EXPIRED/EXEMPTED
-- @@unique([companyId, procedureId, userId])
+- GET /api/operations/dashboard/overview
+- GET /api/operations/dashboard/action-items
+- GET /api/operations/dashboard/upcoming-events
+- GET /api/operations/dashboard/top-assets-at-risk
+- GET /api/operations/dashboard/recent-activity
+- GET /api/operations/dashboard/my-tasks
+- GET /api/operations/dashboard/asset-distribution
+- GET /api/operations/dashboard/compliance-by-category
 
-### Endpoints OPS-028
+### Aggregator service
 
-- GET /api/operations/acknowledgments/my-pending
-- GET /api/operations/acknowledgments/my-pending-count
-- POST /api/operations/acknowledgments/:procedureId/acknowledge
-- POST /api/operations/acknowledgments/:procedureId/exempt/:userId
-- POST /api/operations/acknowledgments/:procedureId/reapply/:userId
-- GET /api/operations/acknowledgments/coverage/:procedureId
-- GET /api/operations/acknowledgments/user/:userId/coverage
-- GET /api/operations/acknowledgments/company-coverage
+operations-dashboard.service.ts reutiliza:
 
-### Lógica de creación automática
+- documentRecordsService.getCompliance
+- permitsService.getCompliance
+- alertInstancesService.getKpis
+- workPermitsService.getActiveCount
+- proceduresService.getKpiCounts
+- acknowledgmentsService.getMyPendingCount/getCompanyCoverage
+- exceptionsService.getPendingCount
+- approvalActionsService.getApprovalCountsForUser
 
-Cuando se publica procedimiento con requiresAcknowledgment=true:
+* Prisma directo para distribución/actividad/risk score
 
-1. Resuelve usuarios target (roles + assets/types/locations)
-2. Skip si ya tiene ACKNOWLEDGED
-3. Calcula dueDate = publishedAt + acknowledgmentDeadlineDays
-4. Crea PENDING + notifica
+### Componentes UI nuevos
 
-Cuando se publica nueva versión:
+- KpiCard (con threshold-tinted color)
+- ActionItemRow (clickeable)
+- AssetRiskCard
+- ActivityStreamItem
+- StatusDistributionDonut (recharts donut con click)
+- ComplianceBarChart
+- UpcomingEventRow
+- MyTasksWidget
 
-- Re-targetea a usuarios que acusaron versión anterior
-- Notificación específica
+### Layout
 
-### trackView idempotente
+- Header con Actualizar + timestamp
+- Banner rojo condicional con action items urgentes
+- 6 KPI cards 3×2 grid responsive
+- 2-column main content (izq: timeline + risks + activity, der: donut + compliance + tasks)
+- Skeleton placeholders durante fetch
+- Promise.all paralelo + 60s auto-refresh
 
-- Primer view: PENDING → READ + firstViewedAt
-- Subsequent views: solo incrementa viewCount
+### Score de risk
 
-### Acknowledge con firma digital
-
-SHA-256(procedureId + userId + ISO timestamp + notes)
-
-- user IP + user agent
-- Modal con declaración formal y checkbox obligatorio
-
-### Crons
-
-- procedure-acknowledgment-reminders: 0 9 \* \* \* (recordatorios)
-- procedure-acknowledgment-expiration: 0 1 \* \* \* (expiraciones)
-- Reminders escalados WARNING → CRITICAL al acercarse deadline
-- Max 3 recordatorios por usuario
-
-### UI agregada
-
-- /operaciones/mis-lecturas con cards y due dates colored
-- AcknowledgmentModal con declaración formal y firma
-- /operaciones/cobertura-acuses (admin/manager) con KPIs y drill-downs
-- Tabs Por procedimiento / Por usuario
-- Botones Eximir / Re-aplicar (admin only)
-- ProcedureAcknowledgmentSection en detail page
-- Sidebar: Mis lecturas (BookMarked) con badge + Cobertura acuses (Users) condicional
-
-### CASL nuevo subject
-
-- ProcedureAcknowledgment con acciones acknowledge + exempt
-- ACCOUNTANT/ANALYST/VIEWER pueden acknowledge propios
-- MANAGER ve cobertura
-- exempt es ADMIN only
-
-═══════════════════════════════════════════════════════════════════
-
-# PLAN ACTUALIZADO DEL MÓDULO OPERACIONES
-
-═══════════════════════════════════════════════════════════════════
-
-✅ Sprint 1 — Fundación (OPS-001 a OPS-004)
-✅ Sprint 2 — Equipos (OPS-005 a OPS-008)
-✅ Sprint 3 — Vehículos (OPS-009 a OPS-012)
-✅ Sprint 4 — Control Documental (OPS-013 a OPS-017)
-✅ Sprint 5 — Alertas y Bloqueos (OPS-018 a OPS-023)
-✅ Sprint 6 — Permisos y Procedimientos (OPS-024 a OPS-028)
-
-🔜 Sprint 7 — Dashboard, Calendario, Reportes e Integración Finanzas
-
-- OPS-029: Dashboard Operacional unificado (NUEVO)
-- OPS-030: Calendario operacional (era OPS-029)
-- OPS-031: Reportes Excel/PDF (era OPS-030)
-- OPS-032: Eventos de dominio Operaciones → Finanzas (era OPS-031)
-- OPS-033: Compromisos automáticos al vencer documentos (era OPS-032)
-
-Sprint 8 — Hardening (renumerado)
-
-- OPS-034: Vistas materializadas para dashboard pesado
-- OPS-035: QR por activo (versión simple)
-- OPS-036: Auditoría completa
-- OPS-037: QA, E2E, documentación
+- 10 por alerta crítica
+- 5 por doc crítico faltante
+- 5 por doc crítico vencido
+- 3 por alerta activa
+- 2 por doc por vencer
 
 # Ticket actual
 
-- OPS-029: Dashboard Operacional unificado
-  Pantalla de aterrizaje del módulo /operaciones (hoy placeholder)
-  KPIs grandes con vista de 30 segundos del estado operacional
-  Tarjeta de acción inmediata si hay urgencias
-  Mini-velocímetros de cumplimiento por categoría
-  Timeline de próximos 30 días
-  Top 5 activos en riesgo
-  Donut chart de distribución por estado de activos
-  Stream de actividad reciente
-  Personalizado por rol del usuario
+- OPS-030: Calendario operacional unificado
+  Pantalla /operaciones/calendario con vista mes/semana/día
+  Todos los eventos del módulo en una sola vista temporal
+  Documentos por vencer + permisos externos + PT programados +
+  acuses con deadline + excepciones que expiran
+  Filtros por tipo de evento, activo, ubicación
+  Click en evento → modal de detalle con link al recurso
+  Vista timeline alternativa (lista cronológica)
+  Color-coded por tipo y severidad
+  Export a iCal/Google Calendar opcional
