@@ -438,9 +438,24 @@ Al escanear se abre la "ficha pública del activo" con info de cumplimiento.
 - Logo Excelsia profesional en PDF (hoy se dibuja un wordmark simple
   con primitivas pdfkit)
 
+### OPS-036: Auditoría completa con queries de compliance (✓ completado)
+
+[el bloque que pusiste antes con todos los detalles de OPS-036]
+
 # Ticket actual
 
-- OPS-036: Auditoría completa con queries de compliance
-  Vista para auditores externos: queries SQL listas + reportes
-  exportables que demuestren cumplimiento de la Ley 16.744 y
-  normativas chilenas. Aún por definir el alcance específico.
+- OPS-037: Cierre del Módulo Operaciones — cleanup, seguridad y documentación
+  Limpieza de warnings ESLint acumulados del Sprint 8
+  Verificación RLS en tablas nuevas + auditoría de endpoints sin guards
+  Health check del módulo /api/operations/health
+  Test de aislamiento multi-tenant
+  Verificación de crons activos
+  Documentación: MODULE_OVERVIEW, API_REFERENCE, KNOWN_ISSUES,
+  MIGRATION_HISTORY
+  README técnico de handoff
+
+  Tests E2E con Playwright SE OMITEN porque el proyecto no tiene setup
+  de E2E previo. Validación manual será con cliente AGS Solutions en
+  producción.
+
+  Cierre del Sprint 8 = 37/37 tickets = Módulo Operaciones 100% completo
