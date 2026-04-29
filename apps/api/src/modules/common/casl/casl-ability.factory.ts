@@ -31,6 +31,7 @@ type Subjects =
       | typeof PermitApprovalSubject
       | typeof ProcedureSubject
       | typeof ProcedureAcknowledgmentSubject
+      | typeof DomainEventSubject
     >
   | 'all';
 
@@ -115,6 +116,12 @@ class ProcedureSubject {
 class ProcedureAcknowledgmentSubject {
   static readonly modelName = 'ProcedureAcknowledgment' as const;
 }
+/* OPS-032 — domain events audit subject. `read` is granted to
+   ADMIN/MANAGER (covered by MANAGER's blanket `read all`); `manage`
+   covers retry/test endpoints (ADMIN-only). */
+class DomainEventSubject {
+  static readonly modelName = 'DomainEvent' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -192,6 +199,7 @@ export {
   PermitApprovalSubject,
   ProcedureSubject,
   ProcedureAcknowledgmentSubject,
+  DomainEventSubject,
 };
 
 @Injectable()

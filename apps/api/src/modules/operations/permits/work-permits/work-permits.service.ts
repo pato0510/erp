@@ -11,6 +11,7 @@ import { AlertSeverity, Prisma, WorkPermitCategory, WorkPermitStatus } from '@pr
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { RlsService } from '../../../common/rls/rls.service';
 import { StorageService } from '../../../common/storage/storage.service';
+import { DomainEventsService } from '../../events/domain-events.service';
 import { NotificationService } from '../../notifications/notification.service';
 import { ApprovalActionsService } from '../approvals/approval-actions.service';
 import { CreateWorkPermitDto } from './dto/create-work-permit.dto';
@@ -75,6 +76,7 @@ export class WorkPermitsService {
     private readonly storage: StorageService,
     private readonly notifications: NotificationService,
     private readonly approvalActions: ApprovalActionsService,
+    private readonly domainEvents: DomainEventsService,
   ) {}
 
   /* ---- Read ----------------------------------------------------- */
@@ -570,6 +572,32 @@ export class WorkPermitsService {
       severity: dto.incidentsReported ? 'WARNING' : 'INFO',
       audience: this.uniqueIds([permit.supervisorId, permit.requestedBy]),
     });
+    /* OPS-032 — emit work-permit.closed so Finance can hook into
+       cost capture (OPS-033). plannedDuration / actualDuration are
+       hours so dashboards can compute over/under-runs without
+       parsing dates. */
+    try {
+      const plannedHrs = (permit.plannedEnd.getTime() - permit.plannedStart.getTime()) / 3_600_000;
+      const actualHrs =
+        permit.actualStart && now ? (now.getTime() - permit.actualStart.getTime()) / 3_600_000 : 0;
+      await this.domainEvents.emit({
+        type: 'work-permit.closed',
+        companyId,
+        workPermitId: permit.id,
+        permitNumber: permit.permitNumber,
+        permitType: permit.permitType.code,
+        title: permit.title,
+        plannedDuration: Math.round(plannedHrs * 10) / 10,
+        actualDuration: Math.round(actualHrs * 10) / 10,
+        incidentsReported: !!dto.incidentsReported,
+        assetId: permit.assetId ?? undefined,
+        occurredAt: now.toISOString(),
+      });
+    } catch (emitErr) {
+      this.logger.warn(
+        `domain-event work-permit.closed emit failed: ${emitErr instanceof Error ? emitErr.message : emitErr}`,
+      );
+    }
     return this.findOne(id, companyId);
   }
 

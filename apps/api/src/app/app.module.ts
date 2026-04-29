@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { SentryModule } from '@sentry/nestjs/setup';
@@ -23,6 +24,8 @@ import { HealthModule } from '../modules/health/health.module';
 import { IamModule } from '../modules/iam/iam.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
 import { MovementsModule } from '../modules/movements/movements.module';
+import { DomainEventsModule } from '../modules/operations/events/domain-events.module';
+import { FinanceModule } from '../modules/finance/finance.module';
 import { OperationsModule } from '../modules/operations/operations.module';
 import { ReconciliationModule } from '../modules/reconciliation/reconciliation.module';
 import { ReportsModule } from '../modules/reports/reports.module';
@@ -38,6 +41,11 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
   imports: [
     SentryModule.forRoot(),
     ScheduleModule.forRoot(),
+    /* OPS-032 — in-process domain bus. `wildcard:false` keeps event
+       names dotted strings (e.g. "document.renewal-imminent") and
+       lets handlers register via `@OnEvent('document.renewal-imminent')`
+       without surprises. */
+    EventEmitterModule.forRoot({ wildcard: false, verboseMemoryLeak: true, maxListeners: 50 }),
     ThrottlerModule.forRoot([
       {
         name: 'default',
@@ -60,6 +68,8 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
     HealthModule,
     IamModule,
     JobsModule,
+    DomainEventsModule,
+    FinanceModule,
     MovementsModule,
     OperationsModule,
     ReconciliationModule,

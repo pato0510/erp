@@ -3,6 +3,7 @@ import { AlertSeverity, AlertTriggerType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { DocumentRequirementsService } from '../document-requirements/document-requirements.service';
+import { DomainEventsService } from '../events/domain-events.service';
 import { NotificationService } from '../notifications/notification.service';
 import { AlertRulesService } from './alert-rules.service';
 import { AssetBlockingService } from './asset-blocking.service';
@@ -41,6 +42,7 @@ export class AlertEngineService {
     private readonly settingsService: CompanyAlertSettingsService,
     private readonly blockingService: AssetBlockingService,
     private readonly notificationService: NotificationService,
+    private readonly domainEvents: DomainEventsService,
   ) {}
 
   /* OPS-019 — main entry point. Walks every active asset for the
@@ -230,6 +232,44 @@ export class AlertEngineService {
                 stateDays,
               },
             });
+          }
+
+          /* OPS-032 — emit a domain event when the document is in
+             the renewal window so Finance can react. occurredAt is
+             pinned to start-of-today UTC; the DomainEvent unique
+             constraint then dedupes repeat cron runs on the same
+             day. Best-effort: any emit failure is logged but never
+             stops the alert pass. */
+          if (
+            !options.dryRun &&
+            latest &&
+            latest.expirationDate &&
+            stateDays !== null &&
+            stateDays >= 0 &&
+            stateDays <= documentType.alertDaysBefore
+          ) {
+            try {
+              await this.domainEvents.emit({
+                type: 'document.renewal-imminent',
+                companyId,
+                documentRecordId: latest.id,
+                documentTypeId: documentType.id,
+                documentTypeCode: documentType.code,
+                documentTypeName: documentType.name,
+                assetId: asset.id,
+                assetCode: asset.code,
+                assetName: asset.name,
+                expirationDate: latest.expirationDate.toISOString(),
+                daysRemaining: stateDays,
+                isCritical: documentType.criticality === 'CRITICAL',
+                blocksOperation: documentType.blocksOperation,
+                occurredAt: today.toISOString(),
+              });
+            } catch (err) {
+              this.logger.warn(
+                `domain-event document.renewal-imminent emit failed: ${err instanceof Error ? err.message : err}`,
+              );
+            }
           }
         }
 
@@ -559,6 +599,26 @@ export class AlertEngineService {
         } catch (err) {
           this.logger.warn(
             `Permit alert notification fan-out failed: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+        /* OPS-032 — domain event for permit renewal. Same idempotency
+           strategy as the document path: occurredAt is pinned to
+           start-of-today so repeat cron ticks dedupe cleanly. */
+        try {
+          await this.domainEvents.emit({
+            type: 'permit.renewal-imminent',
+            companyId,
+            permitId: p.id,
+            permitTypeCode: p.permitType.code,
+            permitTypeName: p.permitType.name,
+            permitNumber: p.permitNumber,
+            expirationDate: exp.toISOString(),
+            daysRemaining: stateDays,
+            occurredAt: today.toISOString(),
+          });
+        } catch (emitErr) {
+          this.logger.warn(
+            `domain-event permit.renewal-imminent emit failed: ${emitErr instanceof Error ? emitErr.message : emitErr}`,
           );
         }
       } catch (err) {

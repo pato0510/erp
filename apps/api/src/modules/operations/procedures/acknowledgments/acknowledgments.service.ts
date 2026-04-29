@@ -9,6 +9,7 @@ import {
 import { AcknowledgmentStatus, AlertSeverity, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { RlsService } from '../../../common/rls/rls.service';
+import { DomainEventsService } from '../../events/domain-events.service';
 import { NotificationService } from '../../notifications/notification.service';
 import { AcknowledgeDto, ExemptUserDto, FilterAcknowledgmentsDto } from './dto/workflow.dto';
 
@@ -25,6 +26,7 @@ export class AcknowledgmentsService {
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
     private readonly notifications: NotificationService,
+    private readonly domainEvents: DomainEventsService,
   ) {}
 
   /* ---- Lifecycle: create / track / acknowledge ---------------- */
@@ -472,6 +474,28 @@ export class AcknowledgmentsService {
             linkPath: `/operaciones/procedimientos/${c.procedureId}`,
             icon: 'AlertCircle',
           });
+        }
+        /* OPS-032 — domain event so Finance/HSEC consumers see the
+           same expiration the user just got notified about. */
+        try {
+          const user = await this.prisma.user.findUnique({
+            where: { id: c.userId },
+            select: { email: true },
+          });
+          await this.domainEvents.emit({
+            type: 'procedure.acknowledgment-expired',
+            companyId: c.companyId,
+            procedureId: c.procedureId,
+            procedureCode: proc?.code ?? '?',
+            procedureTitle: proc?.title ?? '?',
+            userId: c.userId,
+            userEmail: user?.email ?? '',
+            occurredAt: now.toISOString(),
+          });
+        } catch (emitErr) {
+          this.logger.warn(
+            `domain-event procedure.acknowledgment-expired emit failed: ${emitErr instanceof Error ? emitErr.message : emitErr}`,
+          );
         }
         expired += 1;
       } catch (err) {

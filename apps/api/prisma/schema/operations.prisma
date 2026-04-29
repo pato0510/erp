@@ -1059,3 +1059,61 @@ model PermitApproval {
   @@index([companyId, status, createdAt])
   @@map("permit_approvals")
 }
+
+
+/* OPS-032 — domain events. Internal pub/sub trail emitted by the
+   Operations module so Finance (and any future module) can react
+   without a tight coupling. Persisted before broadcast so handlers
+   can replay on retry, and so admins have an audit trail of what
+   was emitted, what was processed, and what failed. */
+
+enum DomainEventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+model DomainEvent {
+  id              String            @id @default(uuid()) @db.Uuid
+  companyId       String            @db.Uuid
+
+  /* Dotted event name — e.g. "document.renewal-imminent". Matches
+     the EventEmitter wildcard string used by NestJS @OnEvent
+     handlers. */
+  eventType       String
+
+  /* Domain aggregate the event is about — e.g. ("DocumentRecord",
+     <id>). Lets the audit table answer "show me everything that
+     happened to this asset" without parsing payloads. */
+  aggregateType   String
+  aggregateId     String            @db.Uuid
+
+  /* Full event payload. The shape is defined per eventType in
+     domain-event-types.ts; the column is loose JSON so the schema
+     doesn't fight a typed event surface that evolves. */
+  payload         Json
+
+  occurredAt      DateTime          @default(now())
+  handledAt       DateTime?
+  status          DomainEventStatus @default(PENDING)
+
+  /* Per-handler outcomes — populated when the bus fans out to
+     multiple listeners. `null` until handlers run. */
+  handlerResults  Json?
+  failureReason   String?
+  retryCount      Int               @default(0)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  /* Idempotency — emitting "the same event for the same aggregate at
+     the same instant" is a duplicate. The combination is wide enough
+     that legitimate re-emissions a millisecond apart still get
+     through, but tight enough that the alert engine running
+     repeatedly on the same minute won't double-emit. */
+  @@unique([companyId, eventType, aggregateId, occurredAt])
+  @@index([companyId, eventType, occurredAt])
+  @@index([companyId, status])
+  @@index([aggregateType, aggregateId])
+  @@map("domain_events")
+}

@@ -327,65 +327,89 @@ Sprint 8: Hardening
 
 ═══════════════════════════════════════════════════════════════════
 
-### OPS-030: Calendario operacional unificado (✓ completado)
+### OPS-031: Reportes Excel/PDF profesionales (✓ completado)
 
-Vista temporal unificada de todos los eventos del módulo.
+Catálogo central de reportes con generación Excel y descarga.
 
-### Endpoints OPS-030
+### Endpoints OPS-031
 
-- GET /api/operations/calendar/events
-- GET /api/operations/calendar/events/by-date
-- GET /api/operations/calendar/month-summary
-- GET /api/operations/calendar/export?format=ical
+- POST /api/operations/reports/asset-compliance
+- POST /api/operations/reports/activity
+- POST /api/operations/reports/acknowledgment-coverage
+- POST /api/operations/reports/alerts-history
+- POST /api/operations/reports/work-permits
+- GET preview endpoints para cada reporte (5 filas + count)
 
-### 6 fuentes de eventos agregadas
+### Generadores creados
 
-- DocumentRecord — vencimientos
-- Permit — vencimientos externos
-- WorkPermit — programación PT
-- ProcedureAcknowledgment — deadlines de acuse
-- AssetException — expiración de excepciones
-- Procedure — publicaciones
+- asset-compliance-report.generator.ts (3 hojas)
+- activity-report.generator.ts (2 hojas, 6 fuentes)
+- acknowledgment-coverage.generator.ts (2 hojas, IP + hash)
+- alerts-history.generator.ts (2 hojas, tiempo resolución)
+- work-permits.generator.ts (2 hojas, planned vs actual)
 
-### iCal export
+### Excel helpers compartidos
 
-RFC 5545 sin dependencia externa (line-folding + escaping manual)
-UIDs estables para sincronización con Google/Apple/Outlook
+- HEADER_FILL #1E3A5F (corporate blue)
+- applyConditionalColor (green/yellow/red por umbrales)
+- addCompanyHeader/Footer con branding
+- formatDateColumn, formatPercentColumn
+- freezeHeader, autoSizeColumns
 
-### Componentes UI nuevos
+### UI agregada
 
-- MonthView — grilla 7×6 con dots de severidad y top-3 eventos
-- WeekView — 7 columnas con event cards
-- DayView — agrupado por hora + "Todo el día"
-- ListView — paginado 50 con grouping por fecha
-- EventDetailModal — type-specific con CTA al recurso
+- /operaciones/reportes con catálogo 6 cards
+- ReportFilterModal único adaptable a 5 tipos
+- Vista previa con 5 filas + count
+- Download via apiClient.postBlob (nuevo método)
 
-### Color coding
+### Carpeta documental por activo
 
-- document_expiration / permit_expiration → rojo
-- work_permit_scheduled → naranja
-- acknowledgment_deadline → azul
-- exception_expiration → amarillo
-- procedure_published → verde
-- Severidad: critical/warning/info dots
+Reusa el export PDF + ZIP ya creado en OPS-017
+Link directo desde card morada → /operaciones/equipos para seleccionar
 
-### URL sync + persistencia
+═══════════════════════════════════════════════════════════════════
 
-- ?view=month&date=2026-05-15
-- View preference en localStorage
-- Mobile default = List
-- AbortController para fetches in-flight
+# MEJORAS V2 PENDIENTES
+
+═══════════════════════════════════════════════════════════════════
+
+Cuando se haga la pasada V2 al ERP módulo por módulo:
+
+### Módulo Operaciones — V2
+
+**Reportes:**
+
+- Selectores como dropdowns con autocomplete (no UUID text)
+- Links desde /documentos, /alertas, /permisos hacia /reportes
+- Histórico de reportes generados con re-download
+
+**Documentos y Procedimientos:**
+
+- Plantillas pre-cargadas chilenas (PT en altura, en caliente)
+- Editor inline que genera el PDF directamente
+- Integración con Word/Google Docs
+- Asistente IA para redactar borradores
+
+**Infraestructura:**
+
+- Vistas materializadas para dashboard pesado
+- QR por activo para verificación en terreno
+- App móvil PWA con sincronización offline
+- OCR para captura de documentos físicos
+- Firma electrónica nativa
+- Modelado bitemporal completo
 
 # Ticket actual
 
-- OPS-031: Reportes Excel/PDF profesionales
-  Reporte de cumplimiento documental por activo (Excel)
-  Reporte de actividad operacional en período (Excel)
-  Reporte de cobertura de acuses (Excel)
-  Reporte de alertas históricas con resoluciones (Excel)
-  Reporte de permisos de trabajo ejecutados (Excel)
-  Carpeta documental ya existe en OPS-017 (PDF + ZIP)
-  Pantalla central /operaciones/reportes con catálogo de reportes
-  Cada reporte con filtros propios y preview antes de descarga
-  Generación con ExcelJS (reusar patrón de Finanzas REP-001)
-  Plantillas con branding empresa, logos, headers profesionales
+- OPS-032: Eventos de dominio Operaciones → Finanzas
+  Sistema de eventos pub/sub interno
+  Operations publica eventos al EventEmitter de NestJS
+  Finance suscribe y reacciona automáticamente
+  Eventos clave:
+  - DocumentRenewalImminentEvent (30 días antes vencimiento)
+  - AssetBlockedEvent (cuando se bloquea automáticamente)
+  - OperationalCostEvent (cierre de PT con costo)
+  - PermitRenewalImminentEvent (renovaciones de permisos)
+    Tabla domain_events para audit trail e idempotencia
+    No genera compromisos aún (eso viene en OPS-033)

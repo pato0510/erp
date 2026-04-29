@@ -11,6 +11,7 @@ import {
   Calendar,
   ClipboardCheck,
   FileText,
+  GitBranch,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -202,6 +203,13 @@ export function OperationsSidebar() {
                     href: '/operaciones/cobertura-acuses',
                     label: 'Cobertura acuses',
                     icon: Users,
+                  },
+                  /* OPS-032 — domain events audit trail. Technical
+                     section, only visible to ADMIN/MANAGER. */
+                  {
+                    href: '/operaciones/eventos',
+                    label: 'Eventos de dominio',
+                    icon: GitBranch,
                   },
                 ]
               : []),

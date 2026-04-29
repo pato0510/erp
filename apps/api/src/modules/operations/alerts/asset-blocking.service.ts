@@ -3,6 +3,7 @@ import { AssetStatus, Prisma, StatusChangeType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { DocumentRequirementsService } from '../document-requirements/document-requirements.service';
+import { DomainEventsService } from '../events/domain-events.service';
 import { NotificationService } from '../notifications/notification.service';
 import { CompanyAlertSettingsService } from './company-alert-settings.service';
 
@@ -57,6 +58,7 @@ export class AssetBlockingService {
     private readonly requirementsService: DocumentRequirementsService,
     private readonly settingsService: CompanyAlertSettingsService,
     private readonly notificationService: NotificationService,
+    private readonly domainEvents: DomainEventsService,
   ) {}
 
   /* Pure evaluator — never writes. Returns the list of CRITICAL+blocking
@@ -330,6 +332,16 @@ export class AssetBlockingService {
           }`,
         );
       }
+      /* OPS-032 — emit domain event so Finance can react. */
+      await this.tryEmitAssetEvent(
+        'asset.blocked',
+        companyId,
+        assetId,
+        asset.status,
+        newStatus,
+        reason,
+        evaluation.blockingDocumentTypeIds,
+      );
       return {
         action: 'BLOCKED',
         newStatus,
@@ -356,6 +368,17 @@ export class AssetBlockingService {
         [],
         [],
         null,
+      );
+      /* OPS-032 — emit domain event so Finance can clear the
+         revenue-at-risk flag set on the matching block event. */
+      await this.tryEmitAssetEvent(
+        'asset.unblocked',
+        companyId,
+        assetId,
+        asset.status,
+        newStatus,
+        reason,
+        [],
       );
       return {
         action: 'UNBLOCKED',
@@ -545,6 +568,58 @@ export class AssetBlockingService {
         .map((id) => docTypeById.get(id))
         .filter(Boolean),
     }));
+  }
+
+  /* OPS-032 — emits an asset.blocked / asset.unblocked event with
+     identifying info hydrated from the asset row. Best-effort: any
+     failure is logged but never re-thrown so the calling transition
+     stays atomic. */
+  private async tryEmitAssetEvent(
+    type: 'asset.blocked' | 'asset.unblocked',
+    companyId: string,
+    assetId: string,
+    previousStatus: AssetStatus,
+    newStatus: AssetStatus,
+    reason: string,
+    blockingDocumentTypeIds: string[],
+  ): Promise<void> {
+    try {
+      const asset = await this.prisma.operationalAsset.findFirst({
+        where: { id: assetId, companyId },
+        select: { id: true, code: true, name: true },
+      });
+      if (!asset) return;
+      const occurredAt = new Date().toISOString();
+      if (type === 'asset.blocked') {
+        await this.domainEvents.emit({
+          type: 'asset.blocked',
+          companyId,
+          assetId: asset.id,
+          assetCode: asset.code,
+          assetName: asset.name,
+          previousStatus,
+          reason,
+          blockingDocumentTypeIds,
+          occurredAt,
+        });
+      } else {
+        await this.domainEvents.emit({
+          type: 'asset.unblocked',
+          companyId,
+          assetId: asset.id,
+          assetCode: asset.code,
+          assetName: asset.name,
+          previousStatus,
+          newStatus,
+          reason,
+          occurredAt,
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `domain-event ${type} emit failed: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   /* Used by the central `/operaciones/documentos` page to show the

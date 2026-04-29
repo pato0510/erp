@@ -2,6 +2,7 @@ import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, OnModuleInit } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
 import { OPERATIONS_ALERT_ENGINE_QUEUE } from '../../jobs/queues.constant';
+import { DomainEventsService } from '../events/domain-events.service';
 import { ExceptionsService } from '../exceptions/exceptions.service';
 import { AcknowledgmentsService } from '../procedures/acknowledgments/acknowledgments.service';
 import { AlertEngineService } from './alert-engine.service';
@@ -22,6 +23,9 @@ const EXCEPTION_EXPIRATION_JOB_NAME = 'exception-expiration-check';
 const ACK_REMINDERS_JOB_NAME = 'procedure-acknowledgment-reminders';
 /* OPS-028 — daily 01:00 sweep that flips overdue rows to EXPIRED. */
 const ACK_EXPIRATION_JOB_NAME = 'procedure-acknowledgment-expiration';
+/* OPS-032 — every 15 minutes, retry FAILED domain events whose
+   retryCount is still below the cap. */
+const DOMAIN_EVENTS_RETRY_JOB_NAME = 'domain-events-retry';
 /* Cron: 06:00 every day. Server timezone — Railway runs UTC, so the user
    sees this fire at 02:00–03:00 local Chile time depending on DST. We
    keep it server-time for now; OPS-021 can move to per-tenant cron. */
@@ -34,6 +38,7 @@ const ESCALATION_CRON = '0 */6 * * *';
 const EXCEPTION_EXPIRATION_CRON = '0 * * * *';
 const ACK_REMINDERS_CRON = '0 9 * * *';
 const ACK_EXPIRATION_CRON = '0 1 * * *';
+const DOMAIN_EVENTS_RETRY_CRON = '*/15 * * * *';
 
 @Processor(OPERATIONS_ALERT_ENGINE_QUEUE)
 export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
@@ -44,6 +49,7 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
     private readonly escalation: AlertEscalationService,
     private readonly exceptions: ExceptionsService,
     private readonly acknowledgments: AcknowledgmentsService,
+    private readonly domainEvents: DomainEventsService,
     @InjectQueue(OPERATIONS_ALERT_ENGINE_QUEUE) private readonly queue: Queue,
   ) {
     super();
@@ -63,7 +69,8 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
           r.name === ESCALATION_JOB_NAME ||
           r.name === EXCEPTION_EXPIRATION_JOB_NAME ||
           r.name === ACK_REMINDERS_JOB_NAME ||
-          r.name === ACK_EXPIRATION_JOB_NAME
+          r.name === ACK_EXPIRATION_JOB_NAME ||
+          r.name === DOMAIN_EVENTS_RETRY_JOB_NAME
         ) {
           await this.queue.removeRepeatableByKey(r.key);
         }
@@ -93,8 +100,13 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
         removeOnComplete: 30,
         removeOnFail: 30,
       });
+      await this.queue.add(DOMAIN_EVENTS_RETRY_JOB_NAME, {} satisfies RecalculateJobData, {
+        repeat: { pattern: DOMAIN_EVENTS_RETRY_CRON },
+        removeOnComplete: 60,
+        removeOnFail: 30,
+      });
       this.logger.log(
-        `Scheduled alert crons (daily="${DAILY_CRON}", escalation="${ESCALATION_CRON}", exceptions="${EXCEPTION_EXPIRATION_CRON}", ackReminders="${ACK_REMINDERS_CRON}", ackExpiration="${ACK_EXPIRATION_CRON}") on ${OPERATIONS_ALERT_ENGINE_QUEUE}`,
+        `Scheduled alert crons (daily="${DAILY_CRON}", escalation="${ESCALATION_CRON}", exceptions="${EXCEPTION_EXPIRATION_CRON}", ackReminders="${ACK_REMINDERS_CRON}", ackExpiration="${ACK_EXPIRATION_CRON}", domainEventsRetry="${DOMAIN_EVENTS_RETRY_CRON}") on ${OPERATIONS_ALERT_ENGINE_QUEUE}`,
       );
     } catch (err) {
       /* Don't crash startup if Redis is briefly unavailable — the job
@@ -118,6 +130,9 @@ export class AlertEngineProcessor extends WorkerHost implements OnModuleInit {
     }
     if (job.name === ACK_EXPIRATION_JOB_NAME) {
       return this.acknowledgments.processExpiredForAllCompanies();
+    }
+    if (job.name === DOMAIN_EVENTS_RETRY_JOB_NAME) {
+      return this.domainEvents.retryFailed();
     }
     if (job.data.companyId) {
       return this.engine.processCompany(job.data.companyId, {
