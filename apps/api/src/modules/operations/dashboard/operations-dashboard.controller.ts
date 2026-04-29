@@ -1,20 +1,39 @@
-import { Controller, DefaultValuePipe, Get, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  DefaultValuePipe,
+  Get,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { OperationsDashboardSubject } from '../../common/casl/casl-ability.factory';
+import { CheckPolicies } from '../../common/decorators/check-policies.decorator';
 import { CurrentCompany } from '../../common/decorators/current-company.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PoliciesGuard } from '../../common/guards/policies.guard';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
+import { MaterializedViewsService } from './materialized-views.service';
 import { OperationsDashboardService } from './operations-dashboard.service';
 
 /* OPS-029 — read-only aggregator over the entire Operations module.
    Every authenticated user in the company can hit these endpoints; the
    underlying queries don't reveal anything beyond what the per-feature
    pages already expose, and RLS still scopes data to the company.
-   No CASL @CheckPolicies — the dashboard is the module's landing page
-   and must work for every role (VIEWER, ANALYST, ACCOUNTANT, MANAGER,
-   ADMIN). */
+   No CASL @CheckPolicies on the read endpoints — the dashboard is the
+   module's landing page and must work for every role (VIEWER, ANALYST,
+   ACCOUNTANT, MANAGER, ADMIN).
+   OPS-034 — added /freshness (open) and /refresh-views (ADMIN-only).
+   PoliciesGuard is added at the controller level: it short-circuits to
+   true when no @CheckPolicies metadata is set, so the read endpoints
+   stay open. */
 @Controller('operations/dashboard')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PoliciesGuard)
 export class OperationsDashboardController {
-  constructor(private readonly service: OperationsDashboardService) {}
+  constructor(
+    private readonly service: OperationsDashboardService,
+    private readonly materializedViews: MaterializedViewsService,
+  ) {}
 
   @Get('overview')
   overview(@CurrentCompany() companyId: string, @CurrentUser() user: { id: string }) {
@@ -63,5 +82,22 @@ export class OperationsDashboardController {
   @Get('compliance-by-category')
   complianceByCategory(@CurrentCompany() companyId: string) {
     return this.service.getComplianceByCategory(companyId);
+  }
+
+  /* OPS-034 — surface the per-MV refreshed_at so the dashboard UI
+     can display "data refreshed N minutes ago". Open to every
+     authenticated user; freshness is not sensitive. */
+  @Get('freshness')
+  freshness() {
+    return this.service.getDashboardFreshness();
+  }
+
+  /* OPS-034 — manual refresh of all 4 MVs. ADMIN-only via the
+     `manage` action on OperationsDashboardSubject (only ADMIN /
+     SUPER_ADMIN have `manage all`). */
+  @Post('refresh-views')
+  @CheckPolicies((ability) => ability.can('manage', OperationsDashboardSubject))
+  async refreshViews() {
+    return this.materializedViews.refreshAll();
   }
 }

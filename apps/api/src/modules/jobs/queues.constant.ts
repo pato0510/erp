@@ -4,3 +4,5 @@ export const BANK_SYNC_QUEUE = 'bank-sync-queue';
 export const OPERATIONS_ALERT_ENGINE_QUEUE = 'operations-alert-engine';
 /* OPS-025 — hourly work-permit auto-expiration queue. */
 export const OPERATIONS_WORK_PERMITS_QUEUE = 'operations-work-permits';
+/* OPS-034 — fast/slow refresh of the dashboard materialized views. */
+export const OPERATIONS_DASHBOARD_MV_REFRESH_QUEUE = 'operations-dashboard-mv-refresh';

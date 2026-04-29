@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ClipboardList,
   ClockAlert,
+  Database,
   FileText,
   RefreshCw,
   ShieldCheck,
@@ -44,6 +45,17 @@ import type {
 
 const REFRESH_INTERVAL_MS = 60_000;
 
+/* OPS-034 — shape returned by GET /api/operations/dashboard/freshness.
+   Each timestamp comes from the corresponding MV's `refreshed_at`
+   column; null means the MV is empty (typically the case for a brand
+   new install before the first cron tick has run). */
+interface DashboardFreshness {
+  assetCompliance: string | null;
+  companySummary: string | null;
+  complianceByCategory: string | null;
+  statusDistribution: string | null;
+}
+
 interface DashboardState {
   overview: DashboardOverview | null;
   actionItems: DashboardActionItems | null;
@@ -53,6 +65,7 @@ interface DashboardState {
   myTasks: DashboardMyTasks | null;
   assetDistribution: DashboardAssetDistribution | null;
   complianceByCategory: DashboardComplianceByCategory;
+  freshness: DashboardFreshness | null;
 }
 
 const EMPTY_STATE: DashboardState = {
@@ -64,7 +77,24 @@ const EMPTY_STATE: DashboardState = {
   myTasks: null,
   assetDistribution: null,
   complianceByCategory: [],
+  freshness: null,
 };
+
+/* "hace X min/h" formatter. Same shape used elsewhere in the app
+   (e.g. ActivityStreamItem) but kept local because the component is
+   tiny and this avoids growing the shared utils API. */
+function formatRelativeTime(iso: string | null): string {
+  if (!iso) return 'sin datos';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return 'ahora';
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'recién';
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days} d`;
+}
 
 /* Local time-window buckets: rather than a horizontal timeline (which
    needs a real chart library and a lot of polish), the spec accepts a
@@ -140,6 +170,7 @@ export default function OperacionesDashboardPage() {
         myTasks,
         assetDistribution,
         complianceByCategory,
+        freshness,
       ] = await Promise.all([
         apiClient.get<DashboardOverview>('/api/operations/dashboard/overview'),
         apiClient.get<DashboardActionItems>('/api/operations/dashboard/action-items'),
@@ -157,6 +188,7 @@ export default function OperacionesDashboardPage() {
         apiClient.get<DashboardComplianceByCategory>(
           '/api/operations/dashboard/compliance-by-category',
         ),
+        apiClient.get<DashboardFreshness>('/api/operations/dashboard/freshness'),
       ]);
       setState({
         overview,
@@ -167,6 +199,7 @@ export default function OperacionesDashboardPage() {
         myTasks,
         assetDistribution,
         complianceByCategory,
+        freshness,
       });
       setLastUpdated(new Date());
     } catch (err) {
@@ -348,6 +381,20 @@ export default function OperacionesDashboardPage() {
                 hour: '2-digit',
                 minute: '2-digit',
               })}
+            </span>
+          )}
+          {state.freshness && (
+            <span
+              className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)]"
+              title={
+                'Los KPIs principales se calculan a partir de vistas materializadas que se ' +
+                'refrescan automáticamente cada 15 minutos para mantener el dashboard rápido. ' +
+                'La actividad reciente, las acciones inmediatas y "Mis tareas" son siempre en ' +
+                'tiempo real.'
+              }
+            >
+              <Database size={11} aria-hidden />
+              KPIs: {formatRelativeTime(state.freshness.companySummary)}
             </span>
           )}
           <button

@@ -6,17 +6,21 @@ import {
   AlertCircle,
   Bell,
   CheckCircle2,
+  Database,
   FileText,
   Layers,
   MapPin,
   Pencil,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Settings,
   Trash2,
   Wallet,
+  Zap,
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
+import { useAuth } from '../../../../hooks/useAuth';
 import { Toast } from '../../../../components/shared/Toast';
 import {
   ASSET_CATEGORY_LABELS,
@@ -62,14 +66,24 @@ import { ApprovalChainsTab } from '../../../../components/operations/config/Appr
 import { AlertsConfigTab } from '../../../../components/operations/config/AlertsConfigTab';
 import { AutoCommitmentsTab } from '../../../../components/operations/config/AutoCommitmentsTab';
 
-type TabKey = 'tipos' | 'ubicaciones' | 'documentos' | 'permisos' | 'alertas' | 'compromisos';
-const TABS: Array<{ key: TabKey; label: string; icon: typeof Layers }> = [
+type TabKey =
+  | 'tipos'
+  | 'ubicaciones'
+  | 'documentos'
+  | 'permisos'
+  | 'alertas'
+  | 'compromisos'
+  | 'avanzado';
+const TABS: Array<{ key: TabKey; label: string; icon: typeof Layers; adminOnly?: boolean }> = [
   { key: 'tipos', label: 'Tipos de Activo', icon: Layers },
   { key: 'ubicaciones', label: 'Ubicaciones', icon: MapPin },
   { key: 'documentos', label: 'Tipos de Documento', icon: FileText },
   { key: 'permisos', label: 'Tipos de Permiso', icon: ShieldCheck },
   { key: 'alertas', label: 'Alertas', icon: Bell },
   { key: 'compromisos', label: 'Compromisos automáticos', icon: Wallet },
+  /* OPS-034 — admin-only tab for performance maintenance (currently:
+     manual refresh of the operations dashboard's materialized views). */
+  { key: 'avanzado', label: 'Avanzado', icon: Zap, adminOnly: true },
 ];
 
 interface AssetTypeRow extends AssetTypeForForm {
@@ -112,14 +126,27 @@ export default function ConfiguracionPage() {
 function ConfiguracionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  /* Same admin gate the alertas page uses: look up the active company's
+     membership and check role. ADMIN/SUPER_ADMIN can see admin-only tabs. */
+  const activeCompanyId = apiClient.getCompanyId();
+  const userRole = user?.companies.find((c) => c.companyId === activeCompanyId)?.role ?? null;
+  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+
+  const visibleTabs = useMemo(() => TABS.filter((t) => !t.adminOnly || isAdmin), [isAdmin]);
+  const validKeys = useMemo(() => visibleTabs.map((t) => t.key), [visibleTabs]);
+
   const initialTab = (searchParams.get('tab') as TabKey | null) ?? 'tipos';
-  const [tab, setTab] = useState<TabKey>(
-    (
-      ['tipos', 'ubicaciones', 'documentos', 'permisos', 'alertas', 'compromisos'] as TabKey[]
-    ).includes(initialTab)
-      ? initialTab
-      : 'tipos',
-  );
+  const [tab, setTab] = useState<TabKey>(validKeys.includes(initialTab) ? initialTab : 'tipos');
+
+  /* If the URL points at avanzado but the user isn't admin, drop them
+     back to the default tab silently. Avoids a "blank tab body" state
+     when an admin-shared link is opened by a non-admin. */
+  useEffect(() => {
+    if (!validKeys.includes(tab)) {
+      setTab('tipos');
+    }
+  }, [validKeys, tab]);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -171,7 +198,7 @@ function ConfiguracionContent() {
         className="flex gap-1 mb-6 p-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl"
         style={{ width: 'fit-content', maxWidth: '100%' }}
       >
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
           const isActive = tab === t.key;
           return (
@@ -214,6 +241,7 @@ function ConfiguracionContent() {
       {tab === 'permisos' && <PermisosTabRouter toaster={showToast} />}
       {tab === 'alertas' && <AlertsConfigTab toaster={showToast} />}
       {tab === 'compromisos' && <AutoCommitmentsTab toaster={showToast} />}
+      {tab === 'avanzado' && isAdmin && <AvanzadoTab toaster={showToast} />}
 
       <style jsx global>{`
         .ops-breadcrumb {
@@ -1826,6 +1854,217 @@ function TiposPermisoDeTrabajoTab({ toaster }: { toaster: Toaster }) {
         />
       )}
     </>
+  );
+}
+
+/* ============================================================ */
+/*  TAB 7 — Avanzado (admin-only)                               */
+/* ============================================================ */
+
+/* OPS-034 — performance maintenance for the operations dashboard.
+   Today this is just the materialized-view refresh control; future
+   tickets can append cards here (cache busting, index rebuilds,
+   etc.) without re-touching the tab plumbing. */
+
+interface MvFreshness {
+  assetCompliance: string | null;
+  companySummary: string | null;
+  complianceByCategory: string | null;
+  statusDistribution: string | null;
+}
+
+interface MvRefreshResult {
+  refreshedAt: string;
+  durations: Record<string, number>;
+}
+
+const MV_DISPLAY_NAMES: Array<{ key: keyof MvFreshness; label: string; description: string }> = [
+  {
+    key: 'companySummary',
+    label: 'Resumen por empresa',
+    description: 'KPIs principales del dashboard (cabecera).',
+  },
+  {
+    key: 'assetCompliance',
+    label: 'Cumplimiento por activo',
+    description: 'Score de riesgo y desglose documental por activo.',
+  },
+  {
+    key: 'statusDistribution',
+    label: 'Distribución de estados',
+    description: 'Datos del gráfico de dona de estado de activos.',
+  },
+  {
+    key: 'complianceByCategory',
+    label: 'Cumplimiento por categoría',
+    description: 'Cumplimiento documental agrupado por categoría.',
+  },
+];
+
+function formatRelativeTimeShort(iso: string | null): string {
+  if (!iso) return 'sin datos';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return 'ahora';
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'recién';
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days} d`;
+}
+
+function formatTimestamp(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString('es-CL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function AvanzadoTab({ toaster }: { toaster: Toaster }) {
+  const [freshness, setFreshness] = useState<MvFreshness | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadFreshness = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiClient.get<MvFreshness>('/api/operations/dashboard/freshness');
+      setFreshness(data);
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error cargando freshness', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [toaster]);
+
+  useEffect(() => {
+    loadFreshness();
+  }, [loadFreshness]);
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    const t0 = Date.now();
+    try {
+      const result = await apiClient.post<MvRefreshResult>(
+        '/api/operations/dashboard/refresh-views',
+      );
+      const totalSec = ((Date.now() - t0) / 1000).toFixed(1);
+      const sumServer = Object.values(result.durations).reduce((a, b) => a + b, 0);
+      toaster(
+        `Vistas refrescadas en ${totalSec}s (servidor: ${(sumServer / 1000).toFixed(1)}s)`,
+        'success',
+      );
+      await loadFreshness();
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error refrescando vistas', 'error');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return (
+    <section className="config-section">
+      <div className="config-section__head">
+        <div>
+          <h2>Vistas materializadas del Dashboard</h2>
+          <p>
+            El Dashboard Operacional lee de 4 vistas materializadas pre-calculadas para responder en
+            milisegundos. Se refrescan automáticamente cada 15 minutos (donut + KPIs) y cada hora
+            (snapshot por activo + categorías), además de eventos puntuales (bloqueo de activo,
+            alerta de vencimiento). Si necesitas datos al instante después de un cambio grande,
+            dispara una actualización manual.
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
+          style={{
+            background: '#1C1C1E',
+            fontFamily: 'var(--font-outfit), sans-serif',
+            fontWeight: 500,
+          }}
+        >
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+          {refreshing ? 'Refrescando...' : 'Refrescar ahora todas las vistas'}
+        </button>
+      </div>
+      {loading ? (
+        <SkeletonRows />
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="config-table">
+            <thead>
+              <tr>
+                <th style={{ width: 56 }}> </th>
+                <th>Vista</th>
+                <th>Descripción</th>
+                <th>Última actualización</th>
+                <th>Antigüedad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MV_DISPLAY_NAMES.map((mv) => {
+                const ts = freshness?.[mv.key] ?? null;
+                return (
+                  <tr key={mv.key}>
+                    <td>
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: 'rgba(37, 99, 235, 0.1)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#1d4ed8',
+                        }}
+                      >
+                        <Database size={14} />
+                      </div>
+                    </td>
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-outfit), sans-serif',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {mv.label}
+                    </td>
+                    <td>
+                      <span className="text-sm text-[var(--text-secondary)]">{mv.description}</span>
+                    </td>
+                    <td>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-jetbrains-mono), monospace',
+                          fontSize: 12,
+                        }}
+                      >
+                        {formatTimestamp(ts)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-sm text-[var(--text-secondary)]">
+                        {formatRelativeTimeShort(ts)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 

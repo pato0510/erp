@@ -33,6 +33,7 @@ type Subjects =
       | typeof ProcedureAcknowledgmentSubject
       | typeof DomainEventSubject
       | typeof CommitmentTemplateSubject
+      | typeof OperationsDashboardSubject
     >
   | 'all';
 
@@ -129,6 +130,13 @@ class DomainEventSubject {
 class CommitmentTemplateSubject {
   static readonly modelName = 'CommitmentTemplate' as const;
 }
+/* OPS-034 — admin-only operations on the dashboard's materialized
+   views (manual refresh). The dashboard endpoints themselves stay
+   open to every authenticated role. Only `manage` is granted, and
+   only ADMIN/SUPER_ADMIN have it via `manage all`. */
+class OperationsDashboardSubject {
+  static readonly modelName = 'OperationsDashboard' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -208,6 +216,7 @@ export {
   ProcedureAcknowledgmentSubject,
   DomainEventSubject,
   CommitmentTemplateSubject,
+  OperationsDashboardSubject,
 };
 
 @Injectable()

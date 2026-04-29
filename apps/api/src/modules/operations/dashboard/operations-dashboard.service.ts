@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AssetStatus, DocumentCriticality } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AlertInstancesService } from '../alerts/alert-instances.service';
@@ -10,6 +10,7 @@ import { PermitsService } from '../permits/permits.service';
 import { WorkPermitsService } from '../permits/work-permits/work-permits.service';
 import { AcknowledgmentsService } from '../procedures/acknowledgments/acknowledgments.service';
 import { ProceduresService } from '../procedures/procedures.service';
+import { MaterializedViewsService } from './materialized-views.service';
 
 interface AssetRiskScore {
   criticalAlerts: number;
@@ -19,8 +20,81 @@ interface AssetRiskScore {
   expiring: number;
 }
 
+/* OPS-034 — fall back to live aggregation when the MV row is older
+   than this. 2 h covers the worst-case slow-cron drift (1 h cadence
+   + a missed tick) without pretending the data is fresh forever. */
+const MV_STALENESS_LIMIT_MS = 2 * 60 * 60 * 1000;
+
+/* Shape returned by the company_summary MV. snake_case because raw
+   queries don't go through Prisma's name-mapping layer. */
+type CompanyCompliancesummaryRow = {
+  company_id: string;
+  total_active_assets: number | string;
+  operational_assets: number | string;
+  blocked_assets: number | string;
+  with_observations: number | string;
+  in_maintenance: number | string;
+  out_of_service: number | string;
+  total_required_docs: number | string;
+  total_valid_docs: number | string;
+  total_expiring_soon_docs: number | string;
+  total_expired_docs: number | string;
+  total_missing_docs: number | string;
+  total_critical_issues: number | string;
+  active_external_permits: number | string;
+  valid_external_permits: number | string;
+  expiring_external_permits: number | string;
+  expired_external_permits: number | string;
+  work_permits_in_execution: number | string;
+  work_permits_pending_authorization: number | string;
+  work_permits_authorized_today: number | string;
+  work_permits_closed_today: number | string;
+  total_alerts: number | string;
+  critical_alerts: number | string;
+  blocking_alerts: number | string;
+  unattended_alerts: number | string;
+  escalated_alerts: number | string;
+  active_exceptions: number | string;
+  pending_approval_exceptions: number | string;
+  expiring_exceptions: number | string;
+  published_procedures: number | string;
+  refreshed_at: Date;
+};
+
+type AssetSnapshotRow = {
+  asset_id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  status: AssetStatus;
+  asset_type_id: string;
+  asset_type_name: string | null;
+  asset_type_category: string | null;
+  active_alerts: number | string;
+  critical_alerts: number | string;
+  missing_docs: number | string;
+  expired_docs: number | string;
+  expiring_soon_docs: number | string;
+  risk_score: number | string;
+  refreshed_at: Date;
+};
+
+type StatusDistributionRow = {
+  company_id: string;
+  status: AssetStatus;
+  count: number | string;
+  refreshed_at: Date;
+};
+
+const toNum = (v: number | string | null | undefined): number => {
+  if (v === null || v === undefined) return 0;
+  return typeof v === 'number' ? v : Number(v);
+};
+
 @Injectable()
 export class OperationsDashboardService {
+  private readonly logger = new Logger(OperationsDashboardService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly assetBlockingService: AssetBlockingService,
@@ -32,11 +106,157 @@ export class OperationsDashboardService {
     private readonly acknowledgmentsService: AcknowledgmentsService,
     private readonly exceptionsService: ExceptionsService,
     private readonly approvalActionsService: ApprovalActionsService,
+    private readonly materializedViews: MaterializedViewsService,
   ) {}
+
+  /* OPS-034 — feature flag. Default ON; set the env var to "false"
+     to bypass the MVs and force live aggregation (debugging / parity
+     verification). */
+  private get useMaterializedViews(): boolean {
+    return process.env.DASHBOARD_USE_MATERIALIZED_VIEWS !== 'false';
+  }
+
+  getDashboardFreshness() {
+    return this.materializedViews.getFreshness();
+  }
 
   /* ---- Overview KPIs ------------------------------------------ */
 
   async getOverview(companyId: string, userId: string) {
+    if (this.useMaterializedViews) {
+      const fromMv = await this.tryGetOverviewFromMV(companyId, userId);
+      if (fromMv) return fromMv;
+      this.logger.debug(
+        `getOverview: MV unavailable/stale for ${companyId}, falling back to live aggregation`,
+      );
+    }
+    return this.getOverviewLive(companyId, userId);
+  }
+
+  /* MV-backed overview. Returns null on any of: feature disabled,
+     query error, MV row missing for this company (fresh install or
+     a company created after the last refresh tick), or MV row older
+     than the staleness ceiling. The caller is responsible for the
+     live fallback in those cases. */
+  private async tryGetOverviewFromMV(companyId: string, userId: string) {
+    let mvRow: CompanyCompliancesummaryRow | undefined;
+    try {
+      const rows = await this.prisma.$queryRawUnsafe<CompanyCompliancesummaryRow[]>(
+        `SELECT * FROM mv_company_compliance_summary WHERE company_id = $1::uuid LIMIT 1`,
+        companyId,
+      );
+      mvRow = rows[0];
+    } catch (err) {
+      this.logger.warn(
+        `tryGetOverviewFromMV query failed: ${err instanceof Error ? err.message : err}`,
+      );
+      return null;
+    }
+    if (!mvRow) return null;
+    if (Date.now() - new Date(mvRow.refreshed_at).getTime() > MV_STALENESS_LIMIT_MS) {
+      return null;
+    }
+
+    const now = new Date();
+    const sevenDaysAhead = new Date(now.getTime() + 7 * 86_400_000);
+    const dayAgo = new Date(now.getTime() - 86_400_000);
+    const startOfToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+
+    /* User-specific bits stay live — they vary per session and don't
+       benefit from a per-company snapshot. ackCoverage is global but
+       isn't surfaced in the MV today; left as a live call to keep the
+       MV migration narrowly scoped. */
+    const [myAckCount, ackCoverage, approvalCounts] = await Promise.all([
+      this.acknowledgmentsService.getMyPendingCount(companyId, userId),
+      this.acknowledgmentsService.getCompanyCoverage(companyId),
+      this.approvalActionsService.getApprovalCountsForUser(companyId, userId),
+    ]);
+
+    const totalActiveAssets = toNum(mvRow.total_active_assets);
+    const operationalAssets = toNum(mvRow.operational_assets);
+    /* Re-derive the percentage to match the live formula's rounding
+       (1 decimal). The MV stores 2-decimal precision; matching here
+       keeps response parity for the acceptance test. */
+    const operationalPercentage =
+      totalActiveAssets === 0
+        ? 100
+        : Math.round((operationalAssets / totalActiveAssets) * 1000) / 10;
+    const totalRequired = toNum(mvRow.total_required_docs);
+    const docCompliancePct =
+      totalRequired === 0
+        ? 100
+        : Math.round((toNum(mvRow.total_valid_docs) / totalRequired) * 1000) / 10;
+    const activePermits = toNum(mvRow.active_external_permits);
+    const permitCompliancePct =
+      activePermits === 0
+        ? 100
+        : Math.round((toNum(mvRow.valid_external_permits) / activePermits) * 1000) / 10;
+
+    return {
+      operationalHealth: {
+        totalActiveAssets,
+        operationalAssets,
+        blockedAssets: toNum(mvRow.blocked_assets),
+        withObservations: toNum(mvRow.with_observations),
+        inMaintenance: toNum(mvRow.in_maintenance),
+        outOfService: toNum(mvRow.out_of_service),
+        operationalPercentage,
+      },
+      documentCompliance: {
+        totalRequired,
+        valid: toNum(mvRow.total_valid_docs),
+        expiringSoon: toNum(mvRow.total_expiring_soon_docs),
+        expired: toNum(mvRow.total_expired_docs),
+        missing: toNum(mvRow.total_missing_docs),
+        compliancePercentage: docCompliancePct,
+        criticalIssues: toNum(mvRow.total_critical_issues),
+      },
+      permitCompliance: {
+        activeExternalPermits: activePermits,
+        validExternalPermits: toNum(mvRow.valid_external_permits),
+        expiringExternalPermits: toNum(mvRow.expiring_external_permits),
+        expiredExternalPermits: toNum(mvRow.expired_external_permits),
+        compliancePercentage: permitCompliancePct,
+      },
+      workPermits: {
+        inExecution: toNum(mvRow.work_permits_in_execution),
+        pendingAuthorization: toNum(mvRow.work_permits_pending_authorization),
+        authorizedToday: toNum(mvRow.work_permits_authorized_today),
+        closedToday: toNum(mvRow.work_permits_closed_today),
+      },
+      procedures: {
+        published: toNum(mvRow.published_procedures),
+        pendingMyAck: myAckCount.count,
+        coveragePercentage: ackCoverage.coveragePercentage,
+      },
+      alerts: {
+        total: toNum(mvRow.total_alerts),
+        critical: toNum(mvRow.critical_alerts),
+        blocking: toNum(mvRow.blocking_alerts),
+        unattended: toNum(mvRow.unattended_alerts),
+        escalated: toNum(mvRow.escalated_alerts),
+      },
+      exceptions: {
+        activeCount: toNum(mvRow.active_exceptions),
+        pendingApproval: toNum(mvRow.pending_approval_exceptions),
+        expiringSoon: toNum(mvRow.expiring_exceptions),
+      },
+      approvals: {
+        myPending: approvalCounts.mine,
+        totalPending: approvalCounts.pendingCompany,
+      },
+      generatedAt: now.toISOString(),
+      _periodMetadata: {
+        startOfToday: startOfToday.toISOString(),
+        sevenDaysAhead: sevenDaysAhead.toISOString(),
+        dayAgo: dayAgo.toISOString(),
+      },
+    };
+  }
+
+  private async getOverviewLive(companyId: string, userId: string) {
     const now = new Date();
     const sevenDaysAhead = new Date(now.getTime() + 7 * 86_400_000);
     const dayAgo = new Date(now.getTime() - 86_400_000);
@@ -379,6 +599,79 @@ export class OperationsDashboardService {
   /* ---- Top assets at risk ------------------------------------- */
 
   async getTopAssetsAtRisk(companyId: string, limit = 5) {
+    if (this.useMaterializedViews) {
+      const fromMv = await this.tryGetTopAssetsAtRiskFromMV(companyId, limit);
+      if (fromMv) return fromMv;
+      this.logger.debug(
+        `getTopAssetsAtRisk: MV unavailable for ${companyId}, falling back to live`,
+      );
+    }
+    return this.getTopAssetsAtRiskLive(companyId, limit);
+  }
+
+  private async tryGetTopAssetsAtRiskFromMV(companyId: string, limit: number) {
+    const safeLimit = Math.max(1, Math.min(50, limit));
+    let rows: AssetSnapshotRow[];
+    try {
+      rows = await this.prisma.$queryRawUnsafe<AssetSnapshotRow[]>(
+        `SELECT
+           asset_id, company_id, code, name, status,
+           asset_type_id, asset_type_name, asset_type_category,
+           active_alerts, critical_alerts, missing_docs, expired_docs,
+           expiring_soon_docs, risk_score, refreshed_at
+         FROM mv_asset_compliance_snapshot
+         WHERE company_id = $1::uuid
+           AND risk_score > 0
+         ORDER BY risk_score DESC
+         LIMIT $2`,
+        companyId,
+        safeLimit,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `tryGetTopAssetsAtRiskFromMV failed: ${err instanceof Error ? err.message : err}`,
+      );
+      return null;
+    }
+
+    /* asset.type.color isn't in the MV; the live response includes it
+       but it's just a UI hint. We omit color rather than re-querying
+       asset_types per row — the dashboard tolerates a null color. */
+    return rows.map((r) => ({
+      asset: {
+        id: r.asset_id,
+        code: r.code,
+        name: r.name,
+        status: r.status,
+        type: r.asset_type_name
+          ? {
+              id: r.asset_type_id,
+              name: r.asset_type_name,
+              category: r.asset_type_category ?? '',
+              color: null as string | null,
+            }
+          : null,
+      },
+      score: toNum(r.risk_score),
+      issues: {
+        criticalAlerts: toNum(r.critical_alerts),
+        /* missing_docs / expired_docs in the MV are total counts, not
+           filtered by criticality the way the live formula computes
+           the intermediate `missingCritical` / `expiredCritical`. The
+           risk_score column already incorporated those criticality-
+           filtered counts during the REFRESH (via critical_missing /
+           critical_expired in the MV definition), so the score itself
+           remains the source of truth. We surface the broader counts
+           here because they're what the UI shows. */
+        missingDocs: toNum(r.missing_docs),
+        expiredDocs: toNum(r.expired_docs),
+        activeAlerts: toNum(r.active_alerts),
+        expiring: toNum(r.expiring_soon_docs),
+      },
+    }));
+  }
+
+  private async getTopAssetsAtRiskLive(companyId: string, limit = 5) {
     const now = new Date();
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const thirtyDays = new Date(today);
@@ -866,11 +1159,45 @@ export class OperationsDashboardService {
   /* ---- Asset status distribution (for donut) ------------------ */
 
   async getAssetStatusDistribution(companyId: string) {
+    if (this.useMaterializedViews) {
+      const fromMv = await this.tryGetAssetStatusDistributionFromMV(companyId);
+      if (fromMv) return fromMv;
+      this.logger.debug(
+        `getAssetStatusDistribution: MV unavailable for ${companyId}, falling back to live`,
+      );
+    }
+    return this.getAssetStatusDistributionLive(companyId);
+  }
+
+  private async tryGetAssetStatusDistributionFromMV(companyId: string) {
+    let rows: StatusDistributionRow[];
+    try {
+      rows = await this.prisma.$queryRawUnsafe<StatusDistributionRow[]>(
+        `SELECT company_id, status, count, refreshed_at
+           FROM mv_asset_status_distribution
+           WHERE company_id = $1::uuid`,
+        companyId,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `tryGetAssetStatusDistributionFromMV failed: ${err instanceof Error ? err.message : err}`,
+      );
+      return null;
+    }
+    return this.shapeStatusDistribution(new Map(rows.map((r) => [r.status, toNum(r.count)])));
+  }
+
+  private async getAssetStatusDistributionLive(companyId: string) {
     const groups = await this.prisma.operationalAsset.groupBy({
       by: ['status'],
       where: { companyId, isActive: true },
       _count: { _all: true },
     });
+    const counts = new Map<AssetStatus, number>(groups.map((row) => [row.status, row._count._all]));
+    return this.shapeStatusDistribution(counts);
+  }
+
+  private shapeStatusDistribution(counts: Map<AssetStatus, number>) {
     const allStatuses: AssetStatus[] = [
       'OPERATIONAL',
       'WITH_OBSERVATIONS',
@@ -879,20 +1206,18 @@ export class OperationsDashboardService {
       'OUT_OF_SERVICE',
       'DECOMMISSIONED',
     ];
-    const counts: Record<string, number> = {};
-    for (const s of allStatuses) counts[s] = 0;
     let total = 0;
-    for (const row of groups) {
-      counts[row.status] = row._count._all;
-      total += row._count._all;
-    }
+    for (const v of counts.values()) total += v;
     return {
       total,
-      segments: allStatuses.map((status) => ({
-        status,
-        count: counts[status] ?? 0,
-        percentage: total === 0 ? 0 : Math.round(((counts[status] ?? 0) / total) * 1000) / 10,
-      })),
+      segments: allStatuses.map((status) => {
+        const count = counts.get(status) ?? 0;
+        return {
+          status,
+          count,
+          percentage: total === 0 ? 0 : Math.round((count / total) * 1000) / 10,
+        };
+      }),
     };
   }
 
@@ -905,6 +1230,12 @@ export class OperationsDashboardService {
     monthStart.setUTCDate(1);
     monthStart.setUTCHours(0, 0, 0, 0);
 
+    /* mv_compliance_by_category captures only headline (total / valid
+       / percentage) per category. This endpoint also returns the
+       expiringSoon / expired / missing segments that drive the UI's
+       stacked bar, so we keep the doc-bucket calc live to preserve
+       parity. The MV is still refreshed by the cron — admin reads /
+       future endpoints can consume it. */
     const [legalAndSafety, permitCompliance, ackCoverage, closeStats] = await Promise.all([
       this.computeDocComplianceForCategories(companyId, today, ['LEGAL', 'SAFETY']),
       this.permitsService.getCompliance(companyId),
