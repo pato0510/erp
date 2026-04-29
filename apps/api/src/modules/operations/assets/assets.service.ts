@@ -105,6 +105,14 @@ export class AssetsService {
     createdAt: true,
     updatedAt: true,
     createdBy: true,
+    /* OPS-035 — QR token + scan stats. The token itself is mostly
+       used by the frontend to build the public URL and detect
+       generation state; downloads happen through dedicated
+       endpoints. */
+    qrToken: true,
+    qrGeneratedAt: true,
+    qrLastScannedAt: true,
+    qrScanCount: true,
   } satisfies Prisma.OperationalAssetSelect;
 
   private withHasPhoto<T extends { photoMimeType: string | null; photoPath: string | null }>(

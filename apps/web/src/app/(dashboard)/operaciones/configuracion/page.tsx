@@ -12,8 +12,10 @@ import {
   MapPin,
   Pencil,
   Plus,
+  QrCode,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   Settings,
   Trash2,
   Wallet,
@@ -1970,21 +1972,199 @@ function AvanzadoTab({ toaster }: { toaster: Toaster }) {
   };
 
   return (
+    <>
+      <section className="config-section">
+        <div className="config-section__head">
+          <div>
+            <h2>Vistas materializadas del Dashboard</h2>
+            <p>
+              El Dashboard Operacional lee de 4 vistas materializadas pre-calculadas para responder
+              en milisegundos. Se refrescan automáticamente cada 15 minutos (donut + KPIs) y cada
+              hora (snapshot por activo + categorías), además de eventos puntuales (bloqueo de
+              activo, alerta de vencimiento). Si necesitas datos al instante después de un cambio
+              grande, dispara una actualización manual.
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
+            style={{
+              background: '#1C1C1E',
+              fontFamily: 'var(--font-outfit), sans-serif',
+              fontWeight: 500,
+            }}
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'Refrescando...' : 'Refrescar ahora todas las vistas'}
+          </button>
+        </div>
+        {loading ? (
+          <SkeletonRows />
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="config-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 56 }}> </th>
+                  <th>Vista</th>
+                  <th>Descripción</th>
+                  <th>Última actualización</th>
+                  <th>Antigüedad</th>
+                </tr>
+              </thead>
+              <tbody>
+                {MV_DISPLAY_NAMES.map((mv) => {
+                  const ts = freshness?.[mv.key] ?? null;
+                  return (
+                    <tr key={mv.key}>
+                      <td>
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            background: 'rgba(37, 99, 235, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#1d4ed8',
+                          }}
+                        >
+                          <Database size={14} />
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          fontFamily: 'var(--font-outfit), sans-serif',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {mv.label}
+                      </td>
+                      <td>
+                        <span className="text-sm text-[var(--text-secondary)]">
+                          {mv.description}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-jetbrains-mono), monospace',
+                            fontSize: 12,
+                          }}
+                        >
+                          {formatTimestamp(ts)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="text-sm text-[var(--text-secondary)]">
+                          {formatRelativeTimeShort(ts)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* OPS-035 — bulk QR generation. Lives in this same admin tab
+        because the use case is rare (initial rollout, bulk reseed)
+        and benefits from being beside the other "ops maintenance"
+        cards rather than scattered in the per-asset views. */}
+      <BulkQrSection toaster={toaster} />
+    </>
+  );
+}
+
+/* ---- OPS-035 sub-section ----------------------------------- */
+
+interface QrStats {
+  totalAssets: number;
+  withQr: number;
+  withoutQr: number;
+}
+
+interface BulkGenerateResult {
+  generated: number;
+  skipped: number;
+  errors: Array<{ assetId: string; reason: string }>;
+}
+
+function BulkQrSection({ toaster }: { toaster: Toaster }) {
+  const [stats, setStats] = useState<QrStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiClient.get<QrStats>('/api/operations/assets/qr/stats');
+      setStats(data);
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error cargando estadísticas de QR', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [toaster]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  const handleBulkGenerate = async () => {
+    if (generating) return;
+    if (!stats || stats.withoutQr === 0) {
+      toaster('Todos los activos ya tienen un código QR.', 'info');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Generar códigos QR para ${stats.withoutQr} activo${
+          stats.withoutQr === 1 ? '' : 's'
+        }. ¿Continuar?`,
+      )
+    ) {
+      return;
+    }
+    setGenerating(true);
+    try {
+      const result = await apiClient.post<BulkGenerateResult>(
+        '/api/operations/assets/qr/bulk-generate',
+      );
+      const errPart = result.errors.length > 0 ? ` · ${result.errors.length} con error` : '';
+      toaster(
+        `${result.generated} código${result.generated === 1 ? '' : 's'} QR generado${
+          result.generated === 1 ? '' : 's'
+        }${errPart}`,
+        result.errors.length > 0 ? 'info' : 'success',
+      );
+      await loadStats();
+    } catch (err) {
+      toaster(err instanceof Error ? err.message : 'Error generando QR', 'error');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
     <section className="config-section">
       <div className="config-section__head">
         <div>
-          <h2>Vistas materializadas del Dashboard</h2>
+          <h2>Códigos QR de activos</h2>
           <p>
-            El Dashboard Operacional lee de 4 vistas materializadas pre-calculadas para responder en
-            milisegundos. Se refrescan automáticamente cada 15 minutos (donut + KPIs) y cada hora
-            (snapshot por activo + categorías), además de eventos puntuales (bloqueo de activo,
-            alerta de vencimiento). Si necesitas datos al instante después de un cambio grande,
-            dispara una actualización manual.
+            Genera códigos QR para cada activo operacional. Cada QR codifica una URL pública que
+            muestra el estado actual del activo, su cumplimiento documental y alertas activas — útil
+            para verificación en terreno por inspectores, auditores o supervisores. Los códigos se
+            imprimen como etiquetas individuales desde la ficha de cada activo.
           </p>
         </div>
         <button
-          onClick={handleRefresh}
-          disabled={refreshing}
+          onClick={handleBulkGenerate}
+          disabled={generating || loading || (stats?.withoutQr ?? 0) === 0}
           className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
           style={{
             background: '#1C1C1E',
@@ -1992,79 +2172,97 @@ function AvanzadoTab({ toaster }: { toaster: Toaster }) {
             fontWeight: 500,
           }}
         >
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          {refreshing ? 'Refrescando...' : 'Refrescar ahora todas las vistas'}
+          <Sparkles size={14} className={generating ? 'animate-pulse' : ''} />
+          {generating ? 'Generando...' : 'Generar QR para activos sin código'}
         </button>
       </div>
-      {loading ? (
+      {loading || !stats ? (
         <SkeletonRows />
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="config-table">
-            <thead>
-              <tr>
-                <th style={{ width: 56 }}> </th>
-                <th>Vista</th>
-                <th>Descripción</th>
-                <th>Última actualización</th>
-                <th>Antigüedad</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MV_DISPLAY_NAMES.map((mv) => {
-                const ts = freshness?.[mv.key] ?? null;
-                return (
-                  <tr key={mv.key}>
-                    <td>
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 8,
-                          background: 'rgba(37, 99, 235, 0.1)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#1d4ed8',
-                        }}
-                      >
-                        <Database size={14} />
-                      </div>
-                    </td>
-                    <td
-                      style={{
-                        fontFamily: 'var(--font-outfit), sans-serif',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {mv.label}
-                    </td>
-                    <td>
-                      <span className="text-sm text-[var(--text-secondary)]">{mv.description}</span>
-                    </td>
-                    <td>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-jetbrains-mono), monospace',
-                          fontSize: 12,
-                        }}
-                      >
-                        {formatTimestamp(ts)}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="text-sm text-[var(--text-secondary)]">
-                        {formatRelativeTimeShort(ts)}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 12,
+            padding: 20,
+          }}
+        >
+          <BulkQrStat
+            icon={<QrCode size={16} />}
+            label="Total de activos"
+            value={stats.totalAssets}
+            tone="neutral"
+          />
+          <BulkQrStat
+            icon={<CheckCircle2 size={16} />}
+            label="Con QR generado"
+            value={stats.withQr}
+            tone="success"
+          />
+          <BulkQrStat
+            icon={<AlertCircle size={16} />}
+            label="Sin QR"
+            value={stats.withoutQr}
+            tone={stats.withoutQr > 0 ? 'warning' : 'neutral'}
+          />
         </div>
       )}
     </section>
+  );
+}
+
+function BulkQrStat({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  tone: 'neutral' | 'success' | 'warning';
+}) {
+  const palette =
+    tone === 'success'
+      ? { bg: 'rgba(34, 197, 94, 0.10)', fg: '#15803d' }
+      : tone === 'warning'
+        ? { bg: 'rgba(234, 179, 8, 0.12)', fg: '#a16207' }
+        : { bg: 'rgba(100, 116, 139, 0.10)', fg: '#475569' };
+  return (
+    <div
+      style={{
+        background: palette.bg,
+        borderRadius: 10,
+        padding: '14px 16px',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          color: palette.fg,
+          fontSize: 12,
+          fontFamily: 'var(--font-ibm-plex-mono), monospace',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {icon}
+        {label}
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontFamily: 'var(--font-outfit), sans-serif',
+          fontWeight: 700,
+          fontSize: 24,
+          color: 'var(--text-primary)',
+        }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
 

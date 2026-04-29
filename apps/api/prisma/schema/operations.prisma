@@ -117,6 +117,15 @@ model OperationalAsset {
   updatedAt         DateTime    @updatedAt
   createdBy         String      @db.Uuid
 
+  // OPS-035 — public scan via QR. `qrToken` is a 32-char base64url
+  // string (not a UUID) so it stays compact when printed and is
+  // collision-resistant. Null until the first generation; rotated
+  // by ADMIN to revoke leaked stickers.
+  qrToken         String?   @unique
+  qrGeneratedAt   DateTime?
+  qrLastScannedAt DateTime?
+  qrScanCount     Int       @default(0)
+
   assetType    AssetType             @relation(fields: [assetTypeId], references: [id])
   assetSubtype AssetSubtype?         @relation(fields: [assetSubtypeId], references: [id])
   location     Location?             @relation(fields: [locationId], references: [id])

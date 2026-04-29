@@ -47,6 +47,7 @@ import { DocumentUploadModal } from '../../../../../components/operations/Docume
 import { AssetPermits } from '../../../../../components/operations/AssetPermits';
 import { ActiveWorkPermits } from '../../../../../components/operations/ActiveWorkPermits';
 import { ApplicableProcedures } from '../../../../../components/operations/ApplicableProcedures';
+import { AssetQrSection } from '../../../../../components/operations/AssetQrSection';
 import { DocumentPreviewModal } from '../../../../../components/operations/DocumentPreviewModal';
 import { DocumentSupersessionModal } from '../../../../../components/operations/DocumentSupersessionModal';
 import { DocumentHistoryModal } from '../../../../../components/operations/DocumentHistoryModal';
@@ -122,6 +123,12 @@ interface VehicleAssetDetail {
   parent?: { id: string; code: string; name: string; status: AssetStatus } | null;
   assignedUser?: UserSummary | null;
   createdByUser?: UserSummary | null;
+  /* OPS-035 — QR token + scan stats. Same shape as the equipos
+     detail page; AssetQrSection consumes them directly. */
+  qrToken?: string | null;
+  qrGeneratedAt?: string | null;
+  qrLastScannedAt?: string | null;
+  qrScanCount?: number | null;
 }
 
 interface VehicleDetail {
@@ -231,6 +238,7 @@ export default function VehicleDetailPage({ params }: PageProps) {
   const activeCompanyId = apiClient.getCompanyId();
   const userRole = user?.companies.find((c) => c.companyId === activeCompanyId)?.role ?? null;
   const canReview = userRole === 'ADMIN' || userRole === 'MANAGER' || userRole === 'SUPER_ADMIN';
+  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [requirements, setRequirements] = useState<ResolvedRequirement[]>([]);
@@ -1177,6 +1185,23 @@ export default function VehicleDetailPage({ params }: PageProps) {
               </div>
             )}
           </Card>
+
+          {/* OPS-035 — QR for field verification. Sourced from
+              vehicle.asset because the vehicle row only carries
+              vehicle-specific extensions. */}
+          <AssetQrSection
+            asset={{
+              id: vehicle.asset.id,
+              code: vehicle.asset.code,
+              qrToken: vehicle.asset.qrToken ?? null,
+              qrGeneratedAt: vehicle.asset.qrGeneratedAt ?? null,
+              qrLastScannedAt: vehicle.asset.qrLastScannedAt ?? null,
+              qrScanCount: vehicle.asset.qrScanCount ?? 0,
+            }}
+            isAdmin={isAdmin}
+            onChange={load}
+            toaster={(message, type) => setToast({ message, type })}
+          />
         </div>
       </div>
 

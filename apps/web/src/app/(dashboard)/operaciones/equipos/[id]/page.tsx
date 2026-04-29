@@ -55,6 +55,7 @@ import { DocumentUploadModal } from '../../../../../components/operations/Docume
 import { AssetPermits } from '../../../../../components/operations/AssetPermits';
 import { ActiveWorkPermits } from '../../../../../components/operations/ActiveWorkPermits';
 import { ApplicableProcedures } from '../../../../../components/operations/ApplicableProcedures';
+import { AssetQrSection } from '../../../../../components/operations/AssetQrSection';
 import { DocumentPreviewModal } from '../../../../../components/operations/DocumentPreviewModal';
 import { DocumentSupersessionModal } from '../../../../../components/operations/DocumentSupersessionModal';
 import { DocumentHistoryModal } from '../../../../../components/operations/DocumentHistoryModal';
@@ -126,6 +127,12 @@ interface AssetDetail {
   children: ChildSummary[];
   assignedUser?: UserSummary | null;
   createdByUser?: UserSummary | null;
+  /* OPS-035 — QR token + scan stats. Token is null until first
+     generation; the AssetQrSection handles both states. */
+  qrToken?: string | null;
+  qrGeneratedAt?: string | null;
+  qrLastScannedAt?: string | null;
+  qrScanCount?: number | null;
 }
 
 interface ResolvedRequirement {
@@ -216,6 +223,7 @@ export default function AssetDetailPage({ params }: PageProps) {
   const activeCompanyId = apiClient.getCompanyId();
   const userRole = user?.companies.find((c) => c.companyId === activeCompanyId)?.role ?? null;
   const canReview = userRole === 'ADMIN' || userRole === 'MANAGER' || userRole === 'SUPER_ADMIN';
+  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
 
   const [asset, setAsset] = useState<AssetDetail | null>(null);
   const [requirements, setRequirements] = useState<ResolvedRequirement[]>([]);
@@ -1175,6 +1183,16 @@ export default function AssetDetailPage({ params }: PageProps) {
               )}
             </div>
           </Card>
+
+          {/* OPS-035 — QR for field verification. Last card in the
+              right column so it doesn't push the operational state /
+              location info below the fold. */}
+          <AssetQrSection
+            asset={asset}
+            isAdmin={isAdmin}
+            onChange={load}
+            toaster={(message, type) => setToast({ message, type })}
+          />
         </div>
       </div>
 

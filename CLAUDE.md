@@ -357,33 +357,90 @@ Cuando se haga la pasada V2 al ERP módulo por módulo:
 - Firma electrónica nativa
 - Modelado bitemporal completo
 
-### OPS-033: Compromisos automáticos al vencer documentos (✓ completado)
+### OPS-035: QR por activo para verificación en terreno (✓ completado)
 
-[mantener lo que ya tenías documentado de OPS-033]
+Cada activo recibe un código QR único que codifica una URL pública.
+Al escanear se abre la "ficha pública del activo" con info de cumplimiento.
 
-═══════════════════════════════════════════════════════════════
+### Schema
 
-# SPRINT 8 — HARDENING (en desarrollo)
+- 4 campos nuevos en OperationalAsset: qrToken (String? @unique),
+  qrGeneratedAt, qrLastScannedAt, qrScanCount (Int @default(0))
+- Migration: 20260429150000_add_asset_qr_fields
+- Partial unique index WHERE qrToken IS NOT NULL
 
-═══════════════════════════════════════════════════════════════
+### Token generation
 
-Sprint dedicado a optimización, robustez y QA. No agrega features
-visibles al usuario sino que pule lo construido.
+- Crypto.randomBytes(24).toString('base64url') = 32 chars URL-safe
+- Idempotente (ensureQrToken devuelve existente si ya existe)
+- Regenerate (ADMIN) genera token nuevo + reset scan counter
+- URL pública: https://app.excelsia.cl/p/asset/{token}
 
-### Tickets del Sprint 8
+### Endpoints OPS-035
 
-- OPS-034: Vistas materializadas para dashboard pesado
-- OPS-035: QR por activo para verificación en terreno
-- OPS-036: Auditoría completa con queries de compliance
-- OPS-037: QA, tests E2E y documentación final
+- GET /api/operations/public/asset/:qrToken (PÚBLICO, sin auth)
+  Throttle: 30 req/min por IP
+  Retorna PublicAssetView con info limitada
+  Incrementa scanCount + actualiza lastScannedAt atómicamente
+- GET /api/operations/public/asset/:qrToken/authenticated
+  Mismo token pero autenticado, retorna AuthenticatedAssetView extendida
+  Con downloadUrls, alertas completas, navegación a ficha 360
+- POST /api/operations/assets/:id/qr (MANAGER+, ensure idempotente)
+- POST /api/operations/assets/:id/qr/regenerate (ADMIN, invalida anterior)
+- POST /api/operations/assets/qr/bulk-generate (ADMIN, todos sin QR)
+- GET /api/operations/assets/qr/stats (counts por empresa)
+- GET /api/operations/assets/:id/qr.png (auth, descarga 400x400)
+- GET /api/operations/assets/:id/qr.svg (auth, descarga escalable)
+- GET /api/operations/assets/:id/qr.pdf?size=5cm|10cm (auth, etiqueta)
+
+### Generación de imágenes
+
+- PNG: 400x400 px, B&W, error correction M, margin 2 (lib qrcode)
+- SVG: viewBox 200x200, escalable, B&W
+- PDF: 10cm o 5cm, layout con wordmark "EXCELSIA." dibujado con
+  primitivas pdfkit, código activo, nombre, QR centrado, URL footer
+
+### Frontend público
+
+- Ruta /p/asset/[qrToken]/page.tsx (FUERA de (dashboard))
+- Server component sin sidebar/topbar
+- Mobile-first (max-w-[480px])
+- Sections: Logo header, identificación, status badge grande,
+  banners condicionales (bloqueado/excepción), ComplianceGauge,
+  stats vigentes/por vencer/vencidos/faltantes, lista docs con
+  DocumentStatusBadge + días restantes, alertas activas pill,
+  CTA "Iniciar sesión", footer Excelsia + scan stats
+- NotFoundScreen branded para tokens inválidos/revocados
+
+### Frontend autenticado
+
+- AssetQrSection en columna derecha de ficha 360 (equipos + vehículos)
+- Generate / Preview SVG / Download PNG/SVG/PDF / Regenerate (admin)
+- Confirmation modal en regenerate con warning de invalidación
+- BulkQrSection en /configuracion → tab Avanzado (admin)
+- 3 KPI tiles: Total / Con QR / Sin QR
+- Botón "Generar QR para activos sin código" con confirm()
+
+### CASL
+
+- Asset.update: ensureQrToken (MANAGER+)
+- Asset.manage: regenerate, bulk-generate (ADMIN)
+- Asset.read: download endpoints (todos los roles autenticados)
+
+### V2 — Mejoras pendientes operations (acumulado)
+
+- Eventos granulares para refresh selectivo de MVs (de OPS-034)
+- Ampliar mv_compliance_by_category con desgloses (de OPS-034)
+- Página pública /p/asset upgrade a vista autenticada cuando hay sesión
+  (hoy siempre muestra vista limitada incluso para usuarios logueados)
+- Foto del activo en vista pública (requiere endpoint de fotos público
+  con signed URLs y rate limiting propio)
+- Logo Excelsia profesional en PDF (hoy se dibuja un wordmark simple
+  con primitivas pdfkit)
 
 # Ticket actual
 
-- OPS-034: Materialized views para acelerar Operations Dashboard
-  4 MV creadas en migración SQL pura: asset_compliance_snapshot,
-  company_compliance_summary, compliance_by_category, status_distribution
-  Refresh strategy: cron BullMQ (15min/1h) + listeners selectivos por evento
-  Integración en operations-dashboard.service con fallback live
-  Feature flag DASHBOARD_USE_MATERIALIZED_VIEWS
-  Endpoint admin POST /dashboard/refresh-views
-  UI: botón refresh + indicador de freshness en dashboard header
+- OPS-036: Auditoría completa con queries de compliance
+  Vista para auditores externos: queries SQL listas + reportes
+  exportables que demuestren cumplimiento de la Ley 16.744 y
+  normativas chilenas. Aún por definir el alcance específico.
