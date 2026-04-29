@@ -62,6 +62,7 @@ import { CompanyAlertSettingsService } from './company-alert-settings.service';
     AlertEngineService,
     AlertEscalationService,
     AssetBlockingService,
+    AlertInstancesService,
   ],
 })
 export class AlertRulesModule {}

@@ -327,102 +327,114 @@ Sprint 8: Hardening
 
 ═══════════════════════════════════════════════════════════════════
 
-# Sprint 5 — Alertas y Bloqueos automáticos (próximo)
+### OPS-028: Acuses de lectura de procedimientos (✓ completado)
 
-Sprint crítico operacionalmente. Convierte el sistema en proactivo:
-detecta documentos por vencer, bloquea automáticamente activos con
-documentos críticos vencidos, escala alertas a responsables.
+Sistema de acuse electrónico con firma digital y reportes de cobertura.
 
-## Tickets del Sprint 5
+### Tabla creada
 
-- OPS-018: Reglas de alerta configurables por tipo documental
-  Tabla alert_rules con thresholds, severidad, escalamiento
-- OPS-019: BullMQ scheduler diario que recalcula vencimientos
-  Job que corre cada 24h, calcula derived states, dispara alertas
-- OPS-020: Bloqueo operacional automático
-  Activos con documentos CRITICAL+blocksOperation vencidos pasan a
-  status BLOCKED_DOCUMENTAL automáticamente
-- OPS-021: Centro de alertas en UI
-  /operaciones/alertas con listado, severidad, filtros, acciones
-- OPS-022: Escalamiento por severidad
-  Notificaciones in-app a responsables según severidad
-  Email queue para casos críticos (futuro)
-- OPS-023: Excepciones temporales aprobadas
-  Admin puede liberar bloqueo con justificación + fecha de validez
-  Tabla exceptions con audit completo
+- procedure_acknowledgments con FK a Procedure (CASCADE) + User
+- Enum AcknowledgmentStatus: PENDING/READ/ACKNOWLEDGED/EXPIRED/EXEMPTED
+- @@unique([companyId, procedureId, userId])
 
-## Próximos sprints
+### Endpoints OPS-028
 
-Sprint 7: Calendario, Reportes e Integración Finanzas (OPS-029 a OPS-032)
-Sprint 8: Hardening (OPS-033 a OPS-036)
+- GET /api/operations/acknowledgments/my-pending
+- GET /api/operations/acknowledgments/my-pending-count
+- POST /api/operations/acknowledgments/:procedureId/acknowledge
+- POST /api/operations/acknowledgments/:procedureId/exempt/:userId
+- POST /api/operations/acknowledgments/:procedureId/reapply/:userId
+- GET /api/operations/acknowledgments/coverage/:procedureId
+- GET /api/operations/acknowledgments/user/:userId/coverage
+- GET /api/operations/acknowledgments/company-coverage
 
-### OPS-027: Biblioteca de procedimientos con versionado (✓ completado)
+### Lógica de creación automática
 
-Repositorio centralizado de procedimientos internos en formato PDF.
+Cuando se publica procedimiento con requiresAcknowledgment=true:
 
-### Tablas creadas
+1. Resuelve usuarios target (roles + assets/types/locations)
+2. Skip si ya tiene ACKNOWLEDGED
+3. Calcula dueDate = publishedAt + acknowledgmentDeadlineDays
+4. Crea PENDING + notifica
 
-- procedures (con versionado replacesProcedureId/replacedByProcedureId)
-- procedure_revisions (audit log con snapshots JSONB)
-- Enums: ProcedureCategory (7 valores), ProcedureStatus (5), RevisionType (7)
+Cuando se publica nueva versión:
 
-### Lifecycle
+- Re-targetea a usuarios que acusaron versión anterior
+- Notificación específica
 
-DRAFT → IN_REVIEW → PUBLISHED → SUPERSEDED/DEPRECATED
+### trackView idempotente
 
-### Endpoints OPS-027
+- Primer view: PENDING → READ + firstViewedAt
+- Subsequent views: solo incrementa viewCount
 
-- CRUD completo con multipart upload
-- Workflow: submit, review, publish, new-version, deprecate
-- Attachments: max 10 por procedimiento, max 10MB c/u
-- GET /:id/file, /:id/attachments/:idx, /:id/revisions
-- GET /applicable?assetId=X (filtra por aplicabilidad)
-- GET /kpi, /category-counts
+### Acknowledge con firma digital
 
-### Versionado formal
+SHA-256(procedureId + userId + ISO timestamp + notes)
 
-- @@unique([companyId, code, version]) permite mismo code en versiones
-- Al publicar nueva versión: original pasa a SUPERSEDED automáticamente
-- replacesProcedureId conecta versiones
-- Changelog requerido min 20 chars en nuevas versiones
-- Bump auto-sugerido (1.0 → 2.0)
+- user IP + user agent
+- Modal con declaración formal y checkbox obligatorio
 
-### Aplicabilidad
+### Crons
 
-- applicableAssetIds, applicableAssetTypeIds, applicableLocationIds
-- applicableRoles
-- requiresAcknowledgment, acknowledgmentDeadlineDays (para OPS-028)
+- procedure-acknowledgment-reminders: 0 9 \* \* \* (recordatorios)
+- procedure-acknowledgment-expiration: 0 1 \* \* \* (expiraciones)
+- Reminders escalados WARNING → CRITICAL al acercarse deadline
+- Max 3 recordatorios por usuario
 
 ### UI agregada
 
-- /operaciones/procedimientos con KPIs, 7 cards de categoría, filtros
-- Toggle table/cards view persistido en localStorage
-- /operaciones/procedimientos/[id] con PDF embebido (PDF.js)
-- ProcedureFormModal (6 secciones)
-- ProcedureNewVersionModal con bump auto-sugerido
-- ProcedureRevisionsTimeline con expand JSONB
-- ApplicableProcedures component en fichas 360
-- Sidebar badge con count "in-review"
+- /operaciones/mis-lecturas con cards y due dates colored
+- AcknowledgmentModal con declaración formal y firma
+- /operaciones/cobertura-acuses (admin/manager) con KPIs y drill-downs
+- Tabs Por procedimiento / Por usuario
+- Botones Eximir / Re-aplicar (admin only)
+- ProcedureAcknowledgmentSection en detail page
+- Sidebar: Mis lecturas (BookMarked) con badge + Cobertura acuses (Users) condicional
 
 ### CASL nuevo subject
 
-- Procedure: read all, create/update/review/publish MANAGER+,
-  deprecate ADMIN
+- ProcedureAcknowledgment con acciones acknowledge + exempt
+- ACCOUNTANT/ANALYST/VIEWER pueden acknowledge propios
+- MANAGER ve cobertura
+- exempt es ADMIN only
 
-### Notificaciones
+═══════════════════════════════════════════════════════════════════
 
-- Submit for review → notifica reviewers
-- Published → notifica usuarios con roles aplicables
-- New version → notifica usuarios que acuse anterior
+# PLAN ACTUALIZADO DEL MÓDULO OPERACIONES
+
+═══════════════════════════════════════════════════════════════════
+
+✅ Sprint 1 — Fundación (OPS-001 a OPS-004)
+✅ Sprint 2 — Equipos (OPS-005 a OPS-008)
+✅ Sprint 3 — Vehículos (OPS-009 a OPS-012)
+✅ Sprint 4 — Control Documental (OPS-013 a OPS-017)
+✅ Sprint 5 — Alertas y Bloqueos (OPS-018 a OPS-023)
+✅ Sprint 6 — Permisos y Procedimientos (OPS-024 a OPS-028)
+
+🔜 Sprint 7 — Dashboard, Calendario, Reportes e Integración Finanzas
+
+- OPS-029: Dashboard Operacional unificado (NUEVO)
+- OPS-030: Calendario operacional (era OPS-029)
+- OPS-031: Reportes Excel/PDF (era OPS-030)
+- OPS-032: Eventos de dominio Operaciones → Finanzas (era OPS-031)
+- OPS-033: Compromisos automáticos al vencer documentos (era OPS-032)
+
+Sprint 8 — Hardening (renumerado)
+
+- OPS-034: Vistas materializadas para dashboard pesado
+- OPS-035: QR por activo (versión simple)
+- OPS-036: Auditoría completa
+- OPS-037: QA, E2E, documentación
 
 # Ticket actual
 
-- OPS-028: Acuse de lectura de procedimientos críticos
-  Cuando se publica un procedimiento con requiresAcknowledgment=true,
-  el sistema crea acuses pendientes para todos los usuarios aplicables
-  Acuse simple: "Leído y entendido" + firma digital + IP + timestamp
-  Notificaciones recordatorias al usuario antes del deadline
-  Reporte de cobertura por procedimiento, por activo, por usuario
-  Bloqueo opcional: usuarios sin acuse no pueden operar el activo
-  Vista personal "Mis lecturas pendientes"
-  Vista de gestión "Cobertura de acuses"
+- OPS-029: Dashboard Operacional unificado
+  Pantalla de aterrizaje del módulo /operaciones (hoy placeholder)
+  KPIs grandes con vista de 30 segundos del estado operacional
+  Tarjeta de acción inmediata si hay urgencias
+  Mini-velocímetros de cumplimiento por categoría
+  Timeline de próximos 30 días
+  Top 5 activos en riesgo
+  Donut chart de distribución por estado de activos
+  Stream de actividad reciente
+  Personalizado por rol del usuario
