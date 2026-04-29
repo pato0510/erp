@@ -117,6 +117,30 @@ class ApiClient {
     return res.json();
   }
 
+  /* POST a JSON body and receive a Blob. Used by report exports
+     (OPS-031) where filters are too rich for a query string. */
+  async postBlob(path: string, body?: unknown): Promise<Blob> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const companyId = this.getCompanyId();
+    if (companyId) headers['x-company-id'] = companyId;
+
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include',
+    });
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') window.location.href = '/login';
+      throw new ApiError('Unauthorized', 401, null);
+    }
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: 'Download failed' }));
+      throw new ApiError(error.message || `HTTP ${res.status}`, res.status, error);
+    }
+    return res.blob();
+  }
+
   /* Fetches a binary endpoint with auth headers and returns a Blob.
      Used for thumbnails / inline images that the browser otherwise can't
      request because <img src> doesn't carry custom headers. */

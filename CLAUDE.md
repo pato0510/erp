@@ -327,73 +327,65 @@ Sprint 8: Hardening
 
 ═══════════════════════════════════════════════════════════════════
 
-### OPS-029: Dashboard Operacional unificado (✓ completado)
+### OPS-030: Calendario operacional unificado (✓ completado)
 
-Pantalla de aterrizaje del módulo /operaciones con vista 30s del estado.
+Vista temporal unificada de todos los eventos del módulo.
 
-### Endpoints OPS-029
+### Endpoints OPS-030
 
-- GET /api/operations/dashboard/overview
-- GET /api/operations/dashboard/action-items
-- GET /api/operations/dashboard/upcoming-events
-- GET /api/operations/dashboard/top-assets-at-risk
-- GET /api/operations/dashboard/recent-activity
-- GET /api/operations/dashboard/my-tasks
-- GET /api/operations/dashboard/asset-distribution
-- GET /api/operations/dashboard/compliance-by-category
+- GET /api/operations/calendar/events
+- GET /api/operations/calendar/events/by-date
+- GET /api/operations/calendar/month-summary
+- GET /api/operations/calendar/export?format=ical
 
-### Aggregator service
+### 6 fuentes de eventos agregadas
 
-operations-dashboard.service.ts reutiliza:
+- DocumentRecord — vencimientos
+- Permit — vencimientos externos
+- WorkPermit — programación PT
+- ProcedureAcknowledgment — deadlines de acuse
+- AssetException — expiración de excepciones
+- Procedure — publicaciones
 
-- documentRecordsService.getCompliance
-- permitsService.getCompliance
-- alertInstancesService.getKpis
-- workPermitsService.getActiveCount
-- proceduresService.getKpiCounts
-- acknowledgmentsService.getMyPendingCount/getCompanyCoverage
-- exceptionsService.getPendingCount
-- approvalActionsService.getApprovalCountsForUser
+### iCal export
 
-* Prisma directo para distribución/actividad/risk score
+RFC 5545 sin dependencia externa (line-folding + escaping manual)
+UIDs estables para sincronización con Google/Apple/Outlook
 
 ### Componentes UI nuevos
 
-- KpiCard (con threshold-tinted color)
-- ActionItemRow (clickeable)
-- AssetRiskCard
-- ActivityStreamItem
-- StatusDistributionDonut (recharts donut con click)
-- ComplianceBarChart
-- UpcomingEventRow
-- MyTasksWidget
+- MonthView — grilla 7×6 con dots de severidad y top-3 eventos
+- WeekView — 7 columnas con event cards
+- DayView — agrupado por hora + "Todo el día"
+- ListView — paginado 50 con grouping por fecha
+- EventDetailModal — type-specific con CTA al recurso
 
-### Layout
+### Color coding
 
-- Header con Actualizar + timestamp
-- Banner rojo condicional con action items urgentes
-- 6 KPI cards 3×2 grid responsive
-- 2-column main content (izq: timeline + risks + activity, der: donut + compliance + tasks)
-- Skeleton placeholders durante fetch
-- Promise.all paralelo + 60s auto-refresh
+- document_expiration / permit_expiration → rojo
+- work_permit_scheduled → naranja
+- acknowledgment_deadline → azul
+- exception_expiration → amarillo
+- procedure_published → verde
+- Severidad: critical/warning/info dots
 
-### Score de risk
+### URL sync + persistencia
 
-- 10 por alerta crítica
-- 5 por doc crítico faltante
-- 5 por doc crítico vencido
-- 3 por alerta activa
-- 2 por doc por vencer
+- ?view=month&date=2026-05-15
+- View preference en localStorage
+- Mobile default = List
+- AbortController para fetches in-flight
 
 # Ticket actual
 
-- OPS-030: Calendario operacional unificado
-  Pantalla /operaciones/calendario con vista mes/semana/día
-  Todos los eventos del módulo en una sola vista temporal
-  Documentos por vencer + permisos externos + PT programados +
-  acuses con deadline + excepciones que expiran
-  Filtros por tipo de evento, activo, ubicación
-  Click en evento → modal de detalle con link al recurso
-  Vista timeline alternativa (lista cronológica)
-  Color-coded por tipo y severidad
-  Export a iCal/Google Calendar opcional
+- OPS-031: Reportes Excel/PDF profesionales
+  Reporte de cumplimiento documental por activo (Excel)
+  Reporte de actividad operacional en período (Excel)
+  Reporte de cobertura de acuses (Excel)
+  Reporte de alertas históricas con resoluciones (Excel)
+  Reporte de permisos de trabajo ejecutados (Excel)
+  Carpeta documental ya existe en OPS-017 (PDF + ZIP)
+  Pantalla central /operaciones/reportes con catálogo de reportes
+  Cada reporte con filtros propios y preview antes de descarga
+  Generación con ExcelJS (reusar patrón de Finanzas REP-001)
+  Plantillas con branding empresa, logos, headers profesionales

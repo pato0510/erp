@@ -13,6 +13,7 @@ import { LocationsModule } from './locations/locations.module';
 import { NotificationModule } from './notifications/notification.module';
 import { PermitsModule } from './permits/permits.module';
 import { ProceduresModule } from './procedures/procedures.module';
+import { OperationsReportsModule } from './reports/operations-reports.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ProceduresModule } from './procedures/procedures.module';
     NotificationModule,
     OperationsCalendarModule,
     OperationsDashboardModule,
+    OperationsReportsModule,
     PermitsModule,
     ProceduresModule,
   ],
