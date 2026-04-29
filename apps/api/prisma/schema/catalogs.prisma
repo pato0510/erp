@@ -20,6 +20,7 @@ model Category {
   children  Category[] @relation("CategoryTree")
   movements   Movement[]
   commitments Commitment[]
+  commitmentTemplates CommitmentTemplate[]
 
   @@unique([companyId, name, type])
   @@map("categories")

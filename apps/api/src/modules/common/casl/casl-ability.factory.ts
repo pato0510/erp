@@ -32,6 +32,7 @@ type Subjects =
       | typeof ProcedureSubject
       | typeof ProcedureAcknowledgmentSubject
       | typeof DomainEventSubject
+      | typeof CommitmentTemplateSubject
     >
   | 'all';
 
@@ -122,6 +123,12 @@ class ProcedureAcknowledgmentSubject {
 class DomainEventSubject {
   static readonly modelName = 'DomainEvent' as const;
 }
+/* OPS-033 — cost templates that drive auto-commitment creation.
+   ADMIN/MANAGER manage; everyone else read-only via blanket
+   `read all`. */
+class CommitmentTemplateSubject {
+  static readonly modelName = 'CommitmentTemplate' as const;
+}
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -200,6 +207,7 @@ export {
   ProcedureSubject,
   ProcedureAcknowledgmentSubject,
   DomainEventSubject,
+  CommitmentTemplateSubject,
 };
 
 @Injectable()
@@ -240,6 +248,10 @@ export class CaslAbilityFactory {
         /* OPS-018 — alert config: MANAGER + ADMIN can author rules and
            tweak the singleton settings row. Lower roles only read. */
         can(['create', 'update', 'delete'], AlertRuleSubject);
+        /* OPS-033 — commitment templates that seed auto-generated
+           cashflow commitments. MANAGER + ADMIN manage; lower roles
+           inherit read via blanket `read all` above. */
+        can('manage', CommitmentTemplateSubject);
         can(['update'], AlertSettingsSubject);
         /* OPS-023 — MANAGER can request an exception but cannot
            approve/reject/revoke it. Only ADMIN (via `manage 'all'`)

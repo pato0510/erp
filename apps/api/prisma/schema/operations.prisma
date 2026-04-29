@@ -415,6 +415,11 @@ model CompanyAlertSettings {
   enableAutoBlocking          Boolean  @default(true)
   enableEmailNotifications    Boolean  @default(false)
   defaultEscalationDays       Int      @default(7)
+  /* OPS-033 — global toggle for the auto-commitment listener. When
+     false, document/permit renewal-imminent events still fire and
+     audit, but the Finance handler short-circuits without creating
+     a Commitment row. */
+  enableAutoCommitments       Boolean  @default(true)
   updatedAt                   DateTime @updatedAt
   updatedBy                   String   @db.Uuid
 

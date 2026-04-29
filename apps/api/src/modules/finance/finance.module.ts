@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
+import { AlertRulesModule } from '../operations/alerts/alert-rules.module';
+import { CommitmentTemplatesModule } from '../operations/commitment-templates/commitment-templates.module';
 import { OperationsListenersService } from './operations-listeners.service';
 
-/* OPS-032 — placeholder Finance module that hosts the operations
-   event listeners. The legacy financial code lives under
-   /modules/cashflow, /modules/movements, etc — this module's job
-   today is to register the @OnEvent handlers so the EventEmitter2
-   discovery pass picks them up at boot.
-
-   When OPS-033 lands real handler logic (creating commitments) the
-   service here will gain a CommitmentsService dependency. */
+/* OPS-033 — Finance module hosts the operations event listeners
+   and now creates real Commitment rows on renewal events. We
+   import AlertRulesModule for CompanyAlertSettingsService (the
+   `enableAutoCommitments` toggle) and CommitmentTemplatesModule
+   for the cost-estimation surface. PrismaService and RlsService
+   are global. */
 @Module({
+  imports: [AlertRulesModule, CommitmentTemplatesModule],
   providers: [OperationsListenersService],
   exports: [OperationsListenersService],
 })

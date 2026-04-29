@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Settings,
   Trash2,
+  Wallet,
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { Toast } from '../../../../components/shared/Toast';
@@ -59,14 +60,16 @@ import {
 } from '../../../../components/operations/config/WorkPermitTypeFormModal';
 import { ApprovalChainsTab } from '../../../../components/operations/config/ApprovalChainsTab';
 import { AlertsConfigTab } from '../../../../components/operations/config/AlertsConfigTab';
+import { AutoCommitmentsTab } from '../../../../components/operations/config/AutoCommitmentsTab';
 
-type TabKey = 'tipos' | 'ubicaciones' | 'documentos' | 'permisos' | 'alertas';
+type TabKey = 'tipos' | 'ubicaciones' | 'documentos' | 'permisos' | 'alertas' | 'compromisos';
 const TABS: Array<{ key: TabKey; label: string; icon: typeof Layers }> = [
   { key: 'tipos', label: 'Tipos de Activo', icon: Layers },
   { key: 'ubicaciones', label: 'Ubicaciones', icon: MapPin },
   { key: 'documentos', label: 'Tipos de Documento', icon: FileText },
   { key: 'permisos', label: 'Tipos de Permiso', icon: ShieldCheck },
   { key: 'alertas', label: 'Alertas', icon: Bell },
+  { key: 'compromisos', label: 'Compromisos automáticos', icon: Wallet },
 ];
 
 interface AssetTypeRow extends AssetTypeForForm {
@@ -111,7 +114,9 @@ function ConfiguracionContent() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as TabKey | null) ?? 'tipos';
   const [tab, setTab] = useState<TabKey>(
-    (['tipos', 'ubicaciones', 'documentos', 'permisos', 'alertas'] as TabKey[]).includes(initialTab)
+    (
+      ['tipos', 'ubicaciones', 'documentos', 'permisos', 'alertas', 'compromisos'] as TabKey[]
+    ).includes(initialTab)
       ? initialTab
       : 'tipos',
   );
@@ -208,6 +213,7 @@ function ConfiguracionContent() {
       {tab === 'documentos' && <TiposDocumentoTab toaster={showToast} />}
       {tab === 'permisos' && <PermisosTabRouter toaster={showToast} />}
       {tab === 'alertas' && <AlertsConfigTab toaster={showToast} />}
+      {tab === 'compromisos' && <AutoCommitmentsTab toaster={showToast} />}
 
       <style jsx global>{`
         .ops-breadcrumb {

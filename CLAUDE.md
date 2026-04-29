@@ -327,49 +327,6 @@ Sprint 8: Hardening
 
 ═══════════════════════════════════════════════════════════════════
 
-### OPS-031: Reportes Excel/PDF profesionales (✓ completado)
-
-Catálogo central de reportes con generación Excel y descarga.
-
-### Endpoints OPS-031
-
-- POST /api/operations/reports/asset-compliance
-- POST /api/operations/reports/activity
-- POST /api/operations/reports/acknowledgment-coverage
-- POST /api/operations/reports/alerts-history
-- POST /api/operations/reports/work-permits
-- GET preview endpoints para cada reporte (5 filas + count)
-
-### Generadores creados
-
-- asset-compliance-report.generator.ts (3 hojas)
-- activity-report.generator.ts (2 hojas, 6 fuentes)
-- acknowledgment-coverage.generator.ts (2 hojas, IP + hash)
-- alerts-history.generator.ts (2 hojas, tiempo resolución)
-- work-permits.generator.ts (2 hojas, planned vs actual)
-
-### Excel helpers compartidos
-
-- HEADER_FILL #1E3A5F (corporate blue)
-- applyConditionalColor (green/yellow/red por umbrales)
-- addCompanyHeader/Footer con branding
-- formatDateColumn, formatPercentColumn
-- freezeHeader, autoSizeColumns
-
-### UI agregada
-
-- /operaciones/reportes con catálogo 6 cards
-- ReportFilterModal único adaptable a 5 tipos
-- Vista previa con 5 filas + count
-- Download via apiClient.postBlob (nuevo método)
-
-### Carpeta documental por activo
-
-Reusa el export PDF + ZIP ya creado en OPS-017
-Link directo desde card morada → /operaciones/equipos para seleccionar
-
-═══════════════════════════════════════════════════════════════════
-
 # MEJORAS V2 PENDIENTES
 
 ═══════════════════════════════════════════════════════════════════
@@ -400,16 +357,83 @@ Cuando se haga la pasada V2 al ERP módulo por módulo:
 - Firma electrónica nativa
 - Modelado bitemporal completo
 
+### OPS-032: Eventos de dominio Operaciones → Finanzas (✓ completado)
+
+Infraestructura de pub/sub interno con @nestjs/event-emitter.
+
+### Tabla creada
+
+- domain_events con @@unique para idempotencia
+- Enum DomainEventStatus: PENDING, PROCESSED, FAILED
+- RLS por companyId + audit trigger
+
+### Endpoints OPS-032
+
+- GET /api/operations/domain-events (paginado con filtros)
+- GET /api/operations/domain-events/:id
+- POST /api/operations/domain-events/:id/retry (ADMIN)
+- GET /api/operations/domain-events/stats (30 días)
+- POST /api/operations/domain-events/test (ADMIN, debug)
+
+### 7 tipos de eventos definidos
+
+- DocumentRenewalImminentEvent (vencimiento próximo)
+- AssetBlockedEvent / AssetUnblockedEvent
+- OperationalCostEvent (costo operacional)
+- PermitRenewalImminentEvent
+- ProcedureAcknowledgmentExpiredEvent
+- WorkPermitClosedEvent
+
+### Integration points (emit, sin cambio de comportamiento)
+
+- alert-engine.service.ts emite document.renewal-imminent + permit.renewal-imminent
+- asset-blocking.service.ts emite asset.blocked / asset.unblocked
+- acknowledgments.service.ts emite procedure.acknowledgment-expired
+- work-permits.service.ts emite work-permit.closed
+- Todos try/catch para no afectar operaciones user-visible
+
+### Idempotencia
+
+@@unique([companyId, eventType, aggregateId, occurredAt])
+occurredAt pinned a start-of-today UTC para dedupe en cron diario
+
+### Finance listener stubs
+
+apps/api/src/modules/finance/operations-listeners.service.ts
+@OnEvent para los 7 tipos, log-only por ahora
+OPS-033 reemplaza stubs con lógica real
+
+### Retry cron
+
+- Schedule: every 15 minutes
+- Job name: domain-events-retry
+- Cap: 3 retries por evento
+- Reusa queue operations existente
+
+### UI agregada
+
+- /operaciones/eventos con KPIs, filtros, tabla, detail modal
+- JSON viewers para payload y handlerResults
+- Retry button para FAILED (ADMIN)
+- Sidebar item "Eventos de dominio" (GitBranch icon)
+- Visible solo ADMIN/MANAGER en sección técnica
+
+### CASL nuevo subject
+
+- 'DomainEvent': read ADMIN/MANAGER, retry/test ADMIN only
+
 # Ticket actual
 
-- OPS-032: Eventos de dominio Operaciones → Finanzas
-  Sistema de eventos pub/sub interno
-  Operations publica eventos al EventEmitter de NestJS
-  Finance suscribe y reacciona automáticamente
-  Eventos clave:
-  - DocumentRenewalImminentEvent (30 días antes vencimiento)
-  - AssetBlockedEvent (cuando se bloquea automáticamente)
-  - OperationalCostEvent (cierre de PT con costo)
-  - PermitRenewalImminentEvent (renovaciones de permisos)
-    Tabla domain_events para audit trail e idempotencia
-    No genera compromisos aún (eso viene en OPS-033)
+- OPS-033: Compromisos automáticos al vencer documentos
+  Cierra el círculo Operations ↔ Finance
+  Listener real reemplaza stubs de OPS-032
+  Al recibir DocumentRenewalImminentEvent:
+  - Calcula costo estimado basado en histórico
+  - Crea compromiso futuro automático en cash module
+  - Vincula al documento via metadata
+    Al renovarse documento (nueva versión APPROVED):
+  - Marca compromiso como cumplido
+  - Genera siguiente compromiso si recurrente
+    Mismo patrón para PermitRenewalImminentEvent
+    Toggle global: enableAutoCommitments en CompanyAlertSettings
+    UI muestra origen del compromiso ("Auto-generado por SOAP")
