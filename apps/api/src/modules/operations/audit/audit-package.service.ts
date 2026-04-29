@@ -580,86 +580,67 @@ export class AuditPackageService {
       }>
     > = [];
 
+    /* Index defs once so each `if (want(code))` block looks up its
+       file metadata without a separate find() per branch. The map
+       is built from the same constant the manifest references, so
+       there's no chance of code drift. Key type widened to plain
+       string because the lookup helper takes a string code. */
+    type ReportDef = (typeof REPORT_FILES.REPORTS)[number];
+    const defByCode = new Map<string, ReportDef>(REPORT_FILES.REPORTS.map((r) => [r.code, r]));
     const want = (code: string) => !only || only.has(code);
-
-    if (want('01')) {
-      const def = REPORT_FILES.REPORTS.find((r) => r.code === '01')!;
+    const enqueue = (code: string, run: () => Promise<Buffer>) => {
+      const def = defByCode.get(code);
+      if (!def) return;
       tasks.push(async () => ({
         code: def.code,
         fileName: def.name,
         label: def.label,
-        buffer: await this.assetCompliance.generateExcel(companyId, {
+        buffer: await run(),
+      }));
+    };
+
+    if (want('01')) {
+      enqueue('01', () =>
+        this.assetCompliance.generateExcel(companyId, {
           assetTypeId: scope.assetTypeIds?.[0],
           locationId: scope.locationIds?.[0],
         }),
-      }));
+      );
     }
-    if (want('02')) {
-      const def = REPORT_FILES.REPORTS.find((r) => r.code === '02')!;
-      tasks.push(async () => ({
-        code: def.code,
-        fileName: def.name,
-        label: def.label,
-        buffer: await this.ackCoverage.generateExcel(companyId, {}),
-      }));
-    }
+    if (want('02')) enqueue('02', () => this.ackCoverage.generateExcel(companyId, {}));
     if (want('03')) {
-      const def = REPORT_FILES.REPORTS.find((r) => r.code === '03')!;
-      tasks.push(async () => ({
-        code: def.code,
-        fileName: def.name,
-        label: def.label,
-        buffer: await this.workPermits.generateExcel(companyId, {
+      enqueue('03', () =>
+        this.workPermits.generateExcel(companyId, {
           startDate: scope.periodFrom,
           endDate: scope.periodTo,
         }),
-      }));
+      );
     }
     if (want('04')) {
-      const def = REPORT_FILES.REPORTS.find((r) => r.code === '04')!;
-      tasks.push(async () => ({
-        code: def.code,
-        fileName: def.name,
-        label: def.label,
-        buffer: await this.alertsHistory.generateExcel(companyId, {
+      enqueue('04', () =>
+        this.alertsHistory.generateExcel(companyId, {
           startDate: scope.periodFrom,
           endDate: scope.periodTo,
         }),
-      }));
+      );
     }
     if (want('05')) {
-      const def = REPORT_FILES.REPORTS.find((r) => r.code === '05')!;
-      tasks.push(async () => ({
-        code: def.code,
-        fileName: def.name,
-        label: def.label,
-        buffer: await this.exceptionsAudit.generateExcel(companyId, {
+      enqueue('05', () =>
+        this.exceptionsAudit.generateExcel(companyId, {
           startDate: scope.periodFrom,
           endDate: scope.periodTo,
         }),
-      }));
+      );
     }
     if (want('06')) {
-      const def = REPORT_FILES.REPORTS.find((r) => r.code === '06')!;
-      tasks.push(async () => ({
-        code: def.code,
-        fileName: def.name,
-        label: def.label,
-        buffer: await this.statusChanges.generateExcel(companyId, {
+      enqueue('06', () =>
+        this.statusChanges.generateExcel(companyId, {
           startDate: scope.periodFrom,
           endDate: scope.periodTo,
         }),
-      }));
+      );
     }
-    if (want('07')) {
-      const def = REPORT_FILES.REPORTS.find((r) => r.code === '07')!;
-      tasks.push(async () => ({
-        code: def.code,
-        fileName: def.name,
-        label: def.label,
-        buffer: await this.qrInventory.generateExcel(companyId, {}),
-      }));
-    }
+    if (want('07')) enqueue('07', () => this.qrInventory.generateExcel(companyId, {}));
 
     /* Run sequentially to keep memory predictable. Parallel
        Promise.all could spike RSS for a large company. */

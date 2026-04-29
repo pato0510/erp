@@ -4,7 +4,6 @@ import {
   addCompanyFooter,
   addCompanyHeader,
   applyHeaderStyle,
-  autoSizeColumns,
   freezeHeader,
   newWorkbook,
 } from '../excel-helpers';

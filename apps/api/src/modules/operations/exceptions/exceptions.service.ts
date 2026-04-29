@@ -1,12 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AssetStatus, ExceptionStatus, Prisma } from '@prisma/client';
+import { AssetStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { AssetBlockingService } from '../alerts/asset-blocking.service';

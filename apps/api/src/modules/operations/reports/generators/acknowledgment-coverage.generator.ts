@@ -8,7 +8,6 @@ import {
   applyHeaderStyle,
   compliancePctTone,
   formatDateColumn,
-  formatPercentColumn,
   freezeHeader,
   newWorkbook,
 } from '../excel-helpers';

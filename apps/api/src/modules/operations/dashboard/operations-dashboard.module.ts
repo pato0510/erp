@@ -31,5 +31,8 @@ import { OperationsDashboardService } from './operations-dashboard.service';
   ],
   controllers: [OperationsDashboardController],
   providers: [OperationsDashboardService, MaterializedViewsService, DashboardMvRefreshProcessor],
+  /* OPS-037 — exported so OperationsHealthModule can probe MV
+     freshness without re-instantiating the service. */
+  exports: [MaterializedViewsService],
 })
 export class OperationsDashboardModule {}

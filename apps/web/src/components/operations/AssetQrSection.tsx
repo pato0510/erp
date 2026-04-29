@@ -35,18 +35,6 @@ interface EnsureResponse {
   publicUrl: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-function buildPublicUrl(token: string): string {
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}/p/asset/${token}`;
-  }
-  /* SSR fallback — the section is 'use client', so this is mostly
-     defensive. The authoritative URL comes from the API response
-     when the user actually generates the token. */
-  return `/p/asset/${token}`;
-}
-
 export function AssetQrSection({ asset, isAdmin, onChange, toaster }: Props) {
   const [token, setToken] = useState<string | null>(asset.qrToken ?? null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(asset.qrGeneratedAt ?? null);

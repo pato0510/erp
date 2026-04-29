@@ -438,24 +438,32 @@ Al escanear se abre la "ficha pública del activo" con info de cumplimiento.
 - Logo Excelsia profesional en PDF (hoy se dibuja un wordmark simple
   con primitivas pdfkit)
 
-### OPS-036: Auditoría completa con queries de compliance (✓ completado)
+### OPS-037: Cierre del Módulo Operaciones (✓ completado)
 
-[el bloque que pusiste antes con todos los detalles de OPS-036]
+- ESLint cleanup: 16 warnings de Sprint 8 eliminados (40 restantes
+  pre-existentes anotados en KNOWN_ISSUES)
+- Refactor Map<string, ReportDef> en audit-package.service eliminando
+  7 non-null assertions
+- Health endpoint /api/operations/health con 5 checks paralelos
+- Endpoint /api/operations/health/crons lista 9+ repeatables
+- 6 documentos creados en apps/api/src/modules/operations/:
+  README.md, MODULE_OVERVIEW.md (16 submódulos), API_REFERENCE.md
+  (~130 endpoints), SECURITY_AUDIT.md (auditoría completa con test
+  multi-tenant), KNOWN_ISSUES.md (V2 backlog consolidado),
+  MIGRATION_HISTORY.md (20 migraciones)
 
-# Ticket actual
+═════════════════════════════════════════════════════════════════════
 
-- OPS-037: Cierre del Módulo Operaciones — cleanup, seguridad y documentación
-  Limpieza de warnings ESLint acumulados del Sprint 8
-  Verificación RLS en tablas nuevas + auditoría de endpoints sin guards
-  Health check del módulo /api/operations/health
-  Test de aislamiento multi-tenant
-  Verificación de crons activos
-  Documentación: MODULE_OVERVIEW, API_REFERENCE, KNOWN_ISSUES,
-  MIGRATION_HISTORY
-  README técnico de handoff
+# 🏁 MÓDULO OPERACIONES — V1 COMPLETO (37/37 tickets, 8 sprints)
 
-  Tests E2E con Playwright SE OMITEN porque el proyecto no tiene setup
-  de E2E previo. Validación manual será con cliente AGS Solutions en
-  producción.
+═════════════════════════════════════════════════════════════════════
 
-  Cierre del Sprint 8 = 37/37 tickets = Módulo Operaciones 100% completo
+Status: V1 ready for production
+Última actualización: 2026-04-29 (OPS-037)
+
+# Próximos pasos
+
+- Actualización del manual de Operaciones (incorporar OPS-035 QR,
+  OPS-036 Auditoría, OPS-034 nota de performance)
+- Creación del manual de Finanzas (V1 ya en producción)
+- Inicio del Módulo RRHH (siguiente prioridad del cliente)

@@ -11,6 +11,7 @@ import { DocumentRequirementsModule } from './document-requirements/document-req
 import { DocumentTypesModule } from './document-types/document-types.module';
 import { ExceptionsModule } from './exceptions/exceptions.module';
 import { FleetModule } from './fleet/fleet.module';
+import { OperationsHealthModule } from './health/operations-health.module';
 import { LocationsModule } from './locations/locations.module';
 import { NotificationModule } from './notifications/notification.module';
 import { PermitsModule } from './permits/permits.module';
@@ -33,6 +34,7 @@ import { OperationsReportsModule } from './reports/operations-reports.module';
     NotificationModule,
     OperationsCalendarModule,
     OperationsDashboardModule,
+    OperationsHealthModule,
     OperationsReportsModule,
     PermitsModule,
     ProceduresModule,

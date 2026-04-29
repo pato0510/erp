@@ -1,11 +1,5 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import {
-  AlertInstance,
-  AlertSeverity,
-  AlertTriggerType,
-  NotificationSourceType,
-  Prisma,
-} from '@prisma/client';
+import { AlertInstance, AlertTriggerType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';

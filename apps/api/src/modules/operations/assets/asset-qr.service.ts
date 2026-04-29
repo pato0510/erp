@@ -483,7 +483,10 @@ export class AssetQrService {
     }
 
     const compliance = await this.computeAssetCompliance(companyId, asset.id);
-    const [alerts, exception, company] = await Promise.all([
+    /* The authenticated view doesn't surface company.name on its own
+       — the visitor's session already implies the company. Public
+       view does include it (see resolvePublicScan). */
+    const [alerts, exception] = await Promise.all([
       this.prisma.alertInstance.findMany({
         where: { companyId, assetId: asset.id, status: 'ACTIVE' },
         select: { id: true, title: true, severity: true, triggeredAt: true },
@@ -499,10 +502,6 @@ export class AssetQrService {
         },
         select: { validUntil: true },
         orderBy: { validUntil: 'desc' },
-      }),
-      this.prisma.company.findUnique({
-        where: { id: companyId },
-        select: { name: true },
       }),
     ]);
 
