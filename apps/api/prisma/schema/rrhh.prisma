@@ -1,0 +1,265 @@
+// ─────────────────────────────────────────────────────────────────────────
+// MÓDULO RRHH (DEMO) — shared foundation
+//
+// Additive schema for the HR module. Demo scope: NO RLS / audit triggers /
+// GRANTs (those live on Finance/Operations tables). Every model is scoped by
+// companyId at the application layer (RrhhModule services), mirroring the
+// calendar/notifications posture. Snake_case plural @@map names.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum EmployeeStatus {
+  ACTIVO
+  INACTIVO
+}
+
+enum ContractType {
+  INDEFINIDO
+  PLAZO_FIJO
+  POR_OBRA
+  HONORARIOS
+}
+
+enum LicenseType {
+  ENFERMEDAD_COMUN
+  ACCIDENTE
+  MATERNAL
+  OTRO
+}
+
+enum LicenseStatus {
+  VIGENTE
+  FINALIZADA
+  RECHAZADA
+}
+
+// Document lifecycle, derived from emisión/vencimiento dates in the service
+// layer. Mirrors the Operations doc-control vocabulary so the frontend can
+// reuse the same DocumentStatusBadge visual components.
+enum EmployeeDocumentStatus {
+  DRAFT
+  VIGENTE
+  POR_VENCER
+  VENCIDO
+}
+
+// ── Certifications / availability (drone & industrial services upgrade) ──────
+// ASCII-only enum members (Prisma constraint); the UI maps to accented labels.
+
+enum CertificationType {
+  PILOTO_DRONE
+  SEGURIDAD
+  TECNICA
+  CLIENTE
+  FAENA
+  INDUCCION
+}
+
+// Derived live in the service from expiryDate (mirrors EmployeeDocumentStatus).
+enum CertificationStatus {
+  VIGENTE
+  POR_VENCER
+  VENCIDA
+}
+
+enum AvailabilityStatus {
+  DISPONIBLE
+  VACACIONES
+  LICENCIA
+  CAPACITACION
+  ASIGNADO
+  DIA_LIBRE
+}
+
+model Employee {
+  id              String         @id @default(uuid()) @db.Uuid
+  companyId       String         @db.Uuid
+  rut             String
+  nombres         String
+  apellidos       String
+  email           String?
+  telefono        String?
+  direccion       String?
+  comuna          String?
+  ciudad          String?
+  fechaNacimiento DateTime?      @db.Date
+  fechaIngreso    DateTime       @db.Date
+  area            String
+  cargo           String
+  base            String? // home base / faena (Antofagasta, Calama, Santiago…) for filtering
+  estado          EmployeeStatus @default(ACTIVO)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  contracts      EmployeeContract[]
+  documents      EmployeeDocument[]
+  vacations      VacationRecord[]
+  licenses       License[]
+  certifications Certification[]
+  availability   EmployeeAvailability[]
+
+  @@unique([companyId, rut])
+  @@index([companyId, estado])
+  @@map("employees")
+}
+
+model EmployeeContract {
+  id           String       @id @default(uuid()) @db.Uuid
+  companyId    String       @db.Uuid
+  employeeId   String       @db.Uuid
+  tipoContrato ContractType @default(INDEFINIDO)
+  sueldoBruto  Decimal      @db.Decimal(12, 2)
+  jornada      String       @default("45h")
+  cargo        String
+  fechaInicio  DateTime     @db.Date
+  fechaFin     DateTime?    @db.Date
+  afp          String
+  salud        String // 'FONASA' o 'ISAPRE - <plan>'
+  activo       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+  @@index([companyId, activo])
+  @@map("employee_contracts")
+}
+
+// One active row per period drives the (directional) liquidación calculator.
+model PayrollParameter {
+  id                      String   @id @default(uuid()) @db.Uuid
+  companyId               String   @db.Uuid
+  periodo                 String // e.g. '2026'
+  ufValue                 Decimal  @db.Decimal(14, 4)
+  utmValue                Decimal  @db.Decimal(14, 4)
+  topeImponibleUf         Decimal  @db.Decimal(8, 4)
+  topeCesantiaUf          Decimal  @db.Decimal(8, 4)
+  afpRates                Json // map AFP -> comisión (decimal fraction)
+  saludRate               Decimal  @db.Decimal(6, 4) // 0.07
+  cesantiaRateTrabajador  Decimal  @db.Decimal(6, 4) // 0.006
+  taxBrackets             Json // array of {desdeUtm,hastaUtm,factor,rebajaUtm}
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([companyId, periodo])
+  @@index([companyId, isActive])
+  @@map("payroll_parameters")
+}
+
+// saldo (días) = mesesTrabajados * 1.25 − diasTomados — computed in service.
+model VacationRecord {
+  id              String   @id @default(uuid()) @db.Uuid
+  companyId       String   @db.Uuid
+  employeeId      String   @db.Uuid
+  mesesTrabajados Int
+  diasTomados     Decimal  @db.Decimal(6, 2)
+  fechaCorte      DateTime @db.Date
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+  @@map("vacation_records")
+}
+
+model License {
+  id          String        @id @default(uuid()) @db.Uuid
+  companyId   String        @db.Uuid
+  employeeId  String        @db.Uuid
+  tipo        LicenseType
+  fechaInicio DateTime      @db.Date
+  fechaFin    DateTime      @db.Date
+  dias        Int
+  folio       String?
+  estado      LicenseStatus @default(VIGENTE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+  @@map("licenses")
+}
+
+// THIN document record — no real storage in demo. The frontend reuses the
+// Operations doc-control visual components pointed at this metadata.
+model EmployeeDocument {
+  id               String                 @id @default(uuid()) @db.Uuid
+  companyId        String                 @db.Uuid
+  employeeId       String                 @db.Uuid
+  tipoDocumento    String
+  nombre           String
+  fechaEmision     DateTime?              @db.Date
+  fechaVencimiento DateTime?              @db.Date
+  estado           EmployeeDocumentStatus @default(DRAFT)
+  fileName         String?
+  mimeType         String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+  @@index([companyId, fechaVencimiento])
+  @@map("employee_documents")
+}
+
+// Staff habilitations (e.g. RPAS pilot cert / SSOMA course). `status` is a stored
+// snapshot; the service derives the live status from expiryDate at read time.
+model Certification {
+  id          String              @id @default(uuid()) @db.Uuid
+  companyId   String              @db.Uuid
+  employeeId  String              @db.Uuid
+  name        String
+  type        CertificationType
+  issuedDate  DateTime?           @db.Date
+  expiryDate  DateTime?           @db.Date
+  status      CertificationStatus @default(VIGENTE)
+  documentRef String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId])
+  @@index([companyId, expiryDate])
+  @@map("certifications")
+}
+
+// Maps a Comercial ServiceCatalog name (string-matched, NO FK) to the cert it
+// requires. Read by the for-service availability resolver.
+model ServiceRequirement {
+  id               String             @id @default(uuid()) @db.Uuid
+  companyId        String             @db.Uuid
+  serviceName      String
+  requiredCertType CertificationType?
+  requiresDrone    Boolean            @default(false)
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([companyId, serviceName])
+  @@map("service_requirements")
+}
+
+// One row per (employee, day) when the worker is NOT plain DISPONIBLE. Absence of
+// a row for a date means the employee is DISPONIBLE on that date.
+model EmployeeAvailability {
+  id         String             @id @default(uuid()) @db.Uuid
+  companyId  String             @db.Uuid
+  employeeId String             @db.Uuid
+  date       DateTime           @db.Date
+  endDate    DateTime?          @db.Date
+  status     AvailabilityStatus @default(DISPONIBLE)
+  notes      String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, date])
+  @@index([companyId, employeeId])
+  @@map("employee_availability")
+}

@@ -163,46 +163,64 @@ const ComercialSvg = () => (
   </svg>
 );
 
-const CALENDAR_CELLS: { x: number; y: number; delay: string | null }[] = [
-  { x: 40, y: 80, delay: '0s' },
-  { x: 80, y: 80, delay: null },
-  { x: 120, y: 80, delay: '1s' },
-  { x: 160, y: 80, delay: null },
-  { x: 40, y: 120, delay: null },
-  { x: 80, y: 120, delay: '2s' },
-  { x: 120, y: 120, delay: null },
-  { x: 160, y: 120, delay: '3s' },
-  { x: 40, y: 160, delay: '1s' },
-  { x: 80, y: 160, delay: null },
-  { x: 120, y: 160, delay: null },
-  { x: 160, y: 160, delay: '0s' },
+// Megaphone broadcasting rising engagement bars + animated signal arcs.
+const MKT_BARS = [
+  { x: 150, y: 175, h: 25, d: '0s' },
+  { x: 168, y: 160, h: 40, d: '0.3s' },
+  { x: 186, y: 140, h: 60, d: '0.6s' },
 ];
 
-const CalendarioSvg = () => (
+const MarketingSvg = () => (
   <svg
     viewBox="0 0 240 240"
     preserveAspectRatio="xMidYMid slice"
     className="mod-svg"
-    style={{ opacity: 0.45 }}
+    style={{ opacity: 0.5 }}
   >
-    <rect x="40" y="50" width="160" height="20" rx="2" fill="white" />
-    {CALENDAR_CELLS.map((c, i) =>
-      c.delay !== null ? (
-        <rect
-          key={i}
-          x={c.x}
-          y={c.y}
-          width="35"
-          height="35"
-          rx="3"
-          fill="white"
-          className="cal-cell"
-          style={{ animationDelay: c.delay }}
-        />
-      ) : (
-        <rect key={i} x={c.x} y={c.y} width="35" height="35" rx="3" fill="white" opacity="0.3" />
-      ),
-    )}
+    {/* Megaphone body */}
+    <g>
+      <path
+        d="M 40 105 L 95 80 L 95 140 L 40 115 Z"
+        fill="white"
+        opacity="0.9"
+      />
+      <rect x="30" y="103" width="12" height="14" rx="2" fill="white" opacity="0.9" />
+      <path
+        d="M 95 80 Q 130 90, 130 110 Q 130 130, 95 140 Z"
+        fill="white"
+        opacity="0.55"
+      />
+      {/* Handle */}
+      <rect x="64" y="140" width="9" height="34" rx="3" fill="white" opacity="0.8" />
+    </g>
+    {/* Broadcast signal arcs */}
+    {[0, 1, 2].map((i) => (
+      <path
+        key={i}
+        d={`M 138 ${96 - i * 4} Q ${150 + i * 12} 110, 138 ${124 + i * 4}`}
+        fill="none"
+        stroke="white"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        className="mkt-wave"
+        style={{ animationDelay: `${i * 0.4}s` }}
+      />
+    ))}
+    {/* Rising engagement bars */}
+    {MKT_BARS.map((b) => (
+      <rect
+        key={b.x}
+        x={b.x}
+        y={b.y}
+        width="12"
+        height={b.h}
+        rx="2"
+        fill="white"
+        opacity="0.85"
+        className="mkt-bar"
+        style={{ animationDelay: b.d }}
+      />
+    ))}
   </svg>
 );
 
@@ -362,26 +380,26 @@ const MODULES: ModuleDef[] = [
     name: 'Comercial',
     description: 'Pipeline de ventas, CRM, cotizaciones y gestión de clientes',
     gradient: 'linear-gradient(135deg, #EC4899, #BE185D)',
-    href: null,
-    active: false,
+    href: '/comercial',
+    active: true,
     svg: <ComercialSvg />,
   },
   {
-    key: 'calendario',
-    name: 'Calendario',
-    description: 'Calendario general de actividades y gestión organizacional',
+    key: 'marketing',
+    name: 'Marketing',
+    description: 'Campañas, contenidos, redes sociales y métricas de marketing',
     gradient: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-    href: null,
-    active: false,
-    svg: <CalendarioSvg />,
+    href: '/marketing',
+    active: true,
+    svg: <MarketingSvg />,
   },
   {
     key: 'rrhh',
     name: 'Recursos Humanos',
     description: 'Gestión del talento, nóminas, evaluaciones y desarrollo organizacional',
     gradient: 'linear-gradient(135deg, #14B8A6, #0F766E)',
-    href: null,
-    active: false,
+    href: '/rrhh',
+    active: true,
     svg: <RrhhSvg />,
   },
 ];
@@ -945,13 +963,22 @@ export default function ModulosPage() {
             opacity: 0;
           }
         }
-        @keyframes calhighlight {
+        @keyframes mktwave {
           0%,
           100% {
-            opacity: 0.2;
+            opacity: 0.25;
           }
           50% {
-            opacity: 0.8;
+            opacity: 0.9;
+          }
+        }
+        @keyframes mktbar {
+          0%,
+          100% {
+            transform: scaleY(1);
+          }
+          50% {
+            transform: scaleY(1.4);
           }
         }
         @keyframes rrhhpulse {
@@ -1019,8 +1046,13 @@ export default function ModulosPage() {
         .com-dot {
           animation: comdot 2s ease-out infinite;
         }
-        .cal-cell {
-          animation: calhighlight 4s ease-in-out infinite;
+        .mkt-wave {
+          animation: mktwave 2.4s ease-in-out infinite;
+        }
+        .mkt-bar {
+          transform-box: fill-box;
+          transform-origin: 50% 100%;
+          animation: mktbar 2.6s ease-in-out infinite;
         }
         .rrhh-line {
           animation: rrhhline 3s ease-in-out infinite;

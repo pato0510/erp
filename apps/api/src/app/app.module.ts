@@ -17,18 +17,21 @@ import { AuditModule } from '../modules/audit/audit.module';
 import { BankingModule } from '../modules/banking/banking.module';
 import { CashflowModule } from '../modules/cashflow/cashflow.module';
 import { ClosingModule } from '../modules/closing/closing.module';
+import { ComercialModule } from '../modules/comercial/comercial.module';
 import { DashboardModule } from '../modules/dashboard/dashboard.module';
 import { CatalogsModule } from '../modules/catalogs/catalogs.module';
 import { CompaniesModule } from '../modules/companies/companies.module';
 import { HealthModule } from '../modules/health/health.module';
 import { IamModule } from '../modules/iam/iam.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
+import { MarketingModule } from '../modules/marketing/marketing.module';
 import { MovementsModule } from '../modules/movements/movements.module';
 import { DomainEventsModule } from '../modules/operations/events/domain-events.module';
 import { FinanceModule } from '../modules/finance/finance.module';
 import { OperationsModule } from '../modules/operations/operations.module';
 import { ReconciliationModule } from '../modules/reconciliation/reconciliation.module';
 import { ReportsModule } from '../modules/reports/reports.module';
+import { RrhhModule } from '../modules/rrhh/rrhh.module';
 import { TaxModule } from '../modules/tax/tax.module';
 import { TenancyModule } from '../modules/tenancy/tenancy.module';
 
@@ -62,6 +65,7 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
     BankingModule,
     CashflowModule,
     ClosingModule,
+    ComercialModule,
     DashboardModule,
     CatalogsModule,
     CompaniesModule,
@@ -70,10 +74,12 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
     JobsModule,
     DomainEventsModule,
     FinanceModule,
+    MarketingModule,
     MovementsModule,
     OperationsModule,
     ReconciliationModule,
     ReportsModule,
+    RrhhModule,
     TaxModule,
     TenancyModule,
   ],

@@ -15,6 +15,27 @@ export function formatDate(date: string | Date): string {
   return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+/**
+ * Formats a Chilean RUT for display: thousands dots on the body + '-DV'.
+ * Accepts already-formatted, hyphen-only, or raw digit strings and is tolerant
+ * of dots/spaces. e.g. '123456789' or '12345678-9' → '12.345.678-9'.
+ */
+export function formatRUT(rut: string): string {
+  if (!rut) return '';
+  const clean = rut.replace(/[.\s]/g, '').toUpperCase();
+  const match = clean.match(/^(\d+)-?([0-9K])?$/);
+  if (!match) return rut;
+  let body = match[1];
+  let dv = match[2];
+  // If no explicit DV separator, treat the last char as the check digit.
+  if (dv === undefined && body.length > 1) {
+    dv = body.slice(-1);
+    body = body.slice(0, -1);
+  }
+  const withDots = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return dv !== undefined ? `${withDots}-${dv}` : withDots;
+}
+
 export function formatRelativeDate(date: string | Date): string {
   const d = new Date(date);
   const now = new Date();

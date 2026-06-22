@@ -1,0 +1,222 @@
+// ─────────────────────────────────────────────────────────────────────────
+// MÓDULO MARKETING (DEMO) — shared foundation
+//
+// Additive schema for the Marketing module. Demo scope: NO RLS / audit
+// triggers / GRANTs (those live on Finance/Operations tables). Every model is
+// scoped by companyId at the application layer (MarketingModule services),
+// mirroring the RRHH/calendar/notifications posture. Snake_case plural @@map
+// names.
+//
+// Finance reference fields (financeCategoryId / financeCategoryName) on
+// MarketingExpense are READ-ONLY display copies — NOT foreign keys. The demo
+// never creates real Finance movements nor mutates Finance tables.
+//
+// CALENDAR UPGRADE (20260622040000): the Marketing module gains a real
+// multi-type operational board (CalendarItem), per-campaign execution tasks
+// (CampaignTask) and a per-campaign funnel snapshot (CampaignMetric). The
+// MarketingCampaign gains commercial-brief fields (objective, serviceAssociated,
+// targetSegment, zone, ownerName, ctaType, kpiTarget). Cross-module CRM reads
+// (CrmLead/CrmOpportunity by sourceCampaignId) stay READ-ONLY — Comercial is
+// never mutated.
+//
+// ENUM NOTE: Prisma enum members are ASCII identifiers (no Ñ / accents). The
+// frontend maps them to accented Spanish labels (CAMPANA → "Campaña", etc).
+// ─────────────────────────────────────────────────────────────────────────
+
+enum CampaignStatus {
+  PLANIFICADA
+  ACTIVA
+  FINALIZADA
+  BORRADOR
+  EN_PRODUCCION
+  PROGRAMADA
+  PAUSADA
+  ANALIZADA
+}
+
+// Multi-type operational calendar item. CAMPANA = a campaign milestone,
+// PUBLICACION = organic post, CONTENIDO_SEO = blog/SEO asset, EMAIL = email
+// send, CAMPANA_PAGADA = paid ad flight, EVENTO = event/fair, TAREA = generic
+// task, ACCION_CRM = a CRM follow-up surfaced on the marketing board.
+enum CalendarItemType {
+  CAMPANA
+  PUBLICACION
+  CONTENIDO_SEO
+  EMAIL
+  CAMPANA_PAGADA
+  EVENTO
+  TAREA
+  ACCION_CRM
+}
+
+enum CalendarItemStatus {
+  PENDIENTE
+  EN_PROGRESO
+  PROGRAMADO
+  PUBLICADO
+  COMPLETADO
+  CANCELADO
+}
+
+enum CampaignTaskType {
+  CONTENIDO
+  DISENO
+  APROBACION
+  CONFIGURACION
+  PUBLICACION
+  REVISION
+  CONTACTO_LEADS
+}
+
+model MarketingCampaign {
+  id        String         @id @default(uuid()) @db.Uuid
+  companyId String         @db.Uuid
+  name      String
+  channel   String
+  startDate DateTime       @db.Date
+  endDate   DateTime       @db.Date
+  cost      Decimal        @db.Decimal(12, 2)
+  status    CampaignStatus @default(PLANIFICADA)
+
+  // Commercial brief (calendar upgrade) — all optional, free-text demo fields.
+  objective         String?
+  serviceAssociated String?
+  targetSegment     String?
+  zone              String?
+  ownerName         String?
+  ctaType           String?
+  kpiTarget         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses      MarketingExpense[]
+  calendarItems CalendarItem[]
+  tasks         CampaignTask[]
+  metric        CampaignMetric?
+
+  @@index([companyId, status])
+  @@index([companyId, startDate])
+  @@map("marketing_campaigns")
+}
+
+model MarketingExpense {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  amount      Decimal  @db.Decimal(12, 2)
+  date        DateTime @db.Date
+  description String
+  channel     String?
+
+  campaignId String?            @db.Uuid
+  campaign   MarketingCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  // READ-ONLY Finance reference (display only — NOT a FK into Finance tables).
+  financeCategoryId   String? @db.Uuid
+  financeCategoryName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, date])
+  @@index([companyId, campaignId])
+  @@map("marketing_expenses")
+}
+
+model SeoKeyword {
+  id               String   @id @default(uuid()) @db.Uuid
+  companyId        String   @db.Uuid
+  keyword          String
+  currentPosition  Int
+  previousPosition Int
+  monthlyTraffic   Int
+  url              String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([companyId, currentPosition])
+  @@map("seo_keywords")
+}
+
+// ── Operational calendar item ──────────────────────────────────────────────
+// The multi-type marketing board entry. Optionally linked to a campaign
+// (onDelete SetNull → the item survives if its campaign is deleted, becoming a
+// standalone board entry). serviceId/serviceName are display references to a
+// Comercial ServiceCatalog row (plain columns — NO cross-schema FK).
+model CalendarItem {
+  id        String             @id @default(uuid()) @db.Uuid
+  companyId String             @db.Uuid
+  type      CalendarItemType
+  title     String
+  date      DateTime           @db.Date
+  endDate   DateTime?          @db.Date
+  channel   String?
+  status    CalendarItemStatus @default(PENDIENTE)
+  ownerName String?
+
+  // Display reference to a Comercial ServiceCatalog row (plain columns, no FK).
+  serviceId   String? @db.Uuid
+  serviceName String?
+
+  targetSegment String?
+  zone          String?
+
+  campaignId String?            @db.Uuid
+  campaign   MarketingCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, date])
+  @@index([companyId, type])
+  @@index([companyId, campaignId])
+  @@map("calendar_items")
+}
+
+// ── Campaign execution task ────────────────────────────────────────────────
+// A checklist-style task that belongs to a campaign (onDelete Cascade → tasks
+// die with their campaign).
+model CampaignTask {
+  id        String           @id @default(uuid()) @db.Uuid
+  companyId String           @db.Uuid
+  campaignId String          @db.Uuid
+  campaign  MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  title     String
+  type      CampaignTaskType
+  dueDate   DateTime?        @db.Date
+  done      Boolean          @default(false)
+  ownerName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, campaignId])
+  @@map("campaign_tasks")
+}
+
+// ── Campaign funnel snapshot ───────────────────────────────────────────────
+// One row per campaign (onDelete Cascade). Holds the SEEDED / directional
+// funnel numbers. The backend overlays LIVE counts read from Comercial
+// (CrmLead/CrmOpportunity by sourceCampaignId) at query time — those live reads
+// never mutate Comercial.
+model CampaignMetric {
+  id         String @id @default(uuid()) @db.Uuid
+  companyId  String @db.Uuid
+  campaignId String @unique @db.Uuid
+  campaign   MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  leadsGenerated       Int     @default(0)
+  leadsQualified       Int     @default(0)
+  meetingsBooked       Int     @default(0)
+  quotesIssued         Int     @default(0)
+  opportunitiesCreated Int     @default(0)
+  salesClosed          Int     @default(0)
+  costPerLead          Decimal @db.Decimal(12, 2) @default(0)
+  attributedRevenue    Decimal @db.Decimal(14, 2) @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("campaign_metrics")
+}

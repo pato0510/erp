@@ -1,0 +1,299 @@
+// ─────────────────────────────────────────────────────────────────────────
+// MÓDULO COMERCIAL / CRM (DEMO) — shared foundation
+//
+// Additive schema for the Comercial (CRM) module. Demo scope: NO RLS / audit
+// triggers / GRANTs (those live on Finance/Operations tables). Every model is
+// scoped by companyId at the application layer (ComercialModule services),
+// mirroring the RRHH/Marketing posture. Snake_case plural @@map names.
+//
+// CROSS-MODULE REFERENCES (plain columns, NOT foreign keys — the demo never
+// mutates Finance and keeps a clean dependency direction):
+//   • CrmOpportunity.counterpartyId  → Finance Counterparty.id (a CLIENT).
+//   • CrmOpportunity.sourceCampaignId → Marketing MarketingCampaign.id (lead
+//     source). Kept as a plain column to avoid a cross-schema FK.
+//   • CrmActivity.counterpartyId     → Finance Counterparty.id.
+//
+// SIMULATED FINANCE COMMITMENT: when an opportunity reaches a WON stage we set
+// generatedCommitmentAmount / generatedCommitmentDate on the opportunity ROW.
+// This is a display-only simulation — NO real Finance Commitment is created and
+// NO domain event is fired.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum CrmActivityType {
+  NOTA
+  LLAMADA
+  REUNION
+  TAREA
+}
+
+// ── Lead enums ───────────────────────────────────────────────────────────────
+// Enum members are ASCII identifiers (no Ñ / accents) per Prisma constraints;
+// the frontend maps these to accented Spanish labels (CAMPANA → "Campaña", etc).
+
+enum CrmLeadSource {
+  WEB
+  SEO
+  CAMPANA
+  REFERIDO
+  LINKEDIN
+  LLAMADA
+  FERIA
+}
+
+enum CrmLeadStatus {
+  NUEVO
+  CONTACTADO
+  CALIFICADO
+  DESCARTADO
+  CONVERTIDO
+}
+
+enum CrmLeadPriority {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+// ── Service catalogue / quotes enums ─────────────────────────────────────────
+
+enum ServiceCategory {
+  DRONE
+  LIMPIEZA
+  INSPECCION
+  AUDIOVISUAL
+  INDUSTRIAL
+}
+
+enum BillingUnit {
+  HORA
+  JORNADA
+  M2
+  EVENTO
+  PROYECTO
+  MENSUAL
+}
+
+enum CrmQuoteStatus {
+  BORRADOR
+  EN_REVISION
+  APROBADA
+  ENVIADA
+  ACEPTADA
+  RECHAZADA
+  VENCIDA
+  REEMPLAZADA
+}
+
+model CrmStage {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  name      String
+  order     Int
+  isWon     Boolean  @default(false)
+  isLost    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  opportunities CrmOpportunity[]
+
+  @@index([companyId, order])
+  @@map("crm_stages")
+}
+
+model CrmOpportunity {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  title String
+
+  // READ-ONLY reference to a Finance Counterparty (a CLIENT). Plain column — no
+  // FK relation into the Finance schema.
+  counterpartyId String @db.Uuid
+
+  amount           Decimal   @db.Decimal(14, 2)
+  probability      Int // 0–100
+  expectedCloseDate DateTime? @db.Date
+  ownerName        String
+
+  stageId String   @db.Uuid
+  stage   CrmStage @relation(fields: [stageId], references: [id])
+
+  // Lead source — plain column referencing a Marketing MarketingCampaign by id
+  // (no cross-schema FK needed).
+  sourceCampaignId String? @db.Uuid
+
+  // Drone/industrial commercial detail. serviceId references ServiceCatalog.id
+  // (plain column; resolved by manual lookup). The requires* flags are copied
+  // from the chosen service on creation but stay independently editable.
+  serviceId              String?  @db.Uuid
+  needDetected           String?
+  serviceZone            String?
+  requiresVisit          Boolean  @default(false)
+  requiresDrone          Boolean  @default(false)
+  requiresCertifiedStaff Boolean  @default(false)
+  lossReason             String?
+
+  // Set when this opportunity was created via POST /leads/:id/convert — plain
+  // column reference to the originating CrmLead.id.
+  convertedFromLeadId String? @db.Uuid
+
+  tags String[] @default([])
+
+  // SIMULATED Finanzas commitment (display-only). Set when the opportunity is
+  // in a WON stage; cleared when it leaves a WON stage.
+  generatedCommitmentAmount Decimal?  @db.Decimal(14, 2)
+  generatedCommitmentDate   DateTime? @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activities CrmActivity[]
+
+  @@index([companyId, stageId])
+  @@index([companyId, counterpartyId])
+  @@index([companyId, sourceCampaignId])
+  @@map("crm_opportunities")
+}
+
+model CrmActivity {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  // Plain column reference to a Finance Counterparty (no FK).
+  counterpartyId String? @db.Uuid
+
+  opportunityId String?         @db.Uuid
+  opportunity   CrmOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  // Plain column reference to a CrmLead (no FK) — lets an activity be pinned to
+  // a lead before it becomes an opportunity.
+  leadId String? @db.Uuid
+
+  type    CrmActivityType
+  content String
+  date    DateTime  @db.Date
+  dueDate DateTime? @db.Date
+  done    Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, counterpartyId])
+  @@index([companyId, opportunityId])
+  @@index([companyId, type, done])
+  @@map("crm_activities")
+}
+
+// ── Leads ────────────────────────────────────────────────────────────────────
+// Top-of-funnel records. A qualified lead is CONVERTED into a CrmOpportunity via
+// POST /comercial/leads/:id/convert (sets status=CONVERTIDO and stamps the new
+// opportunity's convertedFromLeadId). sourceCampaignId is a plain column → a
+// Marketing MarketingCampaign (no cross-schema FK).
+model CrmLead {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  contactName     String
+  company         String
+  position        String?
+  phone           String?
+  email           String?
+  serviceInterest String?
+
+  source           CrmLeadSource
+  sourceCampaignId String?       @db.Uuid
+
+  status   CrmLeadStatus   @default(NUEVO)
+  ownerName String
+  priority CrmLeadPriority @default(MEDIA)
+
+  discardReason String?
+  createdDate   DateTime @db.Date
+  nextAction    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@map("crm_leads")
+}
+
+// ── Service catalogue ────────────────────────────────────────────────────────
+// The B2B drone / industrial service catalogue. Referenced (plain column) by
+// CrmOpportunity.serviceId and CrmQuoteItem.serviceId.
+model ServiceCatalog {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  name        String
+  category    ServiceCategory
+  description String?
+
+  billingUnit BillingUnit
+  basePrice   Decimal     @db.Decimal(14, 2)
+
+  requiresEquipment      Boolean @default(false)
+  requiresCertifiedStaff Boolean @default(false)
+  active                 Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, category])
+  @@map("service_catalog")
+}
+
+// ── Quotes ───────────────────────────────────────────────────────────────────
+// A commercial quote (builder data + on-screen preview only — NO PDF / email).
+// counterpartyId → Finance Counterparty (plain column); opportunityId is an
+// optional plain column to the originating CrmOpportunity. subtotal / ivaAmount
+// / total are recomputed server-side whenever items change.
+model CrmQuote {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  opportunityId  String? @db.Uuid
+  counterpartyId String  @db.Uuid
+
+  status CrmQuoteStatus @default(BORRADOR)
+
+  validUntil          DateTime? @db.Date
+  executionTerm       String?
+  commercialConditions String?
+  technicalNotes      String?
+  version             Int       @default(1)
+
+  subtotal  Decimal @db.Decimal(14, 2) @default(0)
+  ivaAmount Decimal @db.Decimal(14, 2) @default(0)
+  total     Decimal @db.Decimal(14, 2) @default(0)
+
+  items CrmQuoteItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@map("crm_quotes")
+}
+
+model CrmQuoteItem {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  quoteId String   @db.Uuid
+  quote   CrmQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  // Plain column reference to ServiceCatalog.id (optional — free-form lines are
+  // allowed). description/unit are captured at line time so edits to the
+  // catalogue never mutate an existing quote.
+  serviceId   String? @db.Uuid
+  description String
+  quantity    Decimal @db.Decimal(12, 2)
+  unit        String
+  unitPrice   Decimal @db.Decimal(14, 2)
+  discountPct Decimal @db.Decimal(5, 2) @default(0)
+  lineTotal   Decimal @db.Decimal(14, 2)
+
+  @@index([companyId, quoteId])
+  @@map("crm_quote_items")
+}
