@@ -39,7 +39,8 @@ model JobPosition {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  employees Employee[]
+  employees                    Employee[]
+  employeeDocumentRequirements EmployeeDocumentRequirement[]
 
   @@index([companyId])
   @@map("job_positions")
@@ -108,6 +109,9 @@ model Employee {
 
   compensation EmployeeCompensation?
 
+  employeeDocuments            EmployeeDocument[]
+  employeeDocumentRequirements EmployeeDocumentRequirement[]
+
   createdBy String   @db.Uuid
   updatedBy String?  @db.Uuid
   createdAt DateTime @default(now())
@@ -139,4 +143,131 @@ model EmployeeCompensation {
 
   @@index([companyId])
   @@map("employee_compensation")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-004a — employee documents. Three thin tables COPY-ADAPTED from the
+// Operations document-control engine (recon R1: the live engine is too
+// asset-bound to reuse — non-null assetId FK + asset-blocking coupling — so
+// RRHH gets its own tables and copies the proven algorithms, assetId→employeeId,
+// dropping the asset-blocking/commitment side effects). REUSED verbatim:
+// StorageService (MinIO + DB-blob fallback) and the DocumentRecordStatus enum.
+// Every table ships the platform invariant in the migration: RLS policy + audit
+// trigger + GRANT to app_user. Writes go through RlsService.executeWithRls.
+// ASCII enums; the UI maps display labels.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum EmployeeDocCategory {
+  CONTRATO
+  IDENTIDAD
+  PREVISIONAL
+  SALUD
+  SEGURIDAD
+  CERTIFICACION
+  AMONESTACION
+  FINIQUITO
+  OTRO
+}
+
+// RRHH's own approval-status enum. Operations folds approval into
+// DocumentRecordStatus (APPROVED/REJECTED); HR-004a additionally tracks an
+// explicit approvalStatus per the data-model spec. The two are kept in sync by
+// the service (APPROVED↔APROBADO, REJECTED↔RECHAZADO).
+enum EmployeeDocApprovalStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+// RRHH's own document-type catalog — separate from OperationalDocumentType
+// (recon R1 open-question: avoid HR/asset doc-type bleed). Seeded with the
+// Chilean HR set via POST /api/rrhh/document-types/seed-recommended.
+model EmployeeDocumentType {
+  id                  String              @id @default(uuid()) @db.Uuid
+  companyId           String              @db.Uuid
+  name                String
+  category            EmployeeDocCategory
+  defaultValidityDays Int?
+  requiresExpiry      Boolean             @default(false)
+  isMandatoryDefault  Boolean             @default(false)
+  active              Boolean             @default(true)
+  createdBy           String              @db.Uuid
+  updatedBy           String?             @db.Uuid
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  requirements EmployeeDocumentRequirement[]
+  documents    EmployeeDocument[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("employee_document_types")
+}
+
+// Two-level requirements matrix (employee > jobPosition), copy-adapted from the
+// asset>subtype>type engine. Exactly one of employeeId / jobPositionId is set —
+// enforced by a DB CHECK in the migration and validated at the service layer.
+model EmployeeDocumentRequirement {
+  id              String   @id @default(uuid()) @db.Uuid
+  companyId       String   @db.Uuid
+  employeeId      String?  @db.Uuid
+  jobPositionId   String?  @db.Uuid
+  documentTypeId  String   @db.Uuid
+  isMandatory     Boolean  @default(true)
+  appliesToClient String? // habilitación por cliente
+  appliesToSite   String? // habilitación por faena
+  createdBy       String   @db.Uuid
+  updatedBy       String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  employee     Employee?            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  jobPosition  JobPosition?         @relation(fields: [jobPositionId], references: [id], onDelete: Cascade)
+  documentType EmployeeDocumentType @relation(fields: [documentTypeId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@map("employee_document_requirements")
+}
+
+// The records — copy-adapted from DocumentRecord (assetId→employeeId). storageKey
+// is nullable so the DB-blob fallback (blobFallback) works exactly like the
+// Operations filePath?/fileData? pair: exactly one is populated per row.
+// Immutable supersession via supersededById; uploader≠approver enforced in the
+// service; compliance excludes REPLACED.
+model EmployeeDocument {
+  id              String                    @id @default(uuid()) @db.Uuid
+  companyId       String                    @db.Uuid
+  employeeId      String                    @db.Uuid
+  documentTypeId  String                    @db.Uuid
+  fileName        String
+  storageKey      String? // MinIO key (StorageService); null when DB-blob fallback used
+  blobFallback    Bytes? // populated only when MinIO is unavailable
+  mimeType        String
+  sizeBytes       Int
+  issueDate       DateTime?                 @db.Date
+  expiryDate      DateTime?                 @db.Date // auto from defaultValidityDays when requiresExpiry
+  status          DocumentRecordStatus      @default(DRAFT)
+  statusReason    String?
+  version         Int                       @default(1)
+  supersededById  String?                   @db.Uuid
+  approvalStatus  EmployeeDocApprovalStatus @default(PENDIENTE)
+  approvedBy      String?                   @db.Uuid
+  approvedAt      DateTime?
+  rejectedBy      String?                   @db.Uuid
+  rejectedAt      DateTime?
+  rejectionReason String?
+  uploadedBy      String                    @db.Uuid
+  createdBy       String                    @db.Uuid
+  updatedBy       String?                   @db.Uuid
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  employee     Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  documentType EmployeeDocumentType @relation(fields: [documentTypeId], references: [id], onDelete: Restrict)
+  supersededBy EmployeeDocument?    @relation("EmployeeDocSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes   EmployeeDocument[]   @relation("EmployeeDocSupersession")
+
+  @@index([companyId])
+  @@index([companyId, employeeId])
+  @@map("employee_documents")
 }
