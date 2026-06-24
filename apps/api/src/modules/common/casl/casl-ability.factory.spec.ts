@@ -5,6 +5,7 @@
 import { UserRole } from '@prisma/client';
 import {
   CaslAbilityFactory,
+  EmployeeCompensationSubject,
   EmployeeSubject,
   JobPositionSubject,
   SalaryRecordSubject,
@@ -51,5 +52,24 @@ describe('CaslAbilityFactory — RRHH baseline (HR-001)', () => {
     );
     expect(factory.defineAbilityFor(UserRole.ANALYST).can('read', JobPositionSubject)).toBe(false);
     expect(factory.defineAbilityFor(UserRole.VIEWER).can('read', JobPositionSubject)).toBe(false);
+  });
+
+  it('HR-003 — compensation endpoints are MANAGER/ADMIN/SUPER_ADMIN only', () => {
+    const can = (role: UserRole, action: 'read' | 'update') =>
+      factory.defineAbilityFor(role).can(action, EmployeeCompensationSubject);
+    // GET /:id/compensation gates on read AND update (the two-handler check):
+    const canGet = (role: UserRole) => can(role, 'read') && can(role, 'update');
+    expect(canGet(UserRole.MANAGER)).toBe(true);
+    expect(canGet(UserRole.ADMIN)).toBe(true);
+    expect(canGet(UserRole.SUPER_ADMIN)).toBe(true);
+    expect(canGet(UserRole.ACCOUNTANT)).toBe(false); // has read (future aggregate), NOT update → 403
+    expect(canGet(UserRole.ANALYST)).toBe(false);
+    expect(canGet(UserRole.VIEWER)).toBe(false);
+    // PUT /:id/compensation gates on update only:
+    expect(can(UserRole.MANAGER, 'update')).toBe(true);
+    expect(can(UserRole.ACCOUNTANT, 'update')).toBe(false);
+    expect(can(UserRole.VIEWER, 'update')).toBe(false);
+    // sanity: ACCOUNTANT still RETAINS read on compensation (HR-001, for the aggregate)
+    expect(can(UserRole.ACCOUNTANT, 'read')).toBe(true);
   });
 });

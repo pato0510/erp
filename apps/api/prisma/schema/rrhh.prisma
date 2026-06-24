@@ -39,6 +39,104 @@ model JobPosition {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  employees Employee[]
+
   @@index([companyId])
   @@map("job_positions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-003 — employees (the central ficha) + employee_compensation (the guarded
+// 1:1 sub-resource). Salary/bank fields live ONLY in employee_compensation,
+// which is reachable solely via the dedicated, role-restricted endpoint — the
+// employee list/ficha payloads NEVER carry compensation. ASCII enums; the UI
+// maps display labels.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum EmployeeStatus {
+  ACTIVO
+  INACTIVO
+  DESVINCULADO
+}
+
+enum ContractType {
+  INDEFINIDO
+  PLAZO_FIJO
+  POR_OBRA
+  HONORARIOS
+  EXTERNO
+}
+
+enum HealthSystem {
+  FONASA
+  ISAPRE
+}
+
+model Employee {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  // Nullable link to a login user — field staff exist as fichas with NO user.
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  fullName         String
+  rut              String // validated Módulo-11 (@erp/utils validateRut) at the service layer
+  birthDate        DateTime? @db.Date
+  nationality      String?
+  personalEmail    String?
+  companyEmail     String?
+  phone            String?
+  address          String?
+  emergencyContact String?
+  emergencyPhone   String?
+
+  jobPositionId String?      @db.Uuid
+  jobPosition   JobPosition? @relation(fields: [jobPositionId], references: [id], onDelete: SetNull)
+
+  area AreaRRHH
+
+  supervisorId String?    @db.Uuid
+  supervisor   Employee?  @relation("EmployeeSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
+  subordinates Employee[] @relation("EmployeeSupervisor")
+
+  base         String?
+  hireDate     DateTime       @db.Date
+  status       EmployeeStatus @default(ACTIVO)
+  contractType ContractType? // convenience summary; authoritative contracts arrive in HR-007
+  notes        String?
+
+  compensation EmployeeCompensation?
+
+  createdBy String   @db.Uuid
+  updatedBy String?  @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, rut])
+  @@index([companyId])
+  @@map("employees")
+}
+
+model EmployeeCompensation {
+  id        String @id @default(uuid()) @db.Uuid
+  companyId String @db.Uuid
+
+  employeeId String   @unique @db.Uuid
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  baseSalaryGross Decimal       @db.Decimal(18, 2)
+  afp             String?
+  health          HealthSystem?
+  bank            String?
+  bankAccountType String?
+  bankAccount     String?
+
+  createdBy String   @db.Uuid
+  updatedBy String?  @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("employee_compensation")
 }

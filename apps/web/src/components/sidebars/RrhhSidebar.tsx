@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, LogOut, Moon, Sun } from 'lucide-react';
+import { Briefcase, LayoutDashboard, LogOut, Moon, Sun, Users } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -14,6 +14,7 @@ import { SidebarBrand } from './SidebarBrand';
  * later RRHH tickets. */
 const navItems = [
   { href: '/rrhh', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/rrhh/trabajadores', label: 'Trabajadores', icon: Users, exact: false },
   { href: '/rrhh/cargos', label: 'Cargos', icon: Briefcase, exact: false },
 ];
 

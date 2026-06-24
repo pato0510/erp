@@ -21,6 +21,7 @@ model User {
 
   memberships   Membership[]
   notifications UserNotification[]
+  employees     Employee[] // HR-003 — virtual back-relation; the FK lives on employees.userId (no column on users)
 
   @@map("users")
 }
