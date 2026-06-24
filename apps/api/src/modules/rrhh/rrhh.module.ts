@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
 import { RrhhController } from './rrhh.controller';
+import { JobPositionsModule } from './job-positions/job-positions.module';
 
-/* HR-001 — RRHH module scaffold. Controller only: no services, no Prisma
- * models, no migration. The data model (employees, contracts, documents,
- * certifications, …) lands in HR-002+. PoliciesGuard / CaslAbilityFactory /
- * PrismaService are provided by the global Casl/Prisma modules, so no extra
- * imports are needed here (same pattern as every other feature module). */
+/* RRHH module aggregator. HR-001 added the gated health controller; HR-002
+ * adds JobPositionsModule (cargos). Further submodules (employees, contracts,
+ * documents, certifications, …) are imported here as their tickets land —
+ * mirroring how OperationsModule aggregates its feature submodules.
+ * PoliciesGuard / CaslAbilityFactory / PrismaService are provided by the global
+ * Casl/Prisma modules. */
 @Module({
+  imports: [JobPositionsModule],
   controllers: [RrhhController],
 })
 export class RrhhModule {}

@@ -47,6 +47,7 @@ type Subjects =
       | typeof TerminationSimulationSubject
       | typeof PayrollParameterSubject
       | typeof EmployeeCompensationSubject
+      | typeof JobPositionSubject
     >
   | 'all';
 
@@ -202,6 +203,11 @@ class PayrollParameterSubject {
 class EmployeeCompensationSubject {
   static readonly modelName = 'EmployeeCompensation' as const;
 }
+/* HR-002 — cargos / perfiles de cargo. Baseline (via RRHH_SUBJECTS):
+   MANAGER/ADMIN/SUPER_ADMIN manage; all other roles get none. */
+class JobPositionSubject {
+  static readonly modelName = 'JobPosition' as const;
+}
 
 /* All RRHH subjects — granted/revoked in bulk by the baseline role rules. */
 const RRHH_SUBJECTS = [
@@ -217,6 +223,7 @@ const RRHH_SUBJECTS = [
   TerminationSimulationSubject,
   PayrollParameterSubject,
   EmployeeCompensationSubject,
+  JobPositionSubject,
 ];
 /* The compensation-facing subset ACCOUNTANT may read. */
 const RRHH_COMPENSATION_SUBJECTS = [
@@ -317,6 +324,7 @@ export {
   TerminationSimulationSubject,
   PayrollParameterSubject,
   EmployeeCompensationSubject,
+  JobPositionSubject,
 };
 
 @Injectable()

@@ -1,0 +1,44 @@
+// ─────────────────────────────────────────────────────────────────────────
+// MÓDULO RRHH (V1) — schema
+//
+// HR-002: job_positions (cargos / perfiles de cargo) — the first RRHH table.
+// Every RRHH table follows the platform invariant: RLS policy + audit trigger +
+// GRANT to app_user, applied IN the migration (see the add_job_positions
+// migration) so production gets it on deploy. Scoped by companyId at the
+// application layer; writes go through RlsService.executeWithRls.
+//
+// AreaRRHH members are ASCII (no Ñ) — the UI maps them to display labels
+// (e.g. PREVENCION_RIESGOS → "Prevención de Riesgos").
+// ─────────────────────────────────────────────────────────────────────────
+
+enum AreaRRHH {
+  OPERACIONES
+  ADMINISTRACION
+  COMERCIAL
+  GERENCIA
+  FINANZAS
+  PREVENCION_RIESGOS
+  MANTENIMIENTO
+  RRHH
+}
+
+model JobPosition {
+  id                String   @id @default(uuid()) @db.Uuid
+  companyId         String   @db.Uuid
+  name              String
+  area              AreaRRHH
+  description       String?
+  // Free String[] for now — validated against the cert enum / service catalog /
+  // document-type catalog once those RRHH modules exist (HR-003+).
+  requiredCertTypes String[] @default([])
+  requiredDocTypes  String[] @default([])
+  enabledServices   String[] @default([])
+  active            Boolean  @default(true)
+  createdBy         String   @db.Uuid
+  updatedBy         String?  @db.Uuid
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("job_positions")
+}

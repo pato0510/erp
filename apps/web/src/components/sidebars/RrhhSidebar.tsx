@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, LogOut, Moon, Sun } from 'lucide-react';
+import { Briefcase, LayoutDashboard, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -12,7 +12,10 @@ import { SidebarBrand } from './SidebarBrand';
  * shared .tn-sidebar tokens defined in (dashboard)/layout.tsx and the
  * SidebarBrand component. Nav items beyond the landing Dashboard are added by
  * later RRHH tickets. */
-const navItems = [{ href: '/rrhh', label: 'Dashboard', icon: LayoutDashboard, exact: true }];
+const navItems = [
+  { href: '/rrhh', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/rrhh/cargos', label: 'Cargos', icon: Briefcase, exact: false },
+];
 
 export function RrhhSidebar() {
   const { user, logout } = useAuth();

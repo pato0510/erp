@@ -3,7 +3,12 @@
  * `ability.can('read', EmployeeSubject)`, so these assertions are a 1:1 proof
  * of the 200-for-MANAGER/ADMIN, 403-for-VIEWER acceptance criterion. */
 import { UserRole } from '@prisma/client';
-import { CaslAbilityFactory, EmployeeSubject, SalaryRecordSubject } from './casl-ability.factory';
+import {
+  CaslAbilityFactory,
+  EmployeeSubject,
+  JobPositionSubject,
+  SalaryRecordSubject,
+} from './casl-ability.factory';
 
 describe('CaslAbilityFactory — RRHH baseline (HR-001)', () => {
   const factory = new CaslAbilityFactory();
@@ -32,5 +37,19 @@ describe('CaslAbilityFactory — RRHH baseline (HR-001)', () => {
     expect(a.can('read', SalaryRecordSubject)).toBe(true); // re-granted after revoke
     expect(a.can('read', EmployeeSubject)).toBe(false); // blanket read-all revoked
     expect(a.can('update', SalaryRecordSubject)).toBe(false); // read-only
+  });
+
+  it('HR-002 — MANAGER/ADMIN manage JobPosition; ACCOUNTANT/ANALYST/VIEWER get 403', () => {
+    const m = factory.defineAbilityFor(UserRole.MANAGER);
+    expect(m.can('read', JobPositionSubject)).toBe(true);
+    expect(m.can('create', JobPositionSubject)).toBe(true);
+    expect(m.can('update', JobPositionSubject)).toBe(true);
+    expect(m.can('delete', JobPositionSubject)).toBe(true);
+    expect(factory.defineAbilityFor(UserRole.ADMIN).can('manage', JobPositionSubject)).toBe(true);
+    expect(factory.defineAbilityFor(UserRole.ACCOUNTANT).can('read', JobPositionSubject)).toBe(
+      false,
+    );
+    expect(factory.defineAbilityFor(UserRole.ANALYST).can('read', JobPositionSubject)).toBe(false);
+    expect(factory.defineAbilityFor(UserRole.VIEWER).can('read', JobPositionSubject)).toBe(false);
   });
 });
