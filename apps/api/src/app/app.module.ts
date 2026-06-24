@@ -29,6 +29,7 @@ import { FinanceModule } from '../modules/finance/finance.module';
 import { OperationsModule } from '../modules/operations/operations.module';
 import { ReconciliationModule } from '../modules/reconciliation/reconciliation.module';
 import { ReportsModule } from '../modules/reports/reports.module';
+import { RrhhModule } from '../modules/rrhh/rrhh.module';
 import { TaxModule } from '../modules/tax/tax.module';
 import { TenancyModule } from '../modules/tenancy/tenancy.module';
 
@@ -74,6 +75,7 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
     OperationsModule,
     ReconciliationModule,
     ReportsModule,
+    RrhhModule,
     TaxModule,
     TenancyModule,
   ],

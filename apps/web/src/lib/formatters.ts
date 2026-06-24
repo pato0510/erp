@@ -27,3 +27,8 @@ export function formatRelativeDate(date: string | Date): string {
   if (diffDays > 0) return `en ${diffDays} días`;
   return `hace ${Math.abs(diffDays)} días`;
 }
+
+// HR-001 — Chilean RUT helpers. Canonical implementation lives in @erp/utils
+// (shared with the api for DTO validation); surfaced here so the frontend keeps
+// importing all formatters from one place.
+export { formatRUT, validateRut, cleanRut, computeRutDv } from '@erp/utils';

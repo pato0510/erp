@@ -35,6 +35,18 @@ type Subjects =
       | typeof CommitmentTemplateSubject
       | typeof OperationsDashboardSubject
       | typeof AuditPackageSubject
+      | typeof EmployeeSubject
+      | typeof EmployeeContractSubject
+      | typeof EmployeeDocumentSubject
+      | typeof CertificationSubject
+      | typeof AvailabilitySubject
+      | typeof VacationRequestSubject
+      | typeof LeaveRequestSubject
+      | typeof MedicalLeaveSubject
+      | typeof SalaryRecordSubject
+      | typeof TerminationSimulationSubject
+      | typeof PayrollParameterSubject
+      | typeof EmployeeCompensationSubject
     >
   | 'all';
 
@@ -146,6 +158,73 @@ class AuditPackageSubject {
   static readonly modelName = 'AuditPackage' as const;
 }
 
+/* HR-001 — RRHH module subjects. Baseline role rules only (see
+   defineAbilityFor): ADMIN/SUPER_ADMIN manage all (via `manage all`),
+   MANAGER manages all RRHH subjects, ACCOUNTANT reads ONLY the
+   compensation-facing subjects, and every other role gets NONE — the
+   blanket `read all` that MANAGER/ACCOUNTANT/ANALYST carry is explicitly
+   revoked on RRHH subjects so sensitive HR data (salaries, medical leave,
+   PII) is not readable by default. Relationship-conditional rules
+   (self-access, supervisor-approves) are DEFERRED to later RRHH tickets. */
+class EmployeeSubject {
+  static readonly modelName = 'Employee' as const;
+}
+class EmployeeContractSubject {
+  static readonly modelName = 'EmployeeContract' as const;
+}
+class EmployeeDocumentSubject {
+  static readonly modelName = 'EmployeeDocument' as const;
+}
+class CertificationSubject {
+  static readonly modelName = 'Certification' as const;
+}
+class AvailabilitySubject {
+  static readonly modelName = 'Availability' as const;
+}
+class VacationRequestSubject {
+  static readonly modelName = 'VacationRequest' as const;
+}
+class LeaveRequestSubject {
+  static readonly modelName = 'LeaveRequest' as const;
+}
+class MedicalLeaveSubject {
+  static readonly modelName = 'MedicalLeave' as const;
+}
+class SalaryRecordSubject {
+  static readonly modelName = 'SalaryRecord' as const;
+}
+class TerminationSimulationSubject {
+  static readonly modelName = 'TerminationSimulation' as const;
+}
+class PayrollParameterSubject {
+  static readonly modelName = 'PayrollParameter' as const;
+}
+class EmployeeCompensationSubject {
+  static readonly modelName = 'EmployeeCompensation' as const;
+}
+
+/* All RRHH subjects — granted/revoked in bulk by the baseline role rules. */
+const RRHH_SUBJECTS = [
+  EmployeeSubject,
+  EmployeeContractSubject,
+  EmployeeDocumentSubject,
+  CertificationSubject,
+  AvailabilitySubject,
+  VacationRequestSubject,
+  LeaveRequestSubject,
+  MedicalLeaveSubject,
+  SalaryRecordSubject,
+  TerminationSimulationSubject,
+  PayrollParameterSubject,
+  EmployeeCompensationSubject,
+];
+/* The compensation-facing subset ACCOUNTANT may read. */
+const RRHH_COMPENSATION_SUBJECTS = [
+  SalaryRecordSubject,
+  TerminationSimulationSubject,
+  EmployeeCompensationSubject,
+];
+
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
    stays uniform. `manage` continues to imply all of them
@@ -226,12 +305,24 @@ export {
   CommitmentTemplateSubject,
   OperationsDashboardSubject,
   AuditPackageSubject,
+  EmployeeSubject,
+  EmployeeContractSubject,
+  EmployeeDocumentSubject,
+  CertificationSubject,
+  AvailabilitySubject,
+  VacationRequestSubject,
+  LeaveRequestSubject,
+  MedicalLeaveSubject,
+  SalaryRecordSubject,
+  TerminationSimulationSubject,
+  PayrollParameterSubject,
+  EmployeeCompensationSubject,
 };
 
 @Injectable()
 export class CaslAbilityFactory {
   defineAbilityFor(role: UserRole): AppAbility {
-    const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+    const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
 
     switch (role) {
       case UserRole.SUPER_ADMIN:
@@ -314,6 +405,8 @@ export class CaslAbilityFactory {
            read existing ones via blanket `read all`). `delete`
            stays ADMIN-only via `manage all`. */
         can('create', AuditPackageSubject);
+        /* HR-001 — MANAGER fully manages all RRHH subjects. */
+        RRHH_SUBJECTS.forEach((subject) => can('manage', subject));
         break;
 
       case UserRole.ACCOUNTANT:
@@ -335,6 +428,11 @@ export class CaslAbilityFactory {
         /* OPS-028 — every authenticated user can acknowledge their
            own readings; the service still scopes to userId. */
         can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
+        /* HR-001 — ACCOUNTANT must NOT read general RRHH data via the
+           blanket `read all` above. Revoke RRHH read, then re-grant read
+           on the compensation-facing subjects only. */
+        RRHH_SUBJECTS.forEach((subject) => cannot('read', subject));
+        RRHH_COMPENSATION_SUBJECTS.forEach((subject) => can('read', subject));
         break;
 
       case UserRole.ANALYST:
@@ -343,6 +441,9 @@ export class CaslAbilityFactory {
         can('create', AssetExceptionSubject);
         can(['create', 'update'], WorkPermitSubject);
         can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
+        /* HR-001 — ANALYST has no RRHH access; revoke the blanket
+           `read all` on RRHH subjects. */
+        RRHH_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
 
       case UserRole.VIEWER:
