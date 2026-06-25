@@ -6,3 +6,5 @@ export const OPERATIONS_ALERT_ENGINE_QUEUE = 'operations-alert-engine';
 export const OPERATIONS_WORK_PERMITS_QUEUE = 'operations-work-permits';
 /* OPS-034 — fast/slow refresh of the dashboard materialized views. */
 export const OPERATIONS_DASHBOARD_MV_REFRESH_QUEUE = 'operations-dashboard-mv-refresh';
+/* HR-007 — daily RRHH reminders (contract expiry today; the HR-005 cron foundation). */
+export const RRHH_REMINDERS_QUEUE = 'rrhh-reminders';

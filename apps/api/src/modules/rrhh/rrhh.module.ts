@@ -4,6 +4,7 @@ import { JobPositionsModule } from './job-positions/job-positions.module';
 import { EmployeesModule } from './employees/employees.module';
 import { EmployeeDocumentsModule } from './employee-documents/employee-documents.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { EmployeeContractsModule } from './contracts/employee-contracts.module';
 
 /* RRHH module aggregator. HR-001 added the gated health controller; HR-002
  * JobPositionsModule (cargos); HR-003 EmployeesModule (employees + guarded
@@ -14,7 +15,13 @@ import { DashboardModule } from './dashboard/dashboard.module';
  * submodules. PoliciesGuard / CaslAbilityFactory / PrismaService are provided by
  * the global Casl/Prisma modules. */
 @Module({
-  imports: [JobPositionsModule, EmployeesModule, EmployeeDocumentsModule, DashboardModule],
+  imports: [
+    JobPositionsModule,
+    EmployeesModule,
+    EmployeeDocumentsModule,
+    DashboardModule,
+    EmployeeContractsModule,
+  ],
   controllers: [RrhhController],
 })
 export class RrhhModule {}

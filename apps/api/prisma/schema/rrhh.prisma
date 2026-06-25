@@ -112,6 +112,9 @@ model Employee {
   employeeDocuments            EmployeeDocument[]
   employeeDocumentRequirements EmployeeDocumentRequirement[]
 
+  employeeContracts   EmployeeContract[] @relation("EmployeeContracts")
+  supervisedContracts EmployeeContract[] @relation("ContractSupervisor")
+
   createdBy String   @db.Uuid
   updatedBy String?  @db.Uuid
   createdAt DateTime @default(now())
@@ -267,7 +270,77 @@ model EmployeeDocument {
   supersededBy EmployeeDocument?    @relation("EmployeeDocSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
   supersedes   EmployeeDocument[]   @relation("EmployeeDocSupersession")
 
+  // HR-007 — optional link from a contract to its signed PDF (not fused).
+  contracts EmployeeContract[]
+
   @@index([companyId])
   @@index([companyId, employeeId])
   @@map("employee_documents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-007 — employee contracts + anexos. Structured contract data (the signed
+// PDF stays an EmployeeDocument, optionally linked via documentId — NOT fused).
+// Anexos attach to a principal via parentContractId (self-FK). Exactly one
+// principal (parentContractId NULL) VIGENTE contract per employee — enforced
+// atomically in the service (prior principal → REEMPLAZADO). Reuses the existing
+// ContractType enum (HR-003). RLS + audit + GRANT shipped in the migration.
+// ASCII enums; the UI maps display labels.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum ContractWorkSchedule {
+  COMPLETA
+  PARCIAL
+  TURNO
+  ESPECIAL
+}
+
+enum GratificationType {
+  NO
+  LEGAL
+  PACTADA
+}
+
+enum ContractStatus {
+  VIGENTE
+  VENCIDO
+  REEMPLAZADO
+  TERMINADO
+}
+
+model EmployeeContract {
+  id                  String               @id @default(uuid()) @db.Uuid
+  companyId           String               @db.Uuid
+  employeeId          String               @db.Uuid
+  contractType        ContractType
+  startDate           DateTime             @db.Date
+  endDate             DateTime?            @db.Date // required when PLAZO_FIJO/POR_OBRA (service-enforced)
+  contractualRole     String? // the role/cargo as written in the contract
+  workSchedule        ContractWorkSchedule
+  baseSalary          Decimal              @db.Decimal(18, 2)
+  gratification       GratificationType    @default(NO)
+  gratificationAmount Decimal?             @db.Decimal(18, 2)
+  mealAllowance       Decimal?             @db.Decimal(18, 2)
+  transportAllowance  Decimal?             @db.Decimal(18, 2)
+  workLocation        String? // free text / base for now
+  mainDuties          String?
+  supervisorId        String?              @db.Uuid // supervisor named in the contract
+  documentId          String?              @db.Uuid // optional link to the signed PDF (EmployeeDocument)
+  parentContractId    String?              @db.Uuid // set → this row is an anexo of the referenced principal
+  status              ContractStatus       @default(VIGENTE)
+  notes               String?
+  createdBy           String               @db.Uuid
+  updatedBy           String?              @db.Uuid
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  employee   Employee           @relation("EmployeeContracts", fields: [employeeId], references: [id], onDelete: Cascade)
+  supervisor Employee?          @relation("ContractSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
+  document   EmployeeDocument?  @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  parent     EmployeeContract?  @relation("ContractAnexos", fields: [parentContractId], references: [id], onDelete: SetNull)
+  anexos     EmployeeContract[] @relation("ContractAnexos")
+
+  @@index([companyId])
+  @@index([companyId, employeeId])
+  @@map("employee_contracts")
 }
