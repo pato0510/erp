@@ -14,6 +14,7 @@ import { formatCLP, formatDate, formatRUT } from '../../../../../lib/formatters'
 import EmployeeDocumentsTab from '../../../../../components/rrhh/EmployeeDocumentsTab';
 import EmployeeContractsTab from '../../../../../components/rrhh/EmployeeContractsTab';
 import EmployeeVacationsTab from '../../../../../components/rrhh/EmployeeVacationsTab';
+import EmployeeAbsencesTab from '../../../../../components/rrhh/EmployeeAbsencesTab';
 
 const AREA_LABELS: Record<string, string> = {
   OPERACIONES: 'Operaciones',
@@ -171,14 +172,14 @@ export default function EmployeeFichaPage() {
       {tab === 'documentos' && <EmployeeDocumentsTab employeeId={id} />}
       {tab === 'contrato' && <EmployeeContractsTab employeeId={id} />}
       {tab === 'vacaciones' && <EmployeeVacationsTab employeeId={id} />}
+      {tab === 'licencias' && <EmployeeAbsencesTab employeeId={id} />}
       {tab !== 'resumen' &&
         tab !== 'personales' &&
         tab !== 'remuneraciones' &&
         tab !== 'documentos' &&
         tab !== 'contrato' &&
-        tab !== 'vacaciones' && (
-          <Placeholder label={TABS.find((t) => t.key === tab)?.label ?? ''} />
-        )}
+        tab !== 'vacaciones' &&
+        tab !== 'licencias' && <Placeholder label={TABS.find((t) => t.key === tab)?.label ?? ''} />}
     </div>
   );
 }

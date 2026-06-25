@@ -120,6 +120,7 @@ model Employee {
   supervisedContracts EmployeeContract[] @relation("ContractSupervisor")
 
   vacationRequests VacationRequest[]
+  absences         Absence[]
 
   createdBy String   @db.Uuid
   updatedBy String?  @db.Uuid
@@ -278,6 +279,8 @@ model EmployeeDocument {
 
   // HR-007 — optional link from a contract to its signed PDF (not fused).
   contracts EmployeeContract[]
+  // HR-012 — optional link from an absence (permiso/licencia) to its certificate.
+  absences Absence[]
 
   @@index([companyId])
   @@index([companyId, employeeId])
@@ -392,4 +395,90 @@ model VacationRequest {
   @@index([companyId])
   @@index([companyId, employeeId])
   @@map("vacation_requests")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-012 — ausencias: permisos + licencias médicas, UNIFIED (one Absence model,
+// category PERMISO|LICENCIA). Permit types are configurable (seeded with the
+// Chilean legal set). Licencias médicas are REGISTERED ONLY — NO subsidy/payment
+// calc anywhere. Availability blocking is SOFT: a read-only marker (an APROBADO
+// absence with blocksAvailability covering a date). NO Operations integration in
+// V1 — real enforcement is HR-016. RLS + audit + GRANT shipped in the migration.
+// ASCII enums.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum AbsenceCategory {
+  PERMISO
+  LICENCIA
+}
+
+enum AbsenceDayUnit {
+  CORRIDOS
+  HABILES
+  MEDIO_DIA
+  HORAS
+}
+
+enum AbsenceStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  CANCELADO
+}
+
+model AbsenceType {
+  id          String          @id @default(uuid()) @db.Uuid
+  companyId   String          @db.Uuid
+  name        String
+  category    AbsenceCategory @default(PERMISO)
+  daysDefault Int?
+  unit        AbsenceDayUnit  @default(HABILES)
+  withPay     Boolean         @default(true)
+  isLegal     Boolean         @default(false)
+  active      Boolean         @default(true)
+  createdBy   String          @db.Uuid
+  updatedBy   String?         @db.Uuid
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  absences Absence[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("absence_types")
+}
+
+model Absence {
+  id                 String          @id @default(uuid()) @db.Uuid
+  companyId          String          @db.Uuid
+  employeeId         String          @db.Uuid
+  category           AbsenceCategory
+  absenceTypeId      String?         @db.Uuid // permisos reference a type; licencias may not
+  startDate          DateTime        @db.Date
+  endDate            DateTime        @db.Date
+  dias               Int // informational day count (admin-set or computed); NOT a balance
+  withPay            Boolean         @default(true)
+  blocksAvailability Boolean         @default(true)
+  status             AbsenceStatus   @default(PENDIENTE)
+  // licencia-specific (nullable; only used when category = LICENCIA). NO subsidy calc.
+  medicalFolio       String?
+  healthEntity       String? // Isapre/Fonasa — free text
+  requestedBy        String?         @db.Uuid
+  approvedBy         String?         @db.Uuid
+  approvedAt         DateTime?
+  rejectionReason    String?
+  notes              String?
+  documentId         String?         @db.Uuid // optional supporting certificate / licencia PDF
+  createdBy          String          @db.Uuid
+  updatedBy          String?         @db.Uuid
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  employee    Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  absenceType AbsenceType?      @relation(fields: [absenceTypeId], references: [id], onDelete: SetNull)
+  document    EmployeeDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([companyId, employeeId])
+  @@map("absences")
 }
