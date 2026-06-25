@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { ArrowLeft, Pencil, X } from 'lucide-react';
 import { apiClient } from '../../../../../lib/api';
 import { formatCLP, formatDate, formatRUT } from '../../../../../lib/formatters';
+import EmployeeDocumentsTab from '../../../../../components/rrhh/EmployeeDocumentsTab';
 
 const AREA_LABELS: Record<string, string> = {
   OPERACIONES: 'Operaciones',
@@ -165,9 +166,13 @@ export default function EmployeeFichaPage() {
       {tab === 'resumen' && <ResumenTab emp={emp} />}
       {tab === 'personales' && <PersonalesTab emp={emp} />}
       {tab === 'remuneraciones' && <RemuneracionesTab employeeId={id} />}
-      {tab !== 'resumen' && tab !== 'personales' && tab !== 'remuneraciones' && (
-        <Placeholder label={TABS.find((t) => t.key === tab)?.label ?? ''} />
-      )}
+      {tab === 'documentos' && <EmployeeDocumentsTab employeeId={id} />}
+      {tab !== 'resumen' &&
+        tab !== 'personales' &&
+        tab !== 'remuneraciones' &&
+        tab !== 'documentos' && (
+          <Placeholder label={TABS.find((t) => t.key === tab)?.label ?? ''} />
+        )}
     </div>
   );
 }
