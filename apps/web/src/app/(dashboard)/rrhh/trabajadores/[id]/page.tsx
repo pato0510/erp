@@ -15,6 +15,7 @@ import EmployeeDocumentsTab from '../../../../../components/rrhh/EmployeeDocumen
 import EmployeeContractsTab from '../../../../../components/rrhh/EmployeeContractsTab';
 import EmployeeVacationsTab from '../../../../../components/rrhh/EmployeeVacationsTab';
 import EmployeeAbsencesTab from '../../../../../components/rrhh/EmployeeAbsencesTab';
+import EmployeeSettlementsSection from '../../../../../components/rrhh/EmployeeSettlementsSection';
 
 const AREA_LABELS: Record<string, string> = {
   OPERACIONES: 'Operaciones',
@@ -299,51 +300,54 @@ function RemuneracionesTab({ employeeId }: { employeeId: string }) {
   // compensation at all — no separate role lookup needed. (VIEWER/ACCOUNTANT get
   // 403 → 'forbidden' above → no button.)
   return (
-    <Card>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3
-          className="text-sm font-semibold text-[var(--text-primary)]"
-          style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
-        >
-          Remuneración
-        </h3>
-        <button
-          onClick={() => setEditOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
-          style={{ background: '#2563eb' }}
-        >
-          <Pencil size={14} />
-          {comp ? 'Editar' : 'Ingresar remuneración'}
-        </button>
-      </div>
-
-      {comp ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <KV label="Sueldo base bruto" value={formatCLP(comp.baseSalaryGross)} />
-          <KV label="AFP" value={comp.afp} />
-          <KV label="Sistema de salud" value={comp.health ? HEALTH_LABELS[comp.health] : '—'} />
-          <KV label="Banco" value={comp.bank} />
-          <KV label="Tipo de cuenta" value={comp.bankAccountType} />
-          <KV label="N° de cuenta" value={comp.bankAccount} />
+    <div className="space-y-4">
+      <Card>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3
+            className="text-sm font-semibold text-[var(--text-primary)]"
+            style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
+          >
+            Remuneración
+          </h3>
+          <button
+            onClick={() => setEditOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
+            style={{ background: '#2563eb' }}
+          >
+            <Pencil size={14} />
+            {comp ? 'Editar' : 'Ingresar remuneración'}
+          </button>
         </div>
-      ) : (
-        <p className="text-sm text-[var(--text-secondary)]">
-          Este trabajador aún no tiene remuneración registrada.
-        </p>
-      )}
 
-      {editOpen && (
-        <CompensationModal
-          employeeId={employeeId}
-          initial={comp}
-          onClose={() => setEditOpen(false)}
-          onSaved={() => {
-            setEditOpen(false);
-            load();
-          }}
-        />
-      )}
-    </Card>
+        {comp ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <KV label="Sueldo base bruto" value={formatCLP(comp.baseSalaryGross)} />
+            <KV label="AFP" value={comp.afp} />
+            <KV label="Sistema de salud" value={comp.health ? HEALTH_LABELS[comp.health] : '—'} />
+            <KV label="Banco" value={comp.bank} />
+            <KV label="Tipo de cuenta" value={comp.bankAccountType} />
+            <KV label="N° de cuenta" value={comp.bankAccount} />
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--text-secondary)]">
+            Este trabajador aún no tiene remuneración registrada.
+          </p>
+        )}
+
+        {editOpen && (
+          <CompensationModal
+            employeeId={employeeId}
+            initial={comp}
+            onClose={() => setEditOpen(false)}
+            onSaved={() => {
+              setEditOpen(false);
+              load();
+            }}
+          />
+        )}
+      </Card>
+      <EmployeeSettlementsSection employeeId={employeeId} />
+    </div>
   );
 }
 

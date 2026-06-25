@@ -122,6 +122,8 @@ model Employee {
   vacationRequests VacationRequest[]
   absences         Absence[]
 
+  payrollSettlements PayrollSettlement[]
+
   createdBy String   @db.Uuid
   updatedBy String?  @db.Uuid
   createdAt DateTime @default(now())
@@ -281,6 +283,8 @@ model EmployeeDocument {
   contracts EmployeeContract[]
   // HR-012 — optional link from an absence (permiso/licencia) to its certificate.
   absences Absence[]
+  // HR-009 — optional link from a settlement to its UPLOADED signed PDF.
+  payrollSettlements PayrollSettlement[]
 
   @@index([companyId])
   @@index([companyId, employeeId])
@@ -541,4 +545,73 @@ model AfpRate {
   @@unique([parameterSetId, afpName])
   @@index([companyId])
   @@map("afp_rates")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-009 — registro de remuneraciones: RECORD settlements computed ELSEWHERE.
+// The system STORES + DISPLAYS them; it does NOT compute the liquidación (V2).
+// ALL monetary fields are ENTERED by the admin (Decimal 18,2). costoEmpresa is a
+// SUM of entered values (totalHaberes + employer aportes), NOT a previsional
+// derivation — computed on read. The signed PDF is UPLOADED (HR-004 documentId),
+// never generated. SALARY-SENSITIVE: per-person amounts are gated at the API on
+// the EmployeeCompensation guard (read+update → MANAGER/ADMIN/SUPER_ADMIN);
+// ACCOUNTANT gets aggregates only. RLS + audit + GRANT shipped in the migration.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum SettlementStatus {
+  BORRADOR
+  EMITIDA
+  PAGADA
+  ANULADA
+}
+
+model PayrollSettlement {
+  id          String @id @default(uuid()) @db.Uuid
+  companyId   String @db.Uuid
+  employeeId  String @db.Uuid
+  periodYear  Int
+  periodMonth Int // 1..12 (validated at the service)
+
+  // Haberes (entered)
+  haberesImponibles   Decimal  @db.Decimal(18, 2)
+  haberesNoImponibles Decimal  @db.Decimal(18, 2)
+  sueldoBase          Decimal? @db.Decimal(18, 2) // optional breakdown
+  gratificacion       Decimal? @db.Decimal(18, 2) // optional breakdown
+  totalHaberes        Decimal  @db.Decimal(18, 2)
+
+  // Descuentos (entered)
+  descUAfp          Decimal @db.Decimal(18, 2)
+  descSalud         Decimal @db.Decimal(18, 2)
+  descAfc           Decimal @db.Decimal(18, 2)
+  descImpuestoUnico Decimal @db.Decimal(18, 2)
+  otrosDescuentos   Decimal @db.Decimal(18, 2)
+  totalDescuentos   Decimal @db.Decimal(18, 2)
+
+  liquidoPagado Decimal @db.Decimal(18, 2) // entered take-home
+
+  // Employer-side contributions (entered, not derived) — summed into costoEmpresa
+  aporteAfcEmpleador    Decimal? @db.Decimal(18, 2)
+  aporteSis             Decimal? @db.Decimal(18, 2)
+  aporteMutual          Decimal? @db.Decimal(18, 2)
+  otrosAportesEmpleador Decimal? @db.Decimal(18, 2)
+  // MAY be stored; the canonical value is the SUM computed on read.
+  costoEmpresa          Decimal? @db.Decimal(18, 2)
+
+  afpName    String? // the AFP used this period (free text / from compensation)
+  status     SettlementStatus @default(BORRADOR)
+  documentId String?          @db.Uuid // UPLOADED signed PDF (EmployeeDocument) — not generated
+  notes      String?
+
+  createdBy String   @db.Uuid
+  updatedBy String?  @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  document EmployeeDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, employeeId, periodYear, periodMonth])
+  @@index([companyId])
+  @@index([companyId, employeeId])
+  @@map("payroll_settlements")
 }
