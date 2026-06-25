@@ -7,6 +7,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { EmployeeContractsModule } from './contracts/employee-contracts.module';
 import { VacationsModule } from './vacations/vacations.module';
 import { AbsencesModule } from './absences/absences.module';
+import { PayrollParametersModule } from './payroll-parameters/payroll-parameters.module';
 
 /* RRHH module aggregator. HR-001 added the gated health controller; HR-002
  * JobPositionsModule (cargos); HR-003 EmployeesModule (employees + guarded
@@ -25,6 +26,7 @@ import { AbsencesModule } from './absences/absences.module';
     EmployeeContractsModule,
     VacationsModule,
     AbsencesModule,
+    PayrollParametersModule,
   ],
   controllers: [RrhhController],
 })

@@ -482,3 +482,63 @@ model Absence {
   @@index([companyId, employeeId])
   @@map("absences")
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-008 — payroll parameters (Nivel A: STORE + EXPOSE only; NO liquidación calc
+// engine, NO impuesto-único bracket table — both V2). PERIOD-VERSIONED: a
+// PayrollParameterSet is valid for [effectiveFrom, effectiveTo]; AFP comisiones
+// belong to a set. Every tope/tasa here is DATA (configurable per period) — never
+// hardcode a value in business logic; read it from the set. The seed values
+// (HR-008 §3.4, Superintendencia de Pensiones 2026) live in the service seed, not
+// in any formula. RLS + audit + GRANT shipped in the migration.
+// ─────────────────────────────────────────────────────────────────────────
+
+model PayrollParameterSet {
+  id            String    @id @default(uuid()) @db.Uuid
+  companyId     String    @db.Uuid
+  name          String // e.g. "2026"
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date // null = current/open period
+
+  topeImponibleAfpSaludUf     Decimal  @db.Decimal(8, 2) // 90.00 UF
+  topeImponibleAfcUf          Decimal  @db.Decimal(8, 2) // 135.20 UF
+  tasaAfpObligatoria          Decimal  @db.Decimal(6, 3) // 10.000 %
+  tasaSalud                   Decimal  @db.Decimal(6, 3) // 7.000 %
+  tasaAfcIndefinidoTrabajador Decimal  @db.Decimal(6, 3) // 0.600 %
+  tasaAfcIndefinidoEmpleador  Decimal  @db.Decimal(6, 3) // 2.400 %
+  tasaAfcPlazoFijoEmpleador   Decimal  @db.Decimal(6, 3) // 3.000 %
+  tasaSis                     Decimal? @db.Decimal(6, 3) // ~1.530 % (employer; editable)
+
+  active    Boolean  @default(true)
+  notes     String?
+  createdBy String   @db.Uuid
+  updatedBy String?  @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  afpRates AfpRate[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("payroll_parameter_sets")
+}
+
+model AfpRate {
+  id             String  @id @default(uuid()) @db.Uuid
+  companyId      String  @db.Uuid
+  parameterSetId String  @db.Uuid
+  afpName        String
+  // nullable: the comisiones we couldn't verify are left null for the admin to fill.
+  comisionPorcentaje Decimal? @db.Decimal(6, 3)
+  active             Boolean  @default(true)
+  createdBy          String   @db.Uuid
+  updatedBy          String?  @db.Uuid
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  parameterSet PayrollParameterSet @relation(fields: [parameterSetId], references: [id], onDelete: Cascade)
+
+  @@unique([parameterSetId, afpName])
+  @@index([companyId])
+  @@map("afp_rates")
+}

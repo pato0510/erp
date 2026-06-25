@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, LayoutDashboard, LogOut, Moon, Sun, Users } from 'lucide-react';
+import {
+  Briefcase,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  SlidersHorizontal,
+  Sun,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -16,6 +24,7 @@ const navItems = [
   { href: '/rrhh', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/rrhh/trabajadores', label: 'Trabajadores', icon: Users, exact: false },
   { href: '/rrhh/cargos', label: 'Cargos', icon: Briefcase, exact: false },
+  { href: '/rrhh/parametros', label: 'Parámetros', icon: SlidersHorizontal, exact: false },
 ];
 
 export function RrhhSidebar() {
