@@ -107,6 +107,10 @@ model Employee {
   contractType ContractType? // convenience summary; authoritative contracts arrive in HR-007
   notes        String?
 
+  // HR-011 — manual feriado progresivo (días adicionales). Set by the HR admin;
+  // V1 has NO automatic progresivo calc (prior-employer proof + 10-year cap = V2).
+  diasAdicionalesFeriado Int @default(0)
+
   compensation EmployeeCompensation?
 
   employeeDocuments            EmployeeDocument[]
@@ -114,6 +118,8 @@ model Employee {
 
   employeeContracts   EmployeeContract[] @relation("EmployeeContracts")
   supervisedContracts EmployeeContract[] @relation("ContractSupervisor")
+
+  vacationRequests VacationRequest[]
 
   createdBy String   @db.Uuid
   updatedBy String?  @db.Uuid
@@ -343,4 +349,47 @@ model EmployeeContract {
   @@index([companyId])
   @@index([companyId, employeeId])
   @@map("employee_contracts")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-011 — vacaciones / feriado legal (Chile, owner-validated calc). The saldo
+// (balance) is COMPUTED, never stored: devengado (1.25 días hábiles/mes from
+// hireDate, +1.25/30 per partial-month day) + díasAdicionales − días hábiles of
+// APROBADO/TOMADO requests. Annual entitlement is a PARAMETER
+// (CompanySettings.feriadoAnualDiasHabiles, default 15). "Días hábiles" = Mon–Fri
+// only; Chilean festivos are NOT handled in V1 — admin may override diasHabiles
+// per request. RLS + audit + GRANT shipped in the migration. ASCII enum.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum VacationRequestStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  TOMADO
+  CANCELADO
+}
+
+model VacationRequest {
+  id              String                @id @default(uuid()) @db.Uuid
+  companyId       String                @db.Uuid
+  employeeId      String                @db.Uuid
+  startDate       DateTime              @db.Date
+  endDate         DateTime              @db.Date
+  diasHabiles     Int // Mon–Fri count between start/end inclusive; admin-overridable for festivos
+  status          VacationRequestStatus @default(PENDIENTE)
+  requestedBy     String?               @db.Uuid
+  approvedBy      String?               @db.Uuid
+  approvedAt      DateTime?
+  rejectionReason String?
+  notes           String?
+  createdBy       String                @db.Uuid
+  updatedBy       String?               @db.Uuid
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, employeeId])
+  @@map("vacation_requests")
 }

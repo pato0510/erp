@@ -13,6 +13,7 @@ import { apiClient } from '../../../../../lib/api';
 import { formatCLP, formatDate, formatRUT } from '../../../../../lib/formatters';
 import EmployeeDocumentsTab from '../../../../../components/rrhh/EmployeeDocumentsTab';
 import EmployeeContractsTab from '../../../../../components/rrhh/EmployeeContractsTab';
+import EmployeeVacationsTab from '../../../../../components/rrhh/EmployeeVacationsTab';
 
 const AREA_LABELS: Record<string, string> = {
   OPERACIONES: 'Operaciones',
@@ -169,11 +170,15 @@ export default function EmployeeFichaPage() {
       {tab === 'remuneraciones' && <RemuneracionesTab employeeId={id} />}
       {tab === 'documentos' && <EmployeeDocumentsTab employeeId={id} />}
       {tab === 'contrato' && <EmployeeContractsTab employeeId={id} />}
+      {tab === 'vacaciones' && <EmployeeVacationsTab employeeId={id} />}
       {tab !== 'resumen' &&
         tab !== 'personales' &&
         tab !== 'remuneraciones' &&
         tab !== 'documentos' &&
-        tab !== 'contrato' && <Placeholder label={TABS.find((t) => t.key === tab)?.label ?? ''} />}
+        tab !== 'contrato' &&
+        tab !== 'vacaciones' && (
+          <Placeholder label={TABS.find((t) => t.key === tab)?.label ?? ''} />
+        )}
     </div>
   );
 }

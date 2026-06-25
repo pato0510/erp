@@ -9,6 +9,9 @@ model CompanySettings {
   thousandSeparator String   @default(".")
   taxRate           Decimal  @default(0.19) // IVA Chile 19%
   extraSettings     Json?
+  // HR-011 — annual feriado legal entitlement in días hábiles. PARAMETER, not a
+  // hardcoded constant: AGS/Antofagasta general = 15; 20-day austral zones exist.
+  feriadoAnualDiasHabiles Int @default(15)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
