@@ -15,6 +15,7 @@ import EmployeeDocumentsTab from '../../../../../components/rrhh/EmployeeDocumen
 import EmployeeContractsTab from '../../../../../components/rrhh/EmployeeContractsTab';
 import EmployeeVacationsTab from '../../../../../components/rrhh/EmployeeVacationsTab';
 import EmployeeAbsencesTab from '../../../../../components/rrhh/EmployeeAbsencesTab';
+import EmployeeCertificationsTab from '../../../../../components/rrhh/EmployeeCertificationsTab';
 import EmployeeSettlementsSection from '../../../../../components/rrhh/EmployeeSettlementsSection';
 import EmployeeFiniquitoSection from '../../../../../components/rrhh/EmployeeFiniquitoSection';
 
@@ -175,13 +176,23 @@ export default function EmployeeFichaPage() {
       {tab === 'contrato' && <EmployeeContractsTab employeeId={id} />}
       {tab === 'vacaciones' && <EmployeeVacationsTab employeeId={id} />}
       {tab === 'licencias' && <EmployeeAbsencesTab employeeId={id} />}
+      {tab === 'certificaciones' && (
+        <EmployeeCertificationsTab employeeId={id} mode="certificaciones" />
+      )}
+      {tab === 'habilitaciones' && (
+        <EmployeeCertificationsTab employeeId={id} mode="habilitaciones" />
+      )}
       {tab !== 'resumen' &&
         tab !== 'personales' &&
         tab !== 'remuneraciones' &&
         tab !== 'documentos' &&
         tab !== 'contrato' &&
         tab !== 'vacaciones' &&
-        tab !== 'licencias' && <Placeholder label={TABS.find((t) => t.key === tab)?.label ?? ''} />}
+        tab !== 'licencias' &&
+        tab !== 'certificaciones' &&
+        tab !== 'habilitaciones' && (
+          <Placeholder label={TABS.find((t) => t.key === tab)?.label ?? ''} />
+        )}
     </div>
   );
 }

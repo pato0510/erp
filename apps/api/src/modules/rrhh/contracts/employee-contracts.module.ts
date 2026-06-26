@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { RRHH_REMINDERS_QUEUE } from '../../jobs/queues.constant';
 import { NotificationModule } from '../../operations/notifications/notification.module';
+import { CertificationsModule } from '../certifications/certifications.module';
 import { EmployeeDocumentsModule } from '../employee-documents/employee-documents.module';
 import { ContractRemindersService } from './contract-reminders.service';
 import { EmployeeContractsController } from './employee-contracts.controller';
@@ -21,6 +22,7 @@ import { RrhhRemindersProcessor } from './rrhh-reminders.processor';
   imports: [
     NotificationModule,
     EmployeeDocumentsModule,
+    CertificationsModule,
     BullModule.registerQueue({ name: RRHH_REMINDERS_QUEUE }),
   ],
   controllers: [EmployeeContractsController],

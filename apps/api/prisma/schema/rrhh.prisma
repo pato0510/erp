@@ -124,6 +124,7 @@ model Employee {
 
   payrollSettlements PayrollSettlement[]
   terminationRecords TerminationRecord[]
+  certifications     Certification[]
 
   createdBy String   @db.Uuid
   updatedBy String?  @db.Uuid
@@ -286,6 +287,8 @@ model EmployeeDocument {
   absences Absence[]
   // HR-009 — optional link from a settlement to its UPLOADED signed PDF.
   payrollSettlements PayrollSettlement[]
+  // HR-014 — optional link from a certification to its certificate PDF.
+  certifications Certification[]
 
   @@index([companyId])
   @@index([companyId, employeeId])
@@ -670,4 +673,76 @@ model TerminationRecord {
   @@index([companyId])
   @@index([companyId, employeeId])
   @@map("termination_records")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-014 — certificaciones / habilitaciones. COPY-ADAPTED from the HR-004
+// employee-documents engine (type catalog + records), for certifications. A
+// unified Certification model with a category (certificación / habilitación
+// cliente / habilitación faena). Status VIGENTE/POR_VENCER/VENCIDA is DERIVED
+// from expiryDate on read (same deriveStatus fold as HR-004); the persisted
+// status distinguishes active (VIGENTE) from admin-cancelled (ANULADA). The
+// certificate PDF is a linked EmployeeDocument (HR-004 reuse), not re-uploaded
+// here. Compliance reads the cargo's requiredCertTypes (HR-002). RLS + audit +
+// GRANT in the migration. ASCII enums.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum CertificationCategory {
+  CERTIFICACION
+  HABILITACION_CLIENTE
+  HABILITACION_FAENA
+}
+
+enum CertificationStatus {
+  VIGENTE
+  POR_VENCER
+  VENCIDA
+  ANULADA
+}
+
+model CertificationType {
+  id                  String                @id @default(uuid()) @db.Uuid
+  companyId           String                @db.Uuid
+  name                String
+  category            CertificationCategory @default(CERTIFICACION)
+  defaultValidityDays Int?
+  requiresExpiry      Boolean               @default(false)
+  issuingEntity       String? // organismo certificador (optional)
+  active              Boolean               @default(true)
+  createdBy           String                @db.Uuid
+  updatedBy           String?               @db.Uuid
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  certifications Certification[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("certification_types")
+}
+
+model Certification {
+  id                  String                @id @default(uuid()) @db.Uuid
+  companyId           String                @db.Uuid
+  employeeId          String                @db.Uuid
+  certificationTypeId String                @db.Uuid
+  category            CertificationCategory // denormalised from the type for filtering
+  issueDate           DateTime?             @db.Date
+  expiryDate          DateTime?             @db.Date // auto from defaultValidityDays when the type requiresExpiry
+  status              CertificationStatus   @default(VIGENTE) // persisted: VIGENTE | ANULADA; POR_VENCER/VENCIDA derived on read
+  documentId          String?               @db.Uuid // optional link to the certificate PDF (EmployeeDocument)
+  clientOrSite        String? // which client/faena this habilitación is for, when relevant
+  notes               String?
+  createdBy           String                @db.Uuid
+  updatedBy           String?               @db.Uuid
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  employee          Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  certificationType CertificationType @relation(fields: [certificationTypeId], references: [id], onDelete: Restrict)
+  document          EmployeeDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([companyId, employeeId])
+  @@map("certifications")
 }
