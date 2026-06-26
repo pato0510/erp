@@ -16,6 +16,7 @@ import EmployeeContractsTab from '../../../../../components/rrhh/EmployeeContrac
 import EmployeeVacationsTab from '../../../../../components/rrhh/EmployeeVacationsTab';
 import EmployeeAbsencesTab from '../../../../../components/rrhh/EmployeeAbsencesTab';
 import EmployeeSettlementsSection from '../../../../../components/rrhh/EmployeeSettlementsSection';
+import EmployeeFiniquitoSection from '../../../../../components/rrhh/EmployeeFiniquitoSection';
 
 const AREA_LABELS: Record<string, string> = {
   OPERACIONES: 'Operaciones',
@@ -347,6 +348,7 @@ function RemuneracionesTab({ employeeId }: { employeeId: string }) {
         )}
       </Card>
       <EmployeeSettlementsSection employeeId={employeeId} />
+      <EmployeeFiniquitoSection employeeId={employeeId} />
     </div>
   );
 }

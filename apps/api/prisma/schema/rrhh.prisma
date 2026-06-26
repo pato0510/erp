@@ -123,6 +123,7 @@ model Employee {
   absences         Absence[]
 
   payrollSettlements PayrollSettlement[]
+  terminationRecords TerminationRecord[]
 
   createdBy String   @db.Uuid
   updatedBy String?  @db.Uuid
@@ -614,4 +615,59 @@ model PayrollSettlement {
   @@index([companyId])
   @@index([companyId, employeeId])
   @@map("payroll_settlements")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// HR-010 — estimación de finiquito. The CALCULATOR (/estimate) is EPHEMERAL and
+// writes NOTHING; only the explicit "registrar finiquito" action persists a
+// TerminationRecord. This is an ESTIMATION, not the definitive legal finiquito
+// (a disclaimer is returned with every estimation). Acotado arithmetic: dual cap
+// (11 años + 90 UF) on IAS/aviso, feriado at full base (no cap), causal drives
+// which components apply, UF is an EDITABLE input (no live feed). NO tax/recargos
+// in V1. SALARY-SENSITIVE: gated at the API on the TerminationSimulation guard
+// (read+update → MANAGER/ADMIN/SUPER_ADMIN). RLS + audit + GRANT in the migration.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum TerminationCausal {
+  NECESIDADES_EMPRESA // Art. 161 → IAS + aviso (if no notice) + feriado
+  DESAHUCIO_EMPLEADOR // Art. 161 (confianza) → same régimen as necesidades
+  RENUNCIA // Art. 159 N°2 → feriado proporcional only
+  MUTUO_ACUERDO // Art. 159 N°1 → feriado proporcional only
+  CADUCIDAD_ART160 // Art. 160 → feriado proporcional only (no IAS)
+  PLAZO_FIJO_TERMINO // término de plazo/obra → feriado proporcional only
+}
+
+enum TerminationStatus {
+  REGISTRADO
+  ANULADO
+}
+
+model TerminationRecord {
+  id              String            @id @default(uuid()) @db.Uuid
+  companyId       String            @db.Uuid
+  employeeId      String            @db.Uuid
+  causal          TerminationCausal
+  terminationDate DateTime          @db.Date
+  ufValueUsed     Decimal           @db.Decimal(12, 4) // editable input snapshot (no live UF feed)
+  baseMonthlyUsed Decimal           @db.Decimal(18, 2)
+  aniosServicio   Int
+  aniosIndemnizables Int
+  montoIas        Decimal           @db.Decimal(18, 2)
+  montoAvisoPrevio Decimal          @db.Decimal(18, 2)
+  feriadoDias     Decimal           @db.Decimal(6, 2)
+  montoFeriado    Decimal           @db.Decimal(18, 2)
+  montoTotal      Decimal           @db.Decimal(18, 2)
+  avisoPrevioDado Boolean
+  status          TerminationStatus @default(REGISTRADO)
+  notes           String?
+  createdBy       String            @db.Uuid
+  updatedBy       String?           @db.Uuid
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, employeeId])
+  @@map("termination_records")
 }
