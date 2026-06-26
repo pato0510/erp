@@ -11,6 +11,7 @@ import { PayrollParametersModule } from './payroll-parameters/payroll-parameters
 import { SettlementsModule } from './settlements/settlements.module';
 import { TerminationsModule } from './terminations/terminations.module';
 import { CertificationsModule } from './certifications/certifications.module';
+import { DisponibilidadModule } from './disponibilidad/disponibilidad.module';
 
 /* RRHH module aggregator. HR-001 added the gated health controller; HR-002
  * JobPositionsModule (cargos); HR-003 EmployeesModule (employees + guarded
@@ -33,6 +34,7 @@ import { CertificationsModule } from './certifications/certifications.module';
     SettlementsModule,
     TerminationsModule,
     CertificationsModule,
+    DisponibilidadModule,
   ],
   controllers: [RrhhController],
 })

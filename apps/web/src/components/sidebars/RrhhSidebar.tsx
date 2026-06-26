@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Briefcase,
+  CalendarCheck,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -23,6 +24,7 @@ import { SidebarBrand } from './SidebarBrand';
 const navItems = [
   { href: '/rrhh', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/rrhh/trabajadores', label: 'Trabajadores', icon: Users, exact: false },
+  { href: '/rrhh/disponibilidad', label: 'Disponibilidad', icon: CalendarCheck, exact: false },
   { href: '/rrhh/cargos', label: 'Cargos', icon: Briefcase, exact: false },
   { href: '/rrhh/parametros', label: 'Parámetros', icon: SlidersHorizontal, exact: false },
 ];
