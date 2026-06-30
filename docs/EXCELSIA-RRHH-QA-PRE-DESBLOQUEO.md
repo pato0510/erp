@@ -14,7 +14,9 @@
 >   de este documento.
 >
 > Estado del documento: **ABIERTO** — se actualiza a medida que se difieren o completan ítems.
-> Última actualización: 2026-06-30 — RRHH V1 completo (18/18 en prod, HR-016).
+> Última actualización: 2026-06-30 — Ronda de QA en producción: finiquito (HR-010) validado a mano,
+> permisos de datos sensibles validados; 1 hallazgo de permisos pendiente (contador → lista de
+> trabajadores). Ver §1.4.
 
 ---
 
@@ -22,10 +24,10 @@
 
 Estas dos cosas DEBEN estar resueltas antes de sacar el "Próximamente":
 
-| #   | Condición                                                                   | Estado       | Notas                                                                             |
-| --- | --------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------- |
-| G1  | **MinIO en producción configurado**                                         | ❌ Pendiente | Hoy `MINIO_ENDPOINT` vacío → todos los documentos van a DB-blob fallback. Ver §4. |
-| G2  | **Ronda de QA de permisos completa** (todos los roles, todas las pantallas) | ❌ Pendiente | Especialmente datos sensibles: sueldos y finiquitos. Ver §1 y §2.                 |
+| #   | Condición                                                                   | Estado       | Notas                                                                                                                                                                                                            |
+| --- | --------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G1  | **MinIO en producción configurado**                                         | ✅ RESUELTO  | Cloudflare R2 configurado; las subidas caen en el bucket `excelsia-documents` (verificado en prod 2026-06-30). El fix fue la config del cliente S3 (puerto/credenciales/región/bucket), no las env vars. Ver §4. |
+| G2  | **Ronda de QA de permisos completa** (todos los roles, todas las pantallas) | ❌ Pendiente | Especialmente datos sensibles: sueldos y finiquitos. Ver §1 y §2.                                                                                                                                                |
 
 ---
 
@@ -68,13 +70,34 @@ Leyenda: ✅ acceso total · 📊 solo agregados (nunca por persona) · ❌ sin 
 
 ### 1.3 Verificaciones puntuales de alto riesgo (las que NO se hicieron a mano)
 
-- [ ] **HR-009 (remuneraciones):** entrar como **ACCOUNTANT** → confirmar que NO ve montos de
-      sueldo por persona en la ficha (debe decir "sin permiso"); confirmar que sí puede ver el
-      agregado en el dashboard. Como **VIEWER** → no ve nada de remuneraciones.
-      _Estado: validado solo a nivel tabla (RLS). Falta nivel app._
+- [x] **HR-009 (remuneraciones) — ✅ VALIDADO por el owner en producción (2026-06-30).**
+      **ACCOUNTANT:** el dashboard muestra SOLO el agregado de masa salarial, con el mensaje
+      explícito "Tu rol solo tiene acceso al agregado de remuneraciones de la empresa"; los
+      endpoints de sueldo por persona devuelven 403 (Network tab: `payroll`=200, `overview`=403,
+      `employees`=403). Sin fuga de sueldo por persona. **VIEWER:** no ve nada sensible.
+      _Estado: validado a nivel app (no solo RLS). Nota: el `employees`=403 de hoy es correcto para
+      sueldos, pero ver hallazgo §1.4 — el owner quiere habilitar la LISTA de trabajadores (sin
+      montos) al contador._
 - [ ] **HR-010 (finiquito):** entrar como **ACCOUNTANT** y **VIEWER** → confirmar que NO ven la
       sección de finiquito ni montos (403).
-      _Estado: validado solo a nivel tabla. Falta nivel app._
+      _Estado: **VIEWER** ✅ validado en la ronda (no ve nada sensible). Falta ejercer a mano el 403
+      de finiquito específico para **ACCOUNTANT** (no se tocó en esta ronda)._
+
+### 1.4 Hallazgos de la ronda QA en producción (2026-06-30)
+
+- [ ] **AJUSTE DE PERMISOS (pendiente antes de exponer) — el contador debe ver la LISTA de
+      trabajadores.** Hoy **ACCOUNTANT** recibe 403 en `GET /api/rrhh/employees` (la lista), así que
+      la pantalla Trabajadores muestra el error rojo genérico "No se pudieron cargar los
+      trabajadores". **Decisión del owner:** el contador SÍ debe ver la lista (nombre, RUT, área,
+      cargo) — **sin sueldos**. Acción: otorgar a ACCOUNTANT lectura de la lista de empleados (ya
+      separada de la compensación desde HR-003).
+- [ ] **CONSTRAINT CRÍTICO del fix.** Habilitar "el contador ve la lista" NO debe abrir la ficha
+      completa con compensación/liquidaciones/finiquito. La lista (solo lectura, sin montos) sí; los
+      sub-recursos por persona de sueldo/finiquito DEBEN seguir en 403 para ACCOUNTANT. El fix debe
+      acotarse para que ver la lista no cascadee a las pestañas sensibles.
+- [ ] **Secundario (cosmético, menor prioridad).** Aun donde el 403 es intencional, la pantalla
+      Trabajadores debería mostrar un mensaje limpio "sin permiso" en vez del rojo genérico "No se
+      pudieron cargar", igual que lo maneja Disponibilidad.
 
 ---
 
@@ -83,9 +106,13 @@ Leyenda: ✅ acceso total · 📊 solo agregados (nunca por persona) · ❌ sin 
 **Por qué importa:** los cálculos de dominio chileno tienen tests que pasan, pero algunos no se
 verificaron con una cuenta a mano sobre datos reales. Un error acá = plata mal calculada.
 
-- [ ] **HR-010 (finiquito) — cuenta a mano.** Estimar: necesidades de la empresa, trabajador de
-      5 años, base 1.000.000, sin aviso previo → IAS esperado = 1.000.000 × 5 = **5.000.000**, + 1.000.000 de aviso, + feriado del saldo. Confirmar que el total cuadra. - [ ] Confirmar doble tope: base sobre 90 UF usa el tope, no el sueldo real. - [ ] Confirmar tope de 11 años: 14 años de antigüedad → calcula como 11. - [ ] Confirmar que la causal cambia los componentes (renuncia → solo feriado).
-      _Estado: cubierto por 19 unit tests; sin verificación humana._
+- [x] **HR-010 (finiquito) — cuenta a mano. ✅ VALIDADO por el owner en producción (2026-06-30).** - [x] Caso normal (necesidades de la empresa, 5 años, base $1.000.000, UF 40.000, con aviso) →
+      IAS $5.000.000 (1.000.000×5), aviso $0 (aviso dado), feriado $40.333 → total **$5.040.333**. ✅ - [x] Tope 90 UF: base $5.000.000 → topada a $3.600.000 (90×40.000), IAS = 3.600.000×5 =
+      **$18.000.000** (NO sobre los 5M). El feriado usó la base FULL ($166.667/día), no la topada
+      — correcto: el tope aplica solo a IAS/aviso. ✅ - [x] Causal renuncia → IAS $0, aviso $0, solo feriado. La lógica de causales funciona. ✅ - [x] Disclaimer "Estimación referencial…" visible. ✅
+      _Estado: cálculo de finiquito totalmente validado (caso normal + tope UF + causales), además
+      de los 19 unit tests. El tope de 11 años de antigüedad queda cubierto por unit tests (no se
+      ejerció a mano en esta ronda)._
 - [x] **HR-011 (vacaciones) — cuenta a mano.** _YA VERIFICADO por el owner: devengado = meses ×
       1,25; conteo viernes-a-lunes = 2 días hábiles; aprobar/cancelar mueve el saldo._ ✅
 
@@ -126,11 +153,13 @@ Quedaron cubiertas por tests pero sin recorrido manual completo.
 
 ## 4. Deuda de infraestructura (resolver antes o junto al desbloqueo)
 
-- [ ] **MinIO en producción (G1 — bloqueante).** Hoy en Railway: `MINIO_BUCKET=excelsia-documents`,
-      `MINIO_PORT=9000`, `MINIO_USE_SSL=true` seteados, pero `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`,
-      `MINIO_SECRET_KEY` **vacíos** → `isConfigured()=false` → todos los documentos se guardan como
-      blob en PostgreSQL. Funciona, pero infla la DB y los backups. - Decisión pendiente: S3 externo (Cloudflare R2 / Backblaze B2, recomendado por simplicidad
-      y costo) vs. servicio MinIO propio en Railway. - Acción: setear `MINIO_ENDPOINT` + credenciales válidas + asegurar que el bucket existe.
+- [x] **MinIO en producción (G1) — ✅ RESUELTO (2026-06-30).** Se eligió **Cloudflare R2**
+      (S3-compatible). Las subidas caen en el bucket `excelsia-documents`, verificado en prod.
+      El fix fue la **config del cliente S3** (`StorageService`), no las env vars: `region: 'auto'`,
+      `forcePathStyle: true`, endpoint `https://<MINIO_ENDPOINT>` con el scheme agregado una sola vez,
+      puerto leído de `MINIO_PORT` (443) y credenciales de `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`
+      (antes el cliente leía `MINIO_API_PORT`/`MINIO_ROOT_*`, por eso caía a DB-blob). El bucket ahora
+      resuelve de `MINIO_BUCKET`. Los documentos ya no van a blob en PostgreSQL.
 - [ ] **Completar las 4 comisiones de AFP faltantes (HR-008).** Capital, Cuprum, Habitat, PlanVital
       están en `NULL` (no se inventaron). Completar desde spensiones.cl. No urgente (no hay motor
       que las use aún), pero dejar la tabla al día.
@@ -179,11 +208,12 @@ Cuando se haga la ronda (antes de desbloquear), este es el orden por prioridad d
 
 El "Próximamente" de RRHH se puede sacar SOLO cuando:
 
-- [ ] §1 (QA de permisos, incluyendo §1.3 datos sensibles) — completo y sin desvíos.
-- [ ] §2 (cálculo de finiquito verificado a mano) — completo.
-- [ ] §4 MinIO (G1) — resuelto y verificado en producción.
+- [ ] §1 (QA de permisos, incluyendo §1.3 datos sensibles) — completo y sin desvíos. ← **único gate duro pendiente**
+- [ ] §2 (cálculo de finiquito verificado a mano) — fuertemente recomendado (es una _estimación_, no bloquea el desbloqueo).
+- [x] §4 MinIO (G1) — ✅ resuelto y verificado en producción (2026-06-30, Cloudflare R2).
 
-Las secciones §3 y §5 son fuertemente recomendadas pero pueden planificarse como sprint de
-hardening posterior si se decide conscientemente. §1, §2 y §4-MinIO son **innegociables**.
+Con §4-MinIO (G1) ya resuelto, el **único gate duro pendiente para exponer es §1 (QA de
+permisos)**. §2 (cálculo de finiquito) y las secciones §3 y §5 son fuertemente recomendadas pero
+pueden planificarse como sprint de hardening posterior si se decide conscientemente.
 
 _Responsable: Pato (AGS Soluciones). Este documento se versiona junto al código._
