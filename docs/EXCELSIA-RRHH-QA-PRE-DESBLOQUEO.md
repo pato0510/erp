@@ -14,7 +14,7 @@
 >   de este documento.
 >
 > Estado del documento: **ABIERTO** — se actualiza a medida que se difieren o completan ítems.
-> Última actualización: 2026-06-26 — HR-015 (tablero de disponibilidad); RRHH 16/18 en prod.
+> Última actualización: 2026-06-30 — RRHH V1 completo (18/18 en prod, HR-016).
 
 ---
 
@@ -106,14 +106,21 @@ Quedaron cubiertas por tests pero sin recorrido manual completo.
       _Estado: la prueba automática falló por rate-limiting transitorio; CC verificó a mano el
       "no toca Operaciones". El owner verificó registrar permiso/licencia + archivo. Falta el
       recorrido del indicador de disponibilidad con datos._
-- [ ] **HR-015 (tablero de disponibilidad):** - [ ] Recorrido visual: confirmar que la pantalla Disponibilidad muestra el equipo con su
-      estado de hoy (chips disponible/vacaciones/no disponible). - [ ] Cambiar la fecha del selector a un día con vacaciones aprobadas → ese trabajador
-      aparece como VACACIONES (el selector cambia el resultado). - [ ] Aprobar una licencia que cubra hoy en la ficha → confirmar que en el tablero ese
-      trabajador sale NO*DISPONIBLE con el motivo. - [ ] La matriz cruza cargos con certificaciones requeridas correctamente. - [ ] 403 con
+- [ ] **HR-015 (tablero de disponibilidad):** - [ ] Recorrido visual: la pantalla Disponibilidad muestra el equipo con su estado de hoy
+      (chips disponible/vacaciones/no disponible). - [ ] Cambiar la fecha del selector a un día con vacaciones aprobadas → ese trabajador
+      aparece como VACACIONES. - [ ] Aprobar una licencia que cubra hoy en la ficha → en el tablero ese trabajador sale
+      `NO_DISPONIBLE` con motivo. - [ ] La matriz cruza cargos con certificaciones requeridas. - [ ] 403 con
       VIEWER/ANALYST/ACCOUNTANT.
-      \_Estado: lectura/agregación pura que reúne HR-011/012/014; cubierto por 5 unit tests +
-      chequeos en vivo (incluida la aserción recursiva de "sin datos de sueldo"). Sin recorrido
-      visual del owner. Riesgo bajo (sin dato sensible ni mutación).*
+      _Estado: lectura/agregación que reúne HR-011/012/014; cubierto por unit tests + chequeos
+      en vivo (incl. aserción recursiva de "sin datos de sueldo"). Sin recorrido visual del
+      owner. Riesgo bajo._
+- [ ] **HR-016 (endpoint disponibilidad-para-servicio):** - [ ] Verificar que `GET /api/rrhh/disponibilidad-servicio/:employeeId?date=` devuelve el
+      shape documentado y que coincide con el tablero de HR-015 para la misma fecha. - [ ] 403 con ACCOUNTANT/VIEWER. - [ ] Nota: cuando se conecte Operaciones, DECIDIR conscientemente quién puede consumir
+      este endpoint (expone nombres + motivo de no-disponibilidad = PII de salud). Hoy gateado a
+      MANAGER/ADMIN/SUPER*ADMIN; abrir a roles de Operaciones es una decisión deliberada a
+      documentar.
+      \_Estado: endpoint de servicio (sin UI); cubierto por unit tests (incl. paridad con el
+      tablero). Riesgo bajo.*
 
 ---
 
@@ -148,6 +155,10 @@ RRHH (single-tenant hoy), pero deben resolverse antes de un escenario multi-tena
       pensada, no apurada).
 - [ ] **Off-by-one de fechas `@db.Date` en Operaciones.** El mismo bug de timezone que se corrigió
       en RRHH (HR-004b con `formatDateOnly`) está latente en Operaciones. Fuera del alcance de RRHH.
+- [ ] **Habilitación por faena (V2 de HR-016).** Crear `faena` como entidad con su dossier de
+      documentos/certificaciones obligatorios, para cruzar qué trabajador está habilitado para cuál
+      faena. Hoy el endpoint `disponibilidad-servicio` expone solo disponibilidad
+      (vacaciones/licencias/permisos), no habilitación.
 
 ---
 
