@@ -14,9 +14,10 @@
 >   de este documento.
 >
 > Estado del documento: **ABIERTO** — se actualiza a medida que se difieren o completan ítems.
-> Última actualización: 2026-06-30 — Ronda de QA en producción: finiquito (HR-010) validado a mano,
-> permisos de datos sensibles validados; 1 hallazgo de permisos pendiente (contador → lista de
-> trabajadores). Ver §1.4.
+> Última actualización: 2026-06-30 — Política del ACCOUNTANT redefinida por el owner: visibilidad
+> financiera completa (Chile: el contador confecciona la nómina y gestiona el dinero). El 403 de
+> sueldos/finiquitos por persona para el contador se reclasifica como **BUG a corregir** (antes era
+> "blindaje correcto"). Restricciones de VIEWER/ANALYST sin cambios. Ver §1.2–§1.4.
 
 ---
 
@@ -51,12 +52,12 @@ Leyenda: ✅ acceso total · 📊 solo agregados (nunca por persona) · ❌ sin 
 | Pantalla / dato                        | ADMIN | MANAGER | ACCOUNTANT | ANALYST | VIEWER |
 | -------------------------------------- | :---: | :-----: | :--------: | :-----: | :----: |
 | Cargos                                 |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
-| Trabajadores (ficha, datos personales) |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
-| **Remuneración por persona (sueldo)**  |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
-| **Masa salarial (agregado)**           |  ✅   |   ✅    |     📊     |   ❌    |   ❌   |
-| **Liquidaciones por persona (HR-009)** |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
-| **Liquidaciones agregado (HR-009)**    |  ✅   |   ✅    |     📊     |   ❌    |   ❌   |
-| **Finiquito (HR-010)**                 |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
+| Trabajadores (ficha, datos personales) |  ✅   |   ✅    |     ✅     |   ❌    |   ❌   |
+| **Remuneración por persona (sueldo)**  |  ✅   |   ✅    |     ✅     |   ❌    |   ❌   |
+| **Masa salarial (agregado)**           |  ✅   |   ✅    |     ✅     |   ❌    |   ❌   |
+| **Liquidaciones por persona (HR-009)** |  ✅   |   ✅    |     ✅     |   ❌    |   ❌   |
+| **Liquidaciones agregado (HR-009)**    |  ✅   |   ✅    |     ✅     |   ❌    |   ❌   |
+| **Finiquito (HR-010)**                 |  ✅   |   ✅    |     ✅     |   ❌    |   ❌   |
 | Documentos                             |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
 | Contratos                              |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
 | Vacaciones                             |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
@@ -65,39 +66,63 @@ Leyenda: ✅ acceso total · 📊 solo agregados (nunca por persona) · ❌ sin 
 | Dashboard RRHH                         |  ✅   |   ✅    |     📊     |   ❌    |   ❌   |
 | Parámetros previsionales               |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
 
-> Nota: la matriz refleja el diseño acordado (el dato salarial sensible es MANAGER/ADMIN-only;
-> ACCOUNTANT solo ve agregados sin filas por persona). Si al verificar algo no coincide, es un bug.
+> Nota (política redefinida por el owner, 2026-06-30): el **ACCOUNTANT (contador) tiene visibilidad
+> financiera completa** — sueldos por persona, liquidaciones, finiquitos y agregados — porque en
+> Chile el contador confecciona la nómina y gestiona el dinero de la empresa.
+> **MANAGER/ADMIN/SUPER_ADMIN** mantienen acceso total. **VIEWER y ANALYST NO ven datos financieros
+> sensibles** (sueldos, liquidaciones, finiquitos). Si al verificar algo no coincide con esto, es un
+> bug. Las filas no financieras (cargos, documentos, contratos, vacaciones, etc.) siguen siendo
+> MANAGER/ADMIN-only.
 
 ### 1.3 Verificaciones puntuales de alto riesgo (las que NO se hicieron a mano)
 
-- [x] **HR-009 (remuneraciones) — ✅ VALIDADO por el owner en producción (2026-06-30).**
-      **ACCOUNTANT:** el dashboard muestra SOLO el agregado de masa salarial, con el mensaje
-      explícito "Tu rol solo tiene acceso al agregado de remuneraciones de la empresa"; los
-      endpoints de sueldo por persona devuelven 403 (Network tab: `payroll`=200, `overview`=403,
-      `employees`=403). Sin fuga de sueldo por persona. **VIEWER:** no ve nada sensible.
-      _Estado: validado a nivel app (no solo RLS). Nota: el `employees`=403 de hoy es correcto para
-      sueldos, pero ver hallazgo §1.4 — el owner quiere habilitar la LISTA de trabajadores (sin
-      montos) al contador._
-- [ ] **HR-010 (finiquito):** entrar como **ACCOUNTANT** y **VIEWER** → confirmar que NO ven la
-      sección de finiquito ni montos (403).
-      _Estado: **VIEWER** ✅ validado en la ronda (no ve nada sensible). Falta ejercer a mano el 403
-      de finiquito específico para **ACCOUNTANT** (no se tocó en esta ronda)._
+> ⚠️ **REINTERPRETADO bajo la nueva política del owner (2026-06-30).** En la ronda se observó que el
+> ACCOUNTANT recibe 403 en los datos por persona y se registró como "blindaje correcto". Con la
+> política redefinida (el contador DEBE ver los datos financieros), ese 403 ya **no es el
+> comportamiento deseado: es un BUG a corregir antes de exponer**. La validación de VIEWER (no ve
+> nada) sigue siendo correcta.
+
+- [ ] **HR-009 (remuneraciones) — ❌ permiso DEMASIADO restrictivo para ACCOUNTANT (a corregir).**
+      Observado en producción: **ACCOUNTANT** ve solo el agregado de masa salarial y los endpoints de
+      sueldo por persona devuelven 403 (Network tab: `payroll`=200, `overview`=403, `employees`=403).
+      Bajo la nueva política eso es un **BUG**: el contador DEBE ver los sueldos por persona. A
+      corregir antes de exponer (ver §1.4). **VIEWER:** no ve nada sensible → ✅ correcto, sin cambios.
+- [ ] **HR-010 (finiquito) — ❌ permiso DEMASIADO restrictivo para ACCOUNTANT (a corregir).** El
+      **ACCOUNTANT** DEBE poder ver los finiquitos por persona (es quien gestiona el dinero de la
+      empresa). Si en producción el contador recibe 403 en finiquito, es un **BUG a corregir** (ver
+      §1.4). **VIEWER y ANALYST:** NO deben ver finiquitos ni montos → ✅ se mantiene la restricción.
 
 ### 1.4 Hallazgos de la ronda QA en producción (2026-06-30)
 
-- [ ] **AJUSTE DE PERMISOS (pendiente antes de exponer) — el contador debe ver la LISTA de
-      trabajadores.** Hoy **ACCOUNTANT** recibe 403 en `GET /api/rrhh/employees` (la lista), así que
-      la pantalla Trabajadores muestra el error rojo genérico "No se pudieron cargar los
-      trabajadores". **Decisión del owner:** el contador SÍ debe ver la lista (nombre, RUT, área,
-      cargo) — **sin sueldos**. Acción: otorgar a ACCOUNTANT lectura de la lista de empleados (ya
-      separada de la compensación desde HR-003).
-- [ ] **CONSTRAINT CRÍTICO del fix.** Habilitar "el contador ve la lista" NO debe abrir la ficha
-      completa con compensación/liquidaciones/finiquito. La lista (solo lectura, sin montos) sí; los
-      sub-recursos por persona de sueldo/finiquito DEBEN seguir en 403 para ACCOUNTANT. El fix debe
-      acotarse para que ver la lista no cascadee a las pestañas sensibles.
-- [ ] **Secundario (cosmético, menor prioridad).** Aun donde el 403 es intencional, la pantalla
-      Trabajadores debería mostrar un mensaje limpio "sin permiso" en vez del rojo genérico "No se
-      pudieron cargar", igual que lo maneja Disponibilidad.
+> **Decisión del owner (contexto Chile): el ACCOUNTANT (contador) confecciona la nómina /
+> liquidaciones y gestiona TODO el dinero de la empresa → DEBE tener visibilidad financiera
+> completa.** Esto REEMPLAZA el hallazgo anterior (que pedía "lista sin sueldos"); ahora el contador
+> debe ver también los montos por persona.
+
+- [ ] **AJUSTE DE PERMISOS (bloqueante antes de exponer) — abrir los datos financieros al
+      contador.** Estado requerido para **ACCOUNTANT**: lectura completa de (a) la LISTA de
+      trabajadores y su ficha, (b) **sueldos por persona** (HR-003 compensación), (c)
+      **liquidaciones por persona** (HR-009), (d) **finiquitos** (HR-010), además de los agregados.
+      Hoy en producción el contador recibe 403 en estos recursos → es un **BUG a corregir**.
+- [ ] **PREGUNTA ABIERTA para el owner (TBD antes de implementar): ¿el contador solo VE o también
+      CONFECCIONA?** ¿El ACCOUNTANT debe poder además **crear/editar** liquidaciones en el sistema, o
+      solo verlas? Si solo VE → basta abrir la lectura. Si también las confecciona → hay que otorgarle
+      escritura (create/edit) sobre liquidaciones. **Decidir antes de implementar.**
+- [ ] **CONSTRAINT (inverso al anterior).** El fix debe **ABRIR** los datos financieros al
+      ACCOUNTANT **manteniendo a VIEWER y ANALYST bloqueados** (sin sueldos, liquidaciones ni
+      finiquitos). MANAGER/ADMIN/SUPER_ADMIN sin cambios.
+- [ ] **Nota técnica para quien lo implemente.** Hoy el ACCOUNTANT tiene **solo lectura** sobre los
+      subjects de compensación, pero los endpoints sensibles por persona gatean en **"read AND
+      update"** (lo que excluye al ACCOUNTANT de solo-lectura → de ahí el 403 observado). Para darle
+      visibilidad, los endpoints de **lectura** (compensación, liquidaciones por persona, finiquito)
+      deben gatear en **"read"** con el ACCOUNTANT teniendo `read` sobre esos subjects. Si el owner
+      además quiere que el contador **confeccione** liquidaciones (item anterior), los endpoints de
+      **escritura** y CASL deben otorgar `update` al ACCOUNTANT sobre el subject de liquidaciones
+      (TBD). `TerminationSimulationSubject` en `RRHH_COMPENSATION_SUBJECTS` (legible por ACCOUNTANT)
+      es ahora **correcto/deseado**.
+- [ ] **Secundario (cosmético, menor prioridad).** Donde un 403 SÍ es intencional (p.ej. VIEWER /
+      ANALYST en datos financieros), la pantalla Trabajadores debería mostrar un mensaje limpio "sin
+      permiso" en vez del rojo genérico "No se pudieron cargar", igual que lo maneja Disponibilidad.
 
 ---
 
