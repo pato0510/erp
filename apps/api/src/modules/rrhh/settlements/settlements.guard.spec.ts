@@ -1,7 +1,12 @@
-/* HR-009 — proves THE SALARY GUARD at the CASL level (the rule the controller
- * relies on): per-person endpoints require read AND update EmployeeCompensation
- * (MANAGER/ADMIN/SUPER_ADMIN only); the aggregate requires read (ACCOUNTANT too,
- * NOT VIEWER/ANALYST). */
+/* HR-009 — proves THE SALARY GUARD at the CASL level after the read-only
+ * relaxation (the rule the controller relies on):
+ *  - per-person READ endpoints (list, get) now require `read` EmployeeCompensation
+ *    → MANAGER/ADMIN/SUPER_ADMIN and the read-only ACCOUNTANT pass; VIEWER/ANALYST
+ *    lack read → 403;
+ *  - WRITE endpoints (create, status, patch, delete) require `update`
+ *    EmployeeCompensation → MANAGER/ADMIN/SUPER_ADMIN only; ACCOUNTANT is 403
+ *    (strictly read-only — settlements are loaded from an external portal);
+ *  - the aggregate requires `read` (ACCOUNTANT too, NOT VIEWER/ANALYST). */
 import { UserRole } from '@prisma/client';
 import {
   CaslAbilityFactory,
@@ -13,28 +18,30 @@ describe('HR-009 salary guard (EmployeeCompensationSubject)', () => {
   const can = (role: UserRole, action: 'read' | 'update') =>
     factory.defineAbilityFor(role).can(action, EmployeeCompensationSubject);
 
-  // per-person = read AND update; aggregate = read
-  const perPerson = (r: UserRole) => can(r, 'read') && can(r, 'update');
+  // post-relaxation: per-person read = read; write = update; aggregate = read
+  const perPersonRead = (r: UserRole) => can(r, 'read');
+  const write = (r: UserRole) => can(r, 'update');
   const aggregate = (r: UserRole) => can(r, 'read');
 
-  it('MANAGER/ADMIN/SUPER_ADMIN: per-person AND aggregate allowed', () => {
+  it('MANAGER/ADMIN/SUPER_ADMIN: per-person read, write, and aggregate all allowed', () => {
     for (const r of [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN]) {
-      expect(perPerson(r)).toBe(true);
+      expect(perPersonRead(r)).toBe(true);
+      expect(write(r)).toBe(true);
       expect(aggregate(r)).toBe(true);
     }
   });
 
-  it('ACCOUNTANT: aggregate allowed, per-person DENIED (read yes, update no)', () => {
-    expect(can(UserRole.ACCOUNTANT, 'read')).toBe(true);
-    expect(can(UserRole.ACCOUNTANT, 'update')).toBe(false);
-    expect(perPerson(UserRole.ACCOUNTANT)).toBe(false); // → 403 on per-person
+  it('ACCOUNTANT: per-person read + aggregate allowed, WRITE denied (read-only)', () => {
+    expect(perPersonRead(UserRole.ACCOUNTANT)).toBe(true); // → 200 on relaxed per-person reads
     expect(aggregate(UserRole.ACCOUNTANT)).toBe(true); // → 200 on aggregate
+    expect(write(UserRole.ACCOUNTANT)).toBe(false); // → 403 on every settlement write
   });
 
-  it('VIEWER and ANALYST: NEITHER per-person NOR aggregate', () => {
+  it('VIEWER and ANALYST: NEITHER read NOR write (403 on every settlement route)', () => {
     for (const r of [UserRole.VIEWER, UserRole.ANALYST]) {
-      expect(perPerson(r)).toBe(false);
-      expect(aggregate(r)).toBe(false); // → 403 even on the aggregate
+      expect(perPersonRead(r)).toBe(false); // → 403 even on the relaxed per-person reads
+      expect(write(r)).toBe(false);
+      expect(aggregate(r)).toBe(false);
     }
   });
 });

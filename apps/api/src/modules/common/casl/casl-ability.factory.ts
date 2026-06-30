@@ -436,11 +436,19 @@ export class CaslAbilityFactory {
         /* OPS-028 — every authenticated user can acknowledge their
            own readings; the service still scopes to userId. */
         can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
-        /* HR-001 — ACCOUNTANT must NOT read general RRHH data via the
-           blanket `read all` above. Revoke RRHH read, then re-grant read
-           on the compensation-facing subjects only. */
+        /* HR-001 + financial-visibility policy (Chile): the ACCOUNTANT handles
+           payroll and company money, so it gets full RRHH financial READ
+           visibility while staying strictly READ-ONLY. The blanket `read all`
+           above is first revoked on every RRHH subject, then read is re-granted
+           on the compensation-facing subjects AND on Employee (per-person fichas
+           + the dashboard overview — neither carries salary). The re-grants run
+           AFTER the cannot loop so @casl last-rule-wins leaves read enabled.
+           NO create/update/delete is granted on any RRHH subject — settlements
+           and finiquitos are produced in an external portal and only loaded into
+           Excelsia, never written in-app. VIEWER/ANALYST keep no RRHH read. */
         RRHH_SUBJECTS.forEach((subject) => cannot('read', subject));
         RRHH_COMPENSATION_SUBJECTS.forEach((subject) => can('read', subject));
+        can('read', EmployeeSubject);
         break;
 
       case UserRole.ANALYST:

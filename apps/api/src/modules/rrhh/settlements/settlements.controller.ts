@@ -21,10 +21,13 @@ import { UpdateSettlementDto } from './dto/update-settlement.dto';
 import { SettlementsService } from './settlements.service';
 
 /* HR-009 — registro de remuneraciones. THE SALARY GUARD, mirroring HR-003/HR-006:
- *  - PER-PERSON endpoints gate on `read` AND `update` EmployeeCompensation (two
- *    handlers; PoliciesGuard requires BOTH). MANAGER/ADMIN/SUPER_ADMIN have both
- *    (manage all); ACCOUNTANT holds read-only on compensation subjects → fails the
- *    `update` check → 403; VIEWER/ANALYST have neither → 403.
+ *  - PER-PERSON READ endpoints (list, get) gate on `read` EmployeeCompensation →
+ *    MANAGER/ADMIN/SUPER_ADMIN and the read-only ACCOUNTANT (full financial
+ *    visibility) get 200; VIEWER/ANALYST lack read → 403.
+ *  - WRITE endpoints (create, status, patch, delete) gate on `update`
+ *    EmployeeCompensation → MANAGER/ADMIN/SUPER_ADMIN only; ACCOUNTANT 403
+ *    (strictly read-only — settlements are produced externally and only loaded
+ *    into Excelsia); VIEWER/ANALYST 403.
  *  - The AGGREGATE endpoint gates on `read` only → ACCOUNTANT 200 (totals only,
  *    NEVER per-person rows), VIEWER/ANALYST 403.
  * Every endpoint declares @CheckPolicies (PoliciesGuard allows handler-less
@@ -35,10 +38,7 @@ export class SettlementsController {
   constructor(private readonly service: SettlementsService) {}
 
   @Get()
-  @CheckPolicies(
-    (ability) => ability.can('read', EmployeeCompensationSubject),
-    (ability) => ability.can('update', EmployeeCompensationSubject),
-  )
+  @CheckPolicies((ability) => ability.can('read', EmployeeCompensationSubject))
   findAll(
     @CurrentCompany() companyId: string,
     @Query('employeeId') employeeId: string,
@@ -62,10 +62,7 @@ export class SettlementsController {
   }
 
   @Get(':id')
-  @CheckPolicies(
-    (ability) => ability.can('read', EmployeeCompensationSubject),
-    (ability) => ability.can('update', EmployeeCompensationSubject),
-  )
+  @CheckPolicies((ability) => ability.can('read', EmployeeCompensationSubject))
   findOne(@Param('id') id: string, @CurrentCompany() companyId: string) {
     return this.service.findOne(id, companyId);
   }

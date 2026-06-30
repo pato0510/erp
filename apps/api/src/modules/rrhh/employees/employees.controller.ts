@@ -28,10 +28,11 @@ import { EmployeesService } from './employees.service';
 /* HR-003 — employees + the guarded compensation sub-resource. EVERY endpoint
  * declares @CheckPolicies (PoliciesGuard fails OPEN). The employee list/ficha
  * payloads NEVER contain salary/bank (separate table + endpoint, see service).
- * Compensation read/write is restricted to MANAGER/ADMIN/SUPER_ADMIN: the GET
- * requires BOTH read AND update on EmployeeCompensation, which excludes
- * ACCOUNTANT (it holds read-only on compensation subjects for the future
- * Finanzas aggregate, not per-employee access). */
+ * Per-person compensation READ (the GET) gates on `read` EmployeeCompensation:
+ * MANAGER/ADMIN/SUPER_ADMIN and the read-only ACCOUNTANT (full financial
+ * visibility) get 200; VIEWER/ANALYST lack read → 403. Compensation WRITE (the
+ * PUT) gates on `update`, so it stays MANAGER/ADMIN/SUPER_ADMIN only and the
+ * ACCOUNTANT is 403 — settlements are loaded externally, never edited in-app. */
 @Controller('rrhh/employees')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class EmployeesController {
@@ -93,10 +94,7 @@ export class EmployeesController {
 
   // ── Compensation: separate, role-restricted sub-resource ──
   @Get(':id/compensation')
-  @CheckPolicies(
-    (ability) => ability.can('read', EmployeeCompensationSubject),
-    (ability) => ability.can('update', EmployeeCompensationSubject),
-  )
+  @CheckPolicies((ability) => ability.can('read', EmployeeCompensationSubject))
   getCompensation(@Param('id') id: string, @CurrentCompany() companyId: string) {
     return this.service.getCompensation(id, companyId);
   }
