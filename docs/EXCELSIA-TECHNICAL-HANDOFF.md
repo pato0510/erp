@@ -291,6 +291,19 @@ Operational & documentary compliance: the company knows at all times what assets
 - `domain_events` table + event handlers: document/permit renewal-imminent events create **automatic Finance commitments** with estimated cost and due date (e.g., SOAP renewal for a vehicle becomes a future commitment).
 - Known V2 gaps: Finance event handlers only log (no metrics); no automatic retry for failed handlers (manual retry endpoint only).
 
+### 7.1 RRHH → other modules: "disponibilidad para servicio" contract (HR-016)
+
+**OPTION A — RRHH EXPOSES, RRHH stays decoupled.** RRHH publishes a read-only availability query that Operations (now) and Comercial (later) **ASK**. RRHH does NOT import, call, or know about those modules — the dependency arrow points **into** RRHH. Implemented in `apps/api/src/modules/rrhh/disponibilidad/disponibilidad-servicio.controller.ts`; full contract lives in that file's header JSDoc.
+
+- **Scope:** DISPONIBILIDAD ONLY (vacation / leave / permit). It answers "is this worker off?", NOT "is this worker qualified for faena X?". The resolution is the EXACT HR-015 board logic (shared `DisponibilidadService.resolveState` + `loadCoveringMaps`: HR-012 blocking-absence predicate + HR-011 `{APROBADO,TOMADO}` vacation predicate; precedence **VACACIONES > NO_DISPONIBLE > DISPONIBLE**). READ-ONLY; company-scoped via `executeWithRls`; **no salary/compensation data** (asserted recursively in unit tests).
+- **Endpoints** (all `@CheckPolicies` on `AvailabilitySubject`):
+  - `GET /api/rrhh/disponibilidad-servicio/:employeeId?date=YYYY-MM-DD` → `{ employeeId, fullName, date, available, state, reason, until }`; 404 if not an employee of this company.
+  - `GET /api/rrhh/disponibilidad-servicio?employeeIds=a,b,c&date=…` → `{ date, requested, count, items[] }` (batched roster, ≤100 ids, ids not in company ignored — NOT N+1).
+  - `GET /api/rrhh/disponibilidad-servicio/disponibles?date=…` → `{ date, count, employees[] }` (the ACTIVE employees DISPONIBLE on the date — "who can I assign").
+  - `state ∈ { DISPONIBLE, VACACIONES, NO_DISPONIBLE }`, `available === (state === 'DISPONIBLE')`, `date` defaults to today (UTC).
+- **Gating:** same JWT/cookie auth as everything else (it IS the same backend — no invented cross-service auth). `AvailabilitySubject` is read-only reachable by **MANAGER / ADMIN / SUPER_ADMIN**; ACCOUNTANT / ANALYST / VIEWER get 403 — because the payload exposes employee names + the blocking reason (e.g. "Licencia médica"), which is health-adjacent PII. Wiring Operations/Comercial later means the caller holds an RRHH-reading role, or the owner deliberately adds a cross-service grant on `AvailabilitySubject`.
+- **V2 extension (out of scope here):** faena-based **habilitación** — needs a `faena` entity + a per-faena required-document dossier joined with `employee_certifications` to answer "qualified for faena X". Tracked in the V2 backlog.
+
 ---
 
 ## 8. SII INTEGRATION (⚠️ CONTAINS THE #1 CRITICAL OPEN ISSUE)

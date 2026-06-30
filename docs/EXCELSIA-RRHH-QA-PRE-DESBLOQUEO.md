@@ -14,7 +14,7 @@
 >   de este documento.
 >
 > Estado del documento: **ABIERTO** — se actualiza a medida que se difieren o completan ítems.
-> Última actualización: 2026-06-26.
+> Última actualización: 2026-06-26 — HR-015 (tablero de disponibilidad); RRHH 16/18 en prod.
 
 ---
 
@@ -106,6 +106,14 @@ Quedaron cubiertas por tests pero sin recorrido manual completo.
       _Estado: la prueba automática falló por rate-limiting transitorio; CC verificó a mano el
       "no toca Operaciones". El owner verificó registrar permiso/licencia + archivo. Falta el
       recorrido del indicador de disponibilidad con datos._
+- [ ] **HR-015 (tablero de disponibilidad):** - [ ] Recorrido visual: confirmar que la pantalla Disponibilidad muestra el equipo con su
+      estado de hoy (chips disponible/vacaciones/no disponible). - [ ] Cambiar la fecha del selector a un día con vacaciones aprobadas → ese trabajador
+      aparece como VACACIONES (el selector cambia el resultado). - [ ] Aprobar una licencia que cubra hoy en la ficha → confirmar que en el tablero ese
+      trabajador sale NO*DISPONIBLE con el motivo. - [ ] La matriz cruza cargos con certificaciones requeridas correctamente. - [ ] 403 con
+      VIEWER/ANALYST/ACCOUNTANT.
+      \_Estado: lectura/agregación pura que reúne HR-011/012/014; cubierto por 5 unit tests +
+      chequeos en vivo (incluida la aserción recursiva de "sin datos de sueldo"). Sin recorrido
+      visual del owner. Riesgo bajo (sin dato sensible ni mutación).*
 
 ---
 

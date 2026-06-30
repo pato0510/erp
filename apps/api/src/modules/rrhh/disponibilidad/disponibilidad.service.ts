@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { CertificationsService } from '../certifications/certifications.service';
@@ -9,10 +10,31 @@ import { CertificationsService } from '../certifications/certifications.service'
    the HR-014 CertificationsService.compliance per employee), and a consolidated
    alerts view (mirroring the HR-014/HR-007 cron SELECTION as a read view — it does
    NOT run or duplicate the cron). NO writes, NO salary/compensation data anywhere.
-   The 30-day window mirrors the reminder services. */
+   The 30-day window mirrors the reminder services.
+
+   HR-016 — the for-service availability methods (forServiceSingle/Batch/Disponibles)
+   share the SAME resolution (resolveState + loadCoveringMaps) so the cross-module
+   contract can never drift from the human-facing board. */
 const ALERT_WINDOW_DAYS = 30;
+/* HR-016 — sensible cap on the batch roster size (DoS guard for a public-ish
+   contract endpoint). */
+const MAX_BATCH = 100;
 
 export type AvailabilityState = 'DISPONIBLE' | 'NO_DISPONIBLE' | 'VACACIONES';
+
+interface CoveringVacation {
+  endDate: Date;
+}
+interface CoveringAbsence {
+  category: string;
+  endDate: Date;
+  absenceType: { name: string } | null;
+}
+interface ResolvedAvailability {
+  state: AvailabilityState;
+  reason: string | null;
+  until: Date | null;
+}
 
 @Injectable()
 export class DisponibilidadService {
@@ -28,6 +50,78 @@ export class DisponibilidadService {
   private utcToday(): Date {
     return this.startOfUtcDay(new Date());
   }
+  private resolveDate(dateStr?: string): Date {
+    return dateStr ? this.startOfUtcDay(new Date(dateStr)) : this.utcToday();
+  }
+
+  /* THE canonical per-employee resolution. Precedence VACACIONES > NO_DISPONIBLE >
+     DISPONIBLE — shared by the HR-015 board AND the HR-016 for-service endpoints so
+     they can never diverge. */
+  private resolveState(
+    vac: CoveringVacation | undefined,
+    abs: CoveringAbsence | undefined,
+  ): ResolvedAvailability {
+    if (vac) return { state: 'VACACIONES', reason: 'Vacaciones', until: vac.endDate };
+    if (abs) {
+      return {
+        state: 'NO_DISPONIBLE',
+        reason:
+          abs.absenceType?.name ?? (abs.category === 'LICENCIA' ? 'Licencia médica' : 'Permiso'),
+        until: abs.endDate,
+      };
+    }
+    return { state: 'DISPONIBLE', reason: null, until: null };
+  }
+
+  /* THE canonical covering-record queries: the HR-012 blocking-absence predicate +
+     the HR-011 {APROBADO,TOMADO} vacation predicate, both filtered to a date and
+     (optionally) a set of employees. Batched — never N+1. */
+  private async loadCoveringMaps(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    date: Date,
+    employeeIds?: string[],
+  ): Promise<{
+    absenceByEmp: Map<string, CoveringAbsence>;
+    vacationByEmp: Map<string, CoveringVacation>;
+  }> {
+    const empFilter = employeeIds ? { employeeId: { in: employeeIds } } : {};
+
+    const blockingAbsences = await tx.absence.findMany({
+      where: {
+        companyId,
+        status: 'APROBADO',
+        blocksAvailability: true,
+        startDate: { lte: date },
+        endDate: { gte: date },
+        ...empFilter,
+      },
+      select: {
+        employeeId: true,
+        category: true,
+        endDate: true,
+        absenceType: { select: { name: true } },
+      },
+    });
+
+    /* APROBADO AND TOMADO are the consumed-time set (HR-011 computeBalance counts
+       both), so an in-progress vacation already marked TOMADO still shows VACACIONES. */
+    const vacations = await tx.vacationRequest.findMany({
+      where: {
+        companyId,
+        status: { in: ['APROBADO', 'TOMADO'] },
+        startDate: { lte: date },
+        endDate: { gte: date },
+        ...empFilter,
+      },
+      select: { employeeId: true, endDate: true },
+    });
+
+    return {
+      absenceByEmp: new Map(blockingAbsences.map((a) => [a.employeeId, a])),
+      vacationByEmp: new Map(vacations.map((v) => [v.employeeId, v])),
+    };
+  }
 
   /* Team availability for a date. For each ACTIVE employee:
      - VACACIONES   if an APROBADO vacation request covers the date (HR-011)
@@ -38,7 +132,7 @@ export class DisponibilidadService {
      Two batched queries instead of N per-employee calls; the predicates are the
      SAME ones HR-011/HR-012 use. */
   async getAvailability(companyId: string, userId: string, dateStr?: string) {
-    const date = dateStr ? this.startOfUtcDay(new Date(dateStr)) : this.utcToday();
+    const date = this.resolveDate(dateStr);
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       const employees = await tx.employee.findMany({
@@ -52,63 +146,18 @@ export class DisponibilidadService {
         orderBy: [{ area: 'asc' }, { fullName: 'asc' }],
       });
 
-      /* HR-012 marker predicate — APROBADO blocking absence covering the date. */
-      const blockingAbsences = await tx.absence.findMany({
-        where: {
-          companyId,
-          status: 'APROBADO',
-          blocksAvailability: true,
-          startDate: { lte: date },
-          endDate: { gte: date },
-        },
-        select: {
-          employeeId: true,
-          category: true,
-          endDate: true,
-          absenceType: { select: { name: true } },
-        },
-      });
-
-      /* HR-011 approved-request check — a vacation covering the date. APROBADO AND
-         TOMADO are the consumed-time set (computeBalance counts both), so an
-         in-progress vacation already marked TOMADO still shows as VACACIONES. */
-      const vacations = await tx.vacationRequest.findMany({
-        where: {
-          companyId,
-          status: { in: ['APROBADO', 'TOMADO'] },
-          startDate: { lte: date },
-          endDate: { gte: date },
-        },
-        select: { employeeId: true, endDate: true },
-      });
-
-      const absenceByEmp = new Map(blockingAbsences.map((a) => [a.employeeId, a]));
-      const vacationByEmp = new Map(vacations.map((v) => [v.employeeId, v]));
+      const { absenceByEmp, vacationByEmp } = await this.loadCoveringMaps(tx, companyId, date);
 
       const rows = employees.map((e) => {
-        const vac = vacationByEmp.get(e.id);
-        const abs = absenceByEmp.get(e.id);
-        let state: AvailabilityState = 'DISPONIBLE';
-        let reason: string | null = null;
-        let until: Date | null = null;
-        if (vac) {
-          state = 'VACACIONES';
-          reason = 'Vacaciones';
-          until = vac.endDate;
-        } else if (abs) {
-          state = 'NO_DISPONIBLE';
-          reason =
-            abs.absenceType?.name ?? (abs.category === 'LICENCIA' ? 'Licencia médica' : 'Permiso');
-          until = abs.endDate;
-        }
+        const r = this.resolveState(vacationByEmp.get(e.id), absenceByEmp.get(e.id));
         return {
           employeeId: e.id,
           fullName: e.fullName,
           cargo: e.jobPosition?.name ?? null,
           area: e.area,
-          state,
-          reason,
-          until,
+          state: r.state,
+          reason: r.reason,
+          until: r.until,
         };
       });
 
@@ -119,6 +168,121 @@ export class DisponibilidadService {
         vacaciones: rows.filter((r) => r.state === 'VACACIONES').length,
       };
       return { date: date.toISOString(), summary, employees: rows };
+    });
+  }
+
+  /* ───────────────────────── HR-016 — for-service contract ─────────────────────
+     The STABLE, documented availability contract other modules (Operations,
+     later Comercial) ASK. RRHH EXPOSES it and stays decoupled — it does NOT know
+     about or call Operations. DISPONIBILIDAD ONLY (vacation/leave/permit); the
+     faena-based habilitación (faena entity + per-faena required-document dossier)
+     is a V2 extension. Every method is READ-ONLY and reuses resolveState +
+     loadCoveringMaps — the EXACT HR-015 resolution, never a copy. No salary data.
+
+     Response shape (single & each batch item):
+       { employeeId, fullName, date, available, state, reason, until }
+       state:  'DISPONIBLE' | 'VACACIONES' | 'NO_DISPONIBLE'
+       available === (state === 'DISPONIBLE')
+       reason:  human label of the blocking record (or null when DISPONIBLE)
+       until:   the date the block ends (or null when DISPONIBLE) */
+
+  private toForServiceItem(
+    emp: { id: string; fullName: string },
+    date: Date,
+    resolved: ResolvedAvailability,
+  ) {
+    return {
+      employeeId: emp.id,
+      fullName: emp.fullName,
+      date: date.toISOString(),
+      available: resolved.state === 'DISPONIBLE',
+      state: resolved.state,
+      reason: resolved.reason,
+      until: resolved.until,
+    };
+  }
+
+  /* Single employee. 404 if the id is not an employee of this company. */
+  async forServiceSingle(companyId: string, userId: string, employeeId: string, dateStr?: string) {
+    const date = this.resolveDate(dateStr);
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      const emp = await tx.employee.findFirst({
+        where: { id: employeeId, companyId },
+        select: { id: true, fullName: true },
+      });
+      if (!emp) throw new NotFoundException('Trabajador no encontrado');
+      const { absenceByEmp, vacationByEmp } = await this.loadCoveringMaps(tx, companyId, date, [
+        employeeId,
+      ]);
+      return this.toForServiceItem(
+        emp,
+        date,
+        this.resolveState(vacationByEmp.get(employeeId), absenceByEmp.get(employeeId)),
+      );
+    });
+  }
+
+  /* Batch roster. Caps at MAX_BATCH, silently ignores ids not in the company.
+     Two batched queries for the whole roster — never N+1. */
+  async forServiceBatch(companyId: string, userId: string, rawIds: string[], dateStr?: string) {
+    const ids = Array.from(new Set(rawIds.map((s) => s.trim()).filter(Boolean)));
+    if (ids.length === 0) throw new BadRequestException('employeeIds requerido');
+    if (ids.length > MAX_BATCH) {
+      throw new BadRequestException(`Máximo ${MAX_BATCH} trabajadores por consulta`);
+    }
+    const date = this.resolveDate(dateStr);
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      const emps = await tx.employee.findMany({
+        where: { id: { in: ids }, companyId },
+        select: { id: true, fullName: true },
+        orderBy: { fullName: 'asc' },
+      });
+      const foundIds = emps.map((e) => e.id);
+      const { absenceByEmp, vacationByEmp } = await this.loadCoveringMaps(
+        tx,
+        companyId,
+        date,
+        foundIds,
+      );
+      const items = emps.map((emp) =>
+        this.toForServiceItem(
+          emp,
+          date,
+          this.resolveState(vacationByEmp.get(emp.id), absenceByEmp.get(emp.id)),
+        ),
+      );
+      return {
+        date: date.toISOString(),
+        requested: ids.length,
+        count: items.length,
+        items,
+      };
+    });
+  }
+
+  /* Convenience: the ACTIVE employees who are DISPONIBLE on the date (id + name +
+     cargo) — "who can I assign". Read-only. */
+  async forServiceDisponibles(companyId: string, userId: string, dateStr?: string) {
+    const date = this.resolveDate(dateStr);
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      const employees = await tx.employee.findMany({
+        where: { companyId, status: 'ACTIVO' },
+        select: { id: true, fullName: true, jobPosition: { select: { name: true } } },
+        orderBy: [{ area: 'asc' }, { fullName: 'asc' }],
+      });
+      const { absenceByEmp, vacationByEmp } = await this.loadCoveringMaps(tx, companyId, date);
+      const disponibles = employees
+        .filter(
+          (e) =>
+            this.resolveState(vacationByEmp.get(e.id), absenceByEmp.get(e.id)).state ===
+            'DISPONIBLE',
+        )
+        .map((e) => ({
+          employeeId: e.id,
+          fullName: e.fullName,
+          cargo: e.jobPosition?.name ?? null,
+        }));
+      return { date: date.toISOString(), count: disponibles.length, employees: disponibles };
     });
   }
 

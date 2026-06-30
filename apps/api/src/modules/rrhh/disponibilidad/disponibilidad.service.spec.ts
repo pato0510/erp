@@ -124,6 +124,162 @@ describe('DisponibilidadService.getAvailability — state resolution', () => {
   });
 });
 
+describe('DisponibilidadService — HR-016 for-service contract (reuses HR-015 resolution)', () => {
+  /* tx that resolves availability for a fixed roster: e1 on vacation, e2 on a
+     blocking licencia, e3 free. Covering-record queries honour the employeeId
+     filter so single/batch/unknown all derive from the same predicates. */
+  const makeForServiceTx = (roster = EMPLOYEES) => ({
+    employee: {
+      findFirst: (a: Any) =>
+        Promise.resolve(roster.find((e) => e.id === (a as Any).where.id) ?? null),
+      findMany: (a: Any) => {
+        const where = (a as Any).where as Any;
+        const ids = (where.id as Any)?.in as string[] | undefined;
+        const pool = where.status === 'ACTIVO' ? roster : roster;
+        return Promise.resolve(ids ? pool.filter((e) => ids.includes(e.id)) : pool);
+      },
+    },
+    absence: {
+      findMany: (a: Any) => {
+        const ids = ((a as Any).where.employeeId as Any)?.in as string[] | undefined;
+        const all = [
+          {
+            employeeId: 'e2',
+            category: 'LICENCIA',
+            endDate: day(3),
+            absenceType: { name: 'Licencia médica tipo 1' },
+          },
+        ];
+        return Promise.resolve(ids ? all.filter((x) => ids.includes(x.employeeId)) : all);
+      },
+    },
+    vacationRequest: {
+      findMany: (a: Any) => {
+        const ids = ((a as Any).where.employeeId as Any)?.in as string[] | undefined;
+        const all = [{ employeeId: 'e1', endDate: day(5) }];
+        return Promise.resolve(ids ? all.filter((x) => ids.includes(x.employeeId)) : all);
+      },
+    },
+  });
+
+  it('forServiceSingle: vacation / licencia / free resolve to the documented shape; no salary', async () => {
+    const svc = makeService(makeForServiceTx());
+
+    const onVac = (await svc.forServiceSingle('co', 'u1', 'e1')) as Any;
+    expect(onVac).toMatchObject({
+      employeeId: 'e1',
+      fullName: 'Ana',
+      available: false,
+      state: 'VACACIONES',
+      reason: 'Vacaciones',
+    });
+    expect(typeof onVac.date).toBe('string');
+    expect(onVac.until).toBeInstanceOf(Date);
+
+    const onLeave = (await svc.forServiceSingle('co', 'u1', 'e2')) as Any;
+    expect(onLeave).toMatchObject({
+      state: 'NO_DISPONIBLE',
+      available: false,
+      reason: 'Licencia médica tipo 1',
+    });
+
+    const free = (await svc.forServiceSingle('co', 'u1', 'e3')) as Any;
+    expect(free).toMatchObject({ state: 'DISPONIBLE', available: true, reason: null, until: null });
+
+    assertNoSalary(onVac);
+    assertNoSalary(onLeave);
+    assertNoSalary(free);
+  });
+
+  it('forServiceSingle: unknown employee → 404', async () => {
+    const svc = makeService(makeForServiceTx());
+    await expect(svc.forServiceSingle('co', 'u1', 'ghost')).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it('forServiceBatch: roster shape, batched (NOT N+1), ids not in company ignored; no salary', async () => {
+    let absCalls = 0;
+    let vacCalls = 0;
+    const baseTx = makeForServiceTx();
+    const tx = {
+      ...baseTx,
+      absence: {
+        findMany: (a: Any) => {
+          absCalls += 1;
+          return baseTx.absence.findMany(a);
+        },
+      },
+      vacationRequest: {
+        findMany: (a: Any) => {
+          vacCalls += 1;
+          return baseTx.vacationRequest.findMany(a);
+        },
+      },
+    };
+    const res = (await makeService(tx).forServiceBatch('co', 'u1', [
+      'e1',
+      'e2',
+      'e3',
+      'ghost',
+    ])) as Any;
+
+    expect(res.requested).toBe(4); // ghost counted as requested…
+    expect(res.count).toBe(3); // …but ignored in the results (not in company)
+    const items = res.items as Any[];
+    expect(items.map((i) => (i as Any).state).sort()).toEqual([
+      'DISPONIBLE',
+      'NO_DISPONIBLE',
+      'VACACIONES',
+    ]);
+    // each item is the same self-describing shape
+    items.forEach((i) => {
+      expect(i).toEqual(
+        expect.objectContaining({
+          employeeId: expect.any(String),
+          fullName: expect.any(String),
+          available: expect.any(Boolean),
+          state: expect.any(String),
+        }),
+      );
+    });
+    // two batched covering-record queries for the WHOLE roster, not one-per-employee
+    expect(absCalls).toBe(1);
+    expect(vacCalls).toBe(1);
+    assertNoSalary(res);
+  });
+
+  it('forServiceBatch: empty list → 400; over the cap → 400', async () => {
+    const svc = makeService(makeForServiceTx());
+    await expect(svc.forServiceBatch('co', 'u1', ['', '  '])).rejects.toMatchObject({
+      status: 400,
+    });
+    const tooMany = Array.from({ length: 101 }, (_, i) => `id${i}`);
+    await expect(svc.forServiceBatch('co', 'u1', tooMany)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('forServiceDisponibles: only the DISPONIBLE active employees, with cargo; no salary', async () => {
+    const res = (await makeService(makeForServiceTx()).forServiceDisponibles('co', 'u1')) as Any;
+    const emps = res.employees as Any[];
+    expect(emps.map((e) => (e as Any).employeeId)).toEqual(['e3']); // e1 vac, e2 licencia excluded
+    expect(emps[0]).toMatchObject({ employeeId: 'e3', fullName: 'Cata', cargo: null });
+    expect(res.count).toBe(1);
+    assertNoSalary(res);
+  });
+
+  it('for-service resolution MATCHES the HR-015 board for the same date', async () => {
+    const svc = makeService(makeForServiceTx());
+    const board = (await svc.getAvailability('co', 'u1')) as Any;
+    const boardById = Object.fromEntries(
+      (board.employees as Any[]).map((r) => [(r as Any).employeeId, (r as Any).state]),
+    );
+    for (const id of ['e1', 'e2', 'e3']) {
+      const single = (await svc.forServiceSingle('co', 'u1', id)) as Any;
+      expect(single.state).toBe(boardById[id]);
+    }
+  });
+});
+
 describe('DisponibilidadService.getMatriz — reuses HR-014 compliance', () => {
   it('builds a row per employee from CertificationsService.compliance + a column union; no salary', async () => {
     const tx = { employee: { findMany: () => Promise.resolve([EMPLOYEES[0], EMPLOYEES[1]]) } };
