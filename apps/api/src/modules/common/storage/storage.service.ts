@@ -9,13 +9,30 @@ export class StorageService {
   private readonly logger = new Logger(StorageService.name);
 
   constructor() {
+    const useSsl = process.env.MINIO_USE_SSL === 'true';
+    const scheme = useSsl ? 'https' : 'http';
+    // The env stores the host WITHOUT a scheme — add it exactly once here.
+    const host = process.env.MINIO_ENDPOINT ?? '';
+    // Prod / Cloudflare R2 sets MINIO_PORT (443); local docker/dev uses
+    // MINIO_API_PORT (9000). Accept either so both environments resolve.
+    const port = process.env.MINIO_PORT || process.env.MINIO_API_PORT || (useSsl ? '443' : '9000');
+    // R2 wants a clean `https://<host>` (443 implicit); local MinIO needs the
+    // explicit `:9000`. Append the port only when it is NOT the scheme default.
+    const isDefaultPort = port === (useSsl ? '443' : '80');
+    const endpoint = `${scheme}://${host}${isDefaultPort ? '' : `:${port}`}`;
+
     this.s3 = new S3Client({
-      endpoint: `http${process.env.MINIO_USE_SSL === 'true' ? 's' : ''}://${process.env.MINIO_ENDPOINT}:${process.env.MINIO_API_PORT || '9000'}`,
-      region: 'us-east-1',
+      endpoint,
+      // R2 has no AWS-style regions; 'auto' is required there and accepted by MinIO.
+      region: 'auto',
       credentials: {
-        accessKeyId: process.env.MINIO_ROOT_USER || 'minioadmin',
-        secretAccessKey: process.env.MINIO_ROOT_PASSWORD || 'minioadmin',
+        // R2 / prod conventionally uses MINIO_ACCESS_KEY / MINIO_SECRET_KEY; local
+        // MinIO uses MINIO_ROOT_USER / MINIO_ROOT_PASSWORD. Accept either.
+        accessKeyId: process.env.MINIO_ACCESS_KEY || process.env.MINIO_ROOT_USER || 'minioadmin',
+        secretAccessKey:
+          process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD || 'minioadmin',
       },
+      // R2 expects path-style addressing; MinIO also supports it.
       forcePathStyle: true,
     });
   }

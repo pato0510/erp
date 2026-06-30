@@ -11,12 +11,13 @@ import { DocumentRecordStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { StorageService } from '../../common/storage/storage.service';
+import { formatStorageError } from '../../common/storage/storage-error.util';
 import { EmployeeDocumentRequirementsService } from './employee-document-requirements.service';
 import { CreateEmployeeDocumentDto } from './dto/create-employee-document.dto';
 import { RejectEmployeeDocumentDto } from './dto/reject-employee-document.dto';
 import { SupersedeEmployeeDocumentDto } from './dto/supersede-employee-document.dto';
 
-const DOCUMENTS_BUCKET = process.env.SII_CERT_BUCKET || 'excelsia-documents';
+const DOCUMENTS_BUCKET = process.env.MINIO_BUCKET || 'excelsia-documents';
 const FILE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 /* EmployeeDocumentType has no per-type alertDaysBefore column (kept thin); the
    POR_VENCER window uses a single platform default. Mirrors the Operations
@@ -165,7 +166,7 @@ export class EmployeeDocumentsService {
         return { storageKey, blobFallback: null };
       } catch (err) {
         this.logger.warn(
-          `MinIO upload failed (${err instanceof Error ? err.message : err}); falling back to DB blob`,
+          `MinIO/R2 upload failed [${formatStorageError(err)}]; falling back to DB blob`,
         );
         return { storageKey: null, blobFallback: Uint8Array.from(file.buffer) };
       }
