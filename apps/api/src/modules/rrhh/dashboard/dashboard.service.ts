@@ -9,6 +9,42 @@ const ALERT_WINDOW_DAYS = 30;
 const RECENT_LIMIT = 6;
 const EXPIRY_ALERT_LIMIT = 8;
 
+/* Per-caller ability flags used to SHAPE the /overview payload (never to grant
+   access — the endpoint gate stays `read Employee`). Computed at the controller
+   from the CASL ability PoliciesGuard built, so shaping tracks the ability
+   factory automatically (no role-string checks anywhere). */
+export interface OverviewScope {
+  canReadDocuments: boolean;
+  canReadContracts: boolean;
+}
+
+interface ContractRenewalBlock {
+  available: boolean;
+  proximasRenovaciones: unknown[];
+}
+
+/* Pure scoping of the two CROSS-DOMAIN sections of /overview:
+   - alertasVencimiento: per-person document-expiry rows (employee + document-type
+     names) → only a Documentos reader receives them; others get []. NOTE the
+     aggregate document COUNTS are NOT here — they live in the untouched
+     `documentos` block and remain visible (aggregate-appropriate).
+   - contratos: the contract-renewal block → only a Contratos reader may receive
+     populated renewals; others get the empty/unavailable block. Empty today, but
+     the gate is wired for when contract-renewal data goes live.
+   Kept pure so it is trivially unit-testable, and byte-identical for callers that
+   can read both domains. */
+export function scopeOverviewSections<A>(
+  raw: { alertasVencimiento: A[]; contratos: ContractRenewalBlock },
+  scope: OverviewScope,
+): { alertasVencimiento: A[]; contratos: ContractRenewalBlock } {
+  return {
+    alertasVencimiento: scope.canReadDocuments ? raw.alertasVencimiento : [],
+    contratos: scope.canReadContracts
+      ? raw.contratos
+      : { available: false, proximasRenovaciones: [] },
+  };
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -26,7 +62,7 @@ export class DashboardService {
      inside executeWithRls so the company RLS context is set (defense-in-depth)
      and every query also carries an explicit companyId filter. Queries run
      sequentially because they share one interactive-transaction connection. */
-  async getOverview(companyId: string, userId: string) {
+  async getOverview(companyId: string, userId: string, scope: OverviewScope) {
     const today = this.utcToday();
     const horizon = new Date(today);
     horizon.setUTCDate(horizon.getUTCDate() + ALERT_WINDOW_DAYS);
@@ -111,6 +147,20 @@ export class DashboardService {
         };
       });
 
+      /* Per-caller scoping: alertasVencimiento (per-person document rows) and the
+         contract-renewal block are cross-domain data. A caller that cannot read
+         those domains receives the EMPTY shape; the aggregate document COUNTS in
+         `documentos` below stay untouched. scopeOverviewSections is pure + tested. */
+      const sections = scopeOverviewSections(
+        {
+          alertasVencimiento,
+          /* Honest placeholder — this dataset doesn't exist yet. The frontend
+             renders "disponible próximamente", never a fabricated number. */
+          contratos: { available: false, proximasRenovaciones: [] as unknown[] },
+        },
+        scope,
+      );
+
       return {
         dotacion: {
           activos,
@@ -127,11 +177,9 @@ export class DashboardService {
           pendientesRevision: documentosPendientes,
           alertWindowDays: ALERT_WINDOW_DAYS,
         },
-        alertasVencimiento,
+        alertasVencimiento: sections.alertasVencimiento,
         recientes,
-        /* Honest placeholders — these datasets don't exist yet. The frontend
-           renders "disponible próximamente", never a fabricated number. */
-        contratos: { available: false, proximasRenovaciones: [] as never[] },
+        contratos: sections.contratos,
         generatedAt: new Date().toISOString(),
       };
     });
