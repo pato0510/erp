@@ -63,6 +63,7 @@ Leyenda: ✅ acceso total · 📊 solo agregados (nunca por persona) · ❌ sin 
 | Vacaciones                             |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
 | Licencias / permisos                   |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
 | Certificaciones                        |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
+| Disponibilidad (HR-015 / HR-016)       |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
 | Dashboard RRHH                         |  ✅   |   ✅    |     📊     |   ❌    |   ❌   |
 | Parámetros previsionales               |  ✅   |   ✅    |     ❌     |   ❌    |   ❌   |
 
@@ -73,6 +74,18 @@ Leyenda: ✅ acceso total · 📊 solo agregados (nunca por persona) · ❌ sin 
 > sensibles** (sueldos, liquidaciones, finiquitos). Si al verificar algo no coincide con esto, es un
 > bug. Las filas no financieras (cargos, documentos, contratos, vacaciones, etc.) siguen siendo
 > MANAGER/ADMIN-only.
+
+> Nota (Disponibilidad, HR-015 / HR-016): el **tablero de disponibilidad** y el endpoint
+> `disponibilidad-servicio` exponen **nombres de trabajadores + motivos de no-disponibilidad**
+> (licencia / permiso), que son **PII de salud (health-adjacent)**. Por eso quedan restringidos a
+> **MANAGER/ADMIN/SUPER_ADMIN** — gateados en `AvailabilitySubject`, **no** afectados por el grant
+> de `read Employee` del ACCOUNTANT (que sigue en ❌ para esta pantalla).
+
+> Nota (Dashboard RRHH — decisión consciente, ya implementada): `GET /rrhh/dashboard/overview` se
+> **modela según la ability CASL** de quien llama. Su bloque de **renovaciones de contrato**
+> (`proximasRenovaciones`, hoy vacío) está **gateado en `read EmployeeContract`**, de modo que
+> cuando se conecte la data de renovaciones, un lector que **no** ve Contratos (p. ej. el
+> **ACCOUNTANT**, ❌ en Contratos) **no** la recibirá a través del dashboard.
 
 ### 1.3 Verificaciones puntuales de alto riesgo (las que NO se hicieron a mano)
 
