@@ -380,8 +380,8 @@ const MODULES: ModuleDef[] = [
     name: 'Recursos Humanos',
     description: 'Gestión del talento, nóminas, evaluaciones y desarrollo organizacional',
     gradient: 'linear-gradient(135deg, #14B8A6, #0F766E)',
-    href: null,
-    active: false,
+    href: '/rrhh',
+    active: true,
     svg: <RrhhSvg />,
   },
 ];
