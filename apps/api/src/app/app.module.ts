@@ -17,6 +17,7 @@ import { AuditModule } from '../modules/audit/audit.module';
 import { BankingModule } from '../modules/banking/banking.module';
 import { CashflowModule } from '../modules/cashflow/cashflow.module';
 import { ClosingModule } from '../modules/closing/closing.module';
+import { ComercialModule } from '../modules/comercial/comercial.module';
 import { DashboardModule } from '../modules/dashboard/dashboard.module';
 import { CatalogsModule } from '../modules/catalogs/catalogs.module';
 import { CompaniesModule } from '../modules/companies/companies.module';
@@ -63,6 +64,7 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
     BankingModule,
     CashflowModule,
     ClosingModule,
+    ComercialModule,
     DashboardModule,
     CatalogsModule,
     CompaniesModule,

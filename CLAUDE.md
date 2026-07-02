@@ -461,9 +461,39 @@ Al escanear se abre la "ficha pública del activo" con info de cumplimiento.
 Status: V1 ready for production
 Última actualización: 2026-04-29 (OPS-037)
 
+═════════════════════════════════════════════════════════════════════
+
+# 🏁 MÓDULO RRHH — V1 EN PRODUCCIÓN (live desde 2026-07-01)
+
+═════════════════════════════════════════════════════════════════════
+
+Status: V1 completo (HR-001…HR-016), QA de permisos aprobado, desplegado.
+RRHH ya NO es "Próximamente": aparece como módulo live y navegable en el
+selector (/modulos → /rrhh). Antes solo era accesible por link directo.
+El switch vive en apps/web/src/app/modulos/page.tsx (ModuleDef.active=true).
+
+Autorización (RBAC/CASL) — puntos clave:
+
+- ACCOUNTANT (contador): visibilidad financiera de SOLO-LECTURA completa
+  (sueldos por persona, liquidaciones, finiquitos y agregados). Sin
+  create/update/delete sobre ningún subject RRHH — liquidaciones y finiquitos
+  se cargan desde un portal externo, nunca se editan in-app.
+- VIEWER y ANALYST: bloqueados de todo dato financiero-sensible.
+  MANAGER/ADMIN/SUPER_ADMIN: acceso total.
+- Disponibilidad (HR-015/HR-016): solo MANAGER/ADMIN/SUPER_ADMIN
+  (AvailabilitySubject); expone nombres + motivo de no-disponibilidad
+  (PII de salud). No afectada por el grant read Employee del ACCOUNTANT.
+- Dashboard /overview: payload modelado por la ability CASL del caller
+  (filas por-persona de documentos y bloque de renovaciones de contrato
+  gateados; ACCOUNTANT recibe worker-domain + conteos agregados).
+
+QA doc: docs/EXCELSIA-RRHH-QA-PRE-DESBLOQUEO.md
+Última actualización: 2026-07-01
+
 # Próximos pasos
 
 - Actualización del manual de Operaciones (incorporar OPS-035 QR,
   OPS-036 Auditoría, OPS-034 nota de performance)
 - Creación del manual de Finanzas (V1 ya en producción)
-- Inicio del Módulo RRHH (siguiente prioridad del cliente)
+- Creación del manual de RRHH (V1 ya en producción)
+- Inicio de los módulos Comercial y Marketing (siguiente prioridad del cliente)

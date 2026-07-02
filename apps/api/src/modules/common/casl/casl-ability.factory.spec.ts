@@ -9,11 +9,17 @@
  * only, VIEWER/ANALYST exclusion hinges on them LACKING read — pinned below. */
 import { UserRole } from '@prisma/client';
 import {
+  AccountSubject,
+  ActivitySubject,
   CaslAbilityFactory,
+  ContactSubject,
   EmployeeCompensationSubject,
   EmployeeSubject,
   JobPositionSubject,
+  OpportunitySubject,
+  QuoteSubject,
   SalaryRecordSubject,
+  ServiceCatalogSubject,
   TerminationSimulationSubject,
 } from './casl-ability.factory';
 
@@ -122,5 +128,44 @@ describe('HR-003 compensation endpoint gates (post read-only relaxation)', () =>
     expect(canPut(UserRole.ACCOUNTANT)).toBe(false); // read-only — never writes
     expect(canPut(UserRole.ANALYST)).toBe(false);
     expect(canPut(UserRole.VIEWER)).toBe(false);
+  });
+});
+
+describe('CaslAbilityFactory — Comercial default-deny read floor (COM-001)', () => {
+  const factory = new CaslAbilityFactory();
+  const COMERCIAL_SUBJECTS = [
+    AccountSubject,
+    ContactSubject,
+    OpportunitySubject,
+    ActivitySubject,
+    ServiceCatalogSubject,
+    QuoteSubject,
+  ];
+
+  it('SUPER_ADMIN and ADMIN read every Comercial subject (via manage all)', () => {
+    for (const subject of COMERCIAL_SUBJECTS) {
+      expect(factory.defineAbilityFor(UserRole.SUPER_ADMIN).can('read', subject)).toBe(true);
+      expect(factory.defineAbilityFor(UserRole.ADMIN).can('read', subject)).toBe(true);
+    }
+  });
+
+  it('MANAGER/ACCOUNTANT/ANALYST/VIEWER read NO Comercial subject (default-deny floor)', () => {
+    const revoked = [UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.ANALYST, UserRole.VIEWER];
+    for (const subject of COMERCIAL_SUBJECTS) {
+      for (const role of revoked) {
+        expect(factory.defineAbilityFor(role).can('read', subject)).toBe(false);
+      }
+    }
+  });
+
+  it('only REVOKES read — no non-admin role gains create/update/delete on a Comercial subject', () => {
+    const nonAdmin = [UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.ANALYST, UserRole.VIEWER];
+    for (const subject of COMERCIAL_SUBJECTS) {
+      for (const action of ['create', 'update', 'delete'] as const) {
+        for (const role of nonAdmin) {
+          expect(factory.defineAbilityFor(role).can(action, subject)).toBe(false);
+        }
+      }
+    }
   });
 });

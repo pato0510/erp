@@ -48,6 +48,12 @@ type Subjects =
       | typeof PayrollParameterSubject
       | typeof EmployeeCompensationSubject
       | typeof JobPositionSubject
+      | typeof AccountSubject
+      | typeof ContactSubject
+      | typeof OpportunitySubject
+      | typeof ActivitySubject
+      | typeof ServiceCatalogSubject
+      | typeof QuoteSubject
     >
   | 'all';
 
@@ -209,6 +215,30 @@ class JobPositionSubject {
   static readonly modelName = 'JobPosition' as const;
 }
 
+/* COM-001 — Comercial (CRM) module subjects. Declared in the subjects union so
+   later tickets (COM-002+) can gate their endpoints with @CheckPolicies. This
+   ticket grants NO role any ability on them: a subject present in the union with
+   no can()/cannot() rule grants nobody anything, so VIEWER/ANALYST/etc. gain no
+   access from COM-001. Abilities are assigned per-entity as each COM ticket lands. */
+class AccountSubject {
+  static readonly modelName = 'Account' as const;
+}
+class ContactSubject {
+  static readonly modelName = 'Contact' as const;
+}
+class OpportunitySubject {
+  static readonly modelName = 'Opportunity' as const;
+}
+class ActivitySubject {
+  static readonly modelName = 'Activity' as const;
+}
+class ServiceCatalogSubject {
+  static readonly modelName = 'ServiceCatalog' as const;
+}
+class QuoteSubject {
+  static readonly modelName = 'Quote' as const;
+}
+
 /* All RRHH subjects — granted/revoked in bulk by the baseline role rules. */
 const RRHH_SUBJECTS = [
   EmployeeSubject,
@@ -230,6 +260,18 @@ const RRHH_COMPENSATION_SUBJECTS = [
   SalaryRecordSubject,
   TerminationSimulationSubject,
   EmployeeCompensationSubject,
+];
+/* COM-001 — all Comercial (CRM) subjects. Used to establish a default-deny READ
+   floor (mirroring RRHH_SUBJECTS): the blanket-`read all` roles have their
+   inherited Comercial read revoked in their branches below, so no role reads
+   Comercial data until a later ticket grants it per-entity. */
+const COMERCIAL_SUBJECTS = [
+  AccountSubject,
+  ContactSubject,
+  OpportunitySubject,
+  ActivitySubject,
+  ServiceCatalogSubject,
+  QuoteSubject,
 ];
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
@@ -325,6 +367,12 @@ export {
   PayrollParameterSubject,
   EmployeeCompensationSubject,
   JobPositionSubject,
+  AccountSubject,
+  ContactSubject,
+  OpportunitySubject,
+  ActivitySubject,
+  ServiceCatalogSubject,
+  QuoteSubject,
 };
 
 @Injectable()
@@ -415,6 +463,9 @@ export class CaslAbilityFactory {
         can('create', AuditPackageSubject);
         /* HR-001 — MANAGER fully manages all RRHH subjects. */
         RRHH_SUBJECTS.forEach((subject) => can('manage', subject));
+        /* COM-001 — default-deny floor: revoke the inherited blanket `read all`
+           on Comercial subjects. No positive Comercial grant yet (later tickets). */
+        COMERCIAL_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
 
       case UserRole.ACCOUNTANT:
@@ -449,6 +500,9 @@ export class CaslAbilityFactory {
         RRHH_SUBJECTS.forEach((subject) => cannot('read', subject));
         RRHH_COMPENSATION_SUBJECTS.forEach((subject) => can('read', subject));
         can('read', EmployeeSubject);
+        /* COM-001 — default-deny floor: revoke inherited blanket `read all` on
+           Comercial subjects. No Comercial re-grant (unlike RRHH compensation). */
+        COMERCIAL_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
 
       case UserRole.ANALYST:
@@ -460,6 +514,9 @@ export class CaslAbilityFactory {
         /* HR-001 — ANALYST has no RRHH access; revoke the blanket
            `read all` on RRHH subjects. */
         RRHH_SUBJECTS.forEach((subject) => cannot('read', subject));
+        /* COM-001 — default-deny floor: revoke inherited blanket `read all` on
+           Comercial subjects. No Comercial read for ANALYST. */
+        COMERCIAL_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
 
       case UserRole.VIEWER:
