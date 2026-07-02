@@ -82,8 +82,9 @@ model Account {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
-  contacts     Contact[] // COM-004 — people within this account (FK on contacts.accountId, ON DELETE CASCADE)
+  counterparty  Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+  contacts      Contact[] // COM-004 — people within this account (FK on contacts.accountId, ON DELETE CASCADE)
+  opportunities Opportunity[] // COM-005 — deals on this account (FK on opportunities.accountId, ON DELETE RESTRICT)
 
   @@index([companyId])
   @@map("accounts")
@@ -116,4 +117,62 @@ model Contact {
   @@index([companyId])
   @@index([accountId])
   @@map("contacts")
+}
+
+/* COM-005 — opportunity stages (the pipeline). Active flow: PROSPECTO → CONTACTO →
+   VISITA_TECNICA → COTIZACION → NEGOCIACION (free movement). GANADA / PERDIDA are
+   semi-terminal (only a dedicated reopen exits them). EN_PAUSA parks an active
+   deal (previousStage remembers where it was). ASCII members; display labels in UI. */
+enum OpportunityStage {
+  PROSPECTO
+  CONTACTO
+  VISITA_TECNICA
+  COTIZACION
+  NEGOCIACION
+  GANADA
+  PERDIDA
+  EN_PAUSA
+}
+
+enum LostReason {
+  PRECIO
+  COMPETENCIA
+  PROYECTO_CANCELADO
+  OTRO
+}
+
+/* COM-005 — opportunities: the pipeline's core entity (a deal AGS pursues with an
+   account). REQUIRED FK to accounts with ON DELETE RESTRICT — an account with
+   opportunities cannot be hard-deleted (its own soft-deactivate lifecycle is
+   unaffected). Stage transitions are enforced in the SERVICE (not the DB); GANADA/
+   PERDIDA are semi-terminal (reopen-only). ownerId/createdBy are bare actor UUIDs
+   (no FK). estimatedValue is CLP money (same Decimal(18,2) as service_catalog /
+   compensation). expectedCloseDate is @db.Date, stored UTC-anchored to avoid the
+   date off-by-one. Platform invariant (RLS + audit + GRANT) is in migration
+   20260702150000_add_opportunities. */
+model Opportunity {
+  id                String            @id @default(uuid()) @db.Uuid
+  companyId         String            @db.Uuid
+  accountId         String            @db.Uuid
+  name              String
+  stage             OpportunityStage  @default(PROSPECTO)
+  previousStage     OpportunityStage? // where it was before EN_PAUSA (for resume)
+  estimatedValue    Decimal?          @db.Decimal(18, 2) // CLP
+  probability       Int? // 0–100
+  expectedCloseDate DateTime?         @db.Date
+  ownerId           String?           @db.Uuid // commercial executive — bare actor UUID (no FK)
+  lostReason        LostReason?
+  lostReasonDetail  String?
+  closedAt          DateTime? // set when moved to GANADA/PERDIDA
+  notes             String?
+  createdBy         String            @db.Uuid
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([accountId])
+  @@index([stage])
+  @@map("opportunities")
 }

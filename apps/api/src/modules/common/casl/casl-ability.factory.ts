@@ -474,6 +474,8 @@ export class CaslAbilityFactory {
         can(['read', 'create', 'update', 'delete'], AccountSubject);
         /* COM-004 — contacts share the account permission profile → full CRUD. */
         can(['read', 'create', 'update', 'delete'], ContactSubject);
+        /* COM-005 — opportunities (pipeline core) share the same profile → full CRUD. */
+        can(['read', 'create', 'update', 'delete'], OpportunitySubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -519,6 +521,8 @@ export class CaslAbilityFactory {
         can('read', AccountSubject);
         /* COM-004 — contacts share the account read profile. Read-only, no write. */
         can('read', ContactSubject);
+        /* COM-005 — opportunities: ACCOUNTANT read-only (pipeline visibility). No write. */
+        can('read', OpportunitySubject);
         break;
 
       case UserRole.ANALYST:
