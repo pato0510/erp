@@ -39,3 +39,51 @@ model ServiceCatalog {
   @@index([companyId])
   @@map("service_catalog")
 }
+
+/* COM-003 — account lifecycle status. New business enters as PROSPECTO; when
+   confirmed it becomes ACTIVA; INACTIVA is the soft-deactivated state. Transitions
+   are FREE (no state machine). ASCII members; display labels in the UI. */
+enum AccountStatus {
+  PROSPECTO
+  ACTIVA
+  INACTIVA
+}
+
+enum AccountPriority {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+/* COM-003 — accounts: the CRM's core entity (AGS's commercial portfolio). New
+   business enters directly as an account with status PROSPECTO (there is NO
+   separate leads table — deliberate). Fiscal identity (RUT, tax history) lives in
+   Finance `counterparties`; an account only OPTIONALLY references it and stays
+   DECOUPLED — creating an account never auto-creates a counterparty; linkage is
+   manual. `ownerId` (commercial executive) and `createdBy` are bare actor UUIDs
+   (codebase convention, no FK). `sourceCampaignId` is a prepared hook for the
+   future Marketing module — NO FK (the campaigns table does not exist yet). Only
+   `counterpartyId` is a real FK (ON DELETE SET NULL — deleting a counterparty
+   only unlinks, never deletes/blocks the account). The platform invariant (RLS +
+   audit trigger + app_user GRANT) is in migration 20260702130000_add_accounts. */
+model Account {
+  id               String          @id @default(uuid()) @db.Uuid
+  companyId        String          @db.Uuid
+  name             String
+  status           AccountStatus   @default(PROSPECTO)
+  industry         String?
+  priority         AccountPriority @default(MEDIA)
+  commercialRisk   String? // free-text note for V1 (not an enum)
+  ownerId          String?         @db.Uuid // commercial executive — bare actor UUID (no FK), like createdBy
+  counterpartyId   String?         @db.Uuid // optional link to Finance counterparties
+  sourceCampaignId String?         @db.Uuid // Marketing hook — NO FK (campaigns table not created yet)
+  notes            String?
+  createdBy        String          @db.Uuid
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@map("accounts")
+}

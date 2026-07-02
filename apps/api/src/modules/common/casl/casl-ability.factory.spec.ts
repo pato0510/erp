@@ -131,7 +131,7 @@ describe('HR-003 compensation endpoint gates (post read-only relaxation)', () =>
   });
 });
 
-describe('CaslAbilityFactory — Comercial default-deny floor (COM-001) + COM-002 catalog', () => {
+describe('CaslAbilityFactory — Comercial floor (COM-001) + COM-002 catalog + COM-003 accounts', () => {
   const factory = new CaslAbilityFactory();
   const ALL_COMERCIAL = [
     AccountSubject,
@@ -141,15 +141,10 @@ describe('CaslAbilityFactory — Comercial default-deny floor (COM-001) + COM-00
     ServiceCatalogSubject,
     QuoteSubject,
   ];
-  /* COM-002 re-granted READ on ServiceCatalog to every role, so it is no longer
-     under the floor; the other five stay default-deny until their own tickets. */
-  const STILL_FLOORED = [
-    AccountSubject,
-    ContactSubject,
-    OpportunitySubject,
-    ActivitySubject,
-    QuoteSubject,
-  ];
+  /* COM-002 re-granted read on ServiceCatalog and COM-003 re-granted read on
+     Account (to some roles), so both leave the floor. The remaining FOUR stay
+     default-deny until their own tickets. */
+  const STILL_FLOORED = [ContactSubject, OpportunitySubject, ActivitySubject, QuoteSubject];
   const nonAdmin = [UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.ANALYST, UserRole.VIEWER];
 
   it('SUPER_ADMIN and ADMIN read every Comercial subject (via manage all)', () => {
@@ -159,7 +154,7 @@ describe('CaslAbilityFactory — Comercial default-deny floor (COM-001) + COM-00
     }
   });
 
-  it('MANAGER/ACCOUNTANT/ANALYST/VIEWER read NONE of the still-floored Comercial subjects (COM-002 widened only ServiceCatalog)', () => {
+  it('MANAGER/ACCOUNTANT/ANALYST/VIEWER read NONE of the still-floored Comercial subjects (COM-002/003 widened only ServiceCatalog + Account)', () => {
     for (const subject of STILL_FLOORED) {
       for (const role of nonAdmin) {
         expect(factory.defineAbilityFor(role).can('read', subject)).toBe(false);

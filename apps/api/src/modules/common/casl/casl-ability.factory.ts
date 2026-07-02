@@ -470,6 +470,8 @@ export class CaslAbilityFactory {
            read AFTER the revoke (last-rule-wins) and grant MANAGER write. */
         can('read', ServiceCatalogSubject);
         can(['create', 'update', 'delete'], ServiceCatalogSubject);
+        /* COM-003 — accounts (CRM core): MANAGER is the commercial role → full CRUD. */
+        can(['read', 'create', 'update', 'delete'], AccountSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -510,6 +512,9 @@ export class CaslAbilityFactory {
         /* COM-002 — service_catalog is non-sensitive and read by every role:
            re-grant read AFTER the revoke (last-rule-wins). No write for ACCOUNTANT. */
         can('read', ServiceCatalogSubject);
+        /* COM-003 — accounts: ACCOUNTANT gets READ-ONLY portfolio visibility (same
+           rationale as its RRHH financial read). No create/update/delete. */
+        can('read', AccountSubject);
         break;
 
       case UserRole.ANALYST:

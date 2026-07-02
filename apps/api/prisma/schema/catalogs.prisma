@@ -51,6 +51,7 @@ model Counterparty {
 
   movements   Movement[]
   commitments Commitment[]
+  accounts    Account[] // COM-003 — Comercial accounts that optionally link here (FK lives on accounts.counterpartyId; virtual back-relation only, no column)
 
   @@unique([companyId, taxId])
   @@map("counterparties")
