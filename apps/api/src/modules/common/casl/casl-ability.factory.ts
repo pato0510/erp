@@ -464,8 +464,12 @@ export class CaslAbilityFactory {
         /* HR-001 — MANAGER fully manages all RRHH subjects. */
         RRHH_SUBJECTS.forEach((subject) => can('manage', subject));
         /* COM-001 — default-deny floor: revoke the inherited blanket `read all`
-           on Comercial subjects. No positive Comercial grant yet (later tickets). */
+           on Comercial subjects; per-subject grants are added by each COM ticket. */
         COMERCIAL_SUBJECTS.forEach((subject) => cannot('read', subject));
+        /* COM-002 — service_catalog is the shared, non-sensitive catalog: re-grant
+           read AFTER the revoke (last-rule-wins) and grant MANAGER write. */
+        can('read', ServiceCatalogSubject);
+        can(['create', 'update', 'delete'], ServiceCatalogSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -501,8 +505,11 @@ export class CaslAbilityFactory {
         RRHH_COMPENSATION_SUBJECTS.forEach((subject) => can('read', subject));
         can('read', EmployeeSubject);
         /* COM-001 — default-deny floor: revoke inherited blanket `read all` on
-           Comercial subjects. No Comercial re-grant (unlike RRHH compensation). */
+           Comercial subjects, then re-grant only the non-sensitive ones below. */
         COMERCIAL_SUBJECTS.forEach((subject) => cannot('read', subject));
+        /* COM-002 — service_catalog is non-sensitive and read by every role:
+           re-grant read AFTER the revoke (last-rule-wins). No write for ACCOUNTANT. */
+        can('read', ServiceCatalogSubject);
         break;
 
       case UserRole.ANALYST:
@@ -515,8 +522,11 @@ export class CaslAbilityFactory {
            `read all` on RRHH subjects. */
         RRHH_SUBJECTS.forEach((subject) => cannot('read', subject));
         /* COM-001 — default-deny floor: revoke inherited blanket `read all` on
-           Comercial subjects. No Comercial read for ANALYST. */
+           Comercial subjects, then re-grant only the non-sensitive ones below. */
         COMERCIAL_SUBJECTS.forEach((subject) => cannot('read', subject));
+        /* COM-002 — service_catalog is non-sensitive and read by every role:
+           re-grant read AFTER the revoke (last-rule-wins). No write for ANALYST. */
+        can('read', ServiceCatalogSubject);
         break;
 
       case UserRole.VIEWER:
@@ -558,6 +568,9 @@ export class CaslAbilityFactory {
         /* OPS-028 — VIEWER can acknowledge their own readings.
            Coverage dashboards stay gated by the service. */
         can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
+        /* COM-002 — service_catalog is non-sensitive: VIEWER reads it (no blanket
+           `read all` to inherit, so grant explicitly). No write. */
+        can('read', ServiceCatalogSubject);
         break;
     }
 
