@@ -7,6 +7,7 @@ import { DarkGradientBackground } from '../../components/DarkGradientBackground'
 import { FinanceSidebar } from '../../components/sidebars/FinanceSidebar';
 import { OperationsSidebar } from '../../components/sidebars/OperationsSidebar';
 import { RrhhSidebar } from '../../components/sidebars/RrhhSidebar';
+import { ComercialSidebar } from '../../components/sidebars/ComercialSidebar';
 import { NotificationCenter } from '../../components/NotificationCenter';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -48,12 +49,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isOperations = pathname?.startsWith('/operaciones') ?? false;
   const isRrhh = pathname?.startsWith('/rrhh') ?? false;
+  const isComercial = pathname?.startsWith('/comercial') ?? false;
 
   return (
     <>
       <DarkGradientBackground />
       <div className="tn-shell">
-        {isRrhh ? <RrhhSidebar /> : isOperations ? <OperationsSidebar /> : <FinanceSidebar />}
+        {isComercial ? (
+          <ComercialSidebar />
+        ) : isRrhh ? (
+          <RrhhSidebar />
+        ) : isOperations ? (
+          <OperationsSidebar />
+        ) : (
+          <FinanceSidebar />
+        )}
 
         <main className="tn-main">
           {/* OPS-022 — notification bell anchored top-right of the

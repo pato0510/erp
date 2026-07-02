@@ -1,6 +1,12 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { AccountSubject } from '../common/casl/casl-ability.factory';
+import {
+  AccountSubject,
+  ContactSubject,
+  ServiceCatalogSubject,
+} from '../common/casl/casl-ability.factory';
+import type { AppAbility } from '../common/casl/casl-ability.factory';
 import { CheckPolicies } from '../common/decorators/check-policies.decorator';
+import { CurrentAbility } from '../common/decorators/current-ability.decorator';
 import { PoliciesGuard } from '../common/guards/policies.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 
@@ -27,6 +33,32 @@ export class ComercialController {
       status: 'ok',
       module: 'comercial',
       timestamp: new Date().toISOString(),
+    };
+  }
+
+  /* COM-004b — the caller's Comercial abilities, computed FROM the CASL ability
+   * PoliciesGuard built (read via @CurrentAbility), never from role strings. The
+   * frontend consumes these flags to gate write controls, so the UI can never
+   * drift from the CASL matrix. Gated on `read Account` — the read every
+   * Comercial-UI caller has (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); ANALYST/
+   * VIEWER 403, which is fine (they never reach the Comercial UI). This is payload
+   * shaping (self-description), not access control — real access stays in
+   * @CheckPolicies on every feature endpoint. */
+  @Get('permissions')
+  @CheckPolicies((ability) => ability.can('read', AccountSubject))
+  permissions(@CurrentAbility() ability: AppAbility) {
+    const flagsFor = (
+      subject: typeof AccountSubject | typeof ContactSubject | typeof ServiceCatalogSubject,
+    ) => ({
+      read: ability.can('read', subject),
+      create: ability.can('create', subject),
+      update: ability.can('update', subject),
+      delete: ability.can('delete', subject),
+    });
+    return {
+      account: flagsFor(AccountSubject),
+      contact: flagsFor(ContactSubject),
+      serviceCatalog: flagsFor(ServiceCatalogSubject),
     };
   }
 }
