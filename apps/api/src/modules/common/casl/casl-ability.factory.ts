@@ -472,6 +472,8 @@ export class CaslAbilityFactory {
         can(['create', 'update', 'delete'], ServiceCatalogSubject);
         /* COM-003 — accounts (CRM core): MANAGER is the commercial role → full CRUD. */
         can(['read', 'create', 'update', 'delete'], AccountSubject);
+        /* COM-004 — contacts share the account permission profile → full CRUD. */
+        can(['read', 'create', 'update', 'delete'], ContactSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -515,6 +517,8 @@ export class CaslAbilityFactory {
         /* COM-003 — accounts: ACCOUNTANT gets READ-ONLY portfolio visibility (same
            rationale as its RRHH financial read). No create/update/delete. */
         can('read', AccountSubject);
+        /* COM-004 — contacts share the account read profile. Read-only, no write. */
+        can('read', ContactSubject);
         break;
 
       case UserRole.ANALYST:

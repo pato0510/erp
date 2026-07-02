@@ -83,7 +83,37 @@ model Account {
   updatedAt        DateTime        @updatedAt
 
   counterparty Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+  contacts     Contact[] // COM-004 — people within this account (FK on contacts.accountId, ON DELETE CASCADE)
 
   @@index([companyId])
   @@map("accounts")
+}
+
+/* COM-004 — contacts: people within a commercial account (e.g. the client's ops
+   chief, procurement lead). A contact is a DEPENDENT CHILD of an account — the FK
+   is ON DELETE CASCADE (deleting an account removes its contacts), deliberately
+   unlike the account↔counterparty SET NULL peer reference. Contacts share the
+   account permission profile (same CASL grants). At most one contact per account
+   may have isPrimary=true — enforced in the SERVICE layer (not a DB constraint).
+   Platform invariant (RLS + audit + GRANT) is in migration 20260702140000_add_contacts. */
+model Contact {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  accountId String   @db.Uuid
+  firstName String
+  lastName  String
+  role      String? // job title at the client (free text)
+  email     String?
+  phone     String?
+  isPrimary Boolean  @default(false)
+  notes     String?
+  createdBy String   @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([accountId])
+  @@map("contacts")
 }

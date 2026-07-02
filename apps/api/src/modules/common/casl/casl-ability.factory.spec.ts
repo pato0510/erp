@@ -141,10 +141,10 @@ describe('CaslAbilityFactory — Comercial floor (COM-001) + COM-002 catalog + C
     ServiceCatalogSubject,
     QuoteSubject,
   ];
-  /* COM-002 re-granted read on ServiceCatalog and COM-003 re-granted read on
-     Account (to some roles), so both leave the floor. The remaining FOUR stay
-     default-deny until their own tickets. */
-  const STILL_FLOORED = [ContactSubject, OpportunitySubject, ActivitySubject, QuoteSubject];
+  /* COM-002/003/004 re-granted read on ServiceCatalog/Account/Contact (to some
+     roles), so those leave the floor. The remaining THREE stay default-deny until
+     their own tickets. */
+  const STILL_FLOORED = [OpportunitySubject, ActivitySubject, QuoteSubject];
   const nonAdmin = [UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.ANALYST, UserRole.VIEWER];
 
   it('SUPER_ADMIN and ADMIN read every Comercial subject (via manage all)', () => {
@@ -154,7 +154,7 @@ describe('CaslAbilityFactory — Comercial floor (COM-001) + COM-002 catalog + C
     }
   });
 
-  it('MANAGER/ACCOUNTANT/ANALYST/VIEWER read NONE of the still-floored Comercial subjects (COM-002/003 widened only ServiceCatalog + Account)', () => {
+  it('MANAGER/ACCOUNTANT/ANALYST/VIEWER read NONE of the still-floored Comercial subjects (COM-002/003/004 widened only ServiceCatalog + Account + Contact)', () => {
     for (const subject of STILL_FLOORED) {
       for (const role of nonAdmin) {
         expect(factory.defineAbilityFor(role).can('read', subject)).toBe(false);
