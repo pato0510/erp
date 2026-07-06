@@ -1,17 +1,15 @@
 'use client';
 
-/* COM-007 — MINIMAL opportunity detail. Deliberately small: read-only fields + the
- * stage actions for writers (Pausar on active, Reanudar on paused, Reabrir on
- * closed) — each calls the canonical COM-005 endpoint and re-renders the result.
- *
- * NO service-bundle UI here: the full detail (the COM-006 bundle editor with the
- * derived total, plus an activity timeline tab) lands in COM-007b. A dedicated route
- * (not a drawer) is used so the board stays a pure board and this can grow into the
- * full ficha in COM-007b. Tokens: accent #2563eb, Outfit headings, glass cards. */
+/* COM-007b — the opportunity detail: the deal's operating center. Header + stage
+ * actions (Pausar/Reanudar/Reabrir, canonical COM-005 endpoints), the read-only
+ * fields, the "Servicios" bundle editor (COM-006), the Actividad timeline (COM-008),
+ * and a Delete danger zone (COM-005 DELETE). ALL rules live in the backend — the UI
+ * renders them and relays their 4xx messages, never re-implements them. Ability-driven
+ * via /comercial/permissions. Tokens: accent #2563eb, Outfit headings, glass cards. */
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Pause, Play, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Pause, Play, RotateCcw, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
 import { formatCLP, formatDate } from '../../../../../lib/formatters';
 import { useComercialPermissions } from '../../../../../hooks/useCanWrite';
@@ -22,6 +20,8 @@ import {
   StageBadge,
 } from '../../../../../components/comercial/stageLabels';
 import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
+import { OpportunityBundle } from '../../../../../components/comercial/OpportunityBundle';
+import { DeleteOpportunityModal } from '../../../../../components/comercial/DeleteOpportunityModal';
 
 interface Opportunity {
   id: string;
@@ -48,6 +48,7 @@ interface UserOption {
 
 export default function OpportunityDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = String(params.id);
   const perms = useComercialPermissions();
   const canWrite = perms?.opportunity.update ?? false;
@@ -60,6 +61,16 @@ export default function OpportunityDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  /* Re-fetch ONLY the opportunity — used after a bundle mutation, whose derived
+     estimatedValue must be reflected in the header/value display. */
+  const refreshOpp = useCallback(() => {
+    apiClient
+      .get<Opportunity>(`/api/comercial/opportunities/${id}`)
+      .then(setOpp)
+      .catch(() => undefined);
+  }, [id]);
 
   const load = useCallback(() => {
     apiClient
@@ -240,8 +251,18 @@ export default function OpportunityDetailPage() {
         )}
       </div>
 
+      {/* COM-007b — service bundle (COM-006). Editable for writers on non-closed deals;
+          closed deals show it frozen. Refreshing the opp keeps the header value in sync
+          with the derived total. */}
+      <OpportunityBundle
+        opportunityId={opp.id}
+        canEdit={canWrite && !isClosedStage(opp.stage)}
+        closed={isClosedStage(opp.stage)}
+        onChanged={refreshOpp}
+      />
+
       {/* COM-008 — this opportunity's activity timeline. New entries derive the account
-          (not asked). The service-bundle editor + a fuller timeline tab are COM-007b. */}
+          (not asked). */}
       <div className="mt-4">
         <h2
           className="mb-3 text-sm font-semibold text-[var(--text-primary)]"
@@ -251,6 +272,50 @@ export default function OpportunityDetailPage() {
         </h2>
         <ActivityTimeline scope="opportunity" scopeId={opp.id} canWrite={canWrite} />
       </div>
+
+      {/* COM-007b — Delete danger zone (writers only). Hidden entirely for a closed
+          deal, which shows a historical note instead (reopen above to enable delete).
+          Delete lives ONLY here — never on the kanban cards. */}
+      {canWrite && (
+        <div className="mt-6 rounded-xl border border-red-200 bg-red-50/40 p-5">
+          <h2 className="text-sm font-semibold text-red-700">Zona de peligro</h2>
+          {isClosedStage(opp.stage) ? (
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              Las oportunidades cerradas son un registro histórico. Reábrela primero si necesitas
+              eliminarla.
+            </p>
+          ) : (
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-[var(--text-secondary)]">
+                Eliminar la oportunidad y su paquete de servicios. Las actividades permanecen en la
+                cuenta.
+              </p>
+              <button
+                onClick={() => setDeleteOpen(true)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+                style={{ background: '#b91c1c' }}
+              >
+                <Trash2 size={15} /> Eliminar oportunidad
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {deleteOpen && (
+        <DeleteOpportunityModal
+          opportunity={{ id: opp.id, name: opp.name }}
+          onClose={() => setDeleteOpen(false)}
+          onDeleted={() => {
+            try {
+              sessionStorage.setItem('comercial.flash', 'Oportunidad eliminada.');
+            } catch {
+              /* sessionStorage unavailable — navigate without the flash */
+            }
+            router.push('/comercial/pipeline');
+          }}
+        />
+      )}
     </div>
   );
 }

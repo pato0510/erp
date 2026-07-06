@@ -177,6 +177,20 @@ export default function PipelinePage() {
     fetchOpps();
   }, [fetchOpps]);
 
+  // COM-007b — a one-shot flash toast handed off via sessionStorage (e.g. after
+  // deleting an opportunity from its detail page and navigating back here).
+  useEffect(() => {
+    try {
+      const flash = sessionStorage.getItem('comercial.flash');
+      if (flash) {
+        sessionStorage.removeItem('comercial.flash');
+        setToast({ msg: flash, type: 'success' });
+      }
+    } catch {
+      /* sessionStorage unavailable — no flash */
+    }
+  }, []);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 4500);
