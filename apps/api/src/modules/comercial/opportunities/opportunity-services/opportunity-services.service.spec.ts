@@ -98,12 +98,15 @@ function makeWorld(opts: FakeOpts = {}) {
     }),
   };
   const account = { findFirst: jest.fn(() => Promise.resolve({ id: 'acc1' })) };
+  // COM-009 — bundle mutations must NEVER write a timeline activity. This spy proves it.
+  const activity = { create: jest.fn(() => Promise.resolve({ id: 'act1' })) };
 
   const prisma = {
     opportunity,
     opportunityService,
     serviceCatalog,
     account,
+    activity,
   } as unknown as ConstructorParameters<typeof OpportunityServicesService>[0];
   const rls = {
     executeWithRls: (_c: string, _u: string, fn: (t: unknown) => unknown) => fn(prisma),
@@ -115,6 +118,7 @@ function makeWorld(opts: FakeOpts = {}) {
     opp,
     lines,
     catalog,
+    activityCreate: activity.create,
   };
 }
 
@@ -251,5 +255,15 @@ describe('OpportunityServicesService — closed-opportunity guard (Rule 5)', () 
     const { bundle, opp } = makeWorld({ stage: S.EN_PAUSA, catalog: { s1: { basePrice: 10000 } } });
     await bundle.add('c1', 'u1', 'o1', { serviceId: 's1', quantity: 2 });
     expect(est(opp)).toBe(20000);
+  });
+});
+
+describe('OpportunityServicesService — COM-009: bundle mutations write NO timeline entry', () => {
+  it('add / edit / remove never create a system activity (too noisy)', async () => {
+    const { bundle, lines, activityCreate } = makeWorld({ catalog: { s1: { basePrice: 10000 } } });
+    await bundle.add('c1', 'u1', 'o1', { serviceId: 's1', quantity: 2 });
+    await bundle.update('c1', 'u1', 'o1', (lines[0] as Any).id as string, { quantity: 3 });
+    await bundle.remove('c1', 'u1', 'o1', (lines[0] as Any).id as string);
+    expect(activityCreate).not.toHaveBeenCalled();
   });
 });

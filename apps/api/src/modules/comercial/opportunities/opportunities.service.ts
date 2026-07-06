@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { LostReason, OpportunityStage, Prisma } from '@prisma/client';
+import { ActivityType, LostReason, OpportunityStage, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { ChangeStageDto } from './dto/change-stage.dto';
@@ -19,6 +19,27 @@ const ACTIVE_STAGES: OpportunityStage[] = [
   OpportunityStage.NEGOCIACION,
 ];
 const CLOSED_STAGES: OpportunityStage[] = [OpportunityStage.GANADA, OpportunityStage.PERDIDA];
+
+/* COM-009 — Spanish display labels for the system-activity subjects. Hardcoded here
+   (no shared FE/BE label module exists) but kept IDENTICAL to the frontend
+   stageLabels.tsx / stage machine so a timeline entry reads the same as the board
+   column. If these ever diverge from stageLabels, fix them together. */
+const STAGE_LABELS: Record<OpportunityStage, string> = {
+  PROSPECTO: 'Prospecto',
+  CONTACTO: 'Contacto',
+  VISITA_TECNICA: 'Visita Técnica',
+  COTIZACION: 'Cotización',
+  NEGOCIACION: 'Negociación',
+  EN_PAUSA: 'En Pausa',
+  GANADA: 'Ganada',
+  PERDIDA: 'Perdida',
+};
+const LOST_REASON_LABELS: Record<LostReason, string> = {
+  PRECIO: 'Precio',
+  COMPETENCIA: 'Competencia',
+  PROYECTO_CANCELADO: 'Canceló el proyecto',
+  OTRO: 'Otro',
+};
 
 interface ListFilters {
   stage?: OpportunityStage;
@@ -57,7 +78,7 @@ export class OpportunitiesService {
   async create(companyId: string, userId: string, dto: CreateOpportunityDto) {
     await this.assertAccountInCompany(dto.accountId, companyId);
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
-      return tx.opportunity.create({
+      const created = await tx.opportunity.create({
         data: {
           companyId,
           createdBy: userId,
@@ -72,6 +93,15 @@ export class OpportunitiesService {
           notes: dto.notes ?? null,
         },
       });
+      // COM-009 — the create event, in the SAME transaction as the insert.
+      await this.writeSystemActivity(tx, {
+        companyId,
+        accountId: dto.accountId,
+        opportunityId: created.id,
+        userId,
+        subject: 'Oportunidad creada',
+      });
+      return created;
     });
   }
 
@@ -135,6 +165,9 @@ export class OpportunitiesService {
     }
 
     const data: Prisma.OpportunityUncheckedUpdateInput = { stage: to };
+    // COM-009 — the timeline text for this movement (Spanish display labels). Computed
+    // alongside `data`; written in the SAME transaction as the update below.
+    let subject: string;
 
     if (to === OpportunityStage.PERDIDA) {
       // Rule 2 — losing requires a categorized reason; OTRO also requires detail.
@@ -146,32 +179,48 @@ export class OpportunitiesService {
           'Con motivo OTRO debes detallar el motivo (lostReasonDetail).',
         );
       }
+      const detail = dto.lostReasonDetail?.trim() || null;
       data.lostReason = dto.lostReason;
-      data.lostReasonDetail = dto.lostReasonDetail?.trim() || null;
+      data.lostReasonDetail = detail;
       data.closedAt = new Date();
       data.previousStage = null;
+      subject = `Oportunidad perdida — ${LOST_REASON_LABELS[dto.lostReason]}`;
+      if (dto.lostReason === LostReason.OTRO && detail) subject += `: ${detail}`;
     } else if (to === OpportunityStage.GANADA) {
       // Rule 2 — GANADA needs nothing extra here (COM-013 handoff prereqs come later).
       data.closedAt = new Date();
       data.previousStage = null;
+      subject = 'Oportunidad ganada';
     } else if (to === OpportunityStage.EN_PAUSA) {
       // Rule 4 — pause only FROM an active stage; remember where it was.
       if (!ACTIVE_STAGES.includes(from)) {
         throw new BadRequestException('Solo puedes pausar una oportunidad en una etapa activa.');
       }
       data.previousStage = from;
+      subject = 'Oportunidad en pausa';
       // closedAt untouched by a pause
     } else {
       // to is one of the five active stages — Rule 1 free movement, and Rule 4
       // resume-elsewhere: moving out of EN_PAUSA to any active stage clears the
-      // pause context.
+      // pause context (that movement reads as a resume, not a plain stage change).
       if (from === OpportunityStage.EN_PAUSA) {
         data.previousStage = null;
+        subject = `Oportunidad reanudada (a ${STAGE_LABELS[to]})`;
+      } else {
+        subject = `Etapa: ${STAGE_LABELS[from]} → ${STAGE_LABELS[to]}`;
       }
     }
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
-      return tx.opportunity.update({ where: { id }, data });
+      const updated = await tx.opportunity.update({ where: { id }, data });
+      await this.writeSystemActivity(tx, {
+        companyId,
+        accountId: opp.accountId,
+        opportunityId: id,
+        userId,
+        subject,
+      });
+      return updated;
     });
   }
 
@@ -183,10 +232,18 @@ export class OpportunitiesService {
     }
     const target = opp.previousStage ?? OpportunityStage.NEGOCIACION;
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
-      return tx.opportunity.update({
+      const updated = await tx.opportunity.update({
         where: { id },
         data: { stage: target, previousStage: null },
       });
+      await this.writeSystemActivity(tx, {
+        companyId,
+        accountId: opp.accountId,
+        opportunityId: id,
+        userId,
+        subject: `Oportunidad reanudada (a ${STAGE_LABELS[target]})`,
+      });
+      return updated;
     });
   }
 
@@ -198,11 +255,19 @@ export class OpportunitiesService {
       throw new BadRequestException('Solo se puede reabrir una oportunidad GANADA o PERDIDA.');
     }
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
-      return tx.opportunity.update({
+      const updated = await tx.opportunity.update({
         where: { id },
         // lostReason / lostReasonDetail intentionally preserved (historical record).
         data: { stage: OpportunityStage.NEGOCIACION, closedAt: null },
       });
+      await this.writeSystemActivity(tx, {
+        companyId,
+        accountId: opp.accountId,
+        opportunityId: id,
+        userId,
+        subject: 'Oportunidad reabierta',
+      });
+      return updated;
     });
   }
 
@@ -229,5 +294,37 @@ export class OpportunitiesService {
     if (!account) {
       throw new BadRequestException('Cuenta no encontrada en esta empresa.');
     }
+  }
+
+  /** COM-009 — write a SYSTEM activity (type NOTA, isSystemGenerated=true) recording a
+   * pipeline event, in the SAME transaction as the stage mutation (the `tx` passed by
+   * executeWithRls). This deliberately bypasses the public ActivitiesService.create,
+   * which forces isSystemGenerated=false — so the public API still cannot mint system
+   * entries, while the machine's own history is atomic with the movement it records.
+   * Only the COM-005 events call this; bundle mutations / estimatedValue recomputes
+   * (COM-006) never do. detail stays null — the subject carries the message. */
+  private async writeSystemActivity(
+    tx: Prisma.TransactionClient,
+    params: {
+      companyId: string;
+      accountId: string;
+      opportunityId: string;
+      userId: string;
+      subject: string;
+    },
+  ) {
+    await tx.activity.create({
+      data: {
+        companyId: params.companyId,
+        createdBy: params.userId,
+        accountId: params.accountId,
+        opportunityId: params.opportunityId,
+        type: ActivityType.NOTA,
+        subject: params.subject,
+        detail: null,
+        isSystemGenerated: true,
+        activityDate: new Date(),
+      },
+    });
   }
 }
