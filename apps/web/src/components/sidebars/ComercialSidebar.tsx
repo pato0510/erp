@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Moon, Sun, Users } from 'lucide-react';
+import { KanbanSquare, LogOut, Moon, Sun, Users } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -10,8 +10,12 @@ import { SidebarBrand } from './SidebarBrand';
 /* COM-004b — Comercial (CRM) sidebar. Cloned from the RrhhSidebar shell; reuses
  * the shared .tn-sidebar tokens defined once in (dashboard)/layout.tsx and the
  * SidebarBrand component (zero new CSS). Config-driven: append entries to
- * navItems as later COM tickets ship (Pipeline, Cotizaciones, …). */
-const navItems = [{ href: '/comercial/cuentas', label: 'Cuentas', icon: Users, exact: false }];
+ * navItems as later COM tickets ship (Cotizaciones, …). COM-007 adds Pipeline
+ * (the flagship board), placed first. */
+const navItems = [
+  { href: '/comercial/pipeline', label: 'Pipeline', icon: KanbanSquare, exact: false },
+  { href: '/comercial/cuentas', label: 'Cuentas', icon: Users, exact: false },
+];
 
 export function ComercialSidebar() {
   const { user, logout } = useAuth();

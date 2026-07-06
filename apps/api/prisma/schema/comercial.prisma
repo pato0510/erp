@@ -36,6 +36,8 @@ model ServiceCatalog {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  opportunityServices OpportunityService[] // COM-006 — bundle lines referencing this service (FK ON DELETE RESTRICT)
+
   @@index([companyId])
   @@map("service_catalog")
 }
@@ -169,10 +171,47 @@ model Opportunity {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  account  Account              @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  services OpportunityService[] // COM-006 — the service bundle (FK on opportunity_services.opportunityId, ON DELETE CASCADE)
 
   @@index([companyId])
   @@index([accountId])
   @@index([stage])
   @@map("opportunities")
+}
+
+/* COM-006 — opportunity_services: the service bundle of an opportunity (which
+   catalog services a deal packages, at what quantity and price). A line is a
+   DEPENDENT CHILD of an opportunity — the FK is ON DELETE CASCADE (deleting the
+   deal removes its bundle, like contacts). It references a service_catalog entry
+   with ON DELETE RESTRICT: a catalog service used by any line CANNOT be hard-
+   deleted; deactivation (isActive=false) is the normal path and never touches
+   existing lines. PRICE SNAPSHOT: unitPrice is COPIED from the catalog basePrice
+   when the line is added and is thereafter editable per deal — later catalog price
+   changes never alter existing lines. DERIVED TOTAL: while an opportunity has ≥1
+   line, its estimatedValue is Σ(quantity × unitPrice), recomputed in the service
+   on every add/edit/remove; manual estimatedValue edits are rejected until the
+   bundle is emptied. quantity is fractional (e.g. 2.5 months). At most one line per
+   (opportunity, service) — @@unique. Platform invariant (RLS + audit + GRANT) is in
+   migration 20260703120000_add_opportunity_services. */
+model OpportunityService {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @db.Uuid
+  opportunityId String   @db.Uuid
+  serviceId     String   @db.Uuid
+  quantity      Decimal  @db.Decimal(18, 4) // fractional quantities are real (e.g. 2.5 months); > 0 enforced in the service
+  unitPrice     Decimal  @db.Decimal(18, 2) // CLP — snapshotted from service_catalog.basePrice on add, editable afterwards
+  notes         String?
+  createdBy     String   @db.Uuid
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  opportunity Opportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  service     ServiceCatalog @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@unique([opportunityId, serviceId])
+  @@index([companyId])
+  @@index([opportunityId])
+  @@index([serviceId])
+  @@map("opportunity_services")
 }

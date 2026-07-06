@@ -86,6 +86,20 @@ export class OpportunitiesService {
     }
     if (dto.accountId) await this.assertAccountInCompany(dto.accountId, companyId);
 
+    // COM-006 — DERIVED TOTAL: while the opportunity has a service bundle, its
+    // estimatedValue is Σ(quantity × unitPrice) and cannot be set manually. Edit the
+    // bundle lines instead. With ZERO lines, manual editing works as before.
+    if (dto.estimatedValue !== undefined) {
+      const bundleLines = await this.prisma.opportunityService.count({
+        where: { companyId, opportunityId: id },
+      });
+      if (bundleLines > 0) {
+        throw new BadRequestException(
+          'El valor estimado se deriva del bundle de servicios (suma de cantidad × precio); edita las líneas del bundle, no el valor directamente.',
+        );
+      }
+    }
+
     const data: Prisma.OpportunityUncheckedUpdateInput = {};
     if (dto.accountId !== undefined) data.accountId = dto.accountId;
     if (dto.name !== undefined) data.name = dto.name;

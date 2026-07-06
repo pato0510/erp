@@ -2,6 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import {
   AccountSubject,
   ContactSubject,
+  OpportunitySubject,
   ServiceCatalogSubject,
 } from '../common/casl/casl-ability.factory';
 import type { AppAbility } from '../common/casl/casl-ability.factory';
@@ -48,7 +49,11 @@ export class ComercialController {
   @CheckPolicies((ability) => ability.can('read', AccountSubject))
   permissions(@CurrentAbility() ability: AppAbility) {
     const flagsFor = (
-      subject: typeof AccountSubject | typeof ContactSubject | typeof ServiceCatalogSubject,
+      subject:
+        | typeof AccountSubject
+        | typeof ContactSubject
+        | typeof OpportunitySubject
+        | typeof ServiceCatalogSubject,
     ) => ({
       read: ability.can('read', subject),
       create: ability.can('create', subject),
@@ -58,6 +63,9 @@ export class ComercialController {
     return {
       account: flagsFor(AccountSubject),
       contact: flagsFor(ContactSubject),
+      // COM-007 — the kanban gates drag/create/close/reopen on opportunity.update
+      // (MANAGER/ADMIN/SUPER_ADMIN); ACCOUNTANT reads the board but sees no controls.
+      opportunity: flagsFor(OpportunitySubject),
       serviceCatalog: flagsFor(ServiceCatalogSubject),
     };
   }

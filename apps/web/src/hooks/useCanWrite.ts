@@ -17,12 +17,18 @@ export interface SubjectFlags {
 export interface ComercialPermissions {
   account: SubjectFlags;
   contact: SubjectFlags;
+  opportunity: SubjectFlags; // COM-007 — the pipeline board gates on this
   serviceCatalog: SubjectFlags;
 }
 export type ComercialSubject = keyof ComercialPermissions;
 
 const NONE: SubjectFlags = { read: false, create: false, update: false, delete: false };
-const EMPTY: ComercialPermissions = { account: NONE, contact: NONE, serviceCatalog: NONE };
+const EMPTY: ComercialPermissions = {
+  account: NONE,
+  contact: NONE,
+  opportunity: NONE,
+  serviceCatalog: NONE,
+};
 
 /* Session/company-scoped cache: one fetch per company, shared across every hook
    instance (list + ficha + contacts tab) so we don't re-fetch on each mount. A
