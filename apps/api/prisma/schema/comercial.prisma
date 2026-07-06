@@ -87,6 +87,7 @@ model Account {
   counterparty  Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
   contacts      Contact[] // COM-004 — people within this account (FK on contacts.accountId, ON DELETE CASCADE)
   opportunities Opportunity[] // COM-005 — deals on this account (FK on opportunities.accountId, ON DELETE RESTRICT)
+  activities    Activity[] // COM-008 — the account's interaction history (FK ON DELETE CASCADE)
 
   @@index([companyId])
   @@map("accounts")
@@ -171,8 +172,9 @@ model Opportunity {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  account  Account              @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  services OpportunityService[] // COM-006 — the service bundle (FK on opportunity_services.opportunityId, ON DELETE CASCADE)
+  account    Account              @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  services   OpportunityService[] // COM-006 — the service bundle (FK on opportunity_services.opportunityId, ON DELETE CASCADE)
+  activities Activity[] // COM-008 — timeline entries linked to this deal (FK ON DELETE SET NULL)
 
   @@index([companyId])
   @@index([accountId])
@@ -214,4 +216,48 @@ model OpportunityService {
   @@index([opportunityId])
   @@index([serviceId])
   @@map("opportunity_services")
+}
+
+/* COM-008 — activity types (the CRM interaction log). ASCII members; display labels
+   live in the UI (VISITA_FAENA → "Visita a faena"). */
+enum ActivityType {
+  LLAMADA
+  REUNION
+  EMAIL
+  VISITA_FAENA
+  NOTA
+}
+
+/* COM-008 — activities: the CRM interaction timeline (calls, meetings, emails, faena
+   visits, notes). An activity ALWAYS belongs to an account (FK ON DELETE CASCADE —
+   activities ARE the account's history) and OPTIONALLY references one of that
+   account's opportunities (FK ON DELETE SET NULL — deleting an open opportunity must
+   NOT erase the account's real history, only unlink it). `activityDate` is WHEN the
+   interaction happened (distinct from createdAt, when it was logged). This ticket
+   creates MANUAL activities only; `isSystemGenerated` is the prepared flag for the
+   COM-009 system-generated entries (stage changes etc.) — the API forces it false on
+   every create here and the service refuses to update/delete a row where it is true.
+   Platform invariant (RLS + audit + GRANT) is in migration 20260706120000_add_activities. */
+model Activity {
+  id                String       @id @default(uuid()) @db.Uuid
+  companyId         String       @db.Uuid
+  accountId         String       @db.Uuid
+  opportunityId     String?      @db.Uuid
+  type              ActivityType
+  subject           String
+  detail            String?
+  activityDate      DateTime     @default(now()) // WHEN it happened (distinct from createdAt)
+  isSystemGenerated Boolean      @default(false) // COM-009 hook; forced false on manual create
+  createdBy         String       @db.Uuid
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  account     Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([accountId])
+  @@index([opportunityId])
+  @@index([activityDate])
+  @@map("activities")
 }

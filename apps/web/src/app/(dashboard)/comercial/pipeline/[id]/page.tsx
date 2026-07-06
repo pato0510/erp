@@ -21,6 +21,7 @@ import {
   LOST_REASON_LABELS,
   StageBadge,
 } from '../../../../../components/comercial/stageLabels';
+import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
 
 interface Opportunity {
   id: string;
@@ -237,6 +238,18 @@ export default function OpportunityDetailPage() {
             <p className="whitespace-pre-wrap text-sm text-[var(--text-primary)]">{opp.notes}</p>
           </div>
         )}
+      </div>
+
+      {/* COM-008 — this opportunity's activity timeline. New entries derive the account
+          (not asked). The service-bundle editor + a fuller timeline tab are COM-007b. */}
+      <div className="mt-4">
+        <h2
+          className="mb-3 text-sm font-semibold text-[var(--text-primary)]"
+          style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
+        >
+          Actividad
+        </h2>
+        <ActivityTimeline scope="opportunity" scopeId={opp.id} canWrite={canWrite} />
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ export interface ComercialPermissions {
   account: SubjectFlags;
   contact: SubjectFlags;
   opportunity: SubjectFlags; // COM-007 — the pipeline board gates on this
+  activity: SubjectFlags; // COM-008 — the interaction timeline gates on this
   serviceCatalog: SubjectFlags;
 }
 export type ComercialSubject = keyof ComercialPermissions;
@@ -27,6 +28,7 @@ const EMPTY: ComercialPermissions = {
   account: NONE,
   contact: NONE,
   opportunity: NONE,
+  activity: NONE,
   serviceCatalog: NONE,
 };
 

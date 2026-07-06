@@ -19,6 +19,7 @@ import {
 } from '../../../../../components/comercial/accountLabels';
 import { AccountFormModal } from '../../../../../components/comercial/AccountFormModal';
 import AccountContactsTab from '../../../../../components/comercial/AccountContactsTab';
+import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
 
 interface Account {
   id: string;
@@ -38,6 +39,7 @@ interface Account {
 const TABS = [
   { key: 'datos', label: 'Datos generales' },
   { key: 'contactos', label: 'Contactos' },
+  { key: 'actividad', label: 'Actividad' },
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
 
@@ -153,6 +155,7 @@ export default function AccountFichaPage() {
         <AccountDatosTab account={account} canWrite={canWrite} onChanged={load} />
       )}
       {tab === 'contactos' && <AccountContactsTab accountId={id} canWrite={canWrite} />}
+      {tab === 'actividad' && <ActivityTimeline scope="account" scopeId={id} canWrite={canWrite} />}
     </div>
   );
 }

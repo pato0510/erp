@@ -1,6 +1,7 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import {
   AccountSubject,
+  ActivitySubject,
   ContactSubject,
   OpportunitySubject,
   ServiceCatalogSubject,
@@ -51,6 +52,7 @@ export class ComercialController {
     const flagsFor = (
       subject:
         | typeof AccountSubject
+        | typeof ActivitySubject
         | typeof ContactSubject
         | typeof OpportunitySubject
         | typeof ServiceCatalogSubject,
@@ -66,6 +68,9 @@ export class ComercialController {
       // COM-007 — the kanban gates drag/create/close/reopen on opportunity.update
       // (MANAGER/ADMIN/SUPER_ADMIN); ACCOUNTANT reads the board but sees no controls.
       opportunity: flagsFor(OpportunitySubject),
+      // COM-008 — the activity timeline gates register/edit/delete on activity writes;
+      // ACCOUNTANT reads timelines but sees no controls.
+      activity: flagsFor(ActivitySubject),
       serviceCatalog: flagsFor(ServiceCatalogSubject),
     };
   }
