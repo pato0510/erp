@@ -17,7 +17,7 @@
  *
  * The minimal detail (/comercial/pipeline/[id]) shows read-only fields + stage
  * actions; the full detail (service-bundle editor, timeline) lands in COM-007b. */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, Plus, RotateCcw, User as UserIcon } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
@@ -38,6 +38,7 @@ import {
   type UserOption,
 } from '../../../../components/comercial/NewOpportunityModal';
 import { LostReasonModal } from '../../../../components/comercial/LostReasonModal';
+import { CardMoveMenu } from '../../../../components/comercial/CardMoveMenu';
 
 interface Opportunity {
   id: string;
@@ -86,6 +87,57 @@ export default function PipelinePage() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+
+  /* ── Edge auto-scroll during drag ──────────────────────────────────────────
+     Native HTML5 DnD auto-scrolls the PAGE, never an inner overflow container, so
+     dragging a card toward Ganada/Perdida on the wide board would stall at the edge.
+     dragover fires continuously during a drag and carries clientX; we translate the
+     pointer's proximity to the container's left/right edge into a scroll velocity and
+     apply it on a requestAnimationFrame loop. The loop is cancelled on drop/dragend
+     (the card's onDragEnd) and on unmount, so it can't leak. */
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const scrollVelRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
+  const stepAutoScroll = () => {
+    const el = boardRef.current;
+    if (el && scrollVelRef.current !== 0) el.scrollLeft += scrollVelRef.current;
+    rafRef.current = requestAnimationFrame(stepAutoScroll);
+  };
+  const stopAutoScroll = () => {
+    scrollVelRef.current = 0;
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  };
+  // Cancel any in-flight RAF if the board unmounts mid-drag.
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  const onBoardDragOver = (e: React.DragEvent) => {
+    if (!draggingId) return; // only our own card drags
+    const el = boardRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const EDGE = 76; // edge-zone width in px
+    const MIN = 4;
+    const MAX = 24;
+    const x = e.clientX - rect.left;
+    let v = 0;
+    if (x < EDGE) {
+      const i = Math.min(1, (EDGE - x) / EDGE);
+      v = -(MIN + (MAX - MIN) * i);
+    } else if (x > rect.width - EDGE) {
+      const i = Math.min(1, (x - (rect.width - EDGE)) / EDGE);
+      v = MIN + (MAX - MIN) * i;
+    }
+    scrollVelRef.current = v;
+    if (v !== 0 && rafRef.current === null) rafRef.current = requestAnimationFrame(stepAutoScroll);
+  };
 
   /* Directory maps for card display + filters. /api/users degrades to [] for
      non-admins (owners then fall back to a short UUID), consistent with the rest
@@ -185,28 +237,38 @@ export default function PipelinePage() {
     }
   };
 
-  const handleDrop = async (targetStage: OpportunityStage) => {
-    const id = draggingId;
-    setDraggingId(null);
-    setDragOverStage(null);
-    if (!id) return;
-    const opp = opps.find((o) => o.id === id);
-    if (!opp || opp.stage === targetStage || isClosedStage(opp.stage)) return;
+  /* The shared "attempt to move this opportunity to stage X" flow. BOTH a drag-drop
+     and the "Mover a…" menu call this, so the two paths are guaranteed identical: the
+     optimistic move + revert, the GANADA light confirm, the PERDIDA modal (cancel =
+     nothing persists), and the canonical PATCH for active/EN_PAUSA targets all live
+     here — never duplicated per entry-point. */
+  const attemptMove = (opp: Opportunity, targetStage: OpportunityStage) => {
+    if (opp.stage === targetStage || isClosedStage(opp.stage)) return;
     const prev = opp;
-    moveLocally(id, targetStage); // optimistic
+    moveLocally(opp.id, targetStage); // optimistic
 
     if (isActiveStage(targetStage) || targetStage === 'EN_PAUSA') {
-      await commitStage(id, { stage: targetStage }, prev);
+      void commitStage(opp.id, { stage: targetStage }, prev);
     } else if (targetStage === 'GANADA') {
       if (window.confirm(`¿Marcar “${opp.name}” como ganada?`)) {
-        await commitStage(id, { stage: 'GANADA' }, prev);
+        void commitStage(opp.id, { stage: 'GANADA' }, prev);
       } else {
         revert(prev); // cancel reverts the card
       }
     } else if (targetStage === 'PERDIDA') {
       // Persist only on modal confirm; cancel reverts (nothing persists).
-      setLostModal({ id, name: opp.name, prev });
+      setLostModal({ id: opp.id, name: opp.name, prev });
     }
+  };
+
+  const handleDrop = (targetStage: OpportunityStage) => {
+    const id = draggingId;
+    setDraggingId(null);
+    setDragOverStage(null);
+    stopAutoScroll();
+    if (!id) return;
+    const opp = opps.find((o) => o.id === id);
+    if (opp) attemptMove(opp, targetStage);
   };
 
   const confirmLost = async (lostReason: LostReason, lostReasonDetail?: string) => {
@@ -335,8 +397,8 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* Board — horizontally scrollable */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      {/* Board — horizontally scrollable. onDragOver drives the edge auto-scroll. */}
+      <div ref={boardRef} onDragOver={onBoardDragOver} className="flex gap-4 overflow-x-auto pb-4">
         {STAGE_ORDER.map((stage) => {
           const cards = byStage(stage);
           const over = dragOverStage === stage;
@@ -407,6 +469,7 @@ export default function PipelinePage() {
                         onDragEnd={() => {
                           setDraggingId(null);
                           setDragOverStage(null);
+                          stopAutoScroll();
                         }}
                         onClick={() => router.push(`/comercial/pipeline/${o.id}`)}
                         className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 text-left transition-shadow hover:shadow-sm"
@@ -419,13 +482,24 @@ export default function PipelinePage() {
                           <p className="min-w-0 text-sm font-medium text-[var(--text-primary)]">
                             {o.name}
                           </p>
-                          {account?.priority === 'ALTA' && (
-                            <span
-                              title="Cuenta prioridad alta"
-                              className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                              style={{ background: '#ef4444' }}
-                            />
-                          )}
+                          <div className="flex shrink-0 items-center gap-1">
+                            {account?.priority === 'ALTA' && (
+                              <span
+                                title="Cuenta prioridad alta"
+                                className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                                style={{ background: '#ef4444' }}
+                              />
+                            )}
+                            {/* "Mover a…" — writers, non-closed cards. Reuses attemptMove/
+                                resume so it's the same flow as a drag-drop. */}
+                            {draggable && (
+                              <CardMoveMenu
+                                stage={o.stage}
+                                onMove={(t) => attemptMove(o, t)}
+                                onResume={() => resume(o)}
+                              />
+                            )}
+                          </div>
                         </div>
                         <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
                           {account?.name ?? '—'}
