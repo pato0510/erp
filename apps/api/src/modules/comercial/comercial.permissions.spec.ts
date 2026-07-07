@@ -24,43 +24,48 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
       expect(p.contact).toEqual(FULL);
       expect(p.opportunity).toEqual(FULL);
       expect(p.activity).toEqual(FULL);
+      expect(p.quote).toEqual(FULL);
       expect(p.serviceCatalog).toEqual(FULL);
     }
   });
 
-  it('MANAGER: full CRUD on account/contact/opportunity/activity/serviceCatalog', () => {
+  it('MANAGER: full CRUD on account/contact/opportunity/activity/quote/serviceCatalog', () => {
     const p = perms(UserRole.MANAGER);
     expect(p.account).toEqual(FULL);
     expect(p.contact).toEqual(FULL);
     expect(p.opportunity).toEqual(FULL);
     expect(p.activity).toEqual(FULL);
+    expect(p.quote).toEqual(FULL);
     expect(p.serviceCatalog).toEqual(FULL);
   });
 
-  it('ACCOUNTANT: read-only on account/contact/opportunity/activity/serviceCatalog (no create/update/delete)', () => {
+  it('ACCOUNTANT: read-only on account/contact/opportunity/activity/quote/serviceCatalog (no create/update/delete)', () => {
     const p = perms(UserRole.ACCOUNTANT);
     expect(p.account).toEqual(READ_ONLY);
     expect(p.contact).toEqual(READ_ONLY);
     expect(p.opportunity).toEqual(READ_ONLY); // COM-007 — sees the board, cannot mutate
     expect(p.activity).toEqual(READ_ONLY); // COM-008 — sees timelines, cannot register/edit/delete
+    expect(p.quote).toEqual(READ_ONLY); // COM-010 — sees quotes, cannot create/edit/send/delete
     expect(p.serviceCatalog).toEqual(READ_ONLY);
   });
 
-  it('ANALYST: no account/contact/opportunity/activity; serviceCatalog read-only (COM-002 shared catalog)', () => {
+  it('ANALYST: no account/contact/opportunity/activity/quote; serviceCatalog read-only (COM-002 shared catalog)', () => {
     const p = perms(UserRole.ANALYST);
     expect(p.account).toEqual(NONE);
     expect(p.contact).toEqual(NONE);
     expect(p.opportunity).toEqual(NONE); // floored — the board 403s (sin-permiso state)
     expect(p.activity).toEqual(NONE); // floored — never reaches the timeline
+    expect(p.quote).toEqual(NONE); // floored — never reaches quotes
     expect(p.serviceCatalog).toEqual(READ_ONLY);
   });
 
-  it('VIEWER: no account/contact/opportunity/activity; serviceCatalog read-only', () => {
+  it('VIEWER: no account/contact/opportunity/activity/quote; serviceCatalog read-only', () => {
     const p = perms(UserRole.VIEWER);
     expect(p.account).toEqual(NONE);
     expect(p.contact).toEqual(NONE);
     expect(p.opportunity).toEqual(NONE);
     expect(p.activity).toEqual(NONE);
+    expect(p.quote).toEqual(NONE);
     expect(p.serviceCatalog).toEqual(READ_ONLY);
   });
 });

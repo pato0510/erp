@@ -12,7 +12,7 @@ import { OpportunitiesService } from './opportunities.service';
 
 type Any = Record<string, unknown>;
 
-function makeService(oppRow: Any | null, accountRow: Any | null = { id: 'acc1' }) {
+function makeService(oppRow: Any | null, accountRow: Any | null = { id: 'acc1' }, quoteCount = 0) {
   const oppUpdate = jest.fn((args: Any) =>
     Promise.resolve({ id: 'o1', accountId: 'acc1', companyId: 'c1', ...(args.data as Any) }),
   );
@@ -31,6 +31,7 @@ function makeService(oppRow: Any | null, accountRow: Any | null = { id: 'acc1' }
     opportunity: { findFirst: () => Promise.resolve(oppRow) },
     account: { findFirst: () => Promise.resolve(accountRow) },
     opportunityService: { count: () => Promise.resolve(0) },
+    quote: { count: () => Promise.resolve(quoteCount) }, // COM-010 — delete-blocks-on-quotes
   } as unknown as ConstructorParameters<typeof OpportunitiesService>[0];
   const executeWithRls = jest.fn((_c: string, _u: string, fn: (t: unknown) => unknown) => fn(tx));
   const rls = { executeWithRls } as unknown as ConstructorParameters<
@@ -187,6 +188,12 @@ describe('OpportunitiesService — stage transition rules', () => {
     const { svc, oppDelete } = makeService(opp(S.PROSPECTO));
     await svc.remove('o1', 'c1', 'u1');
     expect(oppDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('COM-010: delete a non-closed opportunity WITH quotes is rejected (409)', async () => {
+    const { svc, oppDelete } = makeService(opp(S.PROSPECTO), { id: 'acc1' }, 1); // 1 quote exists
+    await expect(svc.remove('o1', 'c1', 'u1')).rejects.toBeInstanceOf(ConflictException);
+    expect(oppDelete).not.toHaveBeenCalled();
   });
 });
 

@@ -281,6 +281,14 @@ export class OpportunitiesService {
         'No se puede eliminar una oportunidad cerrada (GANADA/PERDIDA); reábrela si corresponde.',
       );
     }
+    // COM-010 — quotes are commercial documents; the quotes→opportunities FK is ON
+    // DELETE RESTRICT. Surface that as a friendly 409 before hitting the DB error.
+    const quoteCount = await this.prisma.quote.count({ where: { companyId, opportunityId: id } });
+    if (quoteCount > 0) {
+      throw new ConflictException(
+        'No se puede eliminar una oportunidad con cotizaciones; son documentos comerciales (elimina los borradores o conserva el historial).',
+      );
+    }
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.opportunity.delete({ where: { id } });
     });

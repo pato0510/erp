@@ -37,6 +37,7 @@ model ServiceCatalog {
   updatedAt   DateTime        @updatedAt
 
   opportunityServices OpportunityService[] // COM-006 — bundle lines referencing this service (FK ON DELETE RESTRICT)
+  quoteLines          QuoteLine[] // COM-010 — quote lines referencing this service (FK ON DELETE RESTRICT)
 
   @@index([companyId])
   @@map("service_catalog")
@@ -175,6 +176,7 @@ model Opportunity {
   account    Account              @relation(fields: [accountId], references: [id], onDelete: Restrict)
   services   OpportunityService[] // COM-006 — the service bundle (FK on opportunity_services.opportunityId, ON DELETE CASCADE)
   activities Activity[] // COM-008 — timeline entries linked to this deal (FK ON DELETE SET NULL)
+  quotes     Quote[] // COM-010 — quotes issued for this deal (FK ON DELETE RESTRICT — blocks opp delete)
 
   @@index([companyId])
   @@index([accountId])
@@ -260,4 +262,85 @@ model Activity {
   @@index([opportunityId])
   @@index([activityDate])
   @@map("activities")
+}
+
+/* COM-010 — quote lifecycle. BORRADOR (editable draft) → ENVIADA (immutable, sent to
+   the client) → ACEPTADA | RECHAZADA (terminal). SUPERSEDIDA is the auto-invalidated
+   state: accepting one quote supersedes the opportunity's other non-terminal quotes.
+   ASCII members; display labels live in the UI. */
+enum QuoteStatus {
+  BORRADOR
+  ENVIADA
+  ACEPTADA
+  RECHAZADA
+  SUPERSEDIDA
+}
+
+/* COM-010 — quotes: the document sent to the client. A quote is a FROZEN COPY of the
+   opportunity's service bundle at creation time, thereafter independent (later bundle
+   changes never touch it). REQUIRED FK to opportunities with ON DELETE RESTRICT — an
+   opportunity with quotes cannot be hard-deleted (this tightens the COM-005 delete
+   rule). An opportunity may hold MANY quotes (per-opportunity `version` 1,2,3…), but at
+   most ONE in ACEPTADA (enforced in the service; accepting auto-supersedes the rest).
+   `quoteNumber` is a per-company sequential id (COT-0001…). TAX SNAPSHOT: netAmount /
+   taxAmount / totalAmount AND the taxRate used are PERSISTED (Chilean IVA, parametrized
+   via CHILE_IVA_RATE in the service — never hardcoded inline; the rate is frozen on the
+   quote so historical documents keep their rate). validUntil uses the HR-004b UTC-
+   anchored date convention. Platform invariant (RLS + audit + GRANT) is in migration
+   20260707120000_add_quotes. */
+model Quote {
+  id            String      @id @default(uuid()) @db.Uuid
+  companyId     String      @db.Uuid
+  opportunityId String      @db.Uuid
+  quoteNumber   String // per-company sequential, e.g. COT-0001
+  version       Int // sequential PER OPPORTUNITY, starting 1
+  status        QuoteStatus @default(BORRADOR)
+  validUntil    DateTime?   @db.Date // optional on BORRADOR, REQUIRED to send
+  netAmount     Decimal     @db.Decimal(18, 2) // Σ lineTotal (CLP)
+  taxAmount     Decimal     @db.Decimal(18, 2) // net × taxRate, rounded to whole CLP
+  totalAmount   Decimal     @db.Decimal(18, 2) // net + tax
+  taxRate       Decimal     @db.Decimal(5, 2) // the IVA rate used, e.g. 19.00 (snapshot)
+  notes         String?
+  sentAt        DateTime?
+  acceptedAt    DateTime?
+  rejectedAt    DateTime?
+  createdBy     String      @db.Uuid
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  lines       QuoteLine[]
+
+  @@unique([companyId, quoteNumber])
+  @@unique([opportunityId, version])
+  @@index([companyId])
+  @@index([opportunityId])
+  @@map("quotes")
+}
+
+/* COM-010 — quote_lines: a quote's frozen line items. DEPENDENT CHILD of a quote (FK
+   ON DELETE CASCADE). References a service_catalog entry (FK ON DELETE RESTRICT, same
+   rationale as bundle lines) BUT also stores a DENORMALIZED serviceName snapshot — the
+   document must read tomorrow as it read when sent, even if the catalog service is
+   later renamed. lineTotal = quantity × unitPrice, rounded to whole CLP and persisted. */
+model QuoteLine {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  quoteId     String   @db.Uuid
+  serviceId   String   @db.Uuid
+  serviceName String // denormalized snapshot of the catalog name at copy time
+  quantity    Decimal  @db.Decimal(18, 4)
+  unitPrice   Decimal  @db.Decimal(18, 2) // CLP
+  lineTotal   Decimal  @db.Decimal(18, 2) // quantity × unitPrice (whole CLP)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  quote   Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  service ServiceCatalog @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([quoteId])
+  @@index([serviceId])
+  @@map("quote_lines")
 }

@@ -478,6 +478,9 @@ export class CaslAbilityFactory {
         can(['read', 'create', 'update', 'delete'], OpportunitySubject);
         /* COM-008 — activities (CRM timeline) share the same profile → full CRUD. */
         can(['read', 'create', 'update', 'delete'], ActivitySubject);
+        /* COM-010 — quotes (quotation documents) share the same profile → full CRUD.
+           This is the LAST Comercial subject to leave the COM-001 floor. */
+        can(['read', 'create', 'update', 'delete'], QuoteSubject);
         break;
 
       case UserRole.ACCOUNTANT:
@@ -527,6 +530,8 @@ export class CaslAbilityFactory {
         can('read', OpportunitySubject);
         /* COM-008 — activities: ACCOUNTANT read-only (timeline visibility). No write. */
         can('read', ActivitySubject);
+        /* COM-010 — quotes: ACCOUNTANT read-only (document visibility). No write. */
+        can('read', QuoteSubject);
         break;
 
       case UserRole.ANALYST:

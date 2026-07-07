@@ -4,6 +4,7 @@ import {
   ActivitySubject,
   ContactSubject,
   OpportunitySubject,
+  QuoteSubject,
   ServiceCatalogSubject,
 } from '../common/casl/casl-ability.factory';
 import type { AppAbility } from '../common/casl/casl-ability.factory';
@@ -55,6 +56,7 @@ export class ComercialController {
         | typeof ActivitySubject
         | typeof ContactSubject
         | typeof OpportunitySubject
+        | typeof QuoteSubject
         | typeof ServiceCatalogSubject,
     ) => ({
       read: ability.can('read', subject),
@@ -71,6 +73,9 @@ export class ComercialController {
       // COM-008 — the activity timeline gates register/edit/delete on activity writes;
       // ACCOUNTANT reads timelines but sees no controls.
       activity: flagsFor(ActivitySubject),
+      // COM-010 — the quote editor gates create/edit/status/delete on quote writes;
+      // ACCOUNTANT reads quotes but sees no controls.
+      quote: flagsFor(QuoteSubject),
       serviceCatalog: flagsFor(ServiceCatalogSubject),
     };
   }

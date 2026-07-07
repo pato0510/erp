@@ -4,6 +4,7 @@ import { ActivitiesModule } from './activities/activities.module';
 import { ComercialController } from './comercial.controller';
 import { ContactsModule } from './contacts/contacts.module';
 import { OpportunitiesModule } from './opportunities/opportunities.module';
+import { QuotesModule } from './quotes/quotes.module';
 import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
 
 /* COM-001 — Comercial (CRM) module aggregator. COM-002 adds ServiceCatalogModule
@@ -21,6 +22,7 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
     ContactsModule,
     OpportunitiesModule,
     ActivitiesModule,
+    QuotesModule,
   ],
   controllers: [ComercialController],
 })

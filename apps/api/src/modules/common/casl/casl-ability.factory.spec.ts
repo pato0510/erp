@@ -131,7 +131,7 @@ describe('HR-003 compensation endpoint gates (post read-only relaxation)', () =>
   });
 });
 
-describe('CaslAbilityFactory — Comercial floor (COM-001) + COM-002 catalog + COM-003 accounts', () => {
+describe('CaslAbilityFactory — Comercial floor fully retired (COM-001…COM-010)', () => {
   const factory = new CaslAbilityFactory();
   const ALL_COMERCIAL = [
     AccountSubject,
@@ -141,11 +141,9 @@ describe('CaslAbilityFactory — Comercial floor (COM-001) + COM-002 catalog + C
     ServiceCatalogSubject,
     QuoteSubject,
   ];
-  /* COM-002/003/004/005/008 re-granted read on ServiceCatalog/Account/Contact/
-     Opportunity/Activity (to some roles), so those leave the floor. Only Quote stays
-     default-deny until its own ticket. */
-  const STILL_FLOORED = [QuoteSubject];
-  const nonAdmin = [UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.ANALYST, UserRole.VIEWER];
+  /* COM-010 retires the last of the COM-001 default-deny floor: Quote leaves it, so
+     STILL_FLOORED is now [] — nothing remains floored. Rather than iterate an empty
+     list, these tests pin the FINAL per-role read matrix the floor-lifting produced. */
 
   it('SUPER_ADMIN and ADMIN read every Comercial subject (via manage all)', () => {
     for (const subject of ALL_COMERCIAL) {
@@ -154,20 +152,34 @@ describe('CaslAbilityFactory — Comercial floor (COM-001) + COM-002 catalog + C
     }
   });
 
-  it('MANAGER/ACCOUNTANT/ANALYST/VIEWER read NONE of the still-floored Comercial subjects (COM-002/003/004/005/008 widened ServiceCatalog + Account + Contact + Opportunity + Activity; only Quote remains)', () => {
-    for (const subject of STILL_FLOORED) {
-      for (const role of nonAdmin) {
-        expect(factory.defineAbilityFor(role).can('read', subject)).toBe(false);
+  it('MANAGER and ACCOUNTANT now read EVERY Comercial subject (floor fully retired)', () => {
+    for (const subject of ALL_COMERCIAL) {
+      expect(factory.defineAbilityFor(UserRole.MANAGER).can('read', subject)).toBe(true);
+      expect(factory.defineAbilityFor(UserRole.ACCOUNTANT).can('read', subject)).toBe(true);
+    }
+  });
+
+  it('ANALYST/VIEWER read ONLY ServiceCatalog (shared, non-sensitive) — none of the others', () => {
+    for (const role of [UserRole.ANALYST, UserRole.VIEWER]) {
+      const ab = factory.defineAbilityFor(role);
+      expect(ab.can('read', ServiceCatalogSubject)).toBe(true);
+      for (const subject of [
+        AccountSubject,
+        ContactSubject,
+        OpportunitySubject,
+        ActivitySubject,
+        QuoteSubject,
+      ]) {
+        expect(ab.can('read', subject)).toBe(false);
       }
     }
   });
 
-  it('no non-admin role gains create/update/delete on any still-floored Comercial subject', () => {
-    for (const subject of STILL_FLOORED) {
+  it('ACCOUNTANT stays READ-ONLY across Comercial — the read re-grants leaked no write', () => {
+    const a = factory.defineAbilityFor(UserRole.ACCOUNTANT);
+    for (const subject of ALL_COMERCIAL) {
       for (const action of ['create', 'update', 'delete'] as const) {
-        for (const role of nonAdmin) {
-          expect(factory.defineAbilityFor(role).can(action, subject)).toBe(false);
-        }
+        expect(a.can(action, subject)).toBe(false);
       }
     }
   });
