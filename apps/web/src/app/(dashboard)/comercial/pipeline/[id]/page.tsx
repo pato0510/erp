@@ -21,6 +21,7 @@ import {
 } from '../../../../../components/comercial/stageLabels';
 import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
 import { OpportunityBundle } from '../../../../../components/comercial/OpportunityBundle';
+import { OpportunityQuotes } from '../../../../../components/comercial/OpportunityQuotes';
 import { DeleteOpportunityModal } from '../../../../../components/comercial/DeleteOpportunityModal';
 
 interface Opportunity {
@@ -52,6 +53,8 @@ export default function OpportunityDetailPage() {
   const id = String(params.id);
   const perms = useComercialPermissions();
   const canWrite = perms?.opportunity.update ?? false;
+  const quoteCanWrite = perms?.quote.update ?? false;
+  const quoteCanCreate = perms?.quote.create ?? false;
 
   const [opp, setOpp] = useState<Opportunity | null>(null);
   const [accountName, setAccountName] = useState<string | null>(null);
@@ -62,6 +65,10 @@ export default function OpportunityDetailPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // COM-011 — the quotes section reports whether any quote exists, so the delete
+  // danger zone can pre-empt the backend 409 (an opp with quotes can't be deleted).
+  const [quotesExist, setQuotesExist] = useState(false);
+  const handleQuotesChanged = useCallback((has: boolean) => setQuotesExist(has), []);
 
   /* Re-fetch ONLY the opportunity — used after a bundle mutation, whose derived
      estimatedValue must be reflected in the header/value display. */
@@ -261,6 +268,17 @@ export default function OpportunityDetailPage() {
         onChanged={refreshOpp}
       />
 
+      {/* COM-011 — quotes lifecycle (COM-010 backend). Writers get create/edit/send/
+          accept/reject/delete; ACCOUNTANT sees the full history read-only. Reports quote
+          existence up so the delete danger zone can pre-empt the 409. */}
+      <OpportunityQuotes
+        opportunityId={opp.id}
+        canWrite={quoteCanWrite}
+        canCreate={quoteCanCreate}
+        oppClosed={isClosedStage(opp.stage)}
+        onQuotesChanged={handleQuotesChanged}
+      />
+
       {/* COM-008 — this opportunity's activity timeline. New entries derive the account
           (not asked). */}
       <div className="mt-4">
@@ -286,13 +304,22 @@ export default function OpportunityDetailPage() {
             </p>
           ) : (
             <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-[var(--text-secondary)]">
-                Eliminar la oportunidad y su paquete de servicios. Las actividades permanecen en la
-                cuenta.
-              </p>
+              <div>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Eliminar la oportunidad y su paquete de servicios. Las actividades permanecen en
+                  la cuenta.
+                </p>
+                {quotesExist && (
+                  <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                    La oportunidad tiene cotizaciones (documentos comerciales); elimina los
+                    borradores o conserva el historial antes de eliminarla.
+                  </p>
+                )}
+              </div>
               <button
                 onClick={() => setDeleteOpen(true)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+                disabled={quotesExist}
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 style={{ background: '#b91c1c' }}
               >
                 <Trash2 size={15} /> Eliminar oportunidad

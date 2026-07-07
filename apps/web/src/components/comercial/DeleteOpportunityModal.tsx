@@ -8,7 +8,10 @@ import { apiClient, ApiError } from '../../lib/api';
    deal and states the consequences: its service bundle goes with it (FK CASCADE) while
    its activities REMAIN in the account's timeline (FK SET NULL — unlinked). The button
    that opens this only renders for writers on non-closed deals; the backend still 409s
-   if the state changed concurrently (e.g. it was just closed), and we relay that. */
+   if the state changed concurrently (e.g. it was just closed), and we relay that.
+   COM-011: an opportunity WITH quotes cannot be deleted (they are commercial documents,
+   FK ON DELETE RESTRICT) — the consequences say so and the backend 409 is relayed if the
+   page's delete button was shown before quotes existed. */
 export function DeleteOpportunityModal({
   opportunity,
   onClose,
@@ -63,6 +66,10 @@ export function DeleteOpportunityModal({
             <li>
               Las actividades registradas permanecen en la línea de tiempo de la cuenta (quedan
               desvinculadas de la oportunidad).
+            </li>
+            <li>
+              Si la oportunidad tiene cotizaciones, no puede eliminarse (son documentos
+              comerciales): elimina los borradores o conserva el historial.
             </li>
             <li>Esta acción no se puede deshacer.</li>
           </ul>
