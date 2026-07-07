@@ -20,6 +20,7 @@ export interface ComercialPermissions {
   opportunity: SubjectFlags; // COM-007 — the pipeline board gates on this
   activity: SubjectFlags; // COM-008 — the interaction timeline gates on this
   quote: SubjectFlags; // COM-011 — the quotes section gates on this
+  availability: { read: boolean }; // COM-012 — RRHH availability projection (read-only)
   serviceCatalog: SubjectFlags;
 }
 export type ComercialSubject = keyof ComercialPermissions;
@@ -31,6 +32,7 @@ const EMPTY: ComercialPermissions = {
   opportunity: NONE,
   activity: NONE,
   quote: NONE,
+  availability: { read: false },
   serviceCatalog: NONE,
 };
 
@@ -85,5 +87,7 @@ export function useCanWrite(subject: ComercialSubject = 'account'): boolean {
   const perms = useComercialPermissions();
   if (!perms) return false;
   const f = perms[subject];
+  // `availability` is a read-only block with no write flags — it can never be a write gate.
+  if (!('create' in f)) return false;
   return f.create || f.update || f.delete;
 }

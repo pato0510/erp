@@ -1,7 +1,8 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
   AccountSubject,
   ActivitySubject,
+  AvailabilitySubject,
   ContactSubject,
   OpportunitySubject,
   QuoteSubject,
@@ -10,8 +11,11 @@ import {
 import type { AppAbility } from '../common/casl/casl-ability.factory';
 import { CheckPolicies } from '../common/decorators/check-policies.decorator';
 import { CurrentAbility } from '../common/decorators/current-ability.decorator';
+import { CurrentCompany } from '../common/decorators/current-company.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PoliciesGuard } from '../common/guards/policies.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
+import { DisponibilidadService } from '../rrhh/disponibilidad/disponibilidad.service';
 
 /* COM-001 — Comercial (CRM) module shell.
  *
@@ -29,6 +33,11 @@ import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 @Controller('comercial')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class ComercialController {
+  /* COM-012 — ComercialModule imports RRHH's DisponibilidadModule (the sanctioned
+     expose/consume seam), which EXPORTS DisponibilidadService. We INJECT it here —
+     never re-provide it — and touch ONLY its reason-free method (see availableStaff). */
+  constructor(private readonly disponibilidad: DisponibilidadService) {}
+
   @Get('health')
   @CheckPolicies((ability) => ability.can('read', AccountSubject))
   health() {
@@ -77,6 +86,55 @@ export class ComercialController {
       // ACCOUNTANT reads quotes but sees no controls.
       quote: flagsFor(QuoteSubject),
       serviceCatalog: flagsFor(ServiceCatalogSubject),
+      // COM-012 — the PII-safe availability projection is READ-ONLY (no write concept).
+      // Gated on the EXISTING read AvailabilitySubject ability (RRHH §1.2 audience:
+      // MANAGER/ADMIN/SUPER_ADMIN; ACCOUNTANT/ANALYST/VIEWER excluded).
+      availability: { read: ability.can('read', AvailabilitySubject) },
     };
+  }
+
+  /* COM-012 — PII-safe availability projection (Comercial → RRHH). This is the
+   * SANCTIONED cross-module consumption of disponibilidad-servicio that the RRHH QA
+   * doc §3 flagged as a deliberate decision to make. It answers "who is available on
+   * date X?" for deal operators by calling ONLY DisponibilidadService.
+   * forServiceDisponibles — the reason-free method that returns EXCLUSIVELY available
+   * staff as {employeeId, fullName, cargo}. Its sibling methods (getAvailability /
+   * forServiceSingle / forServiceBatch / getMatriz / getAlertas) carry health-adjacent
+   * PII (e.g. "Licencia médica") and are intentionally NEVER reachable through this
+   * feature. Audience = the RRHH §1.2 availability audience: gated on the EXISTING
+   * read AvailabilitySubject ability (MANAGER/ADMIN/SUPER_ADMIN; ACCOUNTANT excluded) —
+   * one source of truth, no new subject, no role strings. */
+  @Get('available-staff')
+  @CheckPolicies((ability) => ability.can('read', AvailabilitySubject))
+  async availableStaff(
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @Query('date') date?: string,
+  ) {
+    const dateStr = this.resolveDateParam(date);
+    const result = await this.disponibilidad.forServiceDisponibles(companyId, user.id, dateStr);
+    // EXPLICIT field map (never a spread): even if an upstream row gains fields
+    // (state/reason/until…), ONLY these three can ever leave this endpoint.
+    return result.employees.map((e) => ({
+      employeeId: e.employeeId,
+      fullName: e.fullName,
+      cargo: e.cargo,
+    }));
+  }
+
+  /* Validate the optional ?date (YYYY-MM-DD). Undefined → today (the service anchors
+   * to UTC midnight per the HR-004b convention). A malformed/impossible date is a 400. */
+  private resolveDateParam(date?: string): string | undefined {
+    if (date === undefined || date === '') return undefined;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException('Fecha inválida; usa el formato YYYY-MM-DD.');
+    }
+    // Round-trip check — rejects an impossible day that JS would silently roll over
+    // (e.g. 2026-02-30 → 2026-03-02).
+    const d = new Date(`${date}T00:00:00.000Z`);
+    if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== date) {
+      throw new BadRequestException('Fecha inválida; usa el formato YYYY-MM-DD.');
+    }
+    return date;
   }
 }

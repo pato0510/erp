@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DisponibilidadModule } from '../rrhh/disponibilidad/disponibilidad.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { ComercialController } from './comercial.controller';
@@ -14,7 +15,11 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
  * timeline). Remaining feature submodules (quotes) are imported here as their tickets
  * land, mirroring how RrhhModule / OperationsModule aggregate their feature
  * submodules. PoliciesGuard / CaslAbilityFactory / PrismaService are provided by the
- * global Casl/Prisma modules. */
+ * global Casl/Prisma modules.
+ *
+ * COM-012 — imports RRHH's DisponibilidadModule (which EXPORTS DisponibilidadService)
+ * to consume the reason-free availability projection via the ComercialController. This
+ * is the ONLY RRHH module imported, and the service is NOT re-provided here. */
 @Module({
   imports: [
     ServiceCatalogModule,
@@ -23,6 +28,7 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
     OpportunitiesModule,
     ActivitiesModule,
     QuotesModule,
+    DisponibilidadModule,
   ],
   controllers: [ComercialController],
 })

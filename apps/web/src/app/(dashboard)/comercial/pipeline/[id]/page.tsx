@@ -22,6 +22,7 @@ import {
 import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
 import { OpportunityBundle } from '../../../../../components/comercial/OpportunityBundle';
 import { OpportunityQuotes } from '../../../../../components/comercial/OpportunityQuotes';
+import { AvailableStaff } from '../../../../../components/comercial/AvailableStaff';
 import { DeleteOpportunityModal } from '../../../../../components/comercial/DeleteOpportunityModal';
 
 interface Opportunity {
@@ -55,6 +56,7 @@ export default function OpportunityDetailPage() {
   const canWrite = perms?.opportunity.update ?? false;
   const quoteCanWrite = perms?.quote.update ?? false;
   const quoteCanCreate = perms?.quote.create ?? false;
+  const availabilityRead = perms?.availability.read ?? false;
 
   const [opp, setOpp] = useState<Opportunity | null>(null);
   const [accountName, setAccountName] = useState<string | null>(null);
@@ -267,6 +269,10 @@ export default function OpportunityDetailPage() {
         closed={isClosedStage(opp.stage)}
         onChanged={refreshOpp}
       />
+
+      {/* COM-012 — PII-safe availability projection (Comercial→RRHH). Shown ONLY when
+          availability.read is true (RRHH §1.2 audience); ACCOUNTANT never sees it. */}
+      {availabilityRead && <AvailableStaff />}
 
       {/* COM-011 — quotes lifecycle (COM-010 backend). Writers get create/edit/send/
           accept/reject/delete; ACCOUNTANT sees the full history read-only. Reports quote
