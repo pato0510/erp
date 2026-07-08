@@ -111,10 +111,14 @@ function makeWorld(opts: FakeOpts = {}) {
   const rls = {
     executeWithRls: (_c: string, _u: string, fn: (t: unknown) => unknown) => fn(prisma),
   } as unknown as ConstructorParameters<typeof OpportunityServicesService>[1];
+  // COM-013b — OpportunitiesService gained a DomainEventsService dep; a stub suffices here.
+  const domainEvents = {
+    emit: jest.fn(() => Promise.resolve('evt')),
+  } as unknown as ConstructorParameters<typeof OpportunitiesService>[2];
 
   return {
     bundle: new OpportunityServicesService(prisma, rls),
-    opps: new OpportunitiesService(prisma, rls),
+    opps: new OpportunitiesService(prisma, rls, domainEvents),
     opp,
     lines,
     catalog,

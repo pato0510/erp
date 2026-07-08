@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Pause, Play, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Pause, Play, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
 import { formatCLP, formatDate } from '../../../../../lib/formatters';
 import { useComercialPermissions } from '../../../../../hooks/useCanWrite';
@@ -38,6 +38,7 @@ interface Opportunity {
   lostReason: string | null;
   lostReasonDetail: string | null;
   closedAt: string | null;
+  handoffAt: string | null; // COM-013b — set when sent to Operaciones
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -66,6 +67,7 @@ export default function OpportunityDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   // COM-011 — the quotes section reports whether any quote exists, so the delete
   // danger zone can pre-empt the backend 409 (an opp with quotes can't be deleted).
@@ -137,6 +139,31 @@ export default function OpportunityDetailPage() {
   const reabrir = () => {
     if (!opp || !window.confirm(`¿Reabrir “${opp.name}”? Volverá a Negociación.`)) return;
     act(() => apiClient.post<Opportunity>(`/api/comercial/opportunities/${id}/reopen`));
+  };
+
+  /* COM-013b — send the won deal to Operaciones. On success the ServiceOrder is created
+     ASYNCHRONOUSLY by the listener (so "iniciado", not "creada"). handoffAt comes back set
+     → the action turns into the "ya enviada" chip. The backend is the final word on the
+     critical rule; a 4xx is relayed. */
+  const sendToOps = () => {
+    if (
+      !opp ||
+      !window.confirm(
+        '¿Enviar a Operaciones? Se creará una orden de servicio con el alcance de la cotización aceptada.',
+      )
+    )
+      return;
+    setBusy(true);
+    setErr(null);
+    setNotice(null);
+    apiClient
+      .post<Opportunity>(`/api/comercial/opportunities/${id}/handoff`)
+      .then((u) => {
+        setOpp(u);
+        setNotice('Handoff iniciado — la orden de servicio se está creando en Operaciones.');
+      })
+      .catch((e) => setErr(e instanceof ApiError ? e.message : 'No se pudo enviar a Operaciones.'))
+      .finally(() => setBusy(false));
   };
 
   if (loading)
@@ -215,10 +242,30 @@ export default function OpportunityDetailPage() {
                   Reabrir
                 </ActionButton>
               )}
+              {/* COM-013b — send a WON deal to Operaciones (only once; handoffAt gates it). */}
+              {opp.stage === 'GANADA' &&
+                (opp.handoffAt ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-3 py-2 text-sm text-[var(--text-secondary)]"
+                    title="Ya enviada a Operaciones"
+                  >
+                    <CheckCircle2 size={14} style={{ color: '#15803d' }} /> Enviada a Operaciones el{' '}
+                    {formatDate(opp.handoffAt)}
+                  </span>
+                ) : (
+                  <ActionButton onClick={sendToOps} disabled={busy} icon={<Send size={14} />}>
+                    Enviar a Operaciones
+                  </ActionButton>
+                ))}
             </div>
           )}
         </div>
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
+        {notice && (
+          <p className="mt-3 inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+            <CheckCircle2 size={14} /> {notice}
+          </p>
+        )}
       </div>
 
       {/* Read-only fields */}

@@ -138,6 +138,33 @@ export interface WorkPermitClosedEvent {
   occurredAt: string;
 }
 
+/** COM-013b — a WON Comercial opportunity handed off to Operaciones. Emitted by the
+ *  Comercial side (OpportunitiesService.sendToOperations) when the operator sends a
+ *  GANADA opportunity with an accepted quote to Operaciones.
+ *  Aggregate: Opportunity (aggregateId = opportunityId, a real UUID — NEVER a composite
+ *  string, or emit() would silently swallow the row).
+ *  Consumed by: Operaciones ServiceOrderHandoffListener → creates the ServiceOrder from
+ *  this SELF-CONTAINED payload (the listener never reads Comercial tables — the two
+ *  modules stay decoupled). `occurredAt` is a STABLE timestamp set once at handoff and
+ *  reused as the event's idempotency key, so a re-emit dedupes instead of duplicating. */
+export interface ComercialOpportunityWonEvent {
+  type: 'comercial.opportunity-won';
+  companyId: string;
+  occurredAt: string;
+  opportunityId: string;
+  quoteId: string;
+  clientName: string;
+  counterpartyId: string | null;
+  title: string;
+  description: string | null;
+  scopeLines: { serviceName: string; quantity: number; unitPrice: number; lineTotal: number }[];
+  netAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  currency: string;
+  ownerId: string | null;
+}
+
 /** The full union — switch on `type` to narrow the payload. */
 export type OperationsDomainEvent =
   | DocumentRenewalImminentEvent
@@ -146,7 +173,8 @@ export type OperationsDomainEvent =
   | OperationalCostEvent
   | PermitRenewalImminentEvent
   | ProcedureAcknowledgmentExpiredEvent
-  | WorkPermitClosedEvent;
+  | WorkPermitClosedEvent
+  | ComercialOpportunityWonEvent;
 
 /** Aggregate-type hints used when persisting the event row. The
  *  `aggregateType` column is opaque to consumers but we standardize
@@ -157,6 +185,7 @@ export const AGGREGATE_TYPES = {
   OperationalAsset: 'OperationalAsset',
   WorkPermit: 'WorkPermit',
   ProcedureAcknowledgment: 'ProcedureAcknowledgment',
+  Opportunity: 'Opportunity',
   Other: 'Other',
 } as const;
 
@@ -177,6 +206,8 @@ export function aggregateTypeForEvent(event: OperationsDomainEvent): string {
       return AGGREGATE_TYPES.ProcedureAcknowledgment;
     case 'operational.cost':
       return AGGREGATE_TYPES.Other;
+    case 'comercial.opportunity-won':
+      return AGGREGATE_TYPES.Opportunity;
   }
 }
 
@@ -197,6 +228,10 @@ export function aggregateIdForEvent(event: OperationsDomainEvent): string {
       return `${event.procedureId}:${event.userId}`;
     case 'operational.cost':
       return event.sourceId;
+    case 'comercial.opportunity-won':
+      /* MUST be the raw opportunity UUID — aggregateId is a @db.Uuid column, so a
+         composite string would make emit() silently swallow the row (the landmine). */
+      return event.opportunityId;
   }
 }
 
@@ -210,6 +245,7 @@ export const EVENT_TYPES = [
   'work-permit.closed',
   'procedure.acknowledgment-expired',
   'operational.cost',
+  'comercial.opportunity-won',
 ] as const;
 
 export type EventTypeName = (typeof EVENT_TYPES)[number];

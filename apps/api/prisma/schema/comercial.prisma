@@ -168,6 +168,7 @@ model Opportunity {
   lostReason        LostReason?
   lostReasonDetail  String?
   closedAt          DateTime? // set when moved to GANADA/PERDIDA
+  handoffAt         DateTime? // COM-013b — set when sent to Operaciones (the "already-sent" guard); stable ts also carried as the domain event's occurredAt
   notes             String?
   createdBy         String            @db.Uuid
   createdAt         DateTime          @default(now())

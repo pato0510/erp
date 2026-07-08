@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, LostReason, OpportunityStage, Prisma } from '@prisma/client';
+import { ActivityType, LostReason, OpportunityStage, Prisma, QuoteStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
+import { DomainEventsService } from '../../operations/events/domain-events.service';
 import { ChangeStageDto } from './dto/change-stage.dto';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
@@ -52,6 +54,7 @@ export class OpportunitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
+    private readonly domainEvents: DomainEventsService,
   ) {}
 
   /** Anchor a YYYY-MM-DD (or ISO) string to UTC midnight so an @db.Date column
@@ -291,6 +294,95 @@ export class OpportunitiesService {
     }
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.opportunity.delete({ where: { id } });
+    });
+  }
+
+  /** COM-013b — the Comercial→Operaciones handoff. Validates the critical rule, emits a
+   * self-contained `comercial.opportunity-won` event (the Operaciones listener creates
+   * the ServiceOrder from the payload — no cross-module read), and stamps handoffAt.
+   *
+   * ORDERING (guarantees "handoffAt set ⇒ event emitted"): we EMIT FIRST and only stamp
+   * handoffAt after emit() returns a persisted event-row id. DomainEventsService.emit
+   * persists the domain_event row then returns its id (broadcast is async, and the retry
+   * cron re-runs failed handlers), so a non-null id means the event WILL be delivered.
+   * A failed emit leaves handoffAt null → the operator can retry; the listener's
+   * sourceOpportunityId dedup makes a retry's second event a no-op if the first somehow
+   * created the order. (The naive "stamp handoffAt then emit" would risk an orphan:
+   * handoffAt set with no event, and the already-sent 409 blocking recovery.)
+   *
+   * The endpoint returns "handoff initiated" — the ServiceOrder is created ASYNCHRONOUSLY
+   * by the listener; we do NOT wait for it. */
+  async sendToOperations(companyId: string, userId: string, id: string) {
+    const opp = await this.findOne(id, companyId);
+
+    // Already-sent guard — never re-emit (belt-and-suspenders: the listener also dedups
+    // on sourceOpportunityId and the event row dedups on its unique).
+    if (opp.handoffAt) {
+      throw new ConflictException(
+        `La oportunidad ya fue enviada a Operaciones el ${opp.handoffAt.toISOString().slice(0, 10)}.`,
+      );
+    }
+
+    // The scope is the ACCEPTED quote's frozen lines (COM-010 serviceName snapshots).
+    const quote = await this.prisma.quote.findFirst({
+      where: { companyId, opportunityId: id, status: QuoteStatus.ACEPTADA },
+      include: { lines: { orderBy: { createdAt: 'asc' } } },
+    });
+
+    // Critical rule (V1) — collect everything missing so the 4xx lists it.
+    const missing: string[] = [];
+    if (opp.stage !== OpportunityStage.GANADA) missing.push('la oportunidad debe estar Ganada');
+    if (!opp.ownerId) missing.push('requiere un responsable comercial');
+    if (!quote) missing.push('requiere una cotización aceptada');
+    else if (quote.lines.length === 0) missing.push('el alcance de la cotización está vacío');
+    if (missing.length > 0) {
+      throw new BadRequestException(`No se puede enviar a Operaciones: ${missing.join('; ')}.`);
+    }
+
+    const acceptedQuote = quote!;
+    const account = await this.prisma.account.findFirst({
+      where: { id: opp.accountId, companyId },
+      select: { name: true, counterpartyId: true },
+    });
+
+    // Stable timestamp — used BOTH as the event's occurredAt (idempotency key) and as
+    // handoffAt, so an app-level re-emit dedups instead of duplicating.
+    const occurredAt = new Date();
+    const scopeLines = acceptedQuote.lines.map((l) => ({
+      serviceName: l.serviceName,
+      quantity: Number(l.quantity),
+      unitPrice: Number(l.unitPrice),
+      lineTotal: Number(l.lineTotal),
+    }));
+
+    const eventId = await this.domainEvents.emit({
+      type: 'comercial.opportunity-won',
+      companyId,
+      occurredAt: occurredAt.toISOString(),
+      opportunityId: id, // aggregateId — a real UUID (never composite)
+      quoteId: acceptedQuote.id,
+      clientName: account?.name ?? 'Cliente',
+      counterpartyId: account?.counterpartyId ?? null,
+      title: opp.name,
+      description: opp.notes ?? null,
+      scopeLines,
+      netAmount: Number(acceptedQuote.netAmount),
+      taxAmount: Number(acceptedQuote.taxAmount),
+      totalAmount: Number(acceptedQuote.totalAmount),
+      currency: 'CLP',
+      ownerId: opp.ownerId,
+    });
+    if (!eventId) {
+      // emit() swallowed the row (persistence failed or an exact-duplicate re-emit). Do
+      // NOT stamp handoffAt — leave the opportunity resendable.
+      throw new InternalServerErrorException(
+        'No se pudo iniciar el handoff (el evento no se emitió). Intenta nuevamente.',
+      );
+    }
+
+    // Event persisted → stamp handoffAt (the invariant "handoffAt set ⇒ event emitted").
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.opportunity.update({ where: { id }, data: { handoffAt: occurredAt } });
     });
   }
 

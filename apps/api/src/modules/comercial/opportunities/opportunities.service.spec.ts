@@ -37,8 +37,13 @@ function makeService(oppRow: Any | null, accountRow: Any | null = { id: 'acc1' }
   const rls = { executeWithRls } as unknown as ConstructorParameters<
     typeof OpportunitiesService
   >[1];
+  // COM-013b — OpportunitiesService gained a DomainEventsService dep (handoff). These
+  // tests never call sendToOperations, so a stub emit suffices.
+  const domainEvents = {
+    emit: jest.fn(() => Promise.resolve('evt')),
+  } as unknown as ConstructorParameters<typeof OpportunitiesService>[2];
   return {
-    svc: new OpportunitiesService(prisma, rls),
+    svc: new OpportunitiesService(prisma, rls, domainEvents),
     oppUpdate,
     oppCreate,
     oppDelete,

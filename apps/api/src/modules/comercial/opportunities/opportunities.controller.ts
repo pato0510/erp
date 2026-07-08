@@ -109,6 +109,19 @@ export class OpportunitiesController {
     return this.service.reopen(id, companyId, user.id);
   }
 
+  /* COM-013b — send a WON opportunity to Operaciones (validates the critical rule, emits
+     the handoff event; the ServiceOrder is created ASYNCHRONOUSLY by the Operaciones
+     listener). Writers only (update OpportunitySubject) — ACCOUNTANT cannot trigger. */
+  @Post(':id/handoff')
+  @CheckPolicies((ability) => ability.can('update', OpportunitySubject))
+  handoff(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.sendToOperations(companyId, user.id, id);
+  }
+
   @Delete(':id')
   @CheckPolicies((ability) => ability.can('delete', OpportunitySubject))
   remove(
