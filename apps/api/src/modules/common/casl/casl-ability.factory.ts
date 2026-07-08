@@ -35,6 +35,7 @@ type Subjects =
       | typeof CommitmentTemplateSubject
       | typeof OperationsDashboardSubject
       | typeof AuditPackageSubject
+      | typeof ServiceOrderSubject
       | typeof EmployeeSubject
       | typeof EmployeeContractSubject
       | typeof EmployeeDocumentSubject
@@ -163,6 +164,16 @@ class OperationsDashboardSubject {
    piggybacks on `read all` for MANAGER. */
 class AuditPackageSubject {
   static readonly modelName = 'AuditPackage' as const;
+}
+/* COM-013a — service orders: the work a won Comercial deal becomes (Operaciones-side
+   execution entity). READ audience mirrors the operational work entities (OperationalAsset/
+   WorkPermit): every role reads (SA/ADMIN via manage-all, MANAGER/ACCOUNTANT/ANALYST via
+   read-all, VIEWER via an explicit read grant). WRITE (general update + the status
+   machine) mirrors OperationalAsset: the management audience only (MANAGER + ADMIN/
+   SUPER_ADMIN via manage-all). No `create` is granted to any role — orders are born from
+   the COM-013b handoff (server-side createFromHandoff), never a user endpoint. */
+class ServiceOrderSubject {
+  static readonly modelName = 'ServiceOrder' as const;
 }
 
 /* HR-001 — RRHH module subjects. Baseline role rules only (see
@@ -354,6 +365,7 @@ export {
   CommitmentTemplateSubject,
   OperationsDashboardSubject,
   AuditPackageSubject,
+  ServiceOrderSubject,
   EmployeeSubject,
   EmployeeContractSubject,
   EmployeeDocumentSubject,
@@ -461,6 +473,10 @@ export class CaslAbilityFactory {
            read existing ones via blanket `read all`). `delete`
            stays ADMIN-only via `manage all`. */
         can('create', AuditPackageSubject);
+        /* COM-013a — service orders: MANAGER can advance the status machine + edit
+           title/description/notes (`update`). Read is covered by `read all` above. No
+           `create` — orders are born from the COM-013b handoff, not by users. */
+        can('update', ServiceOrderSubject);
         /* HR-001 — MANAGER fully manages all RRHH subjects. */
         RRHH_SUBJECTS.forEach((subject) => can('manage', subject));
         /* COM-001 — default-deny floor: revoke the inherited blanket `read all`
@@ -543,6 +559,11 @@ export class CaslAbilityFactory {
         /* HR-001 — ANALYST has no RRHH access; revoke the blanket
            `read all` on RRHH subjects. */
         RRHH_SUBJECTS.forEach((subject) => cannot('read', subject));
+        /* COM-013 — service orders carry contract money amounts (net/tax/total). Per
+           policy ANALYST never sees monetary values, so revoke the inherited blanket
+           `read all` on ServiceOrderSubject (last-rule-wins; same shape as the RRHH
+           revoke above). Mirrors how QuoteSubject is closed to ANALYST in Comercial. */
+        cannot('read', ServiceOrderSubject);
         /* COM-001 — default-deny floor: revoke inherited blanket `read all` on
            Comercial subjects, then re-grant only the non-sensitive ones below. */
         COMERCIAL_SUBJECTS.forEach((subject) => cannot('read', subject));
@@ -590,6 +611,9 @@ export class CaslAbilityFactory {
         /* OPS-028 — VIEWER can acknowledge their own readings.
            Coverage dashboards stay gated by the service. */
         can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
+        /* COM-013 — VIEWER gets NO read on ServiceOrderSubject: service orders carry
+           contract money amounts and VIEWER never sees monetary values. VIEWER has no
+           blanket `read all`, so simply granting nothing here is the revoke. */
         /* COM-002 — service_catalog is non-sensitive: VIEWER reads it (no blanket
            `read all` to inherit, so grant explicitly). No write. */
         can('read', ServiceCatalogSubject);

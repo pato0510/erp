@@ -17,6 +17,7 @@ import { NotificationModule } from './notifications/notification.module';
 import { PermitsModule } from './permits/permits.module';
 import { ProceduresModule } from './procedures/procedures.module';
 import { OperationsReportsModule } from './reports/operations-reports.module';
+import { ServiceOrdersModule } from './service-orders/service-orders.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { OperationsReportsModule } from './reports/operations-reports.module';
     OperationsReportsModule,
     PermitsModule,
     ProceduresModule,
+    ServiceOrdersModule,
   ],
 })
 export class OperationsModule {}

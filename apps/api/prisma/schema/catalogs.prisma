@@ -49,9 +49,10 @@ model Counterparty {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  movements   Movement[]
-  commitments Commitment[]
-  accounts    Account[] // COM-003 — Comercial accounts that optionally link here (FK lives on accounts.counterpartyId; virtual back-relation only, no column)
+  movements     Movement[]
+  commitments   Commitment[]
+  accounts      Account[] // COM-003 — Comercial accounts that optionally link here (FK lives on accounts.counterpartyId; virtual back-relation only, no column)
+  serviceOrders ServiceOrder[] // COM-013a — Operaciones service orders optionally linked (FK on service_orders.counterpartyId, SET NULL)
 
   @@unique([companyId, taxId])
   @@map("counterparties")

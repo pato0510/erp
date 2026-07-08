@@ -1165,3 +1165,60 @@ model AuditPackage {
   @@map("audit_packages")
 }
 
+/* COM-013a — service order lifecycle. A contracted job originates as RECIBIDA, moves
+   to EN_EJECUCION when work starts, and ends COMPLETADA (finished) or CANCELADA
+   (aborted). COMPLETADA/CANCELADA are terminal. ASCII members; display labels in UI. */
+enum ServiceOrderStatus {
+  RECIBIDA
+  EN_EJECUCION
+  COMPLETADA
+  CANCELADA
+}
+
+/* COM-013a — service_orders: the work a WON Comercial deal becomes. Operaciones had no
+   entity representing contracted service delivery; this is it. A ServiceOrder is BORN
+   from the COM-013b handoff (a domain-event handler calling createFromHandoff), NEVER
+   typed by hand — there is no user-facing create endpoint. Owner-validated design:
+   - CLIENT is DENORMALIZED: `clientName` is copied from the account (always present),
+     plus an OPTIONAL `counterpartyId` (nullable FK, SET NULL) — a won deal may not have
+     a fiscal counterparty linked yet, so it is never required.
+   - SCOPE is a FROZEN snapshot: `scopeLines` is a JSON array of the accepted quote's
+     lines ([{serviceName, quantity, unitPrice, lineTotal}]) — NOT a live FK to
+     service_catalog, so the order reads tomorrow as it did at handoff.
+   - PROVENANCE is a SOFT pointer: `sourceOpportunityId` / `sourceQuoteId` are bare UUID
+     columns with NO foreign key (Comercial ↔ Operaciones stay decoupled — same pattern
+     as accounts.sourceCampaignId). The (companyId, sourceOpportunityId) index makes the
+     handler's idempotency lookup fast.
+   Money is Decimal(18,2) + currency (matching Commitment). `orderNumber` is per-company
+   sequential (OS-0001…). `createdBy` is nullable — null/system when the handler creates
+   it. Platform invariant (RLS + audit + GRANT) is in migration 20260708120000_add_service_orders. */
+model ServiceOrder {
+  id                  String             @id @default(uuid()) @db.Uuid
+  companyId           String             @db.Uuid
+  orderNumber         String // per-company sequential, e.g. OS-0001
+  status              ServiceOrderStatus @default(RECIBIDA)
+  clientName          String // denormalized copy of the account name (always present)
+  counterpartyId      String?            @db.Uuid // optional fiscal identity (may be linked later)
+  title               String
+  description         String?
+  scopeLines          Json // frozen snapshot of the accepted quote lines
+  netAmount           Decimal            @db.Decimal(18, 2)
+  taxAmount           Decimal            @db.Decimal(18, 2)
+  totalAmount         Decimal            @db.Decimal(18, 2)
+  currency            String             @default("CLP")
+  ownerId             String?            @db.Uuid // commercial owner — bare column (no FK)
+  sourceOpportunityId String?            @db.Uuid // soft provenance pointer (NO FK)
+  sourceQuoteId       String?            @db.Uuid // soft provenance pointer (NO FK)
+  notes               String?
+  createdBy           String?            @db.Uuid // null/system when created by the handler
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, orderNumber])
+  @@index([companyId])
+  @@index([companyId, sourceOpportunityId])
+  @@map("service_orders")
+}
+
