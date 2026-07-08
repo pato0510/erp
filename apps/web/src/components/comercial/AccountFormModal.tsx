@@ -16,8 +16,13 @@ export interface AccountForForm {
   priority: string;
   industry: string | null;
   commercialRisk: string | null;
+  paymentTermDays: number;
   notes: string | null;
 }
+
+/* COM-014 — the client payment terms AGS uses. Values ARE the day counts (the API and the
+   projected-income commitment both work in days), so the option value is the number. */
+const PAYMENT_TERMS = [30, 60, 90] as const;
 
 const INPUT =
   'w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]';
@@ -36,6 +41,7 @@ export function AccountFormModal({
   const [priority, setPriority] = useState(editing?.priority ?? 'MEDIA');
   const [industry, setIndustry] = useState(editing?.industry ?? '');
   const [commercialRisk, setCommercialRisk] = useState(editing?.commercialRisk ?? '');
+  const [paymentTermDays, setPaymentTermDays] = useState<number>(editing?.paymentTermDays ?? 30);
   const [notes, setNotes] = useState(editing?.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -53,6 +59,7 @@ export function AccountFormModal({
       priority,
       industry: industry.trim() || undefined,
       commercialRisk: commercialRisk.trim() || undefined,
+      paymentTermDays,
       notes: notes.trim() || undefined,
     };
     try {
@@ -135,6 +142,19 @@ export function AccountFormModal({
               className={INPUT}
               placeholder="Nota libre (ej. paga a 90 días)"
             />
+          </Field>
+          <Field label="Plazo de pago">
+            <select
+              value={paymentTermDays}
+              onChange={(e) => setPaymentTermDays(Number(e.target.value))}
+              className={INPUT}
+            >
+              {PAYMENT_TERMS.map((d) => (
+                <option key={d} value={d}>
+                  {d} días
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Notas">
             <textarea

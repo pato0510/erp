@@ -3,7 +3,10 @@
  * company (or nonexistent) is rejected via the company-scoped lookup. Fake
  * Prisma/RLS clients (same style as employees.security.spec.ts). */
 import { BadRequestException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { AccountsService } from './accounts.service';
+import { CreateAccountDto } from './dto/create-account.dto';
 
 type Any = Record<string, unknown>;
 
@@ -68,5 +71,51 @@ describe('AccountsService — counterparty decoupling', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(counterpartyCreate).not.toHaveBeenCalled();
     expect(accountUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('AccountsService — paymentTermDays (COM-014)', () => {
+  it('create defaults paymentTermDays to 30 when omitted', async () => {
+    const { svc, accountCreate } = makeService(null);
+    await svc.create('c1', 'u1', { name: 'Nueva' } as never);
+    const data = (accountCreate.mock.calls[0][0] as Any).data as Any;
+    expect(data.paymentTermDays).toBe(30);
+  });
+
+  it('create honors an explicit paymentTermDays', async () => {
+    const { svc, accountCreate } = makeService(null);
+    await svc.create('c1', 'u1', { name: 'Nueva', paymentTermDays: 90 } as never);
+    const data = (accountCreate.mock.calls[0][0] as Any).data as Any;
+    expect(data.paymentTermDays).toBe(90);
+  });
+
+  it('update passes paymentTermDays through (editable in the ficha)', async () => {
+    const { svc, accountUpdate } = makeService(null);
+    await svc.update('a1', 'c1', 'u1', { paymentTermDays: 60 } as never);
+    const data = (accountUpdate.mock.calls[0][0] as Any).data as Any;
+    expect(data.paymentTermDays).toBe(60);
+  });
+});
+
+describe('CreateAccountDto — paymentTermDays validation (COM-014)', () => {
+  const validateDto = (obj: Record<string, unknown>) =>
+    validate(plainToInstance(CreateAccountDto, obj));
+  const termError = (errors: Awaited<ReturnType<typeof validateDto>>) =>
+    errors.find((e) => e.property === 'paymentTermDays');
+
+  it.each([30, 60, 90])('accepts %d', async (v) => {
+    expect(termError(await validateDto({ name: 'X', paymentTermDays: v }))).toBeUndefined();
+  });
+
+  it('rejects a value outside {30,60,90}', async () => {
+    expect(termError(await validateDto({ name: 'X', paymentTermDays: 45 }))).toBeDefined();
+  });
+
+  it('rejects a non-integer', async () => {
+    expect(termError(await validateDto({ name: 'X', paymentTermDays: 30.5 }))).toBeDefined();
+  });
+
+  it('is optional — omitted passes (DB @default(30) applies)', async () => {
+    expect(termError(await validateDto({ name: 'X' }))).toBeUndefined();
   });
 });

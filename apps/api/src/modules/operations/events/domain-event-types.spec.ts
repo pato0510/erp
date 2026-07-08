@@ -25,6 +25,7 @@ const event: ComercialOpportunityWonEvent = {
   totalAmount: 23800,
   currency: 'CLP',
   ownerId: 'owner1',
+  paymentTermDays: 30,
 };
 
 describe('COM-013b — comercial.opportunity-won registry entry', () => {

@@ -145,8 +145,11 @@ export interface WorkPermitClosedEvent {
  *  string, or emit() would silently swallow the row).
  *  Consumed by: Operaciones ServiceOrderHandoffListener → creates the ServiceOrder from
  *  this SELF-CONTAINED payload (the listener never reads Comercial tables — the two
- *  modules stay decoupled). `occurredAt` is a STABLE timestamp set once at handoff and
- *  reused as the event's idempotency key, so a re-emit dedupes instead of duplicating. */
+ *  modules stay decoupled); AND Finance OpportunityCommitmentListener (COM-014) → creates
+ *  the projected-income Commitment (dueDate = occurredAt + paymentTermDays). Both listeners
+ *  fire independently on this one event and each dedupes on its own side. `occurredAt` is a
+ *  STABLE timestamp set once at handoff and reused as the event's idempotency key, so a
+ *  re-emit dedupes instead of duplicating. */
 export interface ComercialOpportunityWonEvent {
   type: 'comercial.opportunity-won';
   companyId: string;
@@ -163,6 +166,10 @@ export interface ComercialOpportunityWonEvent {
   totalAmount: number;
   currency: string;
   ownerId: string | null;
+  /* COM-014 — the account's payment term (days after invoice emission) carried in the
+     payload so the Finance listener stays payload-only (never reads the accounts table),
+     consistent with the ServiceOrder listener's decoupling. */
+  paymentTermDays: number;
 }
 
 /** The full union — switch on `type` to narrow the payload. */

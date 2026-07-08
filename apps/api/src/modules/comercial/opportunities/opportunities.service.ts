@@ -342,7 +342,7 @@ export class OpportunitiesService {
     const acceptedQuote = quote!;
     const account = await this.prisma.account.findFirst({
       where: { id: opp.accountId, companyId },
-      select: { name: true, counterpartyId: true },
+      select: { name: true, counterpartyId: true, paymentTermDays: true },
     });
 
     // Stable timestamp — used BOTH as the event's occurredAt (idempotency key) and as
@@ -371,6 +371,8 @@ export class OpportunitiesService {
       totalAmount: Number(acceptedQuote.totalAmount),
       currency: 'CLP',
       ownerId: opp.ownerId,
+      // COM-014 — carry the account's payment term so the Finance listener stays payload-only.
+      paymentTermDays: account?.paymentTermDays ?? 30,
     });
     if (!eventId) {
       // emit() swallowed the row (persistence failed or an exact-duplicate re-emit). Do

@@ -107,7 +107,7 @@ describe('OpportunitiesService.sendToOperations — critical rule', () => {
 describe('OpportunitiesService.sendToOperations — success', () => {
   it('emits the handoff event with the accepted quote snapshot + amounts, then stamps handoffAt', async () => {
     const { svc, emit, oppUpdate } = makeService({
-      account: { name: 'Minera Los Andes SpA', counterpartyId: 'cp1' },
+      account: { name: 'Minera Los Andes SpA', counterpartyId: 'cp1', paymentTermDays: 60 },
     });
     await svc.sendToOperations('c1', 'u1', 'o1');
 
@@ -127,6 +127,7 @@ describe('OpportunitiesService.sendToOperations — success', () => {
     expect(payload.totalAmount).toBe(23800);
     expect(payload.currency).toBe('CLP');
     expect(payload.ownerId).toBe('owner1');
+    expect(payload.paymentTermDays).toBe(60); // COM-014 — carried from the account (option ii)
 
     // handoffAt stamped, and it equals the event's occurredAt (STABLE timestamp).
     expect(oppUpdate).toHaveBeenCalledTimes(1);

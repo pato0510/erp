@@ -23,6 +23,7 @@ const event: ComercialOpportunityWonEvent = {
   totalAmount: 23800,
   currency: 'CLP',
   ownerId: 'owner1',
+  paymentTermDays: 30, // COM-014 — carried in the payload; the ServiceOrder listener ignores it
 };
 
 function makeListener(opts: { existing?: Any | null; createThrows?: boolean } = {}) {

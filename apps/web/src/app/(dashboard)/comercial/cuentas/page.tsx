@@ -27,6 +27,7 @@ interface AccountRow {
   priority: string;
   industry: string | null;
   commercialRisk: string | null;
+  paymentTermDays: number; // COM-014 — feeds AccountFormModal's edit form
   ownerId: string | null;
   counterpartyId: string | null;
   notes: string | null;

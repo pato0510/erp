@@ -1,5 +1,14 @@
 import { AccountPriority, AccountStatus } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateAccountDto {
   @IsString()
@@ -25,6 +34,14 @@ export class CreateAccountDto {
   @IsString()
   @MaxLength(1000)
   commercialRisk?: string;
+
+  // COM-014 — client payment term in days after invoice emission (AGS bills at 30/60/90).
+  // Constrained to the three business values; drives the projected-income Commitment dueDate
+  // at handoff. Omitted → the DB @default(30) applies.
+  @IsOptional()
+  @IsInt()
+  @IsIn([30, 60, 90])
+  paymentTermDays?: number;
 
   // Commercial executive — bare actor UUID (no FK, codebase convention).
   @IsOptional()

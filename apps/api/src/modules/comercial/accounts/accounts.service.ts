@@ -48,6 +48,7 @@ export class AccountsService {
           industry: dto.industry ?? null,
           priority: dto.priority ?? AccountPriority.MEDIA,
           commercialRisk: dto.commercialRisk ?? null,
+          paymentTermDays: dto.paymentTermDays ?? 30, // COM-014 — mirror the DB default explicitly
           ownerId: dto.ownerId ?? null,
           counterpartyId: dto.counterpartyId ?? null,
           sourceCampaignId: dto.sourceCampaignId ?? null,

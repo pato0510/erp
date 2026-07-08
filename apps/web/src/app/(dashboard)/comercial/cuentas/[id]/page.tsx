@@ -28,6 +28,7 @@ interface Account {
   priority: string;
   industry: string | null;
   commercialRisk: string | null;
+  paymentTermDays: number;
   ownerId: string | null;
   counterpartyId: string | null;
   sourceCampaignId: string | null;
@@ -228,6 +229,8 @@ function AccountDatosTab({
           <KV label="Prioridad" value={PRIORITY_LABELS[account.priority] ?? account.priority} />
           <KV label="Industria" value={account.industry ?? '—'} />
           <KV label="Riesgo comercial" value={account.commercialRisk ?? '—'} />
+          {/* COM-014 — payment term drives the projected-income commitment at handoff */}
+          <KV label="Plazo de pago" value={`${account.paymentTermDays} días`} />
           {account.sourceCampaignId && (
             <KV label="Campaña de origen" value={account.sourceCampaignId} mono />
           )}

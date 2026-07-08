@@ -1,0 +1,16 @@
+-- COM-014 — add the client's payment term (days after invoice emission) to accounts.
+-- NOT NULL with DEFAULT 30 so every existing row backfills automatically (AGS bills at
+-- 30/60/90 days; 30 is the sensible default). Modeled as an Int (not an enum) because the
+-- value IS the number of days the cash-flow projection adds — no enum→days mapping — and it
+-- flows straight into the comercial.opportunity-won event payload. The API constrains it to
+-- {30,60,90} via DTO validation; a future 45-day term needs no migration.
+--
+-- No RLS/audit/GRANT change — accounts already has its RLS policy, the app_user GRANT, and
+-- the row-level audit_trigger_function() trigger, which captures this new column
+-- automatically (a FOR EACH ROW trigger reads the whole NEW row, so an added column needs
+-- no trigger change).
+--
+-- Used by the Comercial→Finanzas handoff (COM-014): the projected INCOME Commitment's
+-- dueDate = handoff date (event occurredAt) + paymentTermDays. This is an ESTIMATE; the
+-- real invoice-based date is V2 (invoice emission + SII is a separate future concern).
+ALTER TABLE "accounts" ADD COLUMN "paymentTermDays" INTEGER NOT NULL DEFAULT 30;

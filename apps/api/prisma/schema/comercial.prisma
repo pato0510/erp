@@ -77,6 +77,7 @@ model Account {
   industry         String?
   priority         AccountPriority @default(MEDIA)
   commercialRisk   String? // free-text note for V1 (not an enum)
+  paymentTermDays  Int             @default(30) // COM-014 — client payment term (days after invoice emission); 30/60/90. Drives the projected-income Commitment dueDate at handoff.
   ownerId          String?         @db.Uuid // commercial executive — bare actor UUID (no FK), like createdBy
   counterpartyId   String?         @db.Uuid // optional link to Finance counterparties
   sourceCampaignId String?         @db.Uuid // Marketing hook — NO FK (campaigns table not created yet)
