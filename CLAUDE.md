@@ -490,10 +490,57 @@ Autorización (RBAC/CASL) — puntos clave:
 QA doc: docs/EXCELSIA-RRHH-QA-PRE-DESBLOQUEO.md
 Última actualización: 2026-07-01
 
+═══════════════════════════════════════════════════════════════════
+
+# 🏁 MÓDULO COMERCIAL — V1 EN PRODUCCIÓN (live desde 2026-07-09)
+
+═══════════════════════════════════════════════════════════════════
+
+Status: V1 completo (COM-001…COM-015), desplegado y visible en /modulos.
+Schema: apps/api/prisma/schema/comercial.prisma
+Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
+
+Tablas: service_catalog, accounts, contacts, opportunities,
+opportunity_services, activities, quotes, quote_lines
+(+ service_orders en Operaciones, target del handoff COM-013a).
+
+Puntos clave:
+
+- service_catalog: catálogo compartido — Comercial escribe (MANAGER+),
+  todos los roles leen.
+- accounts: lifecycle PROSPECTO/ACTIVA/INACTIVA; NO hay tabla de leads
+  (deliberado). Link opcional y desacoplado a counterparties (SET NULL).
+  sourceCampaignId: hook UUID sin FK, reservado para Marketing.
+  paymentTermDays (30/60/90) alimenta el Commitment proyectado de COM-014.
+- opportunities: stage machine — 5 etapas activas con movimiento libre,
+  EN_PAUSA con previousStage, GANADA/PERDIDA semi-terminales (reopen
+  explícito). PERDIDA exige razón categorizada (detalle obligatorio en
+  OTRO). Endpoint canónico PATCH /:id/stage. COM-009: cada transición
+  escribe una Activity system-generated en la MISMA transacción
+  executeWithRls.
+- quotes: frozen copy del bundle; inmutable desde ENVIADA; UNA ACEPTADA
+  por oportunidad (partial unique index a nivel DB); snapshot de IVA
+  persistido (taxRate; constante CHILE_IVA_RATE en el service — no hay
+  parametrización central chilena todavía).
+- Cross-módulo REAL: evento comercial.opportunity-won (aggregateId =
+  UUID de la oportunidad — NUNCA string compuesto) con DOS listeners
+  independientes: Operaciones crea ServiceOrder (createFromHandoff
+  idempotente por sourceOpportunityId) y Finanzas crea Commitment INCOME
+  (dedupe sourceType/sourceId, toggle enableAutoCommitments, skip
+  elegante sin período fiscal). COM-012: disponibilidad RRHH vía
+  DisponibilidadService exportado (solo método reason-free; la PII de
+  salud nunca cruza de módulo).
+- CASL: piso default-deny por subject (patrón COM-001). MANAGER/ADMIN/
+  SUPER_ADMIN full; ACCOUNTANT read-only total; ANALYST/VIEWER sin
+  acceso (nunca ven montos).
+
+Última actualización: 2026-07-09
+
 # Próximos pasos
 
 - Actualización del manual de Operaciones (incorporar OPS-035 QR,
   OPS-036 Auditoría, OPS-034 nota de performance)
 - Creación del manual de Finanzas (V1 ya en producción)
 - Creación del manual de RRHH (V1 ya en producción)
-- Inicio de los módulos Comercial y Marketing (siguiente prioridad del cliente)
+- Creación del manual de Comercial (V1 ya en producción)
+- Módulo Marketing en desarrollo (recon MKT-000 en docs/MARKETING-RECON.md)
