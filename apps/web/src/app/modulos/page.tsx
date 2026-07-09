@@ -206,6 +206,24 @@ const CalendarioSvg = () => (
   </svg>
 );
 
+const MarketingSvg = () => (
+  <svg
+    viewBox="0 0 240 240"
+    preserveAspectRatio="xMidYMid slice"
+    className="mod-svg"
+    style={{ opacity: 0.5 }}
+  >
+    {/* megaphone: mouthpiece + widening cone */}
+    <rect x="55" y="112" width="16" height="26" rx="3" fill="white" opacity="0.85" />
+    <path d="M71 108 L128 84 L128 166 L71 142 Z" fill="white" opacity="0.9" />
+    {/* broadcast waves */}
+    <g stroke="white" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.55">
+      <path d="M140 98 Q158 125 140 152" />
+      <path d="M158 84 Q186 125 158 166" />
+    </g>
+  </svg>
+);
+
 const RRHH_LINES = [
   { x1: 120, y1: 80, x2: 75, y2: 130, d: '0s' },
   { x1: 120, y1: 80, x2: 165, y2: 130, d: '0.5s' },
@@ -367,13 +385,16 @@ const MODULES: ModuleDef[] = [
     svg: <ComercialSvg />,
   },
   {
-    key: 'calendario',
-    name: 'Calendario',
-    description: 'Calendario general de actividades y gestión organizacional',
+    // MKT-001 — repurposed from the old "Calendario" placeholder card. href points at
+    // the built shell, but active stays false ("Próximamente") until MKT-010 un-gates
+    // it (COM-015 pattern); direct-URL access works for local validation meanwhile.
+    key: 'marketing',
+    name: 'Marketing',
+    description: 'Campañas, gastos de marketing y presencia digital',
     gradient: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
-    href: null,
+    href: '/marketing',
     active: false,
-    svg: <CalendarioSvg />,
+    svg: <MarketingSvg />,
   },
   {
     key: 'rrhh',
@@ -383,6 +404,18 @@ const MODULES: ModuleDef[] = [
     href: '/rrhh',
     active: true,
     svg: <RrhhSvg />,
+  },
+  {
+    // MKT-001 — new gated placeholder for the future master activity-calendar module
+    // (its own scope doc). Reuses the calendar-grid icon freed up by the Marketing
+    // repurpose. Stays gated (href null, active false) with no route behind it yet.
+    key: 'calendario-actividades',
+    name: 'Calendario de Actividades',
+    description: 'Calendario maestro de actividades internas de la organización',
+    gradient: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
+    href: null,
+    active: false,
+    svg: <CalendarioSvg />,
   },
 ];
 

@@ -55,6 +55,9 @@ type Subjects =
       | typeof ActivitySubject
       | typeof ServiceCatalogSubject
       | typeof QuoteSubject
+      | typeof CampaignSubject
+      | typeof MarketingExpenseSubject
+      | typeof PresenceSnapshotSubject
     >
   | 'all';
 
@@ -250,6 +253,24 @@ class QuoteSubject {
   static readonly modelName = 'Quote' as const;
 }
 
+/* MKT-001 — Marketing module subjects. Declared in the subjects union so this
+   ticket and later MKT tickets can gate their endpoints with @CheckPolicies.
+   Established with a default-deny READ floor (mirroring COMERCIAL_SUBJECTS): the
+   blanket-`read all` roles have their inherited Marketing read revoked in their
+   branches below, then re-granted per the Part 1 §5 matrix (last-rule-wins).
+   Campaign + MarketingExpense carry money (budget/spend) → ACCOUNTANT reads them;
+   PresenceSnapshot carries no money → outside the ACCOUNTANT grant. ANALYST/VIEWER
+   get none. */
+class CampaignSubject {
+  static readonly modelName = 'Campaign' as const;
+}
+class MarketingExpenseSubject {
+  static readonly modelName = 'MarketingExpense' as const;
+}
+class PresenceSnapshotSubject {
+  static readonly modelName = 'PresenceSnapshot' as const;
+}
+
 /* All RRHH subjects — granted/revoked in bulk by the baseline role rules. */
 const RRHH_SUBJECTS = [
   EmployeeSubject,
@@ -284,6 +305,13 @@ const COMERCIAL_SUBJECTS = [
   ServiceCatalogSubject,
   QuoteSubject,
 ];
+/* MKT-001 — all Marketing subjects. Establishes the default-deny READ floor
+   (same shape as COMERCIAL_SUBJECTS): the blanket-`read all` roles revoke their
+   inherited Marketing read in their branches below, then re-grant per the matrix. */
+const MARKETING_SUBJECTS = [CampaignSubject, MarketingExpenseSubject, PresenceSnapshotSubject];
+/* The money-bearing subset ACCOUNTANT may read (budget + spend). PresenceSnapshot
+   carries no money and is intentionally excluded. */
+const MARKETING_FINANCIAL_SUBJECTS = [CampaignSubject, MarketingExpenseSubject];
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -385,6 +413,9 @@ export {
   ActivitySubject,
   ServiceCatalogSubject,
   QuoteSubject,
+  CampaignSubject,
+  MarketingExpenseSubject,
+  PresenceSnapshotSubject,
 };
 
 @Injectable()
@@ -497,6 +528,13 @@ export class CaslAbilityFactory {
         /* COM-010 — quotes (quotation documents) share the same profile → full CRUD.
            This is the LAST Comercial subject to leave the COM-001 floor. */
         can(['read', 'create', 'update', 'delete'], QuoteSubject);
+        /* MKT-001 — default-deny floor: revoke the inherited blanket `read all` on
+           Marketing subjects, then re-grant full CRUD (MANAGER owns the marketing
+           workflow) AFTER the revoke (last-rule-wins). Per Part 1 §5. */
+        MARKETING_SUBJECTS.forEach((subject) => cannot('read', subject));
+        MARKETING_SUBJECTS.forEach((subject) =>
+          can(['read', 'create', 'update', 'delete'], subject),
+        );
         break;
 
       case UserRole.ACCOUNTANT:
@@ -548,6 +586,12 @@ export class CaslAbilityFactory {
         can('read', ActivitySubject);
         /* COM-010 — quotes: ACCOUNTANT read-only (document visibility). No write. */
         can('read', QuoteSubject);
+        /* MKT-001 — default-deny floor on all Marketing subjects, then re-grant
+           READ only on the money-bearing subset (Campaign + MarketingExpense —
+           budget and spend are financial data, the Chilean contador pattern).
+           PresenceSnapshot stays floored (no money). No write on any. Per Part 1 §5. */
+        MARKETING_SUBJECTS.forEach((subject) => cannot('read', subject));
+        MARKETING_FINANCIAL_SUBJECTS.forEach((subject) => can('read', subject));
         break;
 
       case UserRole.ANALYST:
@@ -570,6 +614,10 @@ export class CaslAbilityFactory {
         /* COM-002 — service_catalog is non-sensitive and read by every role:
            re-grant read AFTER the revoke (last-rule-wins). No write for ANALYST. */
         can('read', ServiceCatalogSubject);
+        /* MKT-001 — ANALYST never sees marketing money (budget/spend) and has no
+           presence access: revoke the inherited blanket `read all` on all Marketing
+           subjects with NO re-grant. Per Part 1 §5. */
+        MARKETING_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
 
       case UserRole.VIEWER:
@@ -617,6 +665,9 @@ export class CaslAbilityFactory {
         /* COM-002 — service_catalog is non-sensitive: VIEWER reads it (no blanket
            `read all` to inherit, so grant explicitly). No write. */
         can('read', ServiceCatalogSubject);
+        /* MKT-001 — VIEWER gets NO access to any Marketing subject: budget/spend are
+           money and presence is out of scope. VIEWER has no blanket `read all`, so
+           granting nothing here IS the floor (same idiom as ServiceOrder for VIEWER). */
         break;
     }
 

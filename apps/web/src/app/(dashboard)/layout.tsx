@@ -8,6 +8,7 @@ import { FinanceSidebar } from '../../components/sidebars/FinanceSidebar';
 import { OperationsSidebar } from '../../components/sidebars/OperationsSidebar';
 import { RrhhSidebar } from '../../components/sidebars/RrhhSidebar';
 import { ComercialSidebar } from '../../components/sidebars/ComercialSidebar';
+import { MarketingSidebar } from '../../components/sidebars/MarketingSidebar';
 import { NotificationCenter } from '../../components/NotificationCenter';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -50,12 +51,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isOperations = pathname?.startsWith('/operaciones') ?? false;
   const isRrhh = pathname?.startsWith('/rrhh') ?? false;
   const isComercial = pathname?.startsWith('/comercial') ?? false;
+  const isMarketing = pathname?.startsWith('/marketing') ?? false;
 
   return (
     <>
       <DarkGradientBackground />
       <div className="tn-shell">
-        {isComercial ? (
+        {isMarketing ? (
+          <MarketingSidebar />
+        ) : isComercial ? (
           <ComercialSidebar />
         ) : isRrhh ? (
           <RrhhSidebar />
