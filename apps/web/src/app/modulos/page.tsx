@@ -362,8 +362,8 @@ const MODULES: ModuleDef[] = [
     name: 'Comercial',
     description: 'Pipeline de ventas, CRM, cotizaciones y gestión de clientes',
     gradient: 'linear-gradient(135deg, #EC4899, #BE185D)',
-    href: null,
-    active: false,
+    href: '/comercial', // COM-015 — un-gated: Comercial is live (CRM, quotes, Operaciones/Finanzas wiring)
+    active: true,
     svg: <ComercialSvg />,
   },
   {
