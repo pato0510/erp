@@ -1,0 +1,56 @@
+/* MKT-002 — Marketing schema. First Marketing table: campaigns. Campaign OWNS its
+   lifecycle (write = MANAGER/ADMIN/SUPER_ADMIN; ACCOUNTANT reads budget/spend — the
+   MKT-001 CASL matrix). Enums use ASCII-only members (Prisma enum Ñ gotcha); display
+   labels live in the UI layer. The platform invariant (RLS + audit trigger + app_user
+   GRANT) ships in migration 20260710120000_add_campaigns.
+
+   Money is never stored derived: `spent = Σ expenses.amount` and the over-budget
+   condition are computed live (MKT-005) — no rollup columns here.
+
+   DEFERRED relations — declared here LATER, together with their tables/FKs, so the
+   schema never drifts from the real database:
+     - expenses MarketingExpense[]  → MKT-005 (marketing_expenses table + campaignId FK)
+     - accounts Account[]           → MKT-006 (accounts.sourceCampaignId promoted to a
+       real FK referencing campaigns(id)) */
+
+enum CampaignChannel {
+  FERIA_EVENTO
+  REDES_SOCIALES
+  GOOGLE_ADS
+  EMAIL
+  REFERIDOS
+  LICITACION
+  OTRO
+}
+
+enum CampaignStatus {
+  BORRADOR
+  ACTIVA
+  PAUSADA
+  FINALIZADA
+  CANCELADA
+}
+
+model Campaign {
+  id           String          @id @default(uuid()) @db.Uuid
+  companyId    String          @db.Uuid
+  name         String
+  description  String?
+  channel      CampaignChannel
+  status       CampaignStatus  @default(BORRADOR)
+  startDate    DateTime?       @db.Date
+  endDate      DateTime?       @db.Date
+  budgetAmount Decimal?        @db.Decimal(18, 2)
+  ownerId      String?         @db.Uuid
+  notes        String?
+  createdBy    String          @db.Uuid
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  // Relations DEFERRED to keep the schema in lockstep with the DB (see header):
+  //   expenses MarketingExpense[]  (MKT-005) · accounts Account[]  (MKT-006)
+
+  @@index([companyId])
+  @@index([status])
+  @@map("campaigns")
+}

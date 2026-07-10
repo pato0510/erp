@@ -1,0 +1,198 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { CampaignChannel, CampaignStatus, Prisma } from '@prisma/client';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { RlsService } from '../../common/rls/rls.service';
+import { CreateCampaignDto } from './dto/create-campaign.dto';
+import { UpdateCampaignDto } from './dto/update-campaign.dto';
+
+interface ListFilters {
+  status?: CampaignStatus;
+  channel?: CampaignChannel;
+}
+
+/* MKT-002 — the campaign status machine, as directed adjacency (current → allowed
+   targets). No self-loops, so same-status moves are rejected. Encodes Part 1 §2.1:
+   - Free movement among BORRADOR/ACTIVA/PAUSADA (all directed pairs).
+   - ACTIVA/PAUSADA → FINALIZADA | CANCELADA (semi-terminal).
+   - FINALIZADA/CANCELADA → ACTIVA only (explicit reopen).
+   The extra "into ACTIVA requires startDate" guard (decision f) is applied on top. */
+const STATUS_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
+  [CampaignStatus.BORRADOR]: [CampaignStatus.ACTIVA, CampaignStatus.PAUSADA],
+  [CampaignStatus.ACTIVA]: [
+    CampaignStatus.BORRADOR,
+    CampaignStatus.PAUSADA,
+    CampaignStatus.FINALIZADA,
+    CampaignStatus.CANCELADA,
+  ],
+  [CampaignStatus.PAUSADA]: [
+    CampaignStatus.BORRADOR,
+    CampaignStatus.ACTIVA,
+    CampaignStatus.FINALIZADA,
+    CampaignStatus.CANCELADA,
+  ],
+  [CampaignStatus.FINALIZADA]: [CampaignStatus.ACTIVA],
+  [CampaignStatus.CANCELADA]: [CampaignStatus.ACTIVA],
+};
+
+/* Closed states: general-field edits (PATCH /:id) are blocked here; the only way out
+   is the status endpoint (reopen → ACTIVA). Mirrors the COM-005 closed-deal guard. */
+const CLOSED_STATUSES: CampaignStatus[] = [CampaignStatus.FINALIZADA, CampaignStatus.CANCELADA];
+
+@Injectable()
+export class CampaignsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rlsService: RlsService,
+  ) {}
+
+  /** Anchor a YYYY-MM-DD (or ISO) string to UTC midnight so an @db.Date column
+   * never suffers the timezone off-by-one (the RRHH HR-004b convention). */
+  private toDateOnly(dateStr: string): Date {
+    const d = new Date(dateStr);
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  }
+
+  /** endDate must never precede startDate. Compares the effective (post-update)
+   * date pair — either may be a fresh string or a persisted Date, or null. */
+  private assertDateOrder(start: Date | null, end: Date | null) {
+    if (start && end && end.getTime() < start.getTime()) {
+      throw new BadRequestException(
+        'La fecha de término no puede ser anterior a la fecha de inicio.',
+      );
+    }
+  }
+
+  async findAll(companyId: string, filters: ListFilters = {}) {
+    const where: Prisma.CampaignWhereInput = { companyId };
+    if (filters.status) where.status = filters.status;
+    if (filters.channel) where.channel = filters.channel;
+    // Comercial list convention: filtered company-scoped findMany, single stable
+    // order, no offset pagination in V1 (volumes are small — Part 1 §3). Recency-
+    // first mirrors the opportunities list (the sibling status-machine entity).
+    return this.prisma.campaign.findMany({ where, orderBy: [{ updatedAt: 'desc' }] });
+  }
+
+  async findOne(id: string, companyId: string) {
+    const campaign = await this.prisma.campaign.findFirst({ where: { id, companyId } });
+    if (!campaign) throw new NotFoundException('Campaña no encontrada');
+    return campaign;
+  }
+
+  async create(companyId: string, userId: string, dto: CreateCampaignDto) {
+    const startDate = dto.startDate ? this.toDateOnly(dto.startDate) : null;
+    const endDate = dto.endDate ? this.toDateOnly(dto.endDate) : null;
+    this.assertDateOrder(startDate, endDate);
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.campaign.create({
+        data: {
+          companyId,
+          createdBy: userId,
+          name: dto.name,
+          channel: dto.channel,
+          // Status is forced server-side — never accepted from the DTO (decision f).
+          status: CampaignStatus.BORRADOR,
+          description: dto.description ?? null,
+          startDate,
+          endDate,
+          budgetAmount:
+            dto.budgetAmount !== undefined && dto.budgetAmount !== null
+              ? new Prisma.Decimal(dto.budgetAmount)
+              : null,
+          ownerId: dto.ownerId ?? null,
+          notes: dto.notes ?? null,
+        },
+      });
+    });
+  }
+
+  /** General-field update. Status edits do NOT happen here (the DTO has no `status`);
+   * status moves only through changeStatus(). Editing a closed campaign is rejected. */
+  async update(id: string, companyId: string, userId: string, dto: UpdateCampaignDto) {
+    const campaign = await this.findOne(id, companyId);
+    if (CLOSED_STATUSES.includes(campaign.status)) {
+      throw new BadRequestException(
+        'No se puede editar una campaña finalizada o cancelada. Reábrela (estado → ACTIVA) para modificarla.',
+      );
+    }
+
+    const data: Prisma.CampaignUncheckedUpdateInput = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.channel !== undefined) data.channel = dto.channel;
+    if (dto.description !== undefined) data.description = dto.description ?? null;
+    if (dto.ownerId !== undefined) data.ownerId = dto.ownerId ?? null;
+    if (dto.notes !== undefined) data.notes = dto.notes ?? null;
+    if (dto.budgetAmount !== undefined) {
+      data.budgetAmount = dto.budgetAmount === null ? null : new Prisma.Decimal(dto.budgetAmount);
+    }
+
+    // Resolve the effective date pair (dto override wins; else keep the persisted
+    // value) so endDate ≥ startDate holds across partial updates.
+    const nextStart =
+      dto.startDate !== undefined
+        ? dto.startDate
+          ? this.toDateOnly(dto.startDate)
+          : null
+        : campaign.startDate;
+    const nextEnd =
+      dto.endDate !== undefined
+        ? dto.endDate
+          ? this.toDateOnly(dto.endDate)
+          : null
+        : campaign.endDate;
+    this.assertDateOrder(nextStart, nextEnd);
+    if (dto.startDate !== undefined) data.startDate = nextStart;
+    if (dto.endDate !== undefined) data.endDate = nextEnd;
+
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.campaign.update({ where: { id }, data });
+    });
+  }
+
+  /** THE canonical status-transition path — enforces the machine + the activation
+   * guard. Rejects any edge not in STATUS_TRANSITIONS (incl. same-status no-ops and
+   * BORRADOR → FINALIZADA/CANCELADA). */
+  async changeStatus(id: string, companyId: string, userId: string, to: CampaignStatus) {
+    const campaign = await this.findOne(id, companyId);
+    const from = campaign.status;
+
+    const allowed = STATUS_TRANSITIONS[from] ?? [];
+    if (!allowed.includes(to)) {
+      throw new BadRequestException(`Transición de estado no permitida: ${from} → ${to}.`);
+    }
+    // Activation guard (decision f): a campaign cannot enter ACTIVA without a start
+    // date — applies to plain activation AND to a reopen back to ACTIVA.
+    if (to === CampaignStatus.ACTIVA && !campaign.startDate) {
+      throw new BadRequestException(
+        'Para activar la campaña debes definir la fecha de inicio (startDate).',
+      );
+    }
+
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.campaign.update({ where: { id }, data: { status: to } });
+    });
+  }
+
+  /** Hard delete ONLY for a BORRADOR campaign. Anything else is CANCELADA, never
+   * deleted — preserves attribution/spend history (decision d). */
+  async remove(id: string, companyId: string, userId: string) {
+    const campaign = await this.findOne(id, companyId);
+    if (campaign.status !== CampaignStatus.BORRADOR) {
+      throw new ConflictException(
+        'Solo se puede eliminar una campaña en estado BORRADOR. Las demás se cancelan (estado → CANCELADA) para conservar el historial.',
+      );
+    }
+    // MKT-005 / MKT-006 — the full "pristine BORRADOR" rule also blocks delete when
+    // the draft already has ANY expense or ANY attributed account (decision d). Those
+    // pre-checks are added with the marketing_expenses table and the accounts.
+    // sourceCampaignId FK; today a BORRADOR can have neither by construction (no FK
+    // targets campaigns yet), so status = BORRADOR is a sufficient guard.
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.campaign.delete({ where: { id } });
+    });
+  }
+}
