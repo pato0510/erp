@@ -16,6 +16,7 @@ import { apiClient, ApiError } from '../../../../../lib/api';
 import { formatCLP } from '../../../../../lib/formatters';
 import { useCanWriteMarketing } from '../../../../../hooks/useMarketingPermissions';
 import {
+  CampaignDerivedBadges,
   CampaignStatus,
   CampaignStatusBadge,
   CHANNEL_LABELS,
@@ -28,6 +29,7 @@ import {
   CampaignFormModal,
   CampaignForForm,
 } from '../../../../../components/marketing/CampaignFormModal';
+import { CampaignExpenses } from '../../../../../components/marketing/CampaignExpenses';
 
 interface Campaign {
   id: string;
@@ -41,6 +43,10 @@ interface Campaign {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  // MKT-005 — derived at read time by the backend (never stored).
+  spent: string;
+  overBudget: boolean;
+  endingSoon: boolean;
 }
 
 export default function CampaignDetailPage() {
@@ -48,6 +54,7 @@ export default function CampaignDetailPage() {
   const router = useRouter();
   const id = String(params.id);
   const canWrite = useCanWriteMarketing('campaign');
+  const canWriteExpenses = useCanWriteMarketing('marketingExpense');
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,6 +161,10 @@ export default function CampaignDetailPage() {
                 <CampaignStatusBadge status={campaign.status} />
                 <span>·</span>
                 <span>{CHANNEL_LABELS[campaign.channel] ?? campaign.channel}</span>
+                <CampaignDerivedBadges
+                  overBudget={campaign.overBudget}
+                  endingSoon={campaign.endingSoon}
+                />
               </div>
             </div>
           </div>
@@ -207,6 +218,16 @@ export default function CampaignDetailPage() {
             </div>
           )}
         </Card>
+
+        {/* Gastos — budget bar + expenses table + CRUD (MKT-005). Reloads the campaign
+            on mutation so the header badges + bar stay in sync with the derived spent. */}
+        <CampaignExpenses
+          campaignId={campaign.id}
+          budgetAmount={campaign.budgetAmount}
+          spent={campaign.spent}
+          canWrite={canWriteExpenses}
+          onChanged={load}
+        />
 
         {/* Status actions (writers only) */}
         {canWrite && (

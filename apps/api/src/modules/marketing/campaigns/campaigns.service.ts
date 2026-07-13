@@ -67,6 +67,25 @@ export class CampaignsService {
     }
   }
 
+  /* MKT-005 — attach the READ-TIME derived fields (never stored). `spent` is the
+     Decimal Σ(amount) computed by the caller. `overBudget` = budget set AND spent
+     STRICTLY greater than budget (equal is NOT over). `endingSoon` = ACTIVA AND endDate
+     set AND todayUTC <= endDate <= todayUTC + 7 days (both ends inclusive; §6). */
+  private withDerived<
+    T extends { status: CampaignStatus; endDate: Date | null; budgetAmount: Prisma.Decimal | null },
+  >(campaign: T, spent: Prisma.Decimal) {
+    const overBudget = campaign.budgetAmount !== null && spent.greaterThan(campaign.budgetAmount);
+    return { ...campaign, spent, overBudget, endingSoon: this.isEndingSoon(campaign) };
+  }
+
+  private isEndingSoon(campaign: { status: CampaignStatus; endDate: Date | null }): boolean {
+    if (campaign.status !== CampaignStatus.ACTIVA || !campaign.endDate) return false;
+    const now = new Date();
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const end = campaign.endDate.getTime(); // @db.Date → UTC midnight
+    return end >= todayUTC && end <= todayUTC + 7 * 86_400_000;
+  }
+
   async findAll(companyId: string, filters: ListFilters = {}) {
     const where: Prisma.CampaignWhereInput = { companyId };
     if (filters.status) where.status = filters.status;
@@ -74,13 +93,34 @@ export class CampaignsService {
     // Comercial list convention: filtered company-scoped findMany, single stable
     // order, no offset pagination in V1 (volumes are small — Part 1 §3). Recency-
     // first mirrors the opportunities list (the sibling status-machine entity).
-    return this.prisma.campaign.findMany({ where, orderBy: [{ updatedAt: 'desc' }] });
+    const campaigns = await this.prisma.campaign.findMany({
+      where,
+      orderBy: [{ updatedAt: 'desc' }],
+    });
+    if (campaigns.length === 0) return [];
+    // MKT-005 — one grouped Σ(amount) query for the whole page; spent is NEVER stored.
+    const sums = await this.prisma.marketingExpense.groupBy({
+      by: ['campaignId'],
+      where: { companyId, campaignId: { in: campaigns.map((c) => c.id) } },
+      _sum: { amount: true },
+    });
+    const spentByCampaign = new Map(
+      sums.map((s) => [s.campaignId, s._sum.amount ?? new Prisma.Decimal(0)]),
+    );
+    return campaigns.map((c) =>
+      this.withDerived(c, spentByCampaign.get(c.id) ?? new Prisma.Decimal(0)),
+    );
   }
 
   async findOne(id: string, companyId: string) {
     const campaign = await this.prisma.campaign.findFirst({ where: { id, companyId } });
     if (!campaign) throw new NotFoundException('Campaña no encontrada');
-    return campaign;
+    // MKT-005 — live Σ(amount) for this campaign; spent/overBudget/endingSoon derived.
+    const agg = await this.prisma.marketingExpense.aggregate({
+      where: { companyId, campaignId: id },
+      _sum: { amount: true },
+    });
+    return this.withDerived(campaign, agg._sum.amount ?? new Prisma.Decimal(0));
   }
 
   /* MKT-004 — campaigns intersecting a month (YYYY-MM), for the calendar feed. Month
@@ -223,11 +263,19 @@ export class CampaignsService {
         'Solo se puede eliminar una campaña en estado BORRADOR. Las demás se cancelan (estado → CANCELADA) para conservar el historial.',
       );
     }
-    // MKT-005 / MKT-006 — the full "pristine BORRADOR" rule also blocks delete when
-    // the draft already has ANY expense or ANY attributed account (decision d). Those
-    // pre-checks are added with the marketing_expenses table and the accounts.
-    // sourceCampaignId FK; today a BORRADOR can have neither by construction (no FK
-    // targets campaigns yet), so status = BORRADOR is a sufficient guard.
+    // MKT-005 — pristine-BORRADOR guard (decision d): a draft with ANY expense cannot
+    // be deleted (deleting it would destroy spend history via the ON DELETE CASCADE).
+    // The attributed-accounts half of the pristine rule lands in MKT-006 (the
+    // accounts.sourceCampaignId FK). Until then, status=BORRADOR + zero expenses is the
+    // guard; the DB CASCADE remains only a safety net for a genuinely pristine draft.
+    const expenseCount = await this.prisma.marketingExpense.count({
+      where: { companyId, campaignId: id },
+    });
+    if (expenseCount > 0) {
+      throw new ConflictException(
+        'No se puede eliminar una campaña con gastos registrados. Elimina primero los gastos o cancela la campaña (estado → CANCELADA) para conservar el historial.',
+      );
+    }
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.campaign.delete({ where: { id } });
     });

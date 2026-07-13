@@ -7,11 +7,11 @@
    Money is never stored derived: `spent = Σ expenses.amount` and the over-budget
    condition are computed live (MKT-005) — no rollup columns here.
 
-   DEFERRED relations — declared here LATER, together with their tables/FKs, so the
-   schema never drifts from the real database:
-     - expenses MarketingExpense[]  → MKT-005 (marketing_expenses table + campaignId FK)
-     - accounts Account[]           → MKT-006 (accounts.sourceCampaignId promoted to a
-       real FK referencing campaigns(id)) */
+   DEFERRED relations — declared here together with their tables/FKs, so the schema
+   never drifts from the real database:
+     - expenses MarketingExpense[]  → ADDED in MKT-005 (marketing_expenses table + FK).
+     - accounts Account[]           → still DEFERRED to MKT-006 (accounts.sourceCampaignId
+       promoted to a real FK referencing campaigns(id)). */
 
 enum CampaignChannel {
   FERIA_EVENTO
@@ -47,10 +47,40 @@ model Campaign {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  // Relations DEFERRED to keep the schema in lockstep with the DB (see header):
-  //   expenses MarketingExpense[]  (MKT-005) · accounts Account[]  (MKT-006)
+  // MKT-005 — dependent expense ledger (onDelete: Cascade on the FK side).
+  expenses MarketingExpense[]
+  // Relation still DEFERRED to keep the schema in lockstep with the DB (see header):
+  //   accounts Account[]  (MKT-006 — accounts.sourceCampaignId → real FK)
 
   @@index([companyId])
   @@index([status])
   @@map("campaigns")
+}
+
+/* MKT-005 — per-campaign marketing expense ledger. INFORMATIONAL ONLY: real money
+   lives in Finanzas (invoice + approval + SII sync). This table NEVER writes to
+   Finance — no Movement, no Commitment, no domain event (Part 1 §2.2 / §4), so there
+   is zero double-count risk by construction. Amounts are NET of IVA (decision b) so
+   ROI compares like-for-like against a quote's netAmount. `vendorName` is free text —
+   deliberately NOT an FK to counterparties. Dependent child of a campaign
+   (onDelete: Cascade), same pattern as quote_lines. The platform invariant (RLS +
+   audit trigger + app_user GRANT) ships in migration 20260713120000_add_marketing_expenses. */
+model MarketingExpense {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @db.Uuid
+  campaignId  String   @db.Uuid
+  expenseDate DateTime @db.Date
+  description String
+  amount      Decimal  @db.Decimal(18, 2)
+  vendorName  String?
+  notes       String?
+  createdBy   String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([campaignId])
+  @@map("marketing_expenses")
 }

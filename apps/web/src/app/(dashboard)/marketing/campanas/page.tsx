@@ -13,6 +13,7 @@ import { useCanWriteMarketing } from '../../../../hooks/useMarketingPermissions'
 import {
   CAMPAIGN_CHANNELS,
   CAMPAIGN_STATUSES,
+  CampaignDerivedBadges,
   CampaignStatusBadge,
   CHANNEL_LABELS,
   formatCampaignDate,
@@ -34,6 +35,10 @@ interface CampaignRow {
   description: string | null;
   notes: string | null;
   updatedAt: string;
+  // MKT-005 — derived at read time by the backend (never stored).
+  spent: string;
+  overBudget: boolean;
+  endingSoon: boolean;
 }
 
 export default function CampanasPage() {
@@ -203,7 +208,10 @@ export default function CampanasPage() {
                     {CHANNEL_LABELS[c.channel] ?? c.channel}
                   </td>
                   <td className="px-4 py-3">
-                    <CampaignStatusBadge status={c.status} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <CampaignStatusBadge status={c.status} />
+                      <CampaignDerivedBadges overBudget={c.overBudget} endingSoon={c.endingSoon} />
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">
                     {formatCampaignDate(c.startDate)}

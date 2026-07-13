@@ -140,3 +140,46 @@ export const STATUS_ACTIONS: Record<string, StatusAction[]> = {
   FINALIZADA: [{ target: 'ACTIVA', label: 'Reabrir' }],
   CANCELADA: [{ target: 'ACTIVA', label: 'Reabrir' }],
 };
+
+/* ── Derived badges (MKT-005 §6) ── computed at read time by the backend
+   (overBudget / endingSoon) and rendered identically in the campaigns list rows and
+   the detail header. Labels + styles centralized here (single source of truth).
+   "Sobre presupuesto" = danger; "Termina en 7 días" = warning. */
+const OVER_BUDGET_STYLE: React.CSSProperties = {
+  background: 'rgba(239,68,68,0.12)',
+  color: '#b91c1c',
+};
+const ENDING_SOON_STYLE: React.CSSProperties = {
+  background: 'rgba(234,179,8,0.14)',
+  color: '#a16207',
+};
+
+export function CampaignDerivedBadges({
+  overBudget,
+  endingSoon,
+}: {
+  overBudget?: boolean;
+  endingSoon?: boolean;
+}) {
+  if (!overBudget && !endingSoon) return null;
+  return (
+    <>
+      {overBudget && (
+        <span
+          className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
+          style={OVER_BUDGET_STYLE}
+        >
+          Sobre presupuesto
+        </span>
+      )}
+      {endingSoon && (
+        <span
+          className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
+          style={ENDING_SOON_STYLE}
+        >
+          Termina en 7 días
+        </span>
+      )}
+    </>
+  );
+}
