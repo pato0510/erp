@@ -80,7 +80,7 @@ model Account {
   paymentTermDays  Int             @default(30) // COM-014 — client payment term (days after invoice emission); 30/60/90. Drives the projected-income Commitment dueDate at handoff.
   ownerId          String?         @db.Uuid // commercial executive — bare actor UUID (no FK), like createdBy
   counterpartyId   String?         @db.Uuid // optional link to Finance counterparties
-  sourceCampaignId String?         @db.Uuid // Marketing hook — NO FK (campaigns table not created yet)
+  sourceCampaignId String?         @db.Uuid // MKT-006 — Marketing attribution hook (real FK below)
   notes            String?
   createdBy        String          @db.Uuid
   createdAt        DateTime        @default(now())
@@ -90,8 +90,14 @@ model Account {
   contacts      Contact[] // COM-004 — people within this account (FK on contacts.accountId, ON DELETE CASCADE)
   opportunities Opportunity[] // COM-005 — deals on this account (FK on opportunities.accountId, ON DELETE RESTRICT)
   activities    Activity[] // COM-008 — the account's interaction history (FK ON DELETE CASCADE)
+  // MKT-006 — the Marketing campaign this account is attributed to (schema-only relation;
+  // Comercial NEVER queries campaigns directly — enrichment goes through the Marketing-
+  // exported CampaignLookupService). ON DELETE SET NULL: deleting a campaign clears the
+  // attribution, never the account.
+  sourceCampaign Campaign? @relation(fields: [sourceCampaignId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
+  @@index([sourceCampaignId])
   @@map("accounts")
 }
 

@@ -16,6 +16,7 @@ import { CurrentCompany } from '../../common/decorators/current-company.decorato
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PoliciesGuard } from '../../common/guards/policies.guard';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
+import { CampaignLookupService } from './campaign-lookup.service';
 import { CampaignsService } from './campaigns.service';
 import { ChangeCampaignStatusDto } from './dto/change-campaign-status.dto';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
@@ -30,7 +31,10 @@ import { UpdateCampaignDto } from './dto/update-campaign.dto';
 @Controller('marketing/campaigns')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class CampaignsController {
-  constructor(private readonly service: CampaignsService) {}
+  constructor(
+    private readonly service: CampaignsService,
+    private readonly lookup: CampaignLookupService,
+  ) {}
 
   @Get()
   @CheckPolicies((ability) => ability.can('read', CampaignSubject))
@@ -52,6 +56,15 @@ export class CampaignsController {
   @CheckPolicies((ability) => ability.can('read', CampaignSubject))
   calendar(@CurrentCompany() companyId: string, @Query('month') month?: string) {
     return this.service.calendar(companyId, month);
+  }
+
+  /* MKT-006 — options for the Comercial "Campaña de origen" select. Declared BEFORE the
+     `:id` route so "/lookup" is never captured as an id. Gated read Campaign (every role
+     that reads accounts also reads Campaign). Excludes CANCELADA. */
+  @Get('lookup')
+  @CheckPolicies((ability) => ability.can('read', CampaignSubject))
+  lookupForSelect(@CurrentCompany() companyId: string) {
+    return this.lookup.listForSelect(companyId);
   }
 
   @Get(':id')

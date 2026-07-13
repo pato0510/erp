@@ -7,11 +7,11 @@
    Money is never stored derived: `spent = Σ expenses.amount` and the over-budget
    condition are computed live (MKT-005) — no rollup columns here.
 
-   DEFERRED relations — declared here together with their tables/FKs, so the schema
-   never drifts from the real database:
-     - expenses MarketingExpense[]  → ADDED in MKT-005 (marketing_expenses table + FK).
-     - accounts Account[]           → still DEFERRED to MKT-006 (accounts.sourceCampaignId
-       promoted to a real FK referencing campaigns(id)). */
+   Relations (both now materialized with their FKs, so the schema matches the DB):
+     - expenses MarketingExpense[]  → MKT-005 (marketing_expenses table + campaignId FK).
+     - accounts Account[]           → MKT-006 (accounts.sourceCampaignId promoted to a
+       real FK referencing campaigns(id), ON DELETE SET NULL). The FK lives on the
+       accounts side (comercial.prisma); here it is just the back-relation. */
 
 enum CampaignChannel {
   FERIA_EVENTO
@@ -49,8 +49,9 @@ model Campaign {
 
   // MKT-005 — dependent expense ledger (onDelete: Cascade on the FK side).
   expenses MarketingExpense[]
-  // Relation still DEFERRED to keep the schema in lockstep with the DB (see header):
-  //   accounts Account[]  (MKT-006 — accounts.sourceCampaignId → real FK)
+  // MKT-006 — accounts attributed to this campaign (FK accounts.sourceCampaignId,
+  // ON DELETE SET NULL — deleting a campaign only clears attribution, never the account).
+  accounts Account[]
 
   @@index([companyId])
   @@index([status])

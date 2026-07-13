@@ -32,6 +32,8 @@ interface Account {
   ownerId: string | null;
   counterpartyId: string | null;
   sourceCampaignId: string | null;
+  // MKT-006 — enriched by the accounts service via the Marketing-exported lookup.
+  sourceCampaign: { id: string; name: string } | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -231,9 +233,24 @@ function AccountDatosTab({
           <KV label="Riesgo comercial" value={account.commercialRisk ?? '—'} />
           {/* COM-014 — payment term drives the projected-income commitment at handoff */}
           <KV label="Plazo de pago" value={`${account.paymentTermDays} días`} />
-          {account.sourceCampaignId && (
-            <KV label="Campaña de origen" value={account.sourceCampaignId} mono />
-          )}
+          {/* MKT-006 — attributed campaign as a link (every role that reads accounts also
+              reads Campaign, so the link is permission-safe). "Sin campaña" otherwise. */}
+          <div>
+            <p className="mb-0.5 text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+              Campaña de origen
+            </p>
+            {account.sourceCampaign ? (
+              <Link
+                href={`/marketing/campanas/${account.sourceCampaign.id}`}
+                className="text-sm"
+                style={{ color: '#2563eb' }}
+              >
+                {account.sourceCampaign.name}
+              </Link>
+            ) : (
+              <p className="text-sm text-[var(--text-primary)]">Sin campaña</p>
+            )}
+          </div>
         </div>
         {account.notes && (
           <div className="mt-4 border-t border-[var(--border-color)] pt-4">

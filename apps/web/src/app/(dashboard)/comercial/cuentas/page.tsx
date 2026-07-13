@@ -30,6 +30,7 @@ interface AccountRow {
   paymentTermDays: number; // COM-014 — feeds AccountFormModal's edit form
   ownerId: string | null;
   counterpartyId: string | null;
+  sourceCampaignId: string | null; // MKT-006 — feeds AccountFormModal's "Campaña de origen"
   notes: string | null;
   updatedAt: string;
 }

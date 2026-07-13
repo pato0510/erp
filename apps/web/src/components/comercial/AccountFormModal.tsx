@@ -1,9 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { ACCOUNT_STATUSES, PRIORITIES, PRIORITY_LABELS, STATUS_LABELS } from './accountLabels';
+// MKT-006 — campaign status labels for the "Campaña de origen" option text. Aliased to
+// avoid clashing with the account STATUS_LABELS above.
+import { STATUS_LABELS as CAMPAIGN_STATUS_LABELS } from '../marketing/campaignLabels';
+
+interface CampaignOption {
+  id: string;
+  name: string;
+  status: string;
+}
 
 /* COM-004b — create/edit an account. Mirrors the CargoModal overlay shell.
    Counterparty linking is NOT here (it lives on the ficha's Datos generales tab),
@@ -18,6 +27,7 @@ export interface AccountForForm {
   commercialRisk: string | null;
   paymentTermDays: number;
   notes: string | null;
+  sourceCampaignId: string | null; // MKT-006 — attribution ("Campaña de origen")
 }
 
 /* COM-014 — the client payment terms AGS uses. Values ARE the day counts (the API and the
@@ -43,8 +53,19 @@ export function AccountFormModal({
   const [commercialRisk, setCommercialRisk] = useState(editing?.commercialRisk ?? '');
   const [paymentTermDays, setPaymentTermDays] = useState<number>(editing?.paymentTermDays ?? 30);
   const [notes, setNotes] = useState(editing?.notes ?? '');
+  const [sourceCampaignId, setSourceCampaignId] = useState(editing?.sourceCampaignId ?? '');
+  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // MKT-006 — options for the "Campaña de origen" select (excludes CANCELADA). A read
+  // failure leaves the list empty (the field just shows "Sin campaña" + any current value).
+  useEffect(() => {
+    apiClient
+      .get<CampaignOption[]>('/api/marketing/campaigns/lookup')
+      .then(setCampaigns)
+      .catch(() => undefined);
+  }, []);
 
   const save = async () => {
     if (!name.trim()) {
@@ -61,6 +82,9 @@ export function AccountFormModal({
       commercialRisk: commercialRisk.trim() || undefined,
       paymentTermDays,
       notes: notes.trim() || undefined,
+      // MKT-006 — null clears the attribution; a uuid is validated company-scoped by the
+      // backend. Sent on both create and edit.
+      sourceCampaignId: sourceCampaignId || null,
     };
     try {
       if (editing) await apiClient.patch(`/api/comercial/accounts/${editing.id}`, body);
@@ -152,6 +176,25 @@ export function AccountFormModal({
               {PAYMENT_TERMS.map((d) => (
                 <option key={d} value={d}>
                   {d} días
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Campaña de origen">
+            <select
+              value={sourceCampaignId}
+              onChange={(e) => setSourceCampaignId(e.target.value)}
+              className={INPUT}
+            >
+              <option value="">Sin campaña</option>
+              {/* Preserve an already-set attribution even if it is a CANCELADA campaign
+                  (the lookup excludes those), so editing never silently clears it. */}
+              {sourceCampaignId && !campaigns.some((c) => c.id === sourceCampaignId) && (
+                <option value={sourceCampaignId}>Campaña actual</option>
+              )}
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({CAMPAIGN_STATUS_LABELS[c.status] ?? c.status})
                 </option>
               ))}
             </select>

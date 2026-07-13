@@ -7,6 +7,7 @@ import {
 import { CampaignChannel, CampaignStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
+import { AccountAttributionReadService } from '../../comercial/attribution-read/attribution-read.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 
@@ -48,6 +49,9 @@ export class CampaignsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
+    // MKT-006 — Comercial's exposed reader (via AttributionReadModule) for the delete
+    // guard. Marketing never queries the accounts table directly.
+    private readonly attributionRead: AccountAttributionReadService,
   ) {}
 
   /** Anchor a YYYY-MM-DD (or ISO) string to UTC midnight so an @db.Date column
@@ -263,17 +267,25 @@ export class CampaignsService {
         'Solo se puede eliminar una campaña en estado BORRADOR. Las demás se cancelan (estado → CANCELADA) para conservar el historial.',
       );
     }
-    // MKT-005 — pristine-BORRADOR guard (decision d): a draft with ANY expense cannot
-    // be deleted (deleting it would destroy spend history via the ON DELETE CASCADE).
-    // The attributed-accounts half of the pristine rule lands in MKT-006 (the
-    // accounts.sourceCampaignId FK). Until then, status=BORRADOR + zero expenses is the
-    // guard; the DB CASCADE remains only a safety net for a genuinely pristine draft.
+    // MKT-006 — pristine-BORRADOR guard, FINAL form (decision d): a draft may be hard-
+    // deleted ONLY when it has zero expenses AND zero attributed accounts. Each check
+    // throws a 409 naming the ACTUAL blocker. Deleting otherwise would destroy spend
+    // history (ON DELETE CASCADE on expenses) or silently detach accounts (ON DELETE SET
+    // NULL on the sourceCampaignId FK) — the DB rules are only the safety net UNDER this
+    // guard. The attributed-accounts count comes from Comercial's exposed reader, never a
+    // cross-module table read.
     const expenseCount = await this.prisma.marketingExpense.count({
       where: { companyId, campaignId: id },
     });
     if (expenseCount > 0) {
       throw new ConflictException(
         'No se puede eliminar una campaña con gastos registrados. Elimina primero los gastos o cancela la campaña (estado → CANCELADA) para conservar el historial.',
+      );
+    }
+    const attributedAccounts = await this.attributionRead.countBySourceCampaign(companyId, id);
+    if (attributedAccounts > 0) {
+      throw new ConflictException(
+        'No se puede eliminar una campaña con cuentas atribuidas. Quita la campaña de origen en esas cuentas o cancela la campaña (estado → CANCELADA) para conservar el historial.',
       );
     }
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
