@@ -16,7 +16,9 @@ import { apiClient } from '../../../../lib/api';
 import { DayView } from '../../../../components/operations/calendar/DayView';
 import { EventDetailModal } from '../../../../components/operations/calendar/EventDetailModal';
 import { ListView } from '../../../../components/operations/calendar/ListView';
-import { MonthView } from '../../../../components/operations/calendar/MonthView';
+// MKT-004 — MonthView now lives in the SHARED, domain-agnostic calendar module. Ops
+// keeps IDENTICAL rendering by passing its TYPE_META colors + severity dots via props.
+import { MonthView } from '../../../../components/calendar/MonthView';
 import { WeekView } from '../../../../components/operations/calendar/WeekView';
 import {
   ALL_SEVERITIES,
@@ -39,6 +41,7 @@ import {
   formatLongDay,
   formatMonthYear,
   formatWeekRange,
+  severityRank,
   startOfDay,
   startOfMonthGrid,
   startOfWeek,
@@ -529,11 +532,31 @@ export default function OperacionesCalendarioPage() {
             Cargando eventos…
           </div>
         ) : view === 'month' ? (
-          <MonthView
+          <MonthView<CalendarEvent>
             focusedDate={focusedDate}
             events={events}
             onSelectDay={onSelectDayFromMonth}
             onSelectEvent={setSelectedEvent}
+            // Reproduce the previous ops MonthView behavior verbatim via props:
+            getChipStyle={(e) => ({ bg: TYPE_META[e.type].bg, color: TYPE_META[e.type].color })}
+            getChipLabel={(e) => e.title}
+            // Within-day order: severity desc, then time asc (was bucketEventsByDay's sort).
+            sortDayEvents={(a, b) => {
+              const s = severityRank(b.severity) - severityRank(a.severity);
+              return s !== 0 ? s : new Date(a.date).getTime() - new Date(b.date).getTime();
+            }}
+            // Severity dots: CRITICAL/BLOCKING → critical, WARNING → warning, else info.
+            getDayIndicators={(list) => {
+              let critical = 0;
+              let warning = 0;
+              let info = 0;
+              for (const e of list) {
+                if (e.severity === 'CRITICAL' || e.severity === 'BLOCKING') critical++;
+                else if (e.severity === 'WARNING') warning++;
+                else info++;
+              }
+              return { critical, warning, info };
+            }}
           />
         ) : view === 'week' ? (
           <WeekView focusedDate={focusedDate} events={events} onSelectEvent={setSelectedEvent} />

@@ -83,6 +83,43 @@ export class CampaignsService {
     return campaign;
   }
 
+  /* MKT-004 — campaigns intersecting a month (YYYY-MM), for the calendar feed. Month
+     boundaries are computed in UTC (HR-004b) to match the UTC-anchored @db.Date columns.
+     Ranges travel as ranges — the client expands them into per-day chips. Rules:
+       - EXCLUDED: CANCELADA, and campaigns without startDate (unplaceable drafts).
+       - Ranged (endDate set): intersects iff startDate <= monthEnd AND endDate >= monthStart.
+       - Open-ended (endDate null): appears ONLY in its start month (startDate within month). */
+  async calendar(companyId: string, month?: string) {
+    if (!month || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      throw new BadRequestException('El parámetro month debe tener el formato YYYY-MM.');
+    }
+    const [year, mon] = month.split('-').map(Number);
+    // monthStart = first day (UTC); monthEnd = last day (UTC) via day 0 of the next month.
+    const monthStart = new Date(Date.UTC(year, mon - 1, 1));
+    const monthEnd = new Date(Date.UTC(year, mon, 0));
+
+    const campaigns = await this.prisma.campaign.findMany({
+      where: {
+        companyId,
+        status: { not: CampaignStatus.CANCELADA },
+        OR: [
+          // Ranged: both dates set, range intersects the month.
+          {
+            AND: [
+              { startDate: { not: null, lte: monthEnd } },
+              { endDate: { not: null, gte: monthStart } },
+            ],
+          },
+          // Open-ended: no endDate, startDate falls inside the month.
+          { endDate: null, startDate: { not: null, gte: monthStart, lte: monthEnd } },
+        ],
+      },
+      select: { id: true, name: true, status: true, startDate: true, endDate: true },
+      orderBy: [{ startDate: 'asc' }],
+    });
+    return campaigns;
+  }
+
   async create(companyId: string, userId: string, dto: CreateCampaignDto) {
     const startDate = dto.startDate ? this.toDateOnly(dto.startDate) : null;
     const endDate = dto.endDate ? this.toDateOnly(dto.endDate) : null;

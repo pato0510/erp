@@ -45,6 +45,15 @@ export class CampaignsController {
     });
   }
 
+  /* MKT-004 — campaign calendar feed for a month (YYYY-MM). Declared BEFORE the
+     `:id` route so "/calendar" is never captured as an id. Returns campaigns
+     intersecting the month as ranges (no per-day expansion — the client expands). */
+  @Get('calendar')
+  @CheckPolicies((ability) => ability.can('read', CampaignSubject))
+  calendar(@CurrentCompany() companyId: string, @Query('month') month?: string) {
+    return this.service.calendar(companyId, month);
+  }
+
   @Get(':id')
   @CheckPolicies((ability) => ability.can('read', CampaignSubject))
   findOne(@Param('id') id: string, @CurrentCompany() companyId: string) {

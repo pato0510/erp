@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import {
   addDays,
-  bucketEventsByDay,
   DAY_NAMES_SHORT,
   dateKey,
   endOfMonthGrid,
@@ -11,20 +10,54 @@ import {
   isToday,
   isWeekend,
   startOfMonthGrid,
-} from './utils';
-import { TYPE_META } from './types';
-import type { CalendarEvent } from './types';
+} from './dateGrid';
 
-interface MonthViewProps {
+/* MKT-004 — the SHARED, domain-agnostic month grid (extracted verbatim in behavior
+   from the Operaciones MonthView, then parameterized). It knows nothing about
+   documents, permits, campaigns, severities or TYPE_META: callers pass a generic event
+   with an `id` + `date`, plus accessors for the chip color/label and (optionally) the
+   per-day indicator dots. Rendering — the 6×7 grid, today outline, weekend shading, the
+   3-per-cell cap with "+N más", chip styling — is identical to the previous ops view. */
+
+export interface CalendarMonthEvent {
+  id: string;
+  date: string; // ISO / date string; bucketed by LOCAL dateKey (calendar is shown in the user's TZ)
+}
+
+export interface DayIndicators {
+  critical: number;
+  warning: number;
+  info: number;
+}
+
+interface MonthViewProps<T extends CalendarMonthEvent> {
   focusedDate: Date;
-  events: CalendarEvent[];
-  onSelectDay: (day: Date) => void;
-  onSelectEvent: (event: CalendarEvent) => void;
+  events: T[];
+  /** Chip background + text/border color for an event. */
+  getChipStyle: (event: T) => { bg: string; color: string };
+  /** Chip text + tooltip for an event. */
+  getChipLabel: (event: T) => string;
+  onSelectEvent: (event: T) => void;
+  /** Optional day-cell click (e.g. drill into a day view). */
+  onSelectDay?: (day: Date) => void;
+  /** Optional within-day ordering (e.g. by severity). Default: input order preserved. */
+  sortDayEvents?: (a: T, b: T) => number;
+  /** Optional severity-dot indicators computed from a day's full event list. */
+  getDayIndicators?: (dayEvents: T[]) => DayIndicators;
 }
 
 const MAX_VISIBLE_PER_CELL = 3;
 
-export function MonthView({ focusedDate, events, onSelectDay, onSelectEvent }: MonthViewProps) {
+export function MonthView<T extends CalendarMonthEvent>({
+  focusedDate,
+  events,
+  getChipStyle,
+  getChipLabel,
+  onSelectEvent,
+  onSelectDay,
+  sortDayEvents,
+  getDayIndicators,
+}: MonthViewProps<T>) {
   const cells = useMemo(() => {
     const start = startOfMonthGrid(focusedDate);
     const end = endOfMonthGrid(focusedDate);
@@ -37,7 +70,22 @@ export function MonthView({ focusedDate, events, onSelectDay, onSelectEvent }: M
     return days;
   }, [focusedDate]);
 
-  const eventsByDay = useMemo(() => bucketEventsByDay(events), [events]);
+  const eventsByDay = useMemo(() => {
+    const out = new Map<string, T[]>();
+    for (const e of events) {
+      const key = dateKey(new Date(e.date));
+      const list = out.get(key) ?? [];
+      list.push(e);
+      out.set(key, list);
+    }
+    if (sortDayEvents) {
+      for (const [k, list] of out) {
+        list.sort(sortDayEvents);
+        out.set(k, list);
+      }
+    }
+    return out;
+  }, [events, sortDayEvents]);
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
@@ -59,22 +107,12 @@ export function MonthView({ focusedDate, events, onSelectDay, onSelectEvent }: M
           const list = eventsByDay.get(dateKey(day)) ?? [];
           const visible = list.slice(0, MAX_VISIBLE_PER_CELL);
           const overflow = list.length - visible.length;
-          /* Severity dots — a red/orange/blue triplet capped at 3
-             dots each. Visual density without overwhelming the
-             cell. */
-          let critical = 0;
-          let warning = 0;
-          let info = 0;
-          for (const e of list) {
-            if (e.severity === 'CRITICAL' || e.severity === 'BLOCKING') critical++;
-            else if (e.severity === 'WARNING') warning++;
-            else info++;
-          }
+          const dots = getDayIndicators && list.length > 0 ? getDayIndicators(list) : null;
           return (
             <button
               type="button"
               key={idx}
-              onClick={() => onSelectDay(day)}
+              onClick={() => onSelectDay?.(day)}
               className={`group relative flex flex-col gap-1 border-b border-r border-[var(--border-color)] px-1.5 py-1.5 text-left transition-colors hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))] ${
                 weekend && inMonth ? 'bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)]' : ''
               }`}
@@ -99,15 +137,15 @@ export function MonthView({ focusedDate, events, onSelectDay, onSelectEvent }: M
                 )}
               </div>
 
-              {(critical > 0 || warning > 0 || info > 0) && (
+              {dots && (dots.critical > 0 || dots.warning > 0 || dots.info > 0) && (
                 <div className="flex items-center gap-0.5">
-                  {Array.from({ length: Math.min(3, critical) }).map((_, i) => (
+                  {Array.from({ length: Math.min(3, dots.critical) }).map((_, i) => (
                     <span key={`c-${i}`} className="h-1.5 w-1.5 rounded-full bg-red-600" />
                   ))}
-                  {Array.from({ length: Math.min(3, warning) }).map((_, i) => (
+                  {Array.from({ length: Math.min(3, dots.warning) }).map((_, i) => (
                     <span key={`w-${i}`} className="h-1.5 w-1.5 rounded-full bg-orange-500" />
                   ))}
-                  {Array.from({ length: Math.min(3, info) }).map((_, i) => (
+                  {Array.from({ length: Math.min(3, dots.info) }).map((_, i) => (
                     <span key={`i-${i}`} className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                   ))}
                 </div>
@@ -115,7 +153,8 @@ export function MonthView({ focusedDate, events, onSelectDay, onSelectEvent }: M
 
               <div className="flex flex-col gap-0.5">
                 {visible.map((e) => {
-                  const meta = TYPE_META[e.type];
+                  const style = getChipStyle(e);
+                  const label = getChipLabel(e);
                   return (
                     <span
                       key={e.id}
@@ -132,15 +171,15 @@ export function MonthView({ focusedDate, events, onSelectDay, onSelectEvent }: M
                           onSelectEvent(e);
                         }
                       }}
-                      title={e.title}
+                      title={label}
                       className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-[10px] font-medium hover:opacity-80"
                       style={{
-                        backgroundColor: meta.bg,
-                        color: meta.color,
-                        borderLeft: `2px solid ${meta.color}`,
+                        backgroundColor: style.bg,
+                        color: style.color,
+                        borderLeft: `2px solid ${style.color}`,
                       }}
                     >
-                      <span className="truncate">{e.title}</span>
+                      <span className="truncate">{label}</span>
                     </span>
                   );
                 })}
