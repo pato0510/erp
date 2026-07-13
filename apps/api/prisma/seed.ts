@@ -75,6 +75,50 @@ async function main() {
   });
   console.log(`Membership: ${membership.role} (${membership.id})`);
 
+  // 5b. Dev-only role users — one per remaining role, in Empresa Demo, so live
+  // role-based permission validation isn't blocked by having only an ADMIN. Created
+  // EXACTLY like admin@excelsia.dev above (same bcrypt hash of the demo password,
+  // same user upsert-by-email + membership upsert wiring) so re-running the seed
+  // refreshes credentials and never duplicates. Guarded to never run in production
+  // (belt and suspenders — the seed should never run there anyway).
+  if (process.env.NODE_ENV !== 'production') {
+    const roleUsers = [
+      { email: 'manager@excelsia.dev', firstName: 'Manager', role: 'MANAGER' as const },
+      { email: 'accountant@excelsia.dev', firstName: 'Accountant', role: 'ACCOUNTANT' as const },
+      { email: 'analyst@excelsia.dev', firstName: 'Analyst', role: 'ANALYST' as const },
+      { email: 'viewer@excelsia.dev', firstName: 'Viewer', role: 'VIEWER' as const },
+    ];
+    for (const ru of roleUsers) {
+      const roleUser = await prisma.user.upsert({
+        where: { email: ru.email },
+        update: {
+          passwordHash,
+          firstName: ru.firstName,
+          lastName: 'Demo',
+          isActive: true,
+        },
+        create: {
+          email: ru.email,
+          passwordHash,
+          firstName: ru.firstName,
+          lastName: 'Demo',
+        },
+      });
+      const roleMembership = await prisma.membership.upsert({
+        where: { userId_companyId: { userId: roleUser.id, companyId: company.id } },
+        update: { role: ru.role },
+        create: {
+          userId: roleUser.id,
+          companyId: company.id,
+          role: ru.role,
+        },
+      });
+      console.log(`Role user: ${roleUser.email} (${roleUser.id}) — ${roleMembership.role}`);
+    }
+  } else {
+    console.log('Role users: skipped (NODE_ENV=production)');
+  }
+
   // 6. Seed default categories
   const defaultCategories = [
     { name: 'Ventas', type: 'INCOME' as const, color: '#4CAF50', icon: 'shopping-cart' },
