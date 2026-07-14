@@ -124,7 +124,10 @@ export class CampaignsService {
       where: { companyId, campaignId: id },
       _sum: { amount: true },
     });
-    return this.withDerived(campaign, agg._sum.amount ?? new Prisma.Decimal(0));
+    // MKT-007 — ROI attribution, computed live by Comercial's exposed reader (no cross-
+    // module table read here). DETAIL-ONLY — the LIST payload stays light (no attribution).
+    const attribution = await this.attributionRead.getCampaignReturn(companyId, id);
+    return { ...this.withDerived(campaign, agg._sum.amount ?? new Prisma.Decimal(0)), attribution };
   }
 
   /* MKT-004 — campaigns intersecting a month (YYYY-MM), for the calendar feed. Month

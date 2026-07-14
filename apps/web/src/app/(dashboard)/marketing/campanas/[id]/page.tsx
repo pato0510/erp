@@ -30,6 +30,7 @@ import {
   CampaignForForm,
 } from '../../../../../components/marketing/CampaignFormModal';
 import { CampaignExpenses } from '../../../../../components/marketing/CampaignExpenses';
+import { CampaignRetorno } from '../../../../../components/marketing/CampaignRetorno';
 
 interface Campaign {
   id: string;
@@ -47,6 +48,8 @@ interface Campaign {
   spent: string;
   overBudget: boolean;
   endingSoon: boolean;
+  // MKT-007 — ROI attribution (detail-only), computed live by Comercial's reader.
+  attribution: { accountsCount: number; wonCount: number; wonNetAmount: string };
 }
 
 export default function CampaignDetailPage() {
@@ -228,6 +231,9 @@ export default function CampaignDetailPage() {
           canWrite={canWriteExpenses}
           onChanged={load}
         />
+
+        {/* Retorno (ROI) — below Gastos. Read-only; live attribution from Comercial. */}
+        <CampaignRetorno attribution={campaign.attribution} spent={campaign.spent} />
 
         {/* Status actions (writers only) */}
         {canWrite && (
