@@ -85,3 +85,27 @@ model MarketingExpense {
   @@index([campaignId])
   @@map("marketing_expenses")
 }
+
+/* MKT-008 — monthly digital-presence snapshot (one row per company per month; the wide
+   model — one column per metric). Manual monthly entry in V1 (API integrations are V2).
+   NO relations to any other model. `period` is always the FIRST day of the month, UTC
+   (normalized in the service). All three metrics are nullable — record what you have; at
+   least one must be present on a write (enforced in the service). The platform invariant
+   (RLS + audit trigger + app_user GRANT) ships in migration
+   20260714120000_add_presence_snapshots. */
+model PresenceSnapshot {
+  id                 String   @id @default(uuid()) @db.Uuid
+  companyId          String   @db.Uuid
+  period             DateTime @db.Date
+  webVisits          Int?
+  linkedinFollowers  Int?
+  googleProfileViews Int?
+  notes              String?
+  createdBy          String   @db.Uuid
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([companyId, period])
+  @@index([companyId])
+  @@map("presence_snapshots")
+}
