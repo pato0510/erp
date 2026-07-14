@@ -455,9 +455,13 @@ export default function CajaPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
-                    <p className="text-[var(--text-primary)] font-medium text-sm">
+                    {/* MKT-007b — link to the commitment detail (shows "Origen del negocio"). */}
+                    <Link
+                      href={`/caja/compromisos/${c.id}`}
+                      className="text-[var(--text-primary)] font-medium text-sm hover:underline"
+                    >
                       {c.description}
-                    </p>
+                    </Link>
                     <p className="text-xs text-[var(--text-muted)]">
                       {c.counterparty?.name || c.category?.name || ''}
                     </p>

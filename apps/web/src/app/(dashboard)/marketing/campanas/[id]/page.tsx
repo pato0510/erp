@@ -48,8 +48,13 @@ interface Campaign {
   spent: string;
   overBudget: boolean;
   endingSoon: boolean;
-  // MKT-007 — ROI attribution (detail-only), computed live by Comercial's reader.
-  attribution: { accountsCount: number; wonCount: number; wonNetAmount: string };
+  // MKT-007/007b — ROI attribution (detail-only), computed live by Comercial's reader.
+  attribution: {
+    accountsCount: number;
+    wonCount: number;
+    wonNetAmount: string;
+    wonDeals: { opportunityId: string; name: string; netAmount: string }[];
+  };
 }
 
 export default function CampaignDetailPage() {

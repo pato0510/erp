@@ -19,7 +19,9 @@ import { PoliciesGuard } from '../common/guards/policies.guard';
 import { CheckPolicies } from '../common/decorators/check-policies.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentCompany } from '../common/decorators/current-company.decorator';
+import { CurrentAbility } from '../common/decorators/current-ability.decorator';
 import { MovementSubject } from '../common/casl/casl-ability.factory';
+import type { AppAbility } from '../common/casl/casl-ability.factory';
 
 @Controller('cashflow')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
@@ -96,6 +98,18 @@ export class CashflowController {
   @CheckPolicies((ability) => ability.can('read', MovementSubject))
   getUpcoming(@CurrentCompany() companyId: string, @Query('days') days?: string) {
     return this.cashflowService.getUpcoming(companyId, days ? parseInt(days, 10) : 30);
+  }
+
+  /* MKT-007b — commitment DETAIL. Declared AFTER 'commitments/upcoming' so that static
+     route is never captured as an :id. The ability shapes the embedded `origin`. */
+  @Get('commitments/:id')
+  @CheckPolicies((ability) => ability.can('read', MovementSubject))
+  findCommitment(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentAbility() ability: AppAbility,
+  ) {
+    return this.cashflowService.findCommitment(id, companyId, ability);
   }
 
   @Post('commitments')

@@ -2,6 +2,16 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, ServiceOrderStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
+import {
+  AppAbility,
+  CampaignSubject,
+  OpportunitySubject,
+} from '../../common/casl/casl-ability.factory';
+import {
+  AccountAttributionReadService,
+  BusinessOrigin,
+} from '../../comercial/attribution-read/attribution-read.service';
+import { CampaignLookupService } from '../../marketing/campaigns/campaign-lookup.service';
 import { ChangeServiceOrderStatusDto } from './dto/change-service-order-status.dto';
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto';
 
@@ -55,7 +65,36 @@ export class ServiceOrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
+    // MKT-007b — Comercial's exposed reader (origin) + Marketing's lookup (campaign name).
+    // Ops reads NO Comercial/Marketing tables directly; both go through DI.
+    private readonly attributionRead: AccountAttributionReadService,
+    private readonly campaignLookup: CampaignLookupService,
   ) {}
+
+  /* MKT-007b — the ability-shaped "Origen del negocio" for a service order. Returns null
+     (no card) when the order is not opportunity-born (sourceOpportunityId null — e.g. a
+     future non-handoff order) or the caller cannot read Opportunity. The campaign part is
+     resolved (name) only when the account has a source campaign AND the caller can read
+     Campaign. Zero role strings — pure CASL ability. */
+  private async composeOrigin(
+    companyId: string,
+    sourceOpportunityId: string | null,
+    ability: AppAbility,
+  ): Promise<BusinessOrigin | null> {
+    if (!sourceOpportunityId || !ability.can('read', OpportunitySubject)) return null;
+    const origin = await this.attributionRead.getOpportunityOrigin(companyId, sourceOpportunityId);
+    if (!origin) return null;
+    let campaign: { id: string; name: string } | null = null;
+    if (origin.sourceCampaignId && ability.can('read', CampaignSubject)) {
+      const c = await this.campaignLookup.getForCompany(companyId, origin.sourceCampaignId);
+      campaign = c ? { id: c.id, name: c.name } : null;
+    }
+    return {
+      opportunity: { id: origin.opportunityId, name: origin.opportunityName },
+      account: { id: origin.accountId, name: origin.accountName },
+      campaign,
+    };
+  }
 
   /** List — filter by status + a simple search over orderNumber/clientName/title. */
   async findAll(companyId: string, filters: ListFilters = {}) {
@@ -72,10 +111,18 @@ export class ServiceOrdersService {
     return this.prisma.serviceOrder.findMany({ where, orderBy: [{ createdAt: 'desc' }] });
   }
 
-  async findOne(id: string, companyId: string) {
+  /** Company-scoped raw fetch (no enrichment) — the existence guard for update/status. */
+  private async getOrderOrThrow(id: string, companyId: string) {
     const order = await this.prisma.serviceOrder.findFirst({ where: { id, companyId } });
     if (!order) throw new NotFoundException('Orden de servicio no encontrada');
     return order;
+  }
+
+  async findOne(id: string, companyId: string, ability: AppAbility) {
+    const order = await this.getOrderOrThrow(id, companyId);
+    // MKT-007b — DETAIL-only origin enrichment (the list stays untouched).
+    const origin = await this.composeOrigin(companyId, order.sourceOpportunityId, ability);
+    return { ...order, origin };
   }
 
   /** COM-013a — the INTERNAL creation seam the COM-013b handoff handler calls. It assigns
@@ -124,7 +171,7 @@ export class ServiceOrdersService {
   /** General-field update (title/description/notes). Stage/status edits are REJECTED
    * here — they go through changeStatus so the machine is the only path. */
   async update(companyId: string, userId: string, id: string, dto: UpdateServiceOrderDto) {
-    await this.findOne(id, companyId);
+    await this.getOrderOrThrow(id, companyId);
     if (dto.status !== undefined) {
       throw new BadRequestException(
         'Los cambios de estado se realizan vía PATCH /:id/status, no en la edición general.',
@@ -147,7 +194,7 @@ export class ServiceOrdersService {
     id: string,
     dto: ChangeServiceOrderStatusDto,
   ) {
-    const order = await this.findOne(id, companyId);
+    const order = await this.getOrderOrThrow(id, companyId);
     const from = order.status;
     const to = dto.status;
 

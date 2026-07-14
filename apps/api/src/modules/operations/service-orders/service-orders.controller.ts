@@ -1,7 +1,9 @@
 import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { ServiceOrderStatus } from '@prisma/client';
 import { ServiceOrderSubject } from '../../common/casl/casl-ability.factory';
+import type { AppAbility } from '../../common/casl/casl-ability.factory';
 import { CheckPolicies } from '../../common/decorators/check-policies.decorator';
+import { CurrentAbility } from '../../common/decorators/current-ability.decorator';
 import { CurrentCompany } from '../../common/decorators/current-company.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PoliciesGuard } from '../../common/guards/policies.guard';
@@ -39,8 +41,13 @@ export class ServiceOrdersController {
 
   @Get(':id')
   @CheckPolicies((ability) => ability.can('read', ServiceOrderSubject))
-  findOne(@Param('id') id: string, @CurrentCompany() companyId: string) {
-    return this.service.findOne(id, companyId);
+  findOne(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentAbility() ability: AppAbility,
+  ) {
+    // MKT-007b — the ability shapes the embedded `origin` (Opportunity/Campaign reads).
+    return this.service.findOne(id, companyId, ability);
   }
 
   @Patch(':id')

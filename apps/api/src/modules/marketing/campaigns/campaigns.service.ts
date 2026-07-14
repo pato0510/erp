@@ -126,8 +126,15 @@ export class CampaignsService {
     });
     // MKT-007 — ROI attribution, computed live by Comercial's exposed reader (no cross-
     // module table read here). DETAIL-ONLY — the LIST payload stays light (no attribution).
-    const attribution = await this.attributionRead.getCampaignReturn(companyId, id);
-    return { ...this.withDerived(campaign, agg._sum.amount ?? new Prisma.Decimal(0)), attribution };
+    // MKT-007b — also embed the won-deals list (the Retorno mirror).
+    const [ret, wonDeals] = await Promise.all([
+      this.attributionRead.getCampaignReturn(companyId, id),
+      this.attributionRead.listWonDeals(companyId, id),
+    ]);
+    return {
+      ...this.withDerived(campaign, agg._sum.amount ?? new Prisma.Decimal(0)),
+      attribution: { ...ret, wonDeals },
+    };
   }
 
   /* MKT-004 — campaigns intersecting a month (YYYY-MM), for the calendar feed. Month

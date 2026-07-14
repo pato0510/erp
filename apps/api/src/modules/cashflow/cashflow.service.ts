@@ -3,17 +3,76 @@ import { CommitmentStatus, MovementStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { RlsService } from '../common/rls/rls.service';
 import { paginate } from '@erp/utils';
+import {
+  AppAbility,
+  CampaignSubject,
+  OpportunitySubject,
+} from '../common/casl/casl-ability.factory';
+import {
+  AccountAttributionReadService,
+  BusinessOrigin,
+} from '../comercial/attribution-read/attribution-read.service';
+import { CampaignLookupService } from '../marketing/campaigns/campaign-lookup.service';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 import { SetOpeningBalanceDto } from './dto/set-opening-balance.dto';
 import { CreateCommitmentDto } from './dto/create-commitment.dto';
 import { FilterCommitmentDto } from './dto/filter-commitment.dto';
+
+/* MKT-007b — the sourceType stamped by the Finanzas COM-014 listener on an
+   opportunity-won commitment (finance/opportunity-commitment.listener.ts). Only these
+   commitments are opportunity-born and carry an origin; manual/SII commitments do not. */
+const OPPORTUNITY_WON_SOURCE_TYPE = 'comercial_opportunity_won';
 
 @Injectable()
 export class CashflowService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
+    // MKT-007b — Comercial's exposed reader (origin) + Marketing's lookup (campaign name).
+    // Cashflow reads NO Comercial/Marketing tables directly; both go through DI.
+    private readonly attributionRead: AccountAttributionReadService,
+    private readonly campaignLookup: CampaignLookupService,
   ) {}
+
+  /* MKT-007b — commitment DETAIL, enriched with the ability-shaped "Origen del negocio".
+     Origin is composed ONLY for a commitment born from a Comercial opportunity (sourceType
+     = comercial_opportunity_won, sourceId = opportunityId) — manual/SII commitments get
+     origin: null (conditional #1). The campaign part resolves only when the account has a
+     source campaign AND the caller can read Campaign. Zero role strings. */
+  async findCommitment(id: string, companyId: string, ability: AppAbility) {
+    const commitment = await this.prisma.commitment.findFirst({
+      where: { id, companyId },
+      include: {
+        counterparty: { select: { name: true } },
+        category: { select: { name: true } },
+      },
+    });
+    if (!commitment) throw new NotFoundException('Compromiso no encontrado');
+    const opportunityId =
+      commitment.sourceType === OPPORTUNITY_WON_SOURCE_TYPE ? commitment.sourceId : null;
+    const origin = await this.composeOrigin(companyId, opportunityId, ability);
+    return { ...commitment, origin };
+  }
+
+  private async composeOrigin(
+    companyId: string,
+    opportunityId: string | null,
+    ability: AppAbility,
+  ): Promise<BusinessOrigin | null> {
+    if (!opportunityId || !ability.can('read', OpportunitySubject)) return null;
+    const origin = await this.attributionRead.getOpportunityOrigin(companyId, opportunityId);
+    if (!origin) return null;
+    let campaign: { id: string; name: string } | null = null;
+    if (origin.sourceCampaignId && ability.can('read', CampaignSubject)) {
+      const c = await this.campaignLookup.getForCompany(companyId, origin.sourceCampaignId);
+      campaign = c ? { id: c.id, name: c.name } : null;
+    }
+    return {
+      opportunity: { id: origin.opportunityId, name: origin.opportunityName },
+      account: { id: origin.accountId, name: origin.accountName },
+      campaign,
+    };
+  }
 
   // ── Bank Accounts ──────────────────────────────────────
 

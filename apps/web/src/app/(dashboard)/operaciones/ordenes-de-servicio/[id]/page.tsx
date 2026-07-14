@@ -17,6 +17,7 @@ import {
   SERVICE_ORDER_STATUS_LABELS,
   ServiceOrderStatusBadge,
 } from '../../../../../components/operations/ServiceOrderStatusBadge';
+import { OriginCard, BusinessOrigin } from '../../../../../components/shared/OriginCard';
 
 interface ScopeLine {
   serviceName: string;
@@ -42,6 +43,8 @@ interface ServiceOrder {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  // MKT-007b — ability-shaped origin (detail only); null when not opportunity-born.
+  origin: BusinessOrigin | null;
 }
 
 export default function ServiceOrderDetailPage() {
@@ -189,6 +192,9 @@ export default function ServiceOrderDetailPage() {
         </div>
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
       </div>
+
+      {/* MKT-007b — Origen del negocio (renders only when opportunity-born) */}
+      <OriginCard origin={order.origin} />
 
       {/* Scope snapshot */}
       <div className="mb-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">

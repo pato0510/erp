@@ -1,16 +1,24 @@
 'use client';
 
-/* MKT-007 — the campaign "Retorno" (ROI) section. Reads the backend-derived
- * `attribution` ({ accountsCount, wonCount, wonNetAmount }) embedded in the campaign
- * detail, plus the existing derived `spent`. Everything is computed live server-side
- * (Comercial's exposed reader); this component only formats. No write affordances by
- * nature. Amounts use the platform CLP formatter. */
+/* MKT-007/007b — the campaign "Retorno" (ROI) section. Reads the backend-derived
+ * `attribution` ({ accountsCount, wonCount, wonNetAmount, wonDeals }) embedded in the
+ * campaign detail, plus the existing derived `spent`. Everything is computed live
+ * server-side (Comercial's exposed reader); this component only formats. No write
+ * affordances by nature. Amounts use the platform CLP formatter. */
+import Link from 'next/link';
 import { formatCLP } from '../../lib/formatters';
+
+interface WonDeal {
+  opportunityId: string;
+  name: string;
+  netAmount: string;
+}
 
 interface Attribution {
   accountsCount: number;
   wonCount: number;
   wonNetAmount: string;
+  wonDeals: WonDeal[];
 }
 
 export function CampaignRetorno({
@@ -44,12 +52,42 @@ export function CampaignRetorno({
           en el campo <span className="font-medium">&quot;Campaña de origen&quot;</span>.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Stat label="Cuentas generadas" value={String(attribution.accountsCount)} />
-          <Stat label="Negocios ganados" value={String(attribution.wonCount)} />
-          <Stat label="Retorno neto" value={formatCLP(attribution.wonNetAmount)} />
-          <Stat label="Gasto" value={formatCLP(spentNum)} />
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="Cuentas generadas" value={String(attribution.accountsCount)} />
+            <Stat label="Negocios ganados" value={String(attribution.wonCount)} />
+            <Stat label="Retorno neto" value={formatCLP(attribution.wonNetAmount)} />
+            <Stat label="Gasto" value={formatCLP(spentNum)} />
+          </div>
+
+          {/* MKT-007b — the won-deals mirror: each currently-GANADA deal + its net, linked. */}
+          {attribution.wonDeals.length > 0 && (
+            <div className="mt-4 border-t border-[var(--border-color)] pt-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                Negocios ganados
+              </p>
+              <ul className="space-y-1">
+                {attribution.wonDeals.map((d) => (
+                  <li
+                    key={d.opportunityId}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <Link
+                      href={`/comercial/pipeline/${d.opportunityId}`}
+                      className="hover:underline"
+                      style={{ color: '#2563eb' }}
+                    >
+                      {d.name}
+                    </Link>
+                    <span className="font-medium text-[var(--text-primary)]">
+                      {formatCLP(d.netAmount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
