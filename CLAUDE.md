@@ -605,8 +605,14 @@ Puntos clave:
   Marketing era el último módulo del roadmap V1.
 - Módulo Calendario de Actividades (scope en
   docs/EXCELSIA-CALENDARIO-ACTIVIDADES-SCOPE.md).
+- DECISIÓN DE POLÍTICA (2026-07-15, fundador): VIEWER es un rol de lectura
+  financiera POR DISEÑO — mantiene read sobre Movement/caja/compromisos,
+  montos incluidos (herencia deliberada de la era Finanzas, confirmada con
+  la evidencia de MKT-010). La regla "ANALYST/VIEWER nunca ven montos"
+  aplica a los módulos posteriores a Finanzas (RRHH, Comercial, Marketing
+  y futuros): ahí sigue siendo ley. La caja es la excepción fundacional,
+  no un bug — ningún ticket futuro debe "corregirla" sin decisión expresa.
 - Semillas V2: sub-tareas / checklists de campaña; conciliación
   gasto↔Movement (link movementId); APIs de ads/analytics (Google,
   LinkedIn) + crawler SEO; notificaciones de marketing por path fino
-  propio (precedente RRHH, no el motor de alertas de Operaciones);
-  decisión de política VIEWER↔caja (ver evidencia MKT-010).
+  propio (precedente RRHH, no el motor de alertas de Operaciones).
