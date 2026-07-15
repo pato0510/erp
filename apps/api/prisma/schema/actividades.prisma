@@ -1,0 +1,28 @@
+/* CAL-002 — Calendario de Actividades schema. First table: activity_areas, the
+   configurable lane catalog managed by MANAGER/ADMIN/SUPER_ADMIN (decision c). ASCII
+   identifiers; Spanish display labels live in the UI. The platform invariant (RLS + audit
+   trigger + app_user GRANT) ships in migration 20260715120000_add_activity_areas.
+
+   COEXISTENCE DOCTRINE (record for future CC): ActivityArea deliberately coexists with
+   RRHH's fixed AreaRRHH enum — DIFFERENT concepts (organizational belonging vs. the small,
+   founder-configurable planning lane). No future ticket unifies them without an explicit
+   founder decision (same class of trap as the VIEWER↔caja doctrine). */
+
+model ActivityArea {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  name      String
+  color     String? // hex "#RRGGBB" for the lane/chip; the UI offers a fixed palette
+  active    Boolean  @default(true)
+  createdBy String   @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation DEFERRED to keep the schema in lockstep with the DB (the MKT-002 lesson):
+  //   activities CalendarActivity[]  → CAL-003 (calendar_activities table + areaId FK
+  //   `Restrict`, which is the DB backstop for the "zero activities" pristine-delete guard).
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("activity_areas")
+}
