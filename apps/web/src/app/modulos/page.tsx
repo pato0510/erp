@@ -405,14 +405,14 @@ const MODULES: ModuleDef[] = [
     svg: <RrhhSvg />,
   },
   {
-    // MKT-001 — new gated placeholder for the future master activity-calendar module
-    // (its own scope doc). Reuses the calendar-grid icon freed up by the Marketing
-    // repurpose. Stays gated (href null, active false) with no route behind it yet.
+    // CAL-001 — the shell is built; href points at /actividades, but active stays false
+    // ("Próximamente") until CAL-007 un-gates it (COM-015/MKT-010 pattern). Direct-URL
+    // access works for local validation meanwhile.
     key: 'calendario-actividades',
     name: 'Calendario de Actividades',
     description: 'Calendario maestro de actividades internas de la organización',
     gradient: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
-    href: null,
+    href: '/actividades',
     active: false,
     svg: <CalendarioSvg />,
   },

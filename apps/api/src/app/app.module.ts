@@ -12,6 +12,7 @@ import { RlsModule } from '../modules/common/rls/rls.module';
 import { StorageModule } from '../modules/common/storage/storage.module';
 import { TenantMiddleware } from '../modules/common/rls/rls.middleware';
 import { NullByteSanitizerMiddleware } from '../modules/common/middleware/null-byte-sanitizer.middleware';
+import { ActividadesModule } from '../modules/actividades/actividades.module';
 import { AlertsModule } from '../modules/alerts/alerts.module';
 import { AuditModule } from '../modules/audit/audit.module';
 import { BankingModule } from '../modules/banking/banking.module';
@@ -60,6 +61,7 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
     CaslModule,
     RlsModule,
     StorageModule,
+    ActividadesModule,
     AlertsModule,
     AuditModule,
     BankingModule,

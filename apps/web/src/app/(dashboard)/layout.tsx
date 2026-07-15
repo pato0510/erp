@@ -9,6 +9,7 @@ import { OperationsSidebar } from '../../components/sidebars/OperationsSidebar';
 import { RrhhSidebar } from '../../components/sidebars/RrhhSidebar';
 import { ComercialSidebar } from '../../components/sidebars/ComercialSidebar';
 import { MarketingSidebar } from '../../components/sidebars/MarketingSidebar';
+import { ActividadesSidebar } from '../../components/sidebars/ActividadesSidebar';
 import { NotificationCenter } from '../../components/NotificationCenter';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -52,12 +53,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isRrhh = pathname?.startsWith('/rrhh') ?? false;
   const isComercial = pathname?.startsWith('/comercial') ?? false;
   const isMarketing = pathname?.startsWith('/marketing') ?? false;
+  const isActividades = pathname?.startsWith('/actividades') ?? false;
 
   return (
     <>
       <DarkGradientBackground />
       <div className="tn-shell">
-        {isMarketing ? (
+        {isActividades ? (
+          <ActividadesSidebar />
+        ) : isMarketing ? (
           <MarketingSidebar />
         ) : isComercial ? (
           <ComercialSidebar />

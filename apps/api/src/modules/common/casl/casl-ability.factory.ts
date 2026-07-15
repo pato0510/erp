@@ -58,6 +58,8 @@ type Subjects =
       | typeof CampaignSubject
       | typeof MarketingExpenseSubject
       | typeof PresenceSnapshotSubject
+      | typeof CalendarActivitySubject
+      | typeof ActivityAreaSubject
     >
   | 'all';
 
@@ -271,6 +273,19 @@ class PresenceSnapshotSubject {
   static readonly modelName = 'PresenceSnapshot' as const;
 }
 
+/* CAL-001 — Calendario de Actividades subjects. THE INVERTED CELL (Part 1 §4): unlike
+   every prior module, READ is granted to ALL SIX roles (no money exists on this surface —
+   founder decision Q4), WRITE to MANAGER/ADMIN/SUPER_ADMIN only. The default-deny floor
+   still extends over both subjects in the blanket-`read all` branches; read is then
+   re-granted to those roles AND to VIEWER (additively). CalendarActivity = the planned
+   activities; ActivityArea = the configurable lane catalog. */
+class CalendarActivitySubject {
+  static readonly modelName = 'CalendarActivity' as const;
+}
+class ActivityAreaSubject {
+  static readonly modelName = 'ActivityArea' as const;
+}
+
 /* All RRHH subjects — granted/revoked in bulk by the baseline role rules. */
 const RRHH_SUBJECTS = [
   EmployeeSubject,
@@ -312,6 +327,9 @@ const MARKETING_SUBJECTS = [CampaignSubject, MarketingExpenseSubject, PresenceSn
 /* The money-bearing subset ACCOUNTANT may read (budget + spend). PresenceSnapshot
    carries no money and is intentionally excluded. */
 const MARKETING_FINANCIAL_SUBJECTS = [CampaignSubject, MarketingExpenseSubject];
+/* CAL-001 — Calendario de Actividades subjects. The floor is applied per blanket-read
+   branch, then read is re-granted to ALL SIX roles (write stays MANAGER+). */
+const CALENDARIO_SUBJECTS = [CalendarActivitySubject, ActivityAreaSubject];
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -416,6 +434,8 @@ export {
   CampaignSubject,
   MarketingExpenseSubject,
   PresenceSnapshotSubject,
+  CalendarActivitySubject,
+  ActivityAreaSubject,
 };
 
 @Injectable()
@@ -535,6 +555,13 @@ export class CaslAbilityFactory {
         MARKETING_SUBJECTS.forEach((subject) =>
           can(['read', 'create', 'update', 'delete'], subject),
         );
+        /* CAL-001 — default-deny floor on the Calendario subjects, then re-grant full
+           CRUD (MANAGER owns the calendar + area catalog) AFTER the revoke (last-rule-
+           wins). Per Part 1 §4. */
+        CALENDARIO_SUBJECTS.forEach((subject) => cannot('read', subject));
+        CALENDARIO_SUBJECTS.forEach((subject) =>
+          can(['read', 'create', 'update', 'delete'], subject),
+        );
         break;
 
       case UserRole.ACCOUNTANT:
@@ -592,6 +619,10 @@ export class CaslAbilityFactory {
            PresenceSnapshot stays floored (no money). No write on any. Per Part 1 §5. */
         MARKETING_SUBJECTS.forEach((subject) => cannot('read', subject));
         MARKETING_FINANCIAL_SUBJECTS.forEach((subject) => can('read', subject));
+        /* CAL-001 — default-deny floor on the Calendario subjects, then re-grant READ on
+           both (no money here → ACCOUNTANT reads like everyone else). No write. Per §4. */
+        CALENDARIO_SUBJECTS.forEach((subject) => cannot('read', subject));
+        CALENDARIO_SUBJECTS.forEach((subject) => can('read', subject));
         break;
 
       case UserRole.ANALYST:
@@ -618,6 +649,11 @@ export class CaslAbilityFactory {
            presence access: revoke the inherited blanket `read all` on all Marketing
            subjects with NO re-grant. Per Part 1 §5. */
         MARKETING_SUBJECTS.forEach((subject) => cannot('read', subject));
+        /* CAL-001 — THE INVERSION: floor the Calendario subjects, then RE-GRANT READ on
+           both. This is the FIRST post-floor re-grant the ANALYST branch has ever had —
+           the calendar carries no money, so "todos lo ven" (Q4). No write. Per §4. */
+        CALENDARIO_SUBJECTS.forEach((subject) => cannot('read', subject));
+        CALENDARIO_SUBJECTS.forEach((subject) => can('read', subject));
         break;
 
       case UserRole.VIEWER:
@@ -668,6 +704,11 @@ export class CaslAbilityFactory {
         /* MKT-001 — VIEWER gets NO access to any Marketing subject: budget/spend are
            money and presence is out of scope. VIEWER has no blanket `read all`, so
            granting nothing here IS the floor (same idiom as ServiceOrder for VIEWER). */
+        /* CAL-001 — THE INVERSION: VIEWER READS the calendar. No blanket `read all` to
+           revoke here → purely ADDITIVE grant-by-enumeration (the COM-002/ServiceCatalog
+           idiom), nothing to floor. Read on both subjects; no write. Per §4. */
+        can('read', CalendarActivitySubject);
+        can('read', ActivityAreaSubject);
         break;
     }
 
