@@ -385,15 +385,14 @@ const MODULES: ModuleDef[] = [
     svg: <ComercialSvg />,
   },
   {
-    // MKT-001 — repurposed from the old "Calendario" placeholder card. href points at
-    // the built shell, but active stays false ("Próximamente") until MKT-010 un-gates
-    // it (COM-015 pattern); direct-URL access works for local validation meanwhile.
+    // MKT-010 — un-gated: Marketing V1 is live (campaigns, expenses, calendar,
+    // attribution/ROI, presence). COM-015 analog: active flips to true, href unchanged.
     key: 'marketing',
     name: 'Marketing',
     description: 'Campañas, gastos de marketing y presencia digital',
     gradient: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
     href: '/marketing',
-    active: false,
+    active: true,
     svg: <MarketingSvg />,
   },
   {

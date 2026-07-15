@@ -536,11 +536,77 @@ Puntos clave:
 
 Última actualización: 2026-07-09
 
+═══════════════════════════════════════════════════════════════════
+
+# 🏁 MÓDULO MARKETING — V1 EN PRODUCCIÓN (live desde 2026-07-15)
+
+═══════════════════════════════════════════════════════════════════
+
+Status: V1 completo (MKT-001…MKT-010 + MKT-007b), card viva en /modulos.
+Schema: apps/api/prisma/schema/marketing.prisma
+Backend: apps/api/src/modules/marketing/ · Frontend: /marketing/...
+
+Tablas: campaigns, marketing_expenses, presence_snapshots
+(+ FK real accounts.sourceCampaignId → campaigns, ON DELETE SET NULL +
+índice, cerrando el hook UUID sin FK de COM-003).
+
+Puntos clave:
+
+- campaigns: máquina de estados — libre entre BORRADOR/ACTIVA/PAUSADA;
+  FINALIZADA/CANCELADA semi-terminales con reopen explícito (→ ACTIVA);
+  activar exige startDate. Endpoint canónico PATCH /:id/status. DELETE
+  solo para BORRADOR prístino, con guard de TRES partes (estado + cero
+  gastos + cero cuentas atribuidas; el mensaje 409 nombra el bloqueador).
+  spent/overBudget/endingSoon derivados EN VIVO al leer — cero rollups,
+  cero cron (badges de UI: "Sobre presupuesto", "Termina en 7 días").
+- marketing_expenses: ledger informativo, montos NETOS sin IVA (para
+  comparar ROI contra el netAmount de la cotización); JAMÁS escribe en
+  Finanzas (sin Movement/Commitment/evento) → cero doble conteo con SII.
+  Hijo de campaign, ON DELETE CASCADE.
+- presence_snapshots: fila ancha (una por empresa/mes), unique(companyId,
+  period) a nivel DB; period normalizado a día 01 UTC en el service
+  (HR-004b, sin shift de zona horaria); upsert full-replace (el form de
+  MKT-009 pre-carga el mes existente para no borrar métricas por accidente).
+- Atribución/ROI: selector "Campaña de origen" en la ficha de cuenta
+  (Comercial consume CampaignLookupService — nunca lee campaigns directo);
+  el service rechaza campañas cross-company (el FK no valida tenant).
+  Retorno EN VIVO = oportunidades EN GANADA al momento de la consulta ×
+  netAmount de su cotización ACEPTADA (un negocio reabierto sale del ROI
+  hasta re-ganarse; GANADA sin ACEPTADA cuenta y aporta 0).
+- Cross-módulo (expose/consume, SIN domain events en Marketing V1):
+  Marketing expone CampaignLookupService; Comercial expone
+  AccountAttributionReadService (count / return / origin / wonDeals) desde
+  AttributionReadModule, que NO importa NADA — la hoja que mantiene el
+  grafo ACÍCLICO (Accounts → Campaigns → AttributionRead; Ops/Finanzas
+  importan AttributionRead + Campaigns) sin forwardRef. Tarjeta "Origen
+  del negocio" en el detalle de ServiceOrder (Operaciones) y Commitment
+  (Finanzas), resuelta EN VIVO (nada denormalizado), con regla condicional
+  (sin oportunidad de origen → sin tarjeta; cuenta sin campaña → sin fila
+  Campaña) y ability-shaping (origin solo si lee Opportunity; campaña solo
+  si lee Campaign).
+- CASL (matriz MKT-001; SIN cambios de fábrica en el cierre):
+  MANAGER/ADMIN/SUPER_ADMIN full; ACCOUNTANT read en Campaign y
+  MarketingExpense (son dinero), pero CIEGO en PresenceSnapshot (la celda
+  rara — presencia no lleva dinero); ANALYST/VIEWER sin acceso.
+- Known issue (solo desarrollo): warning de Next.js/Turbopack "negative
+  time stamp" en páginas de redirect (vercel/next.js #86060, fix en PR
+  #88688) — cosmético, no afecta producción; se resuelve con el bump de
+  dependencias post-módulo.
+
+Última actualización: 2026-07-15
+
 # Próximos pasos
 
-- Actualización del manual de Operaciones (incorporar OPS-035 QR,
-  OPS-036 Auditoría, OPS-034 nota de performance)
-- Creación del manual de Finanzas (V1 ya en producción)
-- Creación del manual de RRHH (V1 ya en producción)
-- Creación del manual de Comercial (V1 ya en producción)
-- Módulo Marketing en desarrollo (recon MKT-000 en docs/MARKETING-RECON.md)
+- Módulos V1 completos: Finanzas, Operaciones, RRHH, Comercial, Marketing.
+- Manual de Comercial (V1 ya en producción).
+- Bump rutinario de dependencias (incorpora el fix de Next.js PR #88688,
+  que elimina el warning dev-only "negative time stamp").
+- ROTACIÓN DE CREDENCIALES R2 — gate de seguridad: vence ahora que
+  Marketing era el último módulo del roadmap V1.
+- Módulo Calendario de Actividades (scope en
+  docs/EXCELSIA-CALENDARIO-ACTIVIDADES-SCOPE.md).
+- Semillas V2: sub-tareas / checklists de campaña; conciliación
+  gasto↔Movement (link movementId); APIs de ads/analytics (Google,
+  LinkedIn) + crawler SEO; notificaciones de marketing por path fino
+  propio (precedente RRHH, no el motor de alertas de Operaciones);
+  decisión de política VIEWER↔caja (ver evidencia MKT-010).
