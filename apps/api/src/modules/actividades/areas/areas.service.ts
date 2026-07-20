@@ -70,10 +70,19 @@ export class AreasService {
 
   async remove(id: string, companyId: string, userId: string) {
     await this.getAreaOrThrow(id, companyId);
-    // CAL-002 — the "zero activities" pristine-delete guard cannot exist yet:
-    // calendar_activities arrives in CAL-003, which adds BOTH the count pre-check AND the
-    // DB `Restrict` FK (areaId → activity_areas) and proves the 409 there. For now a delete
-    // always succeeds (no activities can reference an area). This is deliberate, not a gap.
+    // CAL-003 — RESOLVED (was the CAL-002 deferral): the "zero activities" pristine-delete
+    // guard is now live. calendar_activities exists, so an area can only be dropped when no
+    // activity references it. This app-side count returns a clean 409; the DB `Restrict` FK
+    // (calendar_activities.areaId → activity_areas, onDelete: Restrict) is the backstop that
+    // makes deleting a referenced area impossible even if this pre-check were bypassed.
+    const activityCount = await this.prisma.calendarActivity.count({
+      where: { areaId: id, companyId },
+    });
+    if (activityCount > 0) {
+      throw new ConflictException(
+        `No se puede eliminar el área: tiene ${activityCount} actividad(es) asociada(s). Desactívala en su lugar.`,
+      );
+    }
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.activityArea.delete({ where: { id } });
     });

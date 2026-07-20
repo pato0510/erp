@@ -18,11 +18,45 @@ model ActivityArea {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relation DEFERRED to keep the schema in lockstep with the DB (the MKT-002 lesson):
-  //   activities CalendarActivity[]  → CAL-003 (calendar_activities table + areaId FK
-  //   `Restrict`, which is the DB backstop for the "zero activities" pristine-delete guard).
+  // CAL-003 — RESOLVED (was the CAL-002 deferral): the relation now ships together with the
+  // calendar_activities FK (areaId → activity_areas, onDelete: Restrict). Restrict is the DB
+  // backstop for the "zero activities" pristine-delete guard enforced in AreasService.remove.
+  activities CalendarActivity[]
 
   @@unique([companyId, name])
   @@index([companyId])
   @@map("activity_areas")
+}
+
+/* CAL-003 — the central calendar entity. Named CalendarActivity (not Activity — that table
+ * is Comercial's, §2.0). Company-wide manual activities: single-day or multi-day ranges,
+ * optional wall-clock startTime, an area lane, an optional assignee, a status machine and
+ * free-text notes. RLS + audit trigger + app_user GRANT ship in migration
+ * 20260715130000_add_calendar_activities (platform invariant). */
+enum ActivityStatus {
+  PENDIENTE
+  HECHA
+  CANCELADA
+}
+
+model CalendarActivity {
+  id         String         @id @default(uuid()) @db.Uuid
+  companyId  String         @db.Uuid
+  title      String
+  areaId     String         @db.Uuid
+  startDate  DateTime       @db.Date
+  endDate    DateTime?      @db.Date
+  startTime  String? // wall-clock "HH:mm" — a validated STRING, never a timestamp (§2.2 / f)
+  assigneeId String?        @db.Uuid
+  status     ActivityStatus @default(PENDIENTE)
+  notes      String?
+  createdBy  String         @db.Uuid
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  area ActivityArea @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([companyId, startDate])
+  @@map("calendar_activities")
 }

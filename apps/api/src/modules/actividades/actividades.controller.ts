@@ -1,10 +1,12 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ActivityAreaSubject, CalendarActivitySubject } from '../common/casl/casl-ability.factory';
 import type { AppAbility } from '../common/casl/casl-ability.factory';
 import { CheckPolicies } from '../common/decorators/check-policies.decorator';
 import { CurrentAbility } from '../common/decorators/current-ability.decorator';
+import { CurrentCompany } from '../common/decorators/current-company.decorator';
 import { PoliciesGuard } from '../common/guards/policies.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
+import { ActivitiesService } from './activities/activities.service';
 
 /* CAL-001 — Calendario de Actividades module shell.
  *
@@ -18,6 +20,8 @@ import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 @Controller('actividades')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class ActividadesController {
+  constructor(private readonly activities: ActivitiesService) {}
+
   /* Proves the guard chain end-to-end. Gated on `read CalendarActivity` — which all six
      roles hold — so every authenticated caller gets 200 (the inverted cell, live). */
   @Get('ping')
@@ -50,5 +54,16 @@ export class ActividadesController {
       calendarActivity: flagsFor(CalendarActivitySubject),
       activityArea: flagsFor(ActivityAreaSubject),
     };
+  }
+
+  /* CAL-003 — the month FEED. Canonical public path GET /actividades/calendar?month=YYYY-MM
+     (Part 1 §3). Delegates to ActivitiesService.monthFeed: UTC-clamped month bounds, single-day
+     + range-intersecting activities, CANCELADA excluded (decision e). Response envelope
+     { activities } — CAL-006 extends it with `birthdays`. Gated on `read CalendarActivity` —
+     held by all six roles, so the whole company sees the calendar. Bad month → 400. */
+  @Get('calendar')
+  @CheckPolicies((ability) => ability.can('read', CalendarActivitySubject))
+  calendar(@CurrentCompany() companyId: string, @Query('month') month: string) {
+    return this.activities.monthFeed(companyId, month);
   }
 }
