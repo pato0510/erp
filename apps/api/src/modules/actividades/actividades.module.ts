@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RrhhBirthdayReadModule } from '../rrhh/birthday-read/birthday-read.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { AreasModule } from './areas/areas.module';
 import { ActividadesController } from './actividades.controller';
@@ -7,11 +8,13 @@ import { ActividadesController } from './actividades.controller';
  * scaffold). Ships the module shell (guarded ping + permissions endpoint + the month feed)
  * and composes feature submodules as their tickets land: CAL-002 AreasModule (the area
  * catalog); CAL-003 ActivitiesModule (calendar-activity CRUD + status machine, whose exported
- * service also backs the root controller's GET /actividades/calendar feed); the birthdays feed
- * (CAL-006) folds into that same feed next. PoliciesGuard / CaslAbilityFactory / PrismaService
- * are provided by the global Casl/Prisma modules. */
+ * service also backs the root controller's GET /actividades/calendar feed); CAL-006
+ * RrhhBirthdayReadModule (the RRHH birthday leaf, whose BirthdayReadService the root controller
+ * folds into the SAME /actividades/calendar envelope). The graph is acyclic by construction —
+ * ActividadesModule → RrhhBirthdayReadModule (a leaf that imports NOTHING) — no forwardRef.
+ * PoliciesGuard / CaslAbilityFactory / PrismaService come from the global Casl/Prisma modules. */
 @Module({
-  imports: [AreasModule, ActivitiesModule],
+  imports: [AreasModule, ActivitiesModule, RrhhBirthdayReadModule],
   controllers: [ActividadesController],
 })
 export class ActividadesModule {}

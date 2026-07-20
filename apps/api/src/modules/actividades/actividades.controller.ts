@@ -5,6 +5,7 @@ import { CheckPolicies } from '../common/decorators/check-policies.decorator';
 import { CurrentAbility } from '../common/decorators/current-ability.decorator';
 import { CurrentCompany } from '../common/decorators/current-company.decorator';
 import { PoliciesGuard } from '../common/guards/policies.guard';
+import { BirthdayReadService } from '../rrhh/birthday-read/birthday-read.service';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { ActivitiesService } from './activities/activities.service';
 
@@ -20,7 +21,12 @@ import { ActivitiesService } from './activities/activities.service';
 @Controller('actividades')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class ActividadesController {
-  constructor(private readonly activities: ActivitiesService) {}
+  constructor(
+    private readonly activities: ActivitiesService,
+    // CAL-006 — the RRHH birthday leaf (exported by RrhhBirthdayReadModule). The @CheckPolicies
+    // all-roles read gate on GET /calendar IS the founder-signed exposure (decision d).
+    private readonly birthdays: BirthdayReadService,
+  ) {}
 
   /* Proves the guard chain end-to-end. Gated on `read CalendarActivity` — which all six
      roles hold — so every authenticated caller gets 200 (the inverted cell, live). */
@@ -56,14 +62,20 @@ export class ActividadesController {
     };
   }
 
-  /* CAL-003 — the month FEED. Canonical public path GET /actividades/calendar?month=YYYY-MM
-     (Part 1 §3). Delegates to ActivitiesService.monthFeed: UTC-clamped month bounds, single-day
-     + range-intersecting activities, CANCELADA excluded (decision e). Response envelope
-     { activities } — CAL-006 extends it with `birthdays`. Gated on `read CalendarActivity` —
-     held by all six roles, so the whole company sees the calendar. Bad month → 400. */
+  /* CAL-003/006 — the month FEED. Canonical public path GET /actividades/calendar?month=YYYY-MM
+     (Part 1 §3). Envelope { activities, birthdays }: activities from ActivitiesService.monthFeed
+     (UTC-clamped, CANCELADA excluded — decision e); birthdays from the RRHH leaf (ACTIVE
+     employees' name + day/month, NEVER the year — decision d). Gated on `read CalendarActivity`
+     — held by all six roles, so the whole company sees both, which IS the signed birthday
+     exposure. Bad month → 400 (validated once via parseMonth). */
   @Get('calendar')
   @CheckPolicies((ability) => ability.can('read', CalendarActivitySubject))
-  calendar(@CurrentCompany() companyId: string, @Query('month') month: string) {
-    return this.activities.monthFeed(companyId, month);
+  async calendar(@CurrentCompany() companyId: string, @Query('month') month: string) {
+    const { mon } = this.activities.parseMonth(month);
+    const [feed, birthdays] = await Promise.all([
+      this.activities.monthFeed(companyId, month),
+      this.birthdays.listForMonth(companyId, mon),
+    ]);
+    return { activities: feed.activities, birthdays };
   }
 }

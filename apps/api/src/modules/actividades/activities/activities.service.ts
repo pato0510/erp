@@ -192,7 +192,10 @@ export class ActivitiesService {
    *  CANCELADA (Part 1 §5 / decision e — cancelled activities never paint on the calendar,
    *  though they remain reachable via the list's ?status=CANCELADA filter). CAL-006 will fold
    *  a `birthdays` array into this same envelope. */
-  async monthFeed(companyId: string, month: string) {
+  /** CAL-003/006 — validate a YYYY-MM month param → numeric { year, mon } (mon 1..12). Shared
+   *  by the activities feed AND the CAL-006 birthdays merge (in the controller) so both reject a
+   *  malformed month identically. */
+  parseMonth(month: string): { year: number; mon: number } {
     const m = /^(\d{4})-(\d{2})$/.exec(month);
     if (!m) {
       throw new BadRequestException('El mes debe tener el formato YYYY-MM.');
@@ -202,6 +205,11 @@ export class ActivitiesService {
     if (mon < 1 || mon > 12) {
       throw new BadRequestException('El mes debe estar entre 01 y 12.');
     }
+    return { year, mon };
+  }
+
+  async monthFeed(companyId: string, month: string) {
+    const { year, mon } = this.parseMonth(month);
     const monthStart = new Date(Date.UTC(year, mon - 1, 1));
     const nextMonthStart = new Date(Date.UTC(year, mon, 1));
 

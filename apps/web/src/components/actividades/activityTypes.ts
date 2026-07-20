@@ -26,3 +26,14 @@ export interface ActivityArea {
   color: string | null;
   active: boolean;
 }
+
+/* CAL-006 — the birthday feed entry (GET /actividades/calendar → { activities, birthdays }).
+   PII-safe by construction (decision d): name + day/month of ACTIVE employees, NEVER the year.
+   employeeId is a render key only — never linked or resolved. Mirror of the backend
+   BirthdayReadService.BirthdayEntry; the shape carries nothing else on purpose. */
+export interface BirthdayEntry {
+  employeeId: string;
+  fullName: string;
+  day: number;
+  month: number;
+}
