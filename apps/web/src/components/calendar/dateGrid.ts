@@ -84,4 +84,16 @@ export function dateKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/* CAL-004 — pure es-CL long-day label ("lunes, 15 de julio de 2026"), used by the shared
+   DayView header. Domain-agnostic — moved alongside DAY_NAMES_SHORT so the shared Week/Day
+   views render off ONE date module (identical output to the ops utils.formatLongDay). */
+export function formatLongDay(d: Date): string {
+  return d.toLocaleDateString('es-CL', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 export const DAY_NAMES_SHORT = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];

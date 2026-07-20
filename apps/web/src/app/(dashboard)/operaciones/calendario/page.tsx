@@ -13,16 +13,18 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
-import { DayView } from '../../../../components/operations/calendar/DayView';
 import { EventDetailModal } from '../../../../components/operations/calendar/EventDetailModal';
 import { ListView } from '../../../../components/operations/calendar/ListView';
-// MKT-004 — MonthView now lives in the SHARED, domain-agnostic calendar module. Ops
-// keeps IDENTICAL rendering by passing its TYPE_META colors + severity dots via props.
+// MKT-004 / CAL-004 — Month, Week and Day now live in the SHARED, domain-agnostic calendar
+// module. Ops keeps IDENTICAL rendering by passing its TYPE_META colors, SEVERITY_META badges
+// and the work-permit time rule via props. Only ListView stays ops-bound (no genericity needed).
 import { MonthView } from '../../../../components/calendar/MonthView';
-import { WeekView } from '../../../../components/operations/calendar/WeekView';
+import { WeekView } from '../../../../components/calendar/WeekView';
+import { DayView } from '../../../../components/calendar/DayView';
 import {
   ALL_SEVERITIES,
   ALL_TYPES,
+  SEVERITY_META,
   TYPE_META,
 } from '../../../../components/operations/calendar/types';
 import type {
@@ -40,6 +42,7 @@ import {
   endOfWeek,
   formatLongDay,
   formatMonthYear,
+  formatShortTime,
   formatWeekRange,
   severityRank,
   startOfDay,
@@ -559,9 +562,50 @@ export default function OperacionesCalendarioPage() {
             }}
           />
         ) : view === 'week' ? (
-          <WeekView focusedDate={focusedDate} events={events} onSelectEvent={setSelectedEvent} />
+          <WeekView<CalendarEvent>
+            focusedDate={focusedDate}
+            events={events}
+            onSelectEvent={setSelectedEvent}
+            getChipStyle={(e) => ({ bg: TYPE_META[e.type].bg, color: TYPE_META[e.type].color })}
+            getChipLabel={(e) => e.title}
+            getChipBadge={(e) => TYPE_META[e.type].short}
+            // Lifted ops literal (was inside WeekEventCard): only work permits carry a real
+            // start clock; every other type is deadline-style and shows none. A permit with an
+            // end shows "start – end", otherwise just the start — verbatim as before.
+            getEventTime={(e) =>
+              e.type === 'work_permit_scheduled'
+                ? `${formatShortTime(new Date(e.date))}${
+                    e.endDate ? ` – ${formatShortTime(new Date(e.endDate))}` : ''
+                  }`
+                : null
+            }
+            // Within-day order: severity desc, then time asc (was bucketEventsByDay's sort).
+            sortDayEvents={(a, b) => {
+              const s = severityRank(b.severity) - severityRank(a.severity);
+              return s !== 0 ? s : new Date(a.date).getTime() - new Date(b.date).getTime();
+            }}
+          />
         ) : view === 'day' ? (
-          <DayView focusedDate={focusedDate} events={events} onSelectEvent={setSelectedEvent} />
+          <DayView<CalendarEvent>
+            focusedDate={focusedDate}
+            events={events}
+            onSelectEvent={setSelectedEvent}
+            getChipStyle={(e) => ({ bg: TYPE_META[e.type].bg, color: TYPE_META[e.type].color })}
+            getChipLabel={(e) => e.title}
+            getChipBadge={(e) => TYPE_META[e.type].short}
+            // Severity badge (was SEVERITY_META[e.severity] inside DayEventCard).
+            getSeverityBadge={(e) => {
+              const s = SEVERITY_META[e.severity];
+              return { label: s.label, color: s.color, bg: s.bg };
+            }}
+            // Lifted ops literal (was inside DayEventCard): the day agenda shows a time range
+            // only for work permits that have an end — verbatim as before; others show none.
+            getEventTime={(e) =>
+              e.type === 'work_permit_scheduled' && e.endDate
+                ? `${formatShortTime(new Date(e.date))} – ${formatShortTime(new Date(e.endDate))}`
+                : null
+            }
+          />
         ) : (
           <ListView events={events} onSelectEvent={setSelectedEvent} />
         )}
