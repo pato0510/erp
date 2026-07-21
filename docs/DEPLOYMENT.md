@@ -236,7 +236,7 @@ Run through this list before sending the URL to the client.
 
 - [ ] Uptime monitoring hitting `/api/health` every minute
 - [ ] `fail2ban` or a WAF in front for abuse
-- [ ] Automated DB migrations on deploy (CI step before `up -d`)
+- [ ] Automated DB migrations on deploy (CI step before `up-d`)
 
 ---
 

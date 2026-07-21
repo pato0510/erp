@@ -147,11 +147,69 @@ export class ActivitiesService {
       where,
       orderBy: [{ startDate: 'asc' }, { startTime: 'asc' }],
     });
-    return rows.map((a) => this.withDerived(a));
+    // CAL-009 — enrich each row with notesCount + latestNote WITHOUT N+1: ONE query pulls the
+    // notes for the whole page (companyId + activityId IN ids), ordered createdAt desc; counts
+    // and the latest-per-activity are folded in memory. Small volumes; one round-trip.
+    const ids = rows.map((r) => r.id);
+    const notes = ids.length
+      ? await this.prisma.calendarActivityNote.findMany({
+          where: { companyId, activityId: { in: ids } },
+          orderBy: { createdAt: 'desc' },
+          select: { activityId: true, text: true, createdAt: true },
+        })
+      : [];
+    const counts = new Map<string, number>();
+    const latest = new Map<string, { text: string; createdAt: Date }>();
+    for (const n of notes) {
+      counts.set(n.activityId, (counts.get(n.activityId) ?? 0) + 1);
+      if (!latest.has(n.activityId))
+        latest.set(n.activityId, { text: n.text, createdAt: n.createdAt });
+    }
+    return rows.map((a) => ({
+      ...this.withDerived(a),
+      notesCount: counts.get(a.id) ?? 0,
+      latestNote: latest.get(a.id) ?? null,
+    }));
   }
 
   async findOne(id: string, companyId: string) {
-    return this.withDerived(await this.getActivityOrThrow(id, companyId));
+    const activity = await this.getActivityOrThrow(id, companyId);
+    const [notesCount, latestArr] = await Promise.all([
+      this.prisma.calendarActivityNote.count({ where: { companyId, activityId: id } }),
+      this.prisma.calendarActivityNote.findMany({
+        where: { companyId, activityId: id },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { text: true, createdAt: true },
+      }),
+    ]);
+    return { ...this.withDerived(activity), notesCount, latestNote: latestArr[0] ?? null };
+  }
+
+  /* ── CAL-009: the immutable bitácora ─────────────────────────────────────────────── */
+
+  /** Entries for an activity, newest first. Verifies the activity belongs to the company. */
+  async listNotes(activityId: string, companyId: string) {
+    await this.getActivityOrThrow(activityId, companyId);
+    return this.prisma.calendarActivityNote.findMany({
+      where: { companyId, activityId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** Append one entry. `authorId` is the JWT actor (NEVER from the DTO). Empty/whitespace-only
+   *  text → 400 Spanish. Append-only: there is no update or delete counterpart, anywhere. */
+  async addNote(activityId: string, companyId: string, authorId: string, text: string) {
+    await this.getActivityOrThrow(activityId, companyId);
+    const trimmed = (text ?? '').trim();
+    if (!trimmed) {
+      throw new BadRequestException('La entrada no puede estar vacía.');
+    }
+    return this.rlsService.executeWithRls(companyId, authorId, async (tx) => {
+      return tx.calendarActivityNote.create({
+        data: { companyId, activityId, authorId, text: trimmed },
+      });
+    });
   }
 
   async create(companyId: string, userId: string, dto: CreateActivityDto) {

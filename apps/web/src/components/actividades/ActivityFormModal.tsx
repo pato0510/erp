@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import type { ActivityArea, CalendarActivity } from './activityTypes';
+import type { ActivityArea, CalendarActivity, MemberOption } from './activityTypes';
 
 /* CAL-005 — create / edit a calendar activity. Editing is allowed in ANY status (the deliberate
    contrast with campaigns — CAL-003). The área select offers ACTIVE areas only; when editing an
@@ -27,16 +27,19 @@ function toDateInput(iso: string | null): string {
 export function ActivityFormModal({
   editing,
   areas,
+  members,
   onClose,
   onSaved,
 }: {
   editing: CalendarActivity | null;
   areas: ActivityArea[];
+  members: MemberOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [title, setTitle] = useState(editing?.title ?? '');
   const [areaId, setAreaId] = useState(editing?.areaId ?? '');
+  const [assigneeId, setAssigneeId] = useState(editing?.assigneeId ?? '');
   const [startDate, setStartDate] = useState(toDateInput(editing?.startDate ?? null));
   const [multiDay, setMultiDay] = useState(!!editing?.endDate);
   const [endDate, setEndDate] = useState(toDateInput(editing?.endDate ?? null));
@@ -72,6 +75,7 @@ export function ActivityFormModal({
     const body = {
       title: title.trim(),
       areaId,
+      assigneeId: assigneeId || null,
       startDate,
       endDate: multiDay && endDate ? endDate : null,
       startTime: startTime || null,
@@ -123,6 +127,21 @@ export function ActivityFormModal({
                 <option key={a.id} value={a.id}>
                   {a.name}
                   {!a.active ? ' (inactiva)' : ''}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Responsable (opcional)">
+            <select
+              value={assigneeId}
+              onChange={(e) => setAssigneeId(e.target.value)}
+              className={INPUT}
+            >
+              <option value="">Sin responsable</option>
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.displayName}
                 </option>
               ))}
             </select>

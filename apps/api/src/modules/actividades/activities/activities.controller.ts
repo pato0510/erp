@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { ActivitiesService } from './activities.service';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
+import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 
 /* CAL-003 — calendar-activity CRUD + status machine. EVERY endpoint declares @CheckPolicies on
@@ -91,5 +92,26 @@ export class ActivitiesController {
     @CurrentUser() user: { id: string },
   ) {
     return this.service.remove(id, companyId, user.id);
+  }
+
+  /* CAL-009 — the bitácora. IMMUTABILITY BY ABSENCE: only GET (read) and POST (append) exist —
+     there is NO @Patch or @Delete for notes anywhere. GET is `read CalendarActivity` (all six
+     roles); POST is `update CalendarActivity` (writers only) — notes are part of the activity,
+     NO new CASL subject. authorId is the JWT actor, never the DTO. */
+  @Get(':id/notes')
+  @CheckPolicies((ability) => ability.can('read', CalendarActivitySubject))
+  listNotes(@Param('id') id: string, @CurrentCompany() companyId: string) {
+    return this.service.listNotes(id, companyId);
+  }
+
+  @Post(':id/notes')
+  @CheckPolicies((ability) => ability.can('update', CalendarActivitySubject))
+  addNote(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateNoteDto,
+  ) {
+    return this.service.addNote(id, companyId, user.id, dto.text);
   }
 }

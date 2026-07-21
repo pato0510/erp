@@ -56,8 +56,31 @@ model CalendarActivity {
   updatedAt  DateTime       @updatedAt
 
   area ActivityArea @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  // CAL-009 — the immutable bitácora. Named `logEntries`, NOT `notes`, because the `notes
+  // String?` field above is the static description (they coexist by §1.6). Lands with the table.
+  logEntries CalendarActivityNote[]
 
   @@index([companyId])
   @@index([companyId, startDate])
   @@map("calendar_activities")
+}
+
+/* CAL-009 — the bitácora: append-only, dated entries per activity (the Comercial-timeline
+ * discipline, §1.6). STRUCTURAL IMMUTABILITY: there is deliberately NO `updatedAt` field and
+ * there are NO update/delete endpoints — a typo gets a correcting entry, never an edit. CASCADE
+ * with the activity (deleting the activity deletes its log — decision b's spirit). RLS + audit
+ * trigger + app_user GRANT ship in migration 20260721130000_add_calendar_activity_notes. */
+model CalendarActivityNote {
+  id         String   @id @default(uuid()) @db.Uuid
+  companyId  String   @db.Uuid
+  activityId String   @db.Uuid
+  authorId   String   @db.Uuid // bare actor UUID; the display name is resolved via the members map
+  text       String
+  createdAt  DateTime @default(now())
+
+  activity CalendarActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([activityId])
+  @@map("calendar_activity_notes")
 }

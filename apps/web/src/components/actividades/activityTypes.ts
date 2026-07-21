@@ -27,6 +27,23 @@ export interface ActivityArea {
   active: boolean;
 }
 
+/* CAL-008 — a company member option for the Responsable select + author-name resolution
+   (GET /actividades/members). Structurally { userId, displayName } only. */
+export interface MemberOption {
+  userId: string;
+  displayName: string;
+}
+
+/* CAL-009 — a bitácora entry (GET /actividades/activities/:id/notes). Immutable: no updatedAt.
+   authorId is resolved to a name via the members map. */
+export interface ActivityNote {
+  id: string;
+  activityId: string;
+  authorId: string;
+  text: string;
+  createdAt: string;
+}
+
 /* CAL-006 — the birthday feed entry (GET /actividades/calendar → { activities, birthdays }).
    PII-safe by construction (decision d): name + day/month of ACTIVE employees, NEVER the year.
    employeeId is a render key only — never linked or resolved. Mirror of the backend
