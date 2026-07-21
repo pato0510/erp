@@ -35,6 +35,7 @@ model ActivityArea {
  * 20260715130000_add_calendar_activities (platform invariant). */
 enum ActivityStatus {
   PENDIENTE
+  EN_EJECUCION // CAL-008 — added BETWEEN PENDIENTE and HECHA; DB order must match this order.
   HECHA
   CANCELADA
 }

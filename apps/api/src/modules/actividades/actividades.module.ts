@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { RrhhBirthdayReadModule } from '../rrhh/birthday-read/birthday-read.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { AreasModule } from './areas/areas.module';
+import { MembersReadModule } from './members/members-read.module';
 import { ActividadesController } from './actividades.controller';
 
 /* CAL-001 — Calendario de Actividades module aggregator (mirrors the COM-001/MKT-001
@@ -14,7 +15,7 @@ import { ActividadesController } from './actividades.controller';
  * ActividadesModule → RrhhBirthdayReadModule (a leaf that imports NOTHING) — no forwardRef.
  * PoliciesGuard / CaslAbilityFactory / PrismaService come from the global Casl/Prisma modules. */
 @Module({
-  imports: [AreasModule, ActivitiesModule, RrhhBirthdayReadModule],
+  imports: [AreasModule, ActivitiesModule, RrhhBirthdayReadModule, MembersReadModule],
   controllers: [ActividadesController],
 })
 export class ActividadesModule {}

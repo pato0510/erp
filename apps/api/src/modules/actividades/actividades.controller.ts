@@ -8,6 +8,7 @@ import { PoliciesGuard } from '../common/guards/policies.guard';
 import { BirthdayReadService } from '../rrhh/birthday-read/birthday-read.service';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { ActivitiesService } from './activities/activities.service';
+import { MembersReadService } from './members/members-read.service';
 
 /* CAL-001 — Calendario de Actividades module shell.
  *
@@ -26,6 +27,8 @@ export class ActividadesController {
     // CAL-006 — the RRHH birthday leaf (exported by RrhhBirthdayReadModule). The @CheckPolicies
     // all-roles read gate on GET /calendar IS the founder-signed exposure (decision d).
     private readonly birthdays: BirthdayReadService,
+    // CAL-008 — members-lite read (§2.4). Same all-roles read gate = the signed name exposure.
+    private readonly members: MembersReadService,
   ) {}
 
   /* Proves the guard chain end-to-end. Gated on `read CalendarActivity` — which all six
@@ -77,5 +80,14 @@ export class ActividadesController {
       this.birthdays.listForMonth(companyId, mon),
     ]);
     return { activities: feed.activities, birthdays };
+  }
+
+  /* CAL-008 — members-lite roster for the Responsable select + name resolution (§2.4). Gated
+     `read CalendarActivity` — held by all six roles, which IS the founder-signed name exposure.
+     Returns only { userId, displayName } (structural privacy line). */
+  @Get('members')
+  @CheckPolicies((ability) => ability.can('read', CalendarActivitySubject))
+  listMembers(@CurrentCompany() companyId: string) {
+    return this.members.listForCompany(companyId);
   }
 }

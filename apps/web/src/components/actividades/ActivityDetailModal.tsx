@@ -13,12 +13,14 @@ import type { ActivityArea, ActivityStatus, CalendarActivity } from './activityT
 
 const STATUS_LABEL: Record<ActivityStatus, string> = {
   PENDIENTE: 'Pendiente',
+  EN_EJECUCION: 'En ejecución', // CAL-008
   HECHA: 'Hecha',
   CANCELADA: 'Cancelada',
 };
 
 const STATUS_STYLE: Record<ActivityStatus, { bg: string; color: string }> = {
   PENDIENTE: { bg: 'rgba(37,99,235,0.12)', color: '#1d4ed8' },
+  EN_EJECUCION: { bg: 'rgba(245,158,11,0.14)', color: '#b45309' }, // CAL-008 — amber "in progress"
   HECHA: { bg: 'rgba(34,197,94,0.12)', color: '#15803d' },
   CANCELADA: { bg: 'rgba(100,116,139,0.14)', color: '#475569' },
 };

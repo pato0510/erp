@@ -3,7 +3,7 @@
    @db.Date, serialized as "YYYY-MM-DDT00:00:00.000Z" (UTC midnight — the stored calendar day).
    startTime is a wall-clock "HH:mm" STRING, never a timestamp. */
 
-export type ActivityStatus = 'PENDIENTE' | 'HECHA' | 'CANCELADA';
+export type ActivityStatus = 'PENDIENTE' | 'EN_EJECUCION' | 'HECHA' | 'CANCELADA';
 
 export interface CalendarActivity {
   id: string;

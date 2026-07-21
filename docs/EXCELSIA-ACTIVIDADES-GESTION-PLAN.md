@@ -19,8 +19,7 @@
    CANCELADA stays rejected; same-status rejected. Calendar chips paint
    EN_EJECUCION like PENDIENTE — the distinction lives in the Gestión table.
 3. **"Atrasado" is DERIVED, never stored** (pre-committed doctrine):
-   `overdue = fechaCierre < todayUTC AND status IN (PENDIENTE,
-EN_EJECUCION)`. **Due TODAY is NOT overdue** (strict `<`). Computed
+   `overdue = fechaCierre < today(America/Santiago) AND STATUS IN (PENDIENTE, EN_EJECUCION)` - "today" is the CHILEAN calendar date (CHILE_IVA_RATE-class constant; per-company timezone = V2 seed), so task due today never paints red while the founder's day is still alive. **Due TODAY is NOT overdue** (strict `<`). Computed
    server-side at read time; the UI only paints it.
 4. **Single responsable** this increment (the accountable owner — consistent
    with the module's original Q1). Companions live in the bitácora. Multiple

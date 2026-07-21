@@ -8,23 +8,54 @@ import { UpdateActivityDto } from './dto/update-activity.dto';
 interface ListFilters {
   status?: ActivityStatus;
   areaId?: string;
+  assigneeId?: string;
   from?: string;
   to?: string;
 }
 
-/* CAL-003 — the calendar-activity status machine, as directed adjacency (current → allowed
-   targets). No self-loops, so same-status moves are rejected (the COM-005 convention). The
-   allowed edges (§2.2 / decision e):
-   - PENDIENTE → HECHA          (mark done)
-   - HECHA     → PENDIENTE       (undo a misclick)
-   - PENDIENTE → CANCELADA       (cancel)
-   - CANCELADA → PENDIENTE       (reactivate)
-   HECHA ↔ CANCELADA is intentionally absent (you reopen to PENDIENTE first). */
+/* CAL-003 / CAL-008 — the calendar-activity status machine, as directed adjacency (current →
+   allowed targets). No self-loops, so same-status moves are rejected (the COM-005 convention).
+   The §1.2 edges (Gestión plan):
+   - FREE movement among PENDIENTE ↔ EN_EJECUCION ↔ HECHA — all six directed edges, incl. the
+     PENDIENTE→HECHA shortcut for small tasks.
+   - CANCELADA reachable from PENDIENTE and EN_EJECUCION; CANCELADA → PENDIENTE only.
+   REJECTED (never listed): HECHA↔CANCELADA, CANCELADA→EN_EJECUCION, CANCELADA→HECHA, same-status. */
 const STATUS_TRANSITIONS: Record<ActivityStatus, ActivityStatus[]> = {
-  [ActivityStatus.PENDIENTE]: [ActivityStatus.HECHA, ActivityStatus.CANCELADA],
-  [ActivityStatus.HECHA]: [ActivityStatus.PENDIENTE],
+  [ActivityStatus.PENDIENTE]: [
+    ActivityStatus.EN_EJECUCION,
+    ActivityStatus.HECHA,
+    ActivityStatus.CANCELADA,
+  ],
+  [ActivityStatus.EN_EJECUCION]: [
+    ActivityStatus.PENDIENTE,
+    ActivityStatus.HECHA,
+    ActivityStatus.CANCELADA,
+  ],
+  [ActivityStatus.HECHA]: [ActivityStatus.PENDIENTE, ActivityStatus.EN_EJECUCION],
   [ActivityStatus.CANCELADA]: [ActivityStatus.PENDIENTE],
 };
+
+/* CAL-008 — the open statuses for the derived `overdue` flag (§1.3): only work still to do can
+   be late. HECHA and CANCELADA are never overdue. */
+const OPEN_STATUSES: ActivityStatus[] = [ActivityStatus.PENDIENTE, ActivityStatus.EN_EJECUCION];
+
+/* CAL-008b — "hoy" for the derived `overdue` flag is the CHILEAN calendar date, not the UTC one.
+   AGS operates in America/Santiago (UTC-3/-4); comparing against the UTC date wrongly flags a
+   task due TODAY as overdue from ~20:00 local — violating the validated "due today is NOT
+   overdue" rule. This is a Chilean-platform constant (the CHILE_IVA_RATE precedent); per-company
+   timezone is a recorded V2 seed. Pure: `santiagoDateOf` turns ANY instant into its 'YYYY-MM-DD'
+   in Santiago (the en-CA locale yields ISO order); `todayInSantiago` applies it to now. */
+function santiagoDateOf(instant: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(instant);
+}
+function todayInSantiago(): string {
+  return santiagoDateOf(new Date());
+}
 
 /* CAL-003 — Calendar activities.
  *
@@ -86,23 +117,41 @@ export class ActivitiesService {
     }
   }
 
+  /** CAL-008 / CAL-008b — attach the read-time derived fields (§2.3), NEVER stored, NO cron:
+   *  - dueDate = endDate ?? startDate (a range is due when it ends).
+   *  - overdue = dueDate STRICTLY before TODAY-in-Santiago AND status still open. Due TODAY is
+   *    NOT overdue (strict `<`). Both sides are 'YYYY-MM-DD' strings (lexicographic order =
+   *    chronological): the @db.Date row is UTC midnight so its ISO day-slice IS the stored
+   *    calendar day; "hoy" is the CHILEAN calendar date (CAL-008b — never the UTC date, which
+   *    misfires in the Chilean evening). */
+  private withDerived<T extends { startDate: Date; endDate: Date | null; status: ActivityStatus }>(
+    activity: T,
+  ) {
+    const dueDate = activity.endDate ?? activity.startDate;
+    const dueDateStr = dueDate.toISOString().slice(0, 10);
+    const overdue = OPEN_STATUSES.includes(activity.status) && dueDateStr < todayInSantiago();
+    return { ...activity, dueDate, overdue };
+  }
+
   async findAll(companyId: string, filters: ListFilters = {}) {
     const where: Prisma.CalendarActivityWhereInput = { companyId };
     if (filters.status) where.status = filters.status;
     if (filters.areaId) where.areaId = filters.areaId;
+    if (filters.assigneeId) where.assigneeId = filters.assigneeId;
     if (filters.from || filters.to) {
       where.startDate = {};
       if (filters.from) where.startDate.gte = this.toDateOnly(filters.from);
       if (filters.to) where.startDate.lte = this.toDateOnly(filters.to);
     }
-    return this.prisma.calendarActivity.findMany({
+    const rows = await this.prisma.calendarActivity.findMany({
       where,
       orderBy: [{ startDate: 'asc' }, { startTime: 'asc' }],
     });
+    return rows.map((a) => this.withDerived(a));
   }
 
   async findOne(id: string, companyId: string) {
-    return this.getActivityOrThrow(id, companyId);
+    return this.withDerived(await this.getActivityOrThrow(id, companyId));
   }
 
   async create(companyId: string, userId: string, dto: CreateActivityDto) {

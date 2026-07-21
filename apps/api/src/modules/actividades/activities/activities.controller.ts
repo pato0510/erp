@@ -38,10 +38,11 @@ export class ActivitiesController {
     @CurrentCompany() companyId: string,
     @Query('status') status?: ActivityStatus,
     @Query('areaId') areaId?: string,
+    @Query('assigneeId') assigneeId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.service.findAll(companyId, { status, areaId, from, to });
+    return this.service.findAll(companyId, { status, areaId, assigneeId, from, to });
   }
 
   @Get(':id')
