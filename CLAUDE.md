@@ -595,16 +595,88 @@ Puntos clave:
 
 Última actualización: 2026-07-15
 
+═══════════════════════════════════════════════════════════════════
+
+# 🏁 MÓDULO CALENDARIO DE ACTIVIDADES — V1 EN PRODUCCIÓN (live desde 2026-07-21)
+
+═══════════════════════════════════════════════════════════════════
+
+Status: V1 completo (CAL-000…CAL-007), card viva en /modulos, ruta /actividades.
+Schema: apps/api/prisma/schema/actividades.prisma
+Backend: apps/api/src/modules/actividades/ + apps/api/src/modules/rrhh/
+birthday-read/ (la hoja de cumpleaños) · Frontend: /actividades/...
+
+Tablas: activity_areas, calendar_activities.
+
+Puntos clave:
+
+- activity_areas: catálogo configurable de carriles (nombre + color +
+  active), unique(companyId, name); DELETE solo si está prístino (cero
+  actividades), con FK Restrict de respaldo a nivel DB. Cuando ya tiene
+  actividades se inactiva (active=false), no se borra.
+- calendar_activities: título, área (FK Restrict), fecha de inicio, fecha de
+  término opcional (rango), hora opcional, responsable opcional (assigneeId,
+  sin picker de usuarios en V1), estado y notas. createdBy del JWT.
+- DOCTRINA DE COEXISTENCIA: ActivityArea (carril de planificación,
+  configurable por MANAGER+) y AreaRRHH (8 valores fijos, pertenencia
+  organizacional del empleado) son conceptos DISTINTOS y deliberadamente
+  separados. Ningún ticket futuro los unifica sin decisión expresa del
+  fundador (misma clase de trampa que VIEWER↔caja).
+- HORA DE PARED: startTime es un string "HH:mm", JAMÁS un timestamp; toca un
+  Date SOLO en la construcción local numérica del adapter del frontend
+  (new Date(y, mIdx, d, HH, mm)) — nunca por parseo de "YYYY-MM-DDTHH:mm" ni
+  vía UTC. Válida únicamente en actividades de un día (el backend rechaza la
+  hora en un rango con un 400 verbatim; el form no la pre-bloquea, la
+  regla la impone el servidor).
+- Máquina de estados (PATCH /:id/status): PENDIENTE↔HECHA,
+  PENDIENTE↔CANCELADA, CANCELADA→PENDIENTE; HECHA↔CANCELADA y mismo-estado
+  rechazados (convención COM-005). EDICIÓN permitida en CUALQUIER estado
+  (contraste deliberado con campañas — es herramienta de planificación, no
+  registro contable). DELETE siempre permitido para writers, en cualquier
+  estado (decisión b).
+- Feed: GET /actividades/calendar?month=YYYY-MM → { activities, birthdays }.
+  activities excluye CANCELADA (llega por la lista con ?status=CANCELADA —
+  sección "Canceladas" del calendario); clamp de mes en UTC; la semana que
+  cruza dos meses se resuelve en el cliente con doble fetch + dedupe por id.
+- CASL — LA MATRIZ INVERTIDA: primer módulo del ERP con read para los SEIS
+  roles (no hay dinero en la superficie; decisión Q4 del fundador); write
+  MANAGER/ADMIN/SUPER_ADMIN. VIEWER por grant aditivo (idioma COM-002);
+  ANALYST con su primer re-grant post-floor. PoliciesGuard falla ABIERTO →
+  todo endpoint lleva @CheckPolicies.
+- CUMPLEAÑOS — EXPOSICIÓN FIRMADA (decisión d, 2026-07-15): nombre + día/mes
+  de empleados ACTIVOS visible a TODOS los roles vía calendario; JAMÁS el
+  año, la edad ni ningún otro campo. Línea estructural, no filtro
+  (BirthdayEntry no puede cargar lo que no debe). Derivado en vivo desde
+  Employee.birthDate por RrhhBirthdayReadModule — hoja que NO importa nada
+  (patrón AttributionRead); grafo acíclico Actividades → RrhhBirthdayRead sin
+  forwardRef. birthDate null se salta; employeeId es solo key de render,
+  jamás se enlaza. Modal de cumpleaños de SOLO LECTURA, sin acciones para
+  ningún rol.
+- Vistas compartidas: MonthView/WeekView/DayView genéricas en
+  components/calendar/ (extracciones MKT-004/CAL-004, con regresión de
+  Operaciones verificada). getChipIcon opcional agregado en CAL-006 (ícono
+  torta para cumpleaños) — no-op para Operaciones.
+
+Última actualización: 2026-07-21
+
 # Próximos pasos
 
-- Módulos V1 completos: Finanzas, Operaciones, RRHH, Comercial, Marketing.
+- Módulos V1 completos: Finanzas, Operaciones, RRHH, Comercial, Marketing,
+  Calendario de Actividades.
+- Vista Gestión de actividades — pedido del fundador (2026-07-20): la
+  reunión semanal de AGS migra de la planilla al módulo. Scope en
+  docs/EXCELSIA-ACTIVIDADES-GESTION-SCOPE.md; primer incremento post-V1;
+  prerrequisito: endpoint de miembros de la empresa legible por escritores
+  de actividades.
+- Feed unificado cross-módulo del calendario (V2, scope en el doc de Gestión
+  §4 y el plan Part 1 §1).
 - Manual de Comercial (V1 ya en producción).
 - Bump rutinario de dependencias (incorpora el fix de Next.js PR #88688,
   que elimina el warning dev-only "negative time stamp").
-- ROTACIÓN DE CREDENCIALES R2 — gate de seguridad: vence ahora que
-  Marketing era el último módulo del roadmap V1.
-- Módulo Calendario de Actividades (scope en
-  docs/EXCELSIA-CALENDARIO-ACTIVIDADES-SCOPE.md).
+- ROTACIÓN R2: credenciales nuevas operando en producción desde 2026-07-15;
+  REVOCACIÓN DEL TOKEN VIEJO SIN CONFIRMAR por el fundador — hasta
+  confirmación, la credencial expuesta debe asumirse viva. Pendiente:
+  confirmar revocación en Cloudflare.
 - DECISIÓN DE POLÍTICA (2026-07-15, fundador): VIEWER es un rol de lectura
   financiera POR DISEÑO — mantiene read sobre Movement/caja/compromisos,
   montos incluidos (herencia deliberada de la era Finanzas, confirmada con

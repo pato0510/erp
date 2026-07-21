@@ -405,15 +405,14 @@ const MODULES: ModuleDef[] = [
     svg: <RrhhSvg />,
   },
   {
-    // CAL-001 — the shell is built; href points at /actividades, but active stays false
-    // ("Próximamente") until CAL-007 un-gates it (COM-015/MKT-010 pattern). Direct-URL
-    // access works for local validation meanwhile.
+    // CAL-007 — un-gated: Calendario de Actividades is live (three views, chips by area,
+    // birthdays feed). Was gated ("Próximamente") through CAL-001..006 (COM-015/MKT-010 pattern).
     key: 'calendario-actividades',
     name: 'Calendario de Actividades',
     description: 'Calendario maestro de actividades internas de la organización',
     gradient: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
     href: '/actividades',
-    active: false,
+    active: true,
     svg: <CalendarioSvg />,
   },
 ];
