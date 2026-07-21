@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react';
+import { Cake, ChevronDown, ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { MonthView } from '../../../../components/calendar/MonthView';
 import { WeekView } from '../../../../components/calendar/WeekView';
@@ -18,17 +18,22 @@ import {
 } from '../../../../components/calendar/dateGrid';
 import {
   activityToChips,
-  areaBadge,
-  chipLabel,
-  chipStyle,
-  compareChips,
+  birthdayToChip,
+  chipBadgeFor,
+  chipLabelFor,
+  chipStyleFor,
+  compareCalChips,
+  eventTimeFor,
   monthsInSpan,
-  type ActivityChip,
+  monthYearMap,
+  type CalChip,
 } from '../../../../components/actividades/calendarAdapter';
 import { ActivityDetailModal } from '../../../../components/actividades/ActivityDetailModal';
 import { ActivityFormModal } from '../../../../components/actividades/ActivityFormModal';
+import { BirthdayModal } from '../../../../components/actividades/BirthdayModal';
 import type {
   ActivityArea,
+  BirthdayEntry,
   CalendarActivity,
 } from '../../../../components/actividades/activityTypes';
 import { useCanWriteActividades } from '../../../../hooks/useActividadesPermissions';
@@ -108,6 +113,7 @@ export default function ActividadesCalendarioPage() {
 
   const [areas, setAreas] = useState<ActivityArea[]>([]);
   const [activities, setActivities] = useState<CalendarActivity[]>([]);
+  const [birthdays, setBirthdays] = useState<BirthdayEntry[]>([]);
   const [cancelled, setCancelled] = useState<CalendarActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +122,7 @@ export default function ActividadesCalendarioPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'PENDIENTE' | 'HECHA'>('all');
 
   const [selected, setSelected] = useState<CalendarActivity | null>(null);
+  const [selectedBirthday, setSelectedBirthday] = useState<BirthdayEntry | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarActivity | null>(null);
   const [cancelledOpen, setCancelledOpen] = useState(false);
@@ -130,9 +137,10 @@ export default function ActividadesCalendarioPage() {
       .catch(() => setAreas([]));
   }, []);
 
-  /* Feed: fetch EVERY month the visible grid touches and merge, deduped by activity id — so a
-     cross-month range (fetched from both its months) collapses to one row, which the adapter
-     then expands across the visible span. */
+  /* Feed: fetch EVERY month the visible grid touches and merge. Activities dedupe by id (a
+     cross-month range fetched from both months collapses to one row). Birthdays (CAL-006) are
+     deduped by employeeId+month — each birthday belongs to one month, so the concat across
+     months is naturally disjoint; the Map is belt-and-suspenders. */
   const fetchFeed = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -141,12 +149,19 @@ export default function ActividadesCalendarioPage() {
       const months = monthsInSpan(gridStart, gridEnd);
       const feeds = await Promise.all(
         months.map((m) =>
-          apiClient.get<{ activities: CalendarActivity[] }>(`/api/actividades/calendar?month=${m}`),
+          apiClient.get<{ activities: CalendarActivity[]; birthdays: BirthdayEntry[] }>(
+            `/api/actividades/calendar?month=${m}`,
+          ),
         ),
       );
       const byId = new Map<string, CalendarActivity>();
-      for (const f of feeds) for (const a of f.activities) byId.set(a.id, a);
+      const bdayById = new Map<string, BirthdayEntry>();
+      for (const f of feeds) {
+        for (const a of f.activities) byId.set(a.id, a);
+        for (const b of f.birthdays) bdayById.set(`${b.employeeId}:${b.month}`, b);
+      }
       setActivities([...byId.values()]);
+      setBirthdays([...bdayById.values()]);
     } catch {
       setError('No se pudieron cargar las actividades.');
     } finally {
@@ -191,24 +206,32 @@ export default function ActividadesCalendarioPage() {
     [activities, filterAreaId, filterStatus],
   );
 
-  const chips = useMemo(() => {
+  const chips = useMemo<CalChip[]>(() => {
     const { gridStart, gridEnd } = spanFor(view, focusedDate);
-    return filtered.flatMap((a) => activityToChips(a, gridStart, gridEnd));
-  }, [filtered, view, focusedDate]);
+    const activityChips = filtered.flatMap((a) => activityToChips(a, gridStart, gridEnd));
+    // Birthdays ignore the área/estado filters (they have neither) — they always render.
+    const monthToYear = monthYearMap(monthsInSpan(gridStart, gridEnd));
+    const birthdayChips = birthdays
+      .map((b) => birthdayToChip(b, monthToYear, gridStart, gridEnd))
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+    return [...activityChips, ...birthdayChips];
+  }, [filtered, birthdays, view, focusedDate]);
 
-  /* ---- shared wiring (identical accessors across the three views) ---- */
-  const getChipStyle = useCallback(
-    (chip: ActivityChip) => chipStyle(chip.activity, areaById.get(chip.activity.areaId)),
-    [areaById],
+  /* ---- shared wiring (identical accessors across the three views; union-aware) ---- */
+  const getChipStyle = useCallback((chip: CalChip) => chipStyleFor(chip, areaById), [areaById]);
+  const getChipLabel = useCallback((chip: CalChip) => chipLabelFor(chip), []);
+  const getChipBadge = useCallback((chip: CalChip) => chipBadgeFor(chip, areaById), [areaById]);
+  // getEventTime returns the RAW wall-clock string (no Date); birthdays are untimed → null.
+  const getEventTime = useCallback((chip: CalChip) => eventTimeFor(chip), []);
+  // Birthdays carry the festive Cake icon on every view; activities carry none.
+  const getChipIcon = useCallback(
+    (chip: CalChip) => (chip.kind === 'birthday' ? <Cake size={11} /> : null),
+    [],
   );
-  const getChipLabel = useCallback((chip: ActivityChip) => chipLabel(chip.activity), []);
-  const getChipBadge = useCallback(
-    (chip: ActivityChip) => areaBadge(areaById.get(chip.activity.areaId)?.name ?? '—'),
-    [areaById],
-  );
-  // getEventTime returns the RAW wall-clock string (no Date) — null when untimed.
-  const getEventTime = useCallback((chip: ActivityChip) => chip.activity.startTime ?? null, []);
-  const onSelectEvent = useCallback((chip: ActivityChip) => setSelected(chip.activity), []);
+  const onSelectEvent = useCallback((chip: CalChip) => {
+    if (chip.kind === 'birthday') setSelectedBirthday(chip.birthday);
+    else setSelected(chip.activity);
+  }, []);
 
   const openCreate = () => {
     setEditing(null);
@@ -356,7 +379,7 @@ export default function ActividadesCalendarioPage() {
             Cargando actividades…
           </div>
         ) : view === 'month' ? (
-          <MonthView<ActivityChip>
+          <MonthView<CalChip>
             focusedDate={focusedDate}
             events={chips}
             onSelectDay={(day) => {
@@ -366,27 +389,30 @@ export default function ActividadesCalendarioPage() {
             onSelectEvent={onSelectEvent}
             getChipStyle={getChipStyle}
             getChipLabel={getChipLabel}
-            sortDayEvents={compareChips}
+            getChipIcon={getChipIcon}
+            sortDayEvents={compareCalChips}
           />
         ) : view === 'week' ? (
-          <WeekView<ActivityChip>
+          <WeekView<CalChip>
             focusedDate={focusedDate}
             events={chips}
             onSelectEvent={onSelectEvent}
             getChipStyle={getChipStyle}
             getChipLabel={getChipLabel}
             getChipBadge={getChipBadge}
+            getChipIcon={getChipIcon}
             getEventTime={getEventTime}
-            sortDayEvents={compareChips}
+            sortDayEvents={compareCalChips}
           />
         ) : (
-          <DayView<ActivityChip>
+          <DayView<CalChip>
             focusedDate={focusedDate}
             events={chips}
             onSelectEvent={onSelectEvent}
             getChipStyle={getChipStyle}
             getChipLabel={getChipLabel}
             getChipBadge={getChipBadge}
+            getChipIcon={getChipIcon}
             getEventTime={getEventTime}
           />
         )}
@@ -457,6 +483,10 @@ export default function ActividadesCalendarioPage() {
             refresh();
           }}
         />
+      )}
+
+      {selectedBirthday && (
+        <BirthdayModal birthday={selectedBirthday} onClose={() => setSelectedBirthday(null)} />
       )}
     </div>
   );

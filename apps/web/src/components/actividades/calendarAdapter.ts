@@ -1,5 +1,5 @@
 import { dateKey } from '../calendar/dateGrid';
-import type { ActivityArea, CalendarActivity } from './activityTypes';
+import type { ActivityArea, BirthdayEntry, CalendarActivity } from './activityTypes';
 
 /* CAL-005 — the adapter between CalendarActivity rows and the shared generic calendar views
    (the MKT-004/CAL-004 recipe). It turns each activity into one or more render "chips":
@@ -16,10 +16,27 @@ import type { ActivityArea, CalendarActivity } from './activityTypes';
    (CAL-004's documented contract) and a 13:00 lunch is 13:00 in Antofagasta. */
 
 export interface ActivityChip {
+  kind: 'activity';
   id: string; // unique per rendered chip (activityId, or activityId:dayKey for ranged)
   date: string; // ISO of the exact instant this chip sits at (see localInstantIso)
   activity: CalendarActivity;
 }
+
+/* CAL-006 — a birthday render chip. Same {id, date} contract the shared views need; carries the
+   PII-safe BirthdayEntry (no year). Untimed by nature → lands in the "Todo el día" bucket. */
+export interface BirthdayChip {
+  kind: 'birthday';
+  id: string;
+  date: string;
+  birthday: BirthdayEntry;
+}
+
+/* The unified chip the calendar page feeds to the shared generic views. */
+export type CalChip = ActivityChip | BirthdayChip;
+
+/* Fixed festive style for birthday chips — deliberately NOT an area color, so a birthday reads
+   as a birthday on any view (paired with the Cake icon via the views' getChipIcon slot). */
+export const BIRTHDAY_STYLE = { bg: 'rgba(219,39,119,0.14)', color: '#db2777' } as const;
 
 const NEUTRAL_COLOR = '#64748b'; // slate — fallback when an area has no catalog color
 
@@ -65,6 +82,7 @@ export function activityToChips(
     if (!inSpan(localMidnight, gridStart, gridEnd)) return [];
     return [
       {
+        kind: 'activity',
         id: activity.id,
         date: localInstantIso(start.y, start.m, start.d, activity.startTime),
         activity,
@@ -82,6 +100,7 @@ export function activityToChips(
     const localMidnight = new Date(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate(), 0, 0);
     if (inSpan(localMidnight, gridStart, gridEnd)) {
       chips.push({
+        kind: 'activity',
         id: `${activity.id}:${dateKey(localMidnight)}`,
         date: localMidnight.toISOString(),
         activity,
@@ -150,13 +169,75 @@ export function areaBadge(name: string): string {
   return initials.toUpperCase().slice(0, 3);
 }
 
-/** Week within-day ordering: untimed first, then startTime asc (string compare is fine for
- *  "HH:mm"), then title. */
-export function compareChips(a: ActivityChip, b: ActivityChip): number {
-  const ta = a.activity.startTime;
-  const tb = b.activity.startTime;
+/* ── CAL-006: birthdays + unified (activity | birthday) chip accessors ───────────────── */
+
+/** Map each fetched "YYYY-MM" to its year, so a birthday (which carries month but NO year) can
+ *  be planted on the correct grid cell — including a two-month span (jul → ago) or a Dec→Jan
+ *  wrap where the same month number would otherwise be ambiguous. */
+export function monthYearMap(months: string[]): Map<number, number> {
+  const map = new Map<number, number>();
+  for (const ym of months) {
+    const [y, m] = ym.split('-').map(Number);
+    map.set(m, y);
+  }
+  return map;
+}
+
+/** Place a birthday on its day within the visible span. The year comes from the month→year map
+ *  (the birthday itself has none); the chip sits at LOCAL midnight → the "Todo el día" bucket. */
+export function birthdayToChip(
+  birthday: BirthdayEntry,
+  monthToYear: Map<number, number>,
+  gridStart: Date,
+  gridEnd: Date,
+): BirthdayChip | null {
+  const year = monthToYear.get(birthday.month);
+  if (year === undefined) return null;
+  const localMidnight = new Date(year, birthday.month - 1, birthday.day, 0, 0);
+  if (!inSpan(localMidnight, gridStart, gridEnd)) return null;
+  return {
+    kind: 'birthday',
+    id: `bday:${birthday.employeeId}:${birthday.month}`,
+    date: localMidnight.toISOString(),
+    birthday,
+  };
+}
+
+/** Chip background/color: area color for activities (dimmed if HECHA), fixed festive for
+ *  birthdays. */
+export function chipStyleFor(
+  chip: CalChip,
+  areaById: Map<string, ActivityArea>,
+): { bg: string; color: string } {
+  if (chip.kind === 'birthday') return { ...BIRTHDAY_STYLE };
+  return chipStyle(chip.activity, areaById.get(chip.activity.areaId));
+}
+
+/** Chip label: activity title (✓ if HECHA), or the birthday's fullName. */
+export function chipLabelFor(chip: CalChip): string {
+  return chip.kind === 'birthday' ? chip.birthday.fullName : chipLabel(chip.activity);
+}
+
+/** Week/Day chip badge: area initials for activities, a short "CUMPLE" for birthdays. */
+export function chipBadgeFor(chip: CalChip, areaById: Map<string, ActivityArea>): string {
+  if (chip.kind === 'birthday') return 'CUMPLE';
+  return areaBadge(areaById.get(chip.activity.areaId)?.name ?? '—');
+}
+
+/** getEventTime: the raw wall-clock string for a timed activity; birthdays are always untimed. */
+export function eventTimeFor(chip: CalChip): string | null {
+  if (chip.kind === 'birthday') return null;
+  return chip.activity.startTime ?? null;
+}
+
+/** Within-day ordering: untimed first (birthdays included), then startTime asc, then label. */
+export function compareCalChips(a: CalChip, b: CalChip): number {
+  const ta = a.kind === 'activity' ? a.activity.startTime : null;
+  const tb = b.kind === 'activity' ? b.activity.startTime : null;
   if (!ta && tb) return -1;
   if (ta && !tb) return 1;
   if (ta && tb && ta !== tb) return ta < tb ? -1 : 1;
-  return a.activity.title.localeCompare(b.activity.title);
+  const la = a.kind === 'birthday' ? a.birthday.fullName : a.activity.title;
+  const lb = b.kind === 'birthday' ? b.birthday.fullName : b.activity.title;
+  return la.localeCompare(lb);
 }

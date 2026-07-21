@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   addDays,
   DAY_NAMES_SHORT,
@@ -37,6 +37,8 @@ interface MonthViewProps<T extends CalendarMonthEvent> {
   getChipStyle: (event: T) => { bg: string; color: string };
   /** Chip text + tooltip for an event. */
   getChipLabel: (event: T) => string;
+  /** Optional leading icon node inside the chip (e.g. a birthday Cake). Omitted → nothing. */
+  getChipIcon?: (event: T) => ReactNode;
   onSelectEvent: (event: T) => void;
   /** Optional day-cell click (e.g. drill into a day view). */
   onSelectDay?: (day: Date) => void;
@@ -53,6 +55,7 @@ export function MonthView<T extends CalendarMonthEvent>({
   events,
   getChipStyle,
   getChipLabel,
+  getChipIcon,
   onSelectEvent,
   onSelectDay,
   sortDayEvents,
@@ -179,6 +182,7 @@ export function MonthView<T extends CalendarMonthEvent>({
                         borderLeft: `2px solid ${style.color}`,
                       }}
                     >
+                      {getChipIcon?.(e)}
                       <span className="truncate">{label}</span>
                     </span>
                   );

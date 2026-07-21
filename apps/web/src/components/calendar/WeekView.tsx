@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { addDays, DAY_NAMES_SHORT, dateKey, isToday, isWeekend, startOfWeek } from './dateGrid';
 
 /* CAL-004 — the SHARED, domain-agnostic week grid (extracted verbatim in behavior from the
@@ -25,6 +25,8 @@ interface WeekViewProps<T extends CalendarWeekEvent> {
   getChipLabel: (event: T) => string;
   /** Short code badge (e.g. "PT", "DOC"). */
   getChipBadge: (event: T) => string;
+  /** Optional leading icon node inside the card (e.g. a birthday Cake). Omitted → nothing. */
+  getChipIcon?: (event: T) => ReactNode;
   /** Optional pre-formatted time string (e.g. "08:00 – 12:00"); null → no time shown. This is
    *  the lifted `work_permit_scheduled` coupling — the CALLER decides which events carry a
    *  clock. */
@@ -40,6 +42,7 @@ export function WeekView<T extends CalendarWeekEvent>({
   getChipStyle,
   getChipLabel,
   getChipBadge,
+  getChipIcon,
   getEventTime,
   sortDayEvents,
 }: WeekViewProps<T>) {
@@ -116,6 +119,7 @@ export function WeekView<T extends CalendarWeekEvent>({
                       getChipStyle={getChipStyle}
                       getChipLabel={getChipLabel}
                       getChipBadge={getChipBadge}
+                      getChipIcon={getChipIcon}
                       getEventTime={getEventTime}
                     />
                   ))
@@ -135,6 +139,7 @@ function WeekEventCard<T extends CalendarWeekEvent>({
   getChipStyle,
   getChipLabel,
   getChipBadge,
+  getChipIcon,
   getEventTime,
 }: {
   event: T;
@@ -142,6 +147,7 @@ function WeekEventCard<T extends CalendarWeekEvent>({
   getChipStyle: (e: T) => { bg: string; color: string };
   getChipLabel: (e: T) => string;
   getChipBadge: (e: T) => string;
+  getChipIcon?: (e: T) => ReactNode;
   getEventTime?: (e: T) => string | null;
 }) {
   const style = getChipStyle(event);
@@ -161,8 +167,9 @@ function WeekEventCard<T extends CalendarWeekEvent>({
           {time}
         </span>
       )}
-      <span className="line-clamp-2 text-xs font-medium" style={{ color: style.color }}>
-        {getChipLabel(event)}
+      <span className="flex items-start gap-1 text-xs font-medium" style={{ color: style.color }}>
+        {getChipIcon?.(event)}
+        <span className="line-clamp-2">{getChipLabel(event)}</span>
       </span>
       <span
         className="inline-flex w-fit items-center rounded px-1 py-0 text-[9px] font-semibold tracking-wide"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Calendar, Clock } from 'lucide-react';
 import { formatLongDay, isToday } from './dateGrid';
 
@@ -27,6 +27,8 @@ interface DayViewProps<T extends CalendarDayEvent> {
   getChipLabel: (event: T) => string;
   /** Short code badge (e.g. "PT", "DOC"). */
   getChipBadge: (event: T) => string;
+  /** Optional leading icon node next to the title (e.g. a birthday Cake). Omitted → nothing. */
+  getChipIcon?: (event: T) => ReactNode;
   /** Optional second badge (e.g. severity). null → no badge rendered for this event. */
   getSeverityBadge?: (event: T) => { label: string; color: string; bg: string } | null;
   /** Optional pre-formatted time string (e.g. "08:00 – 12:00"); null → no time shown. This is
@@ -42,6 +44,7 @@ export function DayView<T extends CalendarDayEvent>({
   getChipStyle,
   getChipLabel,
   getChipBadge,
+  getChipIcon,
   getSeverityBadge,
   getEventTime,
 }: DayViewProps<T>) {
@@ -97,6 +100,7 @@ export function DayView<T extends CalendarDayEvent>({
                     getChipStyle={getChipStyle}
                     getChipLabel={getChipLabel}
                     getChipBadge={getChipBadge}
+                    getChipIcon={getChipIcon}
                     getSeverityBadge={getSeverityBadge}
                     getEventTime={getEventTime}
                   />
@@ -116,6 +120,7 @@ function DayEventCard<T extends CalendarDayEvent>({
   getChipStyle,
   getChipLabel,
   getChipBadge,
+  getChipIcon,
   getSeverityBadge,
   getEventTime,
 }: {
@@ -124,6 +129,7 @@ function DayEventCard<T extends CalendarDayEvent>({
   getChipStyle: (e: T) => { bg: string; color: string };
   getChipLabel: (e: T) => string;
   getChipBadge: (e: T) => string;
+  getChipIcon?: (e: T) => ReactNode;
   getSeverityBadge?: (e: T) => { label: string; color: string; bg: string } | null;
   getEventTime?: (e: T) => string | null;
 }) {
@@ -160,7 +166,11 @@ function DayEventCard<T extends CalendarDayEvent>({
             <span className="text-[10px] font-mono text-[var(--text-secondary)]">{time}</span>
           )}
         </div>
-        <div className="mt-1 text-sm font-medium" style={{ color: style.color }}>
+        <div
+          className="mt-1 flex items-center gap-1.5 text-sm font-medium"
+          style={{ color: style.color }}
+        >
+          {getChipIcon?.(event)}
           {getChipLabel(event)}
         </div>
       </div>
