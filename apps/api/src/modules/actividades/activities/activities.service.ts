@@ -186,9 +186,15 @@ export class ActivitiesService {
     return { ...this.withDerived(activity), notesCount, latestNote: latestArr[0] ?? null };
   }
 
-  /* ── CAL-009: the immutable bitácora ─────────────────────────────────────────────── */
+  /* ── CAL-009 / CAL-012: the bitácora ─────────────────────────────────────────────────
+     CAL-009 shipped this bitácora IMMUTABLE (append-only; no update/delete). REVERSED by the
+     founder on 2026-07-22 (CAL-012, after being counseled twice): any activity WRITER may edit
+     or delete ANY entry, forever. The platform audit trigger is the forensic record — every
+     UPDATE/DELETE preserves the prior content in audit_logs. Ordering + "latest" stay keyed on
+     createdAt (immutable), so editing an old entry NEVER reorders or promotes it. */
 
-  /** Entries for an activity, newest first. Verifies the activity belongs to the company. */
+  /** Entries for an activity, newest first (by createdAt — unaffected by edits). Verifies the
+   *  activity belongs to the company. */
   async listNotes(activityId: string, companyId: string) {
     await this.getActivityOrThrow(activityId, companyId);
     return this.prisma.calendarActivityNote.findMany({
@@ -197,8 +203,16 @@ export class ActivitiesService {
     });
   }
 
+  private async getNoteOrThrow(noteId: string, activityId: string, companyId: string) {
+    const note = await this.prisma.calendarActivityNote.findFirst({
+      where: { id: noteId, activityId, companyId },
+    });
+    if (!note) throw new NotFoundException('Entrada de bitácora no encontrada');
+    return note;
+  }
+
   /** Append one entry. `authorId` is the JWT actor (NEVER from the DTO). Empty/whitespace-only
-   *  text → 400 Spanish. Append-only: there is no update or delete counterpart, anywhere. */
+   *  text → 400 Spanish. `updatedAt` stays null (a fresh entry was never edited). */
   async addNote(activityId: string, companyId: string, authorId: string, text: string) {
     await this.getActivityOrThrow(activityId, companyId);
     const trimmed = (text ?? '').trim();
@@ -209,6 +223,39 @@ export class ActivitiesService {
       return tx.calendarActivityNote.create({
         data: { companyId, activityId, authorId, text: trimmed },
       });
+    });
+  }
+
+  /** CAL-012 — edit an entry's text (any writer, any entry). Verifies the note belongs to the
+   *  activity + company; empty text → 400. `updatedAt` is set EXPLICITLY here (never via
+   *  @updatedAt), so pristine entries keep updatedAt=null and the "editada" marker is truthful.
+   *  createdAt is untouched → ordering/latest never change. */
+  async editNote(
+    activityId: string,
+    noteId: string,
+    companyId: string,
+    userId: string,
+    text: string,
+  ) {
+    await this.getNoteOrThrow(noteId, activityId, companyId);
+    const trimmed = (text ?? '').trim();
+    if (!trimmed) {
+      throw new BadRequestException('La entrada no puede estar vacía.');
+    }
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.calendarActivityNote.update({
+        where: { id: noteId },
+        data: { text: trimmed, updatedAt: new Date() },
+      });
+    });
+  }
+
+  /** CAL-012 — hard-delete an entry (any writer, any entry). The audit trigger preserves the
+   *  deleted row's content in audit_logs (the forensic layer). */
+  async deleteNote(activityId: string, noteId: string, companyId: string, userId: string) {
+    await this.getNoteOrThrow(noteId, activityId, companyId);
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.calendarActivityNote.delete({ where: { id: noteId } });
     });
   }
 

@@ -65,18 +65,22 @@ model CalendarActivity {
   @@map("calendar_activities")
 }
 
-/* CAL-009 — the bitácora: append-only, dated entries per activity (the Comercial-timeline
- * discipline, §1.6). STRUCTURAL IMMUTABILITY: there is deliberately NO `updatedAt` field and
- * there are NO update/delete endpoints — a typo gets a correcting entry, never an edit. CASCADE
- * with the activity (deleting the activity deletes its log — decision b's spirit). RLS + audit
- * trigger + app_user GRANT ship in migration 20260721130000_add_calendar_activity_notes. */
+/* CAL-009 / CAL-012 — the bitácora: dated entries per activity (the Comercial-timeline
+ * discipline, §1.6). CAL-009 shipped this IMMUTABLE (no updatedAt, no edit/delete routes).
+ * REVERSED by the founder 2026-07-22 (CAL-012): any activity WRITER may edit or delete ANY entry,
+ * forever. `updatedAt` is PLAIN nullable (NOT @updatedAt) — set EXPLICITLY only in the edit path,
+ * so a pristine entry stays null and the "editada" marker is truthful. The platform audit trigger
+ * is the forensic layer: every UPDATE/DELETE preserves the prior content in audit_logs. CASCADE
+ * with the activity. RLS + audit trigger + app_user GRANT shipped in 20260721130000; the
+ * updatedAt column in 20260722120000_add_note_updatedat. */
 model CalendarActivityNote {
-  id         String   @id @default(uuid()) @db.Uuid
-  companyId  String   @db.Uuid
-  activityId String   @db.Uuid
-  authorId   String   @db.Uuid // bare actor UUID; the display name is resolved via the members map
+  id         String    @id @default(uuid()) @db.Uuid
+  companyId  String    @db.Uuid
+  activityId String    @db.Uuid
+  authorId   String    @db.Uuid // bare actor UUID; the display name is resolved via the members map
   text       String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime? // null = never edited; set EXPLICITLY in the edit path (NOT @updatedAt)
 
   activity CalendarActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
 

@@ -677,11 +677,18 @@ Puntos clave:
   nombres). Lee Membership/User (infra común, no frontera de módulo de
   negocio). displayName = "firstName lastName", fallback al local-part del
   email.
-- Bitácora — INMUTABILIDAD FIRMADA (CAL-009): tabla calendar_activity_notes
-  SIN updatedAt y SIN rutas de edición/borrado (inmutabilidad por AUSENCIA;
-  un error se corrige con una entrada nueva), CASCADE con la actividad.
-  authorId del JWT (jamás del DTO); GET notes gate read, POST notes gate
-  update. Lista/detalle enriquecidos con latestNote + notesCount sin N+1.
+- Bitácora — EDICIÓN LIBRE (revertido por el fundador 2026-07-22:
+  edición/borrado libre por writers; auditoría conserva el contenido previo).
+  CAL-009 la lanzó INMUTABLE (sin updatedAt, sin rutas de edición/borrado);
+  CAL-012 la revierte: cualquier writer edita o borra CUALQUIER entrada,
+  siempre. tabla calendar_activity_notes con updatedAt nullable (null = jamás
+  editada → marca "editada" veraz; NO @updatedAt, se setea explícito solo al
+  editar), CASCADE con la actividad. authorId del JWT en el append (jamás del
+  DTO); GET notes gate read, POST/PATCH/DELETE notes gate update. Orden y
+  "latest" por createdAt (editar una entrada vieja NO la reordena ni promueve).
+  El trigger de auditoría es la CAPA FORENSE (cada UPDATE/DELETE conserva el
+  texto previo en audit_logs). Lista/detalle enriquecidos con latestNote +
+  notesCount sin N+1.
 - Vista Gestión (/actividades/gestion, CAL-010): tabla Tarea · Área ·
   Responsable · Fecha cierre · Estado (dropdown INLINE con SOLO los targets
   legales de la máquina, gateado canWrite; no-writers ven badge estático) ·
@@ -707,9 +714,10 @@ Puntos clave:
   sin candado y sin botón "Nueva actividad" en Gestión — crear ES escribir; el
   Calendario conserva su botón). Observaciones append-in-place: la celda es
   editable en vivo para writers (como Estado), click → input VACÍO → Enter/blur
-  con texto → POST a la bitácora; cada texto es una ENTRADA NUEVA, jamás edición
-  (sin id de nota, sin ruta de edición/borrado — §1.6); Escape cancela, vacío no
-  hace nada, 4xx verbatim inline.
+  con texto → POST a la bitácora; cada texto es una ENTRADA NUEVA (la celda solo
+  AGREGA — la edición/borrado de entradas vive en el modal, revertido por el
+  fundador 2026-07-22: edición/borrado libre por writers; auditoría conserva el
+  contenido previo); Escape cancela, vacío no hace nada, 4xx verbatim inline.
 
 Última actualización: 2026-07-22
 

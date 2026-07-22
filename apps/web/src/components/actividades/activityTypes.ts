@@ -48,6 +48,7 @@ export interface ActivityNote {
   authorId: string;
   text: string;
   createdAt: string;
+  updatedAt: string | null; // CAL-012 — null = never edited; set only on edit (the "editada" marker)
 }
 
 /* CAL-006 — the birthday feed entry (GET /actividades/calendar → { activities, birthdays }).

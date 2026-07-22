@@ -33,6 +33,14 @@
    activity (author + timestamp automatic), the Comercial-timeline
    discipline. No edit, no delete — a typo gets a correcting entry. The
    existing `notes` field remains as static description.
+   - **REVERSAL (founder, 2026-07-22, CAL-012):** the immutability above is
+     REVERSED — after being counseled twice (original design 2026-07-21; a
+     grace-window alternative offered and declined 2026-07-22), the founder
+     chose FREE editing/deletion: any activity writer may edit or delete any
+     entry, forever (`updatedAt` nullable + PATCH/DELETE note endpoints). The
+     platform audit trigger is the forensic layer — every UPDATE/DELETE keeps
+     the prior content in `audit_logs`. The original decision above is kept for
+     history; this reversal supersedes it.
 7. **The Gestión view** replaces the sheet's date-blocks with living
    filters: default shows open items (PENDIENTE + EN_EJECUCION) sorted by
    fecha de cierre asc with overdue floating on top; quick filters

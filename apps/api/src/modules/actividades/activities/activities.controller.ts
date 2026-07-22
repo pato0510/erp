@@ -94,10 +94,11 @@ export class ActivitiesController {
     return this.service.remove(id, companyId, user.id);
   }
 
-  /* CAL-009 — the bitácora. IMMUTABILITY BY ABSENCE: only GET (read) and POST (append) exist —
-     there is NO @Patch or @Delete for notes anywhere. GET is `read CalendarActivity` (all six
-     roles); POST is `update CalendarActivity` (writers only) — notes are part of the activity,
-     NO new CASL subject. authorId is the JWT actor, never the DTO. */
+  /* CAL-009 / CAL-012 — the bitácora. GET is `read CalendarActivity` (all six roles); POST/PATCH/
+     DELETE are `update CalendarActivity` (writers only) — notes are part of the activity, NO new
+     CASL subject. CAL-009 shipped this append-only (immutable); the founder REVERSED that on
+     2026-07-22 (CAL-012): writers may edit/delete any entry. authorId on append is the JWT actor,
+     never the DTO. The audit trigger keeps the prior content of every UPDATE/DELETE. */
   @Get(':id/notes')
   @CheckPolicies((ability) => ability.can('read', CalendarActivitySubject))
   listNotes(@Param('id') id: string, @CurrentCompany() companyId: string) {
@@ -113,5 +114,31 @@ export class ActivitiesController {
     @Body() dto: CreateNoteDto,
   ) {
     return this.service.addNote(id, companyId, user.id, dto.text);
+  }
+
+  /* CAL-012 — edit an entry (writers). Reuses CreateNoteDto ({ text }); the non-empty rule +
+     ownership check live in the service. Sets updatedAt. */
+  @Patch(':id/notes/:noteId')
+  @CheckPolicies((ability) => ability.can('update', CalendarActivitySubject))
+  editNote(
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateNoteDto,
+  ) {
+    return this.service.editNote(id, noteId, companyId, user.id, dto.text);
+  }
+
+  /* CAL-012 — hard-delete an entry (writers). The audit trigger preserves the content. */
+  @Delete(':id/notes/:noteId')
+  @CheckPolicies((ability) => ability.can('update', CalendarActivitySubject))
+  deleteNote(
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.deleteNote(id, noteId, companyId, user.id);
   }
 }

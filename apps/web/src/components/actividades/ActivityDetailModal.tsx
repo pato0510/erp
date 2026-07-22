@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Pencil, Play, RotateCcw, Send, Trash2, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { STATUS_LABEL, STATUS_STYLE } from './statusMachine';
@@ -233,9 +233,11 @@ function ActionBtn({
   );
 }
 
-/* CAL-009 — the bitácora: entries newest-first, author resolved via the members map (fetched
-   once per page — NOT re-fetched per entry), append box for writers only, ZERO edit/delete
-   affordances for every role. Backend 400s (empty text) surface verbatim. */
+/* CAL-009 / CAL-012 — the bitácora: entries newest-first (by createdAt), author resolved via the
+   members map (fetched once per page). Append box for writers. CAL-012 — the founder reversed the
+   signed immutability (2026-07-22): each entry now carries a pencil (edit, PREFILLED) and a trash
+   (delete) for writers; an edited entry shows a "· editada" marker. Readers see the marker, zero
+   controls. Backend 400s (empty text) surface verbatim; the audit trigger keeps prior content. */
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('es-CL', {
     day: '2-digit',
@@ -306,17 +308,14 @@ function BitacoraSection({
       ) : (
         <ul className="space-y-3">
           {notes.map((n) => (
-            <li key={n.id} className="text-sm">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-medium text-[var(--text-primary)]">
-                  {authorName(n.authorId)}
-                </span>
-                <span className="shrink-0 text-[11px] text-[var(--text-secondary)]">
-                  {formatDateTime(n.createdAt)}
-                </span>
-              </div>
-              <p className="whitespace-pre-wrap text-[var(--text-primary)]">{n.text}</p>
-            </li>
+            <NoteItem
+              key={n.id}
+              note={n}
+              activityId={activityId}
+              authorName={authorName(n.authorId)}
+              canWrite={canWrite}
+              onChanged={load}
+            />
           ))}
         </ul>
       )}
@@ -345,6 +344,136 @@ function BitacoraSection({
         </div>
       )}
     </div>
+  );
+}
+
+/* CAL-012 — a single bitácora entry with writer edit/delete. The edit box is PREFILLED with the
+   current text (prefill is correct now — editing, not appending). Enter/blur saves, Escape
+   cancels, empty → backend 400 verbatim. The "· editada" marker shows when updatedAt is set. */
+function NoteItem({
+  note,
+  activityId,
+  authorName,
+  canWrite,
+  onChanged,
+}: {
+  note: ActivityNote;
+  activityId: string;
+  authorName: string;
+  canWrite: boolean;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(note.text);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const cancelled = useRef(false); // Escape / post-success blur must NOT re-submit
+
+  const startEdit = () => {
+    cancelled.current = false;
+    setText(note.text); // PREFILL
+    setErr(null);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await apiClient.patch(`/api/actividades/activities/${activityId}/notes/${note.id}`, { text });
+      cancelled.current = true; // swallow the unmount blur
+      setEditing(false);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'No se pudo guardar la entrada.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancel = () => {
+    cancelled.current = true;
+    setText(note.text);
+    setErr(null);
+    setEditing(false);
+  };
+
+  const remove = async () => {
+    if (!window.confirm('¿Eliminar esta entrada de la bitácora?')) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await apiClient.delete(`/api/actividades/activities/${activityId}/notes/${note.id}`);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'No se pudo eliminar la entrada.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="text-sm">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-medium text-[var(--text-primary)]">{authorName}</span>
+        <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          <span>{formatDateTime(note.createdAt)}</span>
+          {note.updatedAt && <span className="italic opacity-70">· editada</span>}
+          {canWrite && !editing && (
+            <>
+              <button
+                type="button"
+                onClick={startEdit}
+                title="Editar entrada"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={remove}
+                disabled={busy}
+                title="Eliminar entrada"
+                className="text-red-600 hover:text-red-700 disabled:opacity-60"
+              >
+                <Trash2 size={12} />
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+      {editing ? (
+        <div className="mt-1">
+          <textarea
+            autoFocus
+            value={text}
+            disabled={busy}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={save}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                save();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancel();
+              }
+            }}
+            rows={2}
+            className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          />
+          {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+        </div>
+      ) : (
+        <>
+          <p className="whitespace-pre-wrap text-[var(--text-primary)]">{note.text}</p>
+          {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+        </>
+      )}
+    </li>
   );
 }
 
