@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarDays, Layers, LogOut, Moon, Sun } from 'lucide-react';
+import { CalendarDays, Layers, ListChecks, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -13,6 +13,7 @@ import { SidebarBrand } from './SidebarBrand';
  * placeholders that later tickets flesh out (CAL-005 Calendario, CAL-002 Áreas). */
 const navItems = [
   { href: '/actividades/calendario', label: 'Calendario', icon: CalendarDays, exact: false },
+  { href: '/actividades/gestion', label: 'Gestión', icon: ListChecks, exact: false },
   { href: '/actividades/areas', label: 'Áreas', icon: Layers, exact: false },
 ];
 

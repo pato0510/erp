@@ -657,19 +657,56 @@ Puntos clave:
   Operaciones verificada). getChipIcon opcional agregado en CAL-006 (ícono
   torta para cumpleaños) — no-op para Operaciones.
 
-Última actualización: 2026-07-21
+## Vista Gestión (CAL-008…CAL-010)
+
+- Estado EN_EJECUCION (CAL-008): máquina de TRES vías libre PENDIENTE ↔
+  EN_EJECUCION ↔ HECHA (los seis edges dirigidos, incluido el atajo
+  PENDIENTE→HECHA); CANCELADA desde PENDIENTE/EN_EJECUCION, y CANCELADA →
+  PENDIENTE. El chip de calendario pinta EN_EJECUCION como PENDIENTE; la
+  distinción vive en la tabla Gestión.
+- dueDate = endDate ?? startDate (un rango vence cuando termina). overdue
+  DERIVADO — nunca almacenado, nunca cron: dueDate < "hoy" AND estado
+  abierto (PENDIENTE/EN_EJECUCION), con "<" ESTRICTO (vence hoy NO es
+  atrasado). "hoy" = FECHA CALENDARIO CHILENA (America/Santiago, doctrina
+  CAL-008b — jamás la fecha UTC, que se dispara en la tarde chilena;
+  precedente CHILE_IVA_RATE; tz por empresa = semilla V2). La UI pinta el
+  flag del servidor, JAMÁS lo recomputa.
+- Members — EXPOSICIÓN FIRMADA (2026-07-21): GET /actividades/members →
+  { userId, displayName } ESTRUCTURAL (jamás email/rol/estado), gate read
+  CalendarActivity (los seis roles — todo lector de la tabla resuelve
+  nombres). Lee Membership/User (infra común, no frontera de módulo de
+  negocio). displayName = "firstName lastName", fallback al local-part del
+  email.
+- Bitácora — INMUTABILIDAD FIRMADA (CAL-009): tabla calendar_activity_notes
+  SIN updatedAt y SIN rutas de edición/borrado (inmutabilidad por AUSENCIA;
+  un error se corrige con una entrada nueva), CASCADE con la actividad.
+  authorId del JWT (jamás del DTO); GET notes gate read, POST notes gate
+  update. Lista/detalle enriquecidos con latestNote + notesCount sin N+1.
+- Vista Gestión (/actividades/gestion, CAL-010): tabla Tarea · Área ·
+  Responsable · Fecha cierre · Estado (dropdown INLINE con SOLO los targets
+  legales de la máquina, gateado canWrite; no-writers ven badge estático) ·
+  Atrasado (badge derivado) · última observación (truncada + contador).
+  Chips Atrasadas / Esta semana (semana chilena lun–dom que contiene hoy) +
+  selects área/responsable/estado, TODOS client-side sobre el set traído (el
+  from/to del server filtra startDate, no el cierre — no se dobla; volúmenes
+  chicos). Default: abiertas, atrasadas primero, cierre asc. Responsable
+  ÚNICO este incremento (multi-asignado M2M = semilla V2).
+
+Última actualización: 2026-07-22
 
 # Próximos pasos
 
 - Módulos V1 completos: Finanzas, Operaciones, RRHH, Comercial, Marketing,
   Calendario de Actividades.
-- Vista Gestión de actividades — pedido del fundador (2026-07-20): la
-  reunión semanal de AGS migra de la planilla al módulo. Scope en
-  docs/EXCELSIA-ACTIVIDADES-GESTION-SCOPE.md; primer incremento post-V1;
-  prerrequisito: endpoint de miembros de la empresa legible por escritores
-  de actividades.
+- Vista Gestión de actividades — LISTA (CAL-008…CAL-010, live 2026-07-22):
+  la reunión semanal de AGS migró de la planilla al módulo (tabla con estado
+  inline, atrasadas derivadas con fecha chilena, bitácora inmutable). Detalle
+  en el bloque del módulo arriba.
 - Feed unificado cross-módulo del calendario (V2, scope en el doc de Gestión
   §4 y el plan Part 1 §1).
+- Semillas V2 (Gestión de actividades): asignados múltiples (M2M) · política
+  de corrección/borrado de notas · recordatorios de actividades atrasadas ·
+  export semanal de la vista.
 - Manual de Comercial (V1 ya en producción).
 - Bump rutinario de dependencias (incorpora el fix de Next.js PR #88688,
   que elimina el warning dev-only "negative time stamp").

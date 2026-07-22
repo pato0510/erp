@@ -18,6 +18,12 @@ export interface CalendarActivity {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  // CAL-008/009 read-time derived fields — present on the LIST + DETAIL payloads (not on the
+  // calendar feed, which returns raw rows). Optional so both shapes typecheck.
+  dueDate?: string;
+  overdue?: boolean;
+  notesCount?: number;
+  latestNote?: { text: string; createdAt: string } | null;
 }
 
 export interface ActivityArea {

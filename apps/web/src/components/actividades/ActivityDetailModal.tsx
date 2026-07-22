@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Pencil, RotateCcw, Send, Trash2, X, XCircle } from 'lucide-react';
+import { Check, Pencil, Play, RotateCcw, Send, Trash2, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import { STATUS_LABEL, STATUS_STYLE } from './statusMachine';
 import type {
   ActivityArea,
   ActivityNote,
@@ -16,20 +17,6 @@ import type {
    sees the full read view and ZERO buttons. Status moves go through the CAL-003 machine
    (PATCH /:id/status); backend 4xx messages surface VERBATIM. Editar is offered in ANY status
    (the deliberate contrast with campaigns); Eliminar is any status with a confirm. */
-
-const STATUS_LABEL: Record<ActivityStatus, string> = {
-  PENDIENTE: 'Pendiente',
-  EN_EJECUCION: 'En ejecución', // CAL-008
-  HECHA: 'Hecha',
-  CANCELADA: 'Cancelada',
-};
-
-const STATUS_STYLE: Record<ActivityStatus, { bg: string; color: string }> = {
-  PENDIENTE: { bg: 'rgba(37,99,235,0.12)', color: '#1d4ed8' },
-  EN_EJECUCION: { bg: 'rgba(245,158,11,0.14)', color: '#b45309' }, // CAL-008 — amber "in progress"
-  HECHA: { bg: 'rgba(34,197,94,0.12)', color: '#15803d' },
-  CANCELADA: { bg: 'rgba(100,116,139,0.14)', color: '#475569' },
-};
 
 function formatDate(iso: string): string {
   // Format from UTC parts so the stored @db.Date day never shifts.
@@ -154,8 +141,28 @@ export function ActivityDetailModal({
           <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border-color)] px-5 py-4">
             {activity.status === 'PENDIENTE' && (
               <>
+                <ActionBtn onClick={() => changeStatus('EN_EJECUCION')} disabled={busy} icon={Play}>
+                  Iniciar
+                </ActionBtn>
                 <ActionBtn onClick={() => changeStatus('HECHA')} disabled={busy} icon={Check}>
                   Marcar hecha
+                </ActionBtn>
+                <ActionBtn onClick={() => changeStatus('CANCELADA')} disabled={busy} icon={XCircle}>
+                  Cancelar
+                </ActionBtn>
+              </>
+            )}
+            {activity.status === 'EN_EJECUCION' && (
+              <>
+                <ActionBtn onClick={() => changeStatus('HECHA')} disabled={busy} icon={Check}>
+                  Marcar hecha
+                </ActionBtn>
+                <ActionBtn
+                  onClick={() => changeStatus('PENDIENTE')}
+                  disabled={busy}
+                  icon={RotateCcw}
+                >
+                  Volver a pendiente
                 </ActionBtn>
                 <ActionBtn onClick={() => changeStatus('CANCELADA')} disabled={busy} icon={XCircle}>
                   Cancelar
