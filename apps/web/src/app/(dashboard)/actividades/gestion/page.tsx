@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Maximize2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Maximize2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { ActivityDetailModal } from '../../../../components/actividades/ActivityDetailModal';
 import { ActivityFormModal } from '../../../../components/actividades/ActivityFormModal';
@@ -252,11 +252,13 @@ export default function ActividadesGestionPage() {
   );
   const onNewCreated = useCallback(
     (id: string) => {
-      setFrozenOrder((f) => [...f, id]);
+      // In edit mode the order is frozen, so pin the newborn at the bottom of the snapshot; in
+      // view mode the refetched list re-derives `rows` and it appears in the normal sort.
+      if (editMode) setFrozenOrder((f) => [...f, id]);
       setNewDraft(EMPTY_DRAFT);
       fetchList(true);
     },
-    [fetchList],
+    [editMode, fetchList],
   );
 
   const selectCls =
@@ -288,26 +290,17 @@ export default function ActividadesGestionPage() {
                 <Check size={14} /> Listo
               </button>
             ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditing(null);
-                    setFormOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)]"
-                >
-                  <Plus size={14} /> Nueva actividad
-                </button>
-                <button
-                  type="button"
-                  onClick={enterEdit}
-                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white"
-                  style={{ background: '#2563eb' }}
-                >
-                  <Pencil size={14} /> Editar
-                </button>
-              </>
+              // CAL-011b — "Nueva actividad" removed: creation here IS writing (the always-ready
+              // bottom row). The full form stays reachable via each row's detail icon (rangos,
+              // hora, bitácora). The Calendario page keeps its own button untouched.
+              <button
+                type="button"
+                onClick={enterEdit}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white"
+                style={{ background: '#2563eb' }}
+              >
+                <Pencil size={14} /> Editar
+              </button>
             )}
           </div>
         )}
@@ -388,27 +381,37 @@ export default function ActividadesGestionPage() {
         <table className="w-full min-w-[860px] text-sm">
           <thead className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-white/5">
             <tr>
-              {[
-                'Tarea',
-                'Área',
-                'Responsable',
-                'Fecha cierre',
-                'Estado',
-                '',
-                'Última observación',
-              ].map((h, i) => (
-                <th
-                  key={i}
-                  className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
-                >
-                  {h}
-                </th>
-              ))}
+              {['Tarea', 'Área', 'Responsable', 'Fecha cierre', 'Estado', '', 'Observaciones'].map(
+                (h, i) => (
+                  <th
+                    key={i}
+                    className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]"
+                  >
+                    {h}
+                  </th>
+                ),
+              )}
               {editMode && <th className="px-3 py-2.5" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-color)]">
-            {!editMode && loading && activities.length === 0 ? (
+            {editMode ? (
+              editRows.map((a, idx) => (
+                <EditRow
+                  key={a.id}
+                  activity={a}
+                  areaById={areaById}
+                  activeAreas={activeAreas}
+                  members={members}
+                  nextId={idx + 1 < editRows.length ? editRows[idx + 1].id : 'new'}
+                  busy={busyId === a.id}
+                  onStatusChange={changeStatus}
+                  onSaved={onRowSaved}
+                  onDeleted={onRowDeleted}
+                  onOpenDetail={setSelected}
+                />
+              ))
+            ) : loading && activities.length === 0 ? (
               <tr>
                 <td
                   colSpan={COLS}
@@ -417,7 +420,7 @@ export default function ActividadesGestionPage() {
                   <RefreshCw size={16} className="mx-auto mb-2 animate-spin opacity-60" /> Cargando…
                 </td>
               </tr>
-            ) : !editMode && rows.length === 0 ? (
+            ) : rows.length === 0 ? (
               <tr>
                 <td
                   colSpan={COLS}
@@ -428,31 +431,6 @@ export default function ActividadesGestionPage() {
                     : 'Ninguna actividad coincide con los filtros.'}
                 </td>
               </tr>
-            ) : editMode ? (
-              <>
-                {editRows.map((a, idx) => (
-                  <EditRow
-                    key={a.id}
-                    activity={a}
-                    areaById={areaById}
-                    activeAreas={activeAreas}
-                    members={members}
-                    nextId={idx + 1 < editRows.length ? editRows[idx + 1].id : 'new'}
-                    busy={busyId === a.id}
-                    onStatusChange={changeStatus}
-                    onSaved={onRowSaved}
-                    onDeleted={onRowDeleted}
-                    onOpenDetail={setSelected}
-                  />
-                ))}
-                <NewRow
-                  draft={newDraft}
-                  setDraft={setNewDraft}
-                  activeAreas={activeAreas}
-                  members={members}
-                  onCreated={onNewCreated}
-                />
-              </>
             ) : (
               rows.map((a) => {
                 const area = areaById.get(a.areaId);
@@ -494,11 +472,24 @@ export default function ActividadesGestionPage() {
                       <AtrasadoBadge overdue={a.overdue} />
                     </td>
                     <td className="px-3 py-2.5">
-                      <ObsCell activity={a} />
+                      <ObsCell activity={a} canWrite={canWrite} onAppended={onRowSaved} />
                     </td>
                   </tr>
                 );
               })
+            )}
+            {/* CAL-011b — the ALWAYS-READY writing row: canWrite, in BOTH modes (it escapes the
+                lock). Existing rows stay locked until "Editar"; readers never see this row. */}
+            {canWrite && (
+              <NewRow
+                draft={newDraft}
+                setDraft={setNewDraft}
+                activeAreas={activeAreas}
+                members={members}
+                onCreated={onNewCreated}
+                editMode={editMode}
+                cols={COLS}
+              />
             )}
           </tbody>
         </table>
@@ -590,10 +581,28 @@ function AtrasadoBadge({ overdue }: { overdue?: boolean }) {
   );
 }
 
-function ObsCell({ activity }: { activity: CalendarActivity }) {
-  if (!activity.latestNote)
-    return <span className="text-[var(--text-secondary)] opacity-50">—</span>;
-  return (
+/* CAL-011b — Observaciones IN-CELL APPEND. For writers this cell is ALWAYS live (like Estado —
+   the other Monday action; the lock protects identity data only). Click → an EMPTY input (never
+   prefilled with the previous note — the user is writing a NEW entry) → Enter/blur with text →
+   POST /notes. APPEND IS THE ONLY VERB: no note id is ever read or sent, no edit/delete path
+   (plan §1.6). Escape cancels; empty → no-op (no stray 400s); a 4xx surfaces VERBATIM inline and
+   keeps the text. Readers see only the latest note + count. */
+function ObsCell({
+  activity,
+  canWrite,
+  onAppended,
+}: {
+  activity: CalendarActivity;
+  canWrite: boolean;
+  onAppended: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const cancelled = useRef(false); // an Escape / post-success blur must NOT re-submit
+
+  const display = activity.latestNote ? (
     <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
       <span className="truncate">{truncate(activity.latestNote.text)}</span>
       {!!activity.notesCount && (
@@ -602,6 +611,82 @@ function ObsCell({ activity }: { activity: CalendarActivity }) {
         </span>
       )}
     </span>
+  ) : (
+    <span className="text-[var(--text-secondary)] opacity-50">—</span>
+  );
+
+  if (!canWrite) return display;
+
+  const submit = async () => {
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
+    const t = text.trim();
+    if (!t) {
+      setEditing(false);
+      setText('');
+      setErr(null);
+      return;
+    }
+    setPosting(true);
+    setErr(null);
+    try {
+      await apiClient.post(`/api/actividades/activities/${activity.id}/notes`, { text: t });
+      cancelled.current = true; // swallow the unmount blur that closing the input will trigger
+      setText('');
+      setEditing(false);
+      onAppended();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'No se pudo agregar la observación.');
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div>
+        <input
+          autoFocus
+          value={text}
+          disabled={posting}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={submit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submit();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              cancelled.current = true;
+              setText('');
+              setErr(null);
+              setEditing(false);
+            }
+          }}
+          placeholder="Agregar observación…"
+          className={CELL_INPUT}
+        />
+        {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        cancelled.current = false;
+        setErr(null);
+        setText(''); // ALWAYS empty — a new entry, never editing the previous note
+        setEditing(true);
+      }}
+      title="Agregar observación"
+      className="w-full text-left hover:opacity-80"
+    >
+      {display}
+    </button>
   );
 }
 
@@ -746,7 +831,7 @@ function EditRow({
           <AtrasadoBadge overdue={activity.overdue} />
         </td>
         <td className="px-3 py-1.5">
-          <ObsCell activity={activity} />
+          <ObsCell activity={activity} canWrite onAppended={onSaved} />
         </td>
         <td className="px-3 py-1.5">
           <div className="flex items-center justify-end gap-1.5">
@@ -795,12 +880,16 @@ function NewRow({
   activeAreas,
   members,
   onCreated,
+  editMode,
+  cols,
 }: {
   draft: RowDraft;
   setDraft: (d: RowDraft) => void;
   activeAreas: ActivityArea[];
   members: MemberOption[];
   onCreated: (id: string) => void;
+  editMode: boolean;
+  cols: number;
 }) {
   const [state, setState] = useState<'idle' | 'saving' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -876,23 +965,34 @@ function NewRow({
             className={CELL_INPUT}
           />
         </td>
-        <td className="px-3 py-1.5 text-[11px] text-[var(--text-secondary)]" colSpan={3}>
-          {state === 'saving'
-            ? 'Creando…'
-            : newRowPartial(draft)
-              ? 'Completa título, área y fecha para crear la tarea.'
-              : 'Fila nueva'}
-        </td>
+        {/* Estado + Atrasado: not applicable until the task is born. */}
+        <td className="px-3 py-1.5 text-[var(--text-secondary)] opacity-40">—</td>
+        <td className="px-3 py-1.5" />
+        {/* Observaciones: inert for the writing row — first the task must exist (no chained
+            create+note in V1). */}
         <td className="px-3 py-1.5">
-          {state === 'saving' && (
-            <RefreshCw size={13} className="animate-spin text-[var(--text-secondary)]" />
-          )}
+          <span className="text-[11px] italic text-[var(--text-secondary)] opacity-60">
+            primero nace la tarea
+          </span>
         </td>
+        {editMode && (
+          <td className="px-3 py-1.5">
+            {state === 'saving' && (
+              <RefreshCw size={13} className="animate-spin text-[var(--text-secondary)]" />
+            )}
+          </td>
+        )}
       </tr>
-      {state === 'error' && errMsg && (
-        <tr className="bg-red-50 dark:bg-red-950/30">
-          <td colSpan={8} className="px-3 pb-2 text-xs text-red-600">
-            {errMsg}
+      {(state === 'saving' || newRowPartial(draft) || (state === 'error' && !!errMsg)) && (
+        <tr className={state === 'error' ? 'bg-red-50 dark:bg-red-950/30' : ''}>
+          <td colSpan={cols} className="px-3 pb-2 text-[11px]">
+            <span className={state === 'error' ? 'text-red-600' : 'text-[var(--text-secondary)]'}>
+              {state === 'saving'
+                ? 'Creando…'
+                : state === 'error'
+                  ? errMsg
+                  : 'Completa título, área y fecha para crear la tarea.'}
+            </span>
           </td>
         </tr>
       )}

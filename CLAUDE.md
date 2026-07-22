@@ -703,6 +703,13 @@ Puntos clave:
   endDate si la actividad TIENE endDate (un rango mueve su fin), si no
   startDate; la grilla nunca crea/quita rango ni toca la hora (eso vive en el
   modal). Errores del backend verbatim por fila.
+- CAL-011b (frontend): fila de escritura SIEMPRE lista (view mode incluido,
+  sin candado y sin botón "Nueva actividad" en Gestión — crear ES escribir; el
+  Calendario conserva su botón). Observaciones append-in-place: la celda es
+  editable en vivo para writers (como Estado), click → input VACÍO → Enter/blur
+  con texto → POST a la bitácora; cada texto es una ENTRADA NUEVA, jamás edición
+  (sin id de nota, sin ruta de edición/borrado — §1.6); Escape cancela, vacío no
+  hace nada, 4xx verbatim inline.
 
 Última actualización: 2026-07-22
 
