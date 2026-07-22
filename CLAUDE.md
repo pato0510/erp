@@ -691,6 +691,18 @@ Puntos clave:
   from/to del server filtra startDate, no el cierre — no se dobla; volúmenes
   chicos). Default: abiertas, atrasadas primero, cierre asc. Responsable
   ÚNICO este incremento (multi-asignado M2M = semilla V2).
+- Edición inline estilo planilla (CAL-011, frontend puro — los endpoints
+  POST/PATCH/PATCH status/DELETE YA son la API de la grilla): grilla
+  BLOQUEADA por defecto, botón "Editar" (solo writers) despierta editores por
+  celda con AUTOSAVE por fila al salir el foco (solo los campos cambiados);
+  fila nueva persistente al pie (mínimo título+área+fecha → POST, status
+  PENDIENTE forzado server-side); tacho por fila; ORDEN CONGELADO en edición
+  (snapshot al entrar, las filas no saltan ni desaparecen al guardar; "Listo"
+  reanuda orden/filtros); Estado SIEMPRE vivo (acción, no dato). Regla de
+  escritura del cierre: como cierre = endDate ?? startDate, editarlo escribe
+  endDate si la actividad TIENE endDate (un rango mueve su fin), si no
+  startDate; la grilla nunca crea/quita rango ni toca la hora (eso vive en el
+  modal). Errores del backend verbatim por fila.
 
 Última actualización: 2026-07-22
 

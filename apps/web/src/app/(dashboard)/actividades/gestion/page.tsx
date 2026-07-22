@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
-import { apiClient } from '../../../../lib/api';
+import { Check, Maximize2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { apiClient, ApiError } from '../../../../lib/api';
 import { ActivityDetailModal } from '../../../../components/actividades/ActivityDetailModal';
 import { ActivityFormModal } from '../../../../components/actividades/ActivityFormModal';
 import {
@@ -18,38 +18,56 @@ import type {
 } from '../../../../components/actividades/activityTypes';
 import { useCanWriteActividades } from '../../../../hooks/useActividadesPermissions';
 
-/* CAL-010 — Vista Gestión: the weekly management table (§1.7). The list endpoint already
-   carries the server's derived dueDate/overdue (Chilean-dated, CAL-008b) + latestNote/notesCount
-   — this page PAINTS them, never recomputes. Inline estado dropdown offers only the machine's
-   legal targets (STATUS_TARGETS, mirroring the backend); the Atrasadas / Esta semana chips filter
-   CLIENT-SIDE over the fetched set's derived fields, because the server's from/to targets
-   startDate (not the cierre = endDate ?? startDate) — bending it would be dishonest, and at this
-   module's volumes client filtering is correct and cheap. */
+/* CAL-010/011 — Vista Gestión: the weekly management table, now with Excel-style inline editing.
+   The list endpoint carries the server's derived dueDate/overdue (Chilean-dated, CAL-008b) +
+   latestNote/notesCount — this page PAINTS them, NEVER recomputes. The grid is LOCKED by default;
+   "Editar" (writers only) wakes per-cell editors with PER-ROW AUTOSAVE on blur (changed fields
+   only). Estado stays a LIVE dropdown in both modes (it is an action, not data editing). The
+   backend endpoints (POST/PATCH/PATCH status/DELETE) ARE this grid's API — zero api/ changes. */
 
 type EstadoFilter = 'abiertas' | ActivityStatus | 'todas';
+type RowField = 'title' | 'area' | 'assignee' | 'cierre';
 
-/** Chilean calendar week (Monday–Sunday) containing today in America/Santiago (the CAL-008b
-    doctrine). Computed on the LOCAL calendar-date string, parsed at UTC midnight so the
-    Monday-week math never drifts by timezone. */
-function chileanWeek(): { monday: string; sunday: string; today: string } {
-  const today = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Santiago',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-  const d = new Date(today + 'T00:00:00Z');
-  const dow = d.getUTCDay(); // 0=Sun..6=Sat
-  const toMonday = dow === 0 ? 6 : dow - 1;
-  const monday = new Date(d);
-  monday.setUTCDate(d.getUTCDate() - toMonday);
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
-  return {
-    monday: monday.toISOString().slice(0, 10),
-    sunday: sunday.toISOString().slice(0, 10),
-    today,
-  };
+interface RowDraft {
+  title: string;
+  areaId: string;
+  assigneeId: string;
+  cierre: string; // 'YYYY-MM-DD'
+}
+const EMPTY_DRAFT: RowDraft = { title: '', areaId: '', assigneeId: '', cierre: '' };
+
+const CELL_INPUT =
+  'w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-1.5 py-1 text-sm text-[var(--text-primary)]';
+
+/* CAL-011 — the CHANGED-FIELDS-ONLY PATCH body. Compares the row's local draft to the activity's
+   current server values and emits ONLY what changed. FECHA CIERRE WRITE RULE: cierre is DERIVED
+   (dueDate = endDate ?? startDate), so a change writes endDate when the activity HAS an endDate
+   (a range keeps its start, moves its end), else startDate (a single day moves). The grid never
+   creates or removes a range, and never touches hora — those stay in the modal. */
+function buildRowDiff(activity: CalendarActivity, draft: RowDraft): Record<string, unknown> {
+  const diff: Record<string, unknown> = {};
+  const title = draft.title.trim();
+  if (title !== activity.title) diff.title = title;
+  if (draft.areaId !== activity.areaId) diff.areaId = draft.areaId;
+  const curAssignee = activity.assigneeId ?? '';
+  if (draft.assigneeId !== curAssignee) diff.assigneeId = draft.assigneeId || null;
+  const curCierre = (activity.dueDate ?? activity.startDate).slice(0, 10);
+  if (draft.cierre && draft.cierre !== curCierre) {
+    if (activity.endDate) diff.endDate = draft.cierre;
+    else diff.startDate = draft.cierre;
+  }
+  return diff;
+}
+
+/* CAL-011 — the NEW-ROW MINIMUM GATE: a bottom row becomes real only with título + área + fecha.
+   `partial` means "some data typed but not yet complete" → stays pending with a hint, and blocks
+   a silent discard on exit. */
+function newRowReady(d: RowDraft): boolean {
+  return d.title.trim().length > 0 && !!d.areaId && !!d.cierre;
+}
+function newRowPartial(d: RowDraft): boolean {
+  const any = d.title.trim().length > 0 || !!d.areaId || !!d.cierre || !!d.assigneeId;
+  return any && !newRowReady(d);
 }
 
 function formatCierre(iso: string | undefined): string {
@@ -61,9 +79,31 @@ function formatCierre(iso: string | undefined): string {
     year: 'numeric',
   });
 }
-
 function truncate(text: string, n = 46): string {
   return text.length > n ? text.slice(0, n - 1) + '…' : text;
+}
+
+/** Chilean calendar week (Monday–Sunday) containing today in America/Santiago (CAL-008b). */
+function chileanWeek(): { monday: string; sunday: string } {
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const d = new Date(today + 'T00:00:00Z');
+  const dow = d.getUTCDay();
+  const toMonday = dow === 0 ? 6 : dow - 1;
+  const monday = new Date(d);
+  monday.setUTCDate(d.getUTCDate() - toMonday);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return { monday: monday.toISOString().slice(0, 10), sunday: sunday.toISOString().slice(0, 10) };
+}
+
+function focusCell(rowId: string, field: RowField) {
+  const el = document.querySelector<HTMLElement>(`[data-cell="${rowId}:${field}"]`);
+  el?.focus();
 }
 
 export default function ActividadesGestionPage() {
@@ -78,7 +118,7 @@ export default function ActividadesGestionPage() {
 
   const [estado, setEstado] = useState<EstadoFilter>('abiertas');
   const [areaId, setAreaId] = useState<string>('all');
-  const [responsable, setResponsable] = useState<string>('all'); // 'all' | 'none' | userId
+  const [responsable, setResponsable] = useState<string>('all');
   const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [onlyThisWeek, setOnlyThisWeek] = useState(false);
 
@@ -86,16 +126,23 @@ export default function ActividadesGestionPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarActivity | null>(null);
 
+  // CAL-011 — edit mode + the frozen order snapshot + the persistent new-row draft.
+  const [editMode, setEditMode] = useState(false);
+  const [frozenOrder, setFrozenOrder] = useState<string[]>([]);
+  const [newDraft, setNewDraft] = useState<RowDraft>(EMPTY_DRAFT);
+
   const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
+  const activityById = useMemo(() => new Map(activities.map((a) => [a.id, a])), [activities]);
+  const activeAreas = useMemo(() => areas.filter((a) => a.active), [areas]);
   const memberName = useCallback(
     (userId: string | null) =>
       userId ? (members.find((m) => m.userId === userId)?.displayName ?? '—') : '—',
     [members],
   );
 
-  const fetchList = useCallback(() => {
-    setLoading(true);
-    apiClient
+  const fetchList = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
+    return apiClient
       .get<CalendarActivity[]>('/api/actividades/activities')
       .then((data) => {
         setActivities(data);
@@ -105,7 +152,6 @@ export default function ActividadesGestionPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  /* Areas + members (the resolver maps) once on mount; the list on mount + after every change. */
   useEffect(() => {
     apiClient
       .get<ActivityArea[]>('/api/actividades/areas')
@@ -122,6 +168,7 @@ export default function ActividadesGestionPage() {
 
   const week = useMemo(() => chileanWeek(), []);
 
+  /* View-mode rows: filter + sort over fresh data. Also the snapshot source for the order freeze. */
   const rows = useMemo(() => {
     const matchEstado = (s: ActivityStatus) => {
       if (estado === 'todas') return true;
@@ -141,7 +188,6 @@ export default function ActividadesGestionPage() {
       }
       return true;
     });
-    // Default order: overdue first, then fecha de cierre asc, then title.
     return filtered.sort((a, b) => {
       if (!!a.overdue !== !!b.overdue) return a.overdue ? -1 : 1;
       const da = a.dueDate ?? '';
@@ -151,13 +197,39 @@ export default function ActividadesGestionPage() {
     });
   }, [activities, estado, areaId, responsable, onlyOverdue, onlyThisWeek, week]);
 
+  /* CAL-011 — ORDER FREEZE: entering edit mode snapshots the current filtered+sorted ids; edit
+     mode renders strictly in that order (each row looked up live by id), so a save that flips a
+     row's overdue/cierre/estado updates its cells IN PLACE but never reorders or filters it out.
+     New rows append their id to the snapshot. "Listo" clears it → normal sort/filter resumes. */
+  const enterEdit = () => {
+    setFrozenOrder(rows.map((r) => r.id));
+    setNewDraft(EMPTY_DRAFT);
+    setEditMode(true);
+  };
+  const exitEdit = () => {
+    if (
+      newRowPartial(newDraft) &&
+      !window.confirm('La fila nueva está incompleta. ¿Descartarla?')
+    ) {
+      return;
+    }
+    setNewDraft(EMPTY_DRAFT);
+    setFrozenOrder([]);
+    setEditMode(false);
+  };
+
+  const editRows = useMemo(
+    () => frozenOrder.map((id) => activityById.get(id)).filter((a): a is CalendarActivity => !!a),
+    [frozenOrder, activityById],
+  );
+
   const changeStatus = async (a: CalendarActivity, status: ActivityStatus) => {
     if (status === a.status) return;
     setBusyId(a.id);
     setError(null);
     try {
       await apiClient.patch(`/api/actividades/activities/${a.id}/status`, { status });
-      fetchList();
+      await fetchList(editMode); // silent while editing so the frozen table doesn't flicker
     } catch {
       setError('No se pudo cambiar el estado.');
     } finally {
@@ -165,13 +237,31 @@ export default function ActividadesGestionPage() {
     }
   };
 
-  const openCreate = () => {
-    setEditing(null);
-    setFormOpen(true);
-  };
+  const onRowSaved = useCallback(() => fetchList(true), [fetchList]);
+  const onRowDeleted = useCallback(
+    async (id: string) => {
+      try {
+        await apiClient.delete(`/api/actividades/activities/${id}`);
+        setFrozenOrder((f) => f.filter((x) => x !== id));
+        fetchList(true);
+      } catch {
+        setError('No se pudo eliminar la actividad.');
+      }
+    },
+    [fetchList],
+  );
+  const onNewCreated = useCallback(
+    (id: string) => {
+      setFrozenOrder((f) => [...f, id]);
+      setNewDraft(EMPTY_DRAFT);
+      fetchList(true);
+    },
+    [fetchList],
+  );
 
   const selectCls =
-    'rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1 text-xs font-normal normal-case text-[var(--text-primary)]';
+    'rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1 text-xs font-normal normal-case text-[var(--text-primary)] disabled:opacity-50';
+  const COLS = editMode ? 8 : 7;
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-[1400px] mx-auto">
@@ -188,28 +278,53 @@ export default function ActividadesGestionPage() {
           </p>
         </div>
         {canWrite && (
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white"
-            style={{ background: '#2563eb' }}
-          >
-            <Plus size={14} /> Nueva actividad
-          </button>
+          <div className="flex items-center gap-2">
+            {editMode ? (
+              <button
+                type="button"
+                onClick={exitEdit}
+                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)]"
+              >
+                <Check size={14} /> Listo
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(null);
+                    setFormOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)]"
+                >
+                  <Plus size={14} /> Nueva actividad
+                </button>
+                <button
+                  type="button"
+                  onClick={enterEdit}
+                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white"
+                  style={{ background: '#2563eb' }}
+                >
+                  <Pencil size={14} /> Editar
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Filters */}
+      {/* Filters — disabled while editing (the order is frozen). */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2.5 shadow-sm">
-        <Chip active={onlyOverdue} onClick={() => setOnlyOverdue((v) => !v)}>
+        <Chip active={onlyOverdue} disabled={editMode} onClick={() => setOnlyOverdue((v) => !v)}>
           Atrasadas
         </Chip>
-        <Chip active={onlyThisWeek} onClick={() => setOnlyThisWeek((v) => !v)}>
+        <Chip active={onlyThisWeek} disabled={editMode} onClick={() => setOnlyThisWeek((v) => !v)}>
           Esta semana
         </Chip>
         <span className="mx-1 h-4 w-px bg-[var(--border-color)]" />
         <select
           value={estado}
+          disabled={editMode}
           onChange={(e) => setEstado(e.target.value as EstadoFilter)}
           className={selectCls}
         >
@@ -220,7 +335,12 @@ export default function ActividadesGestionPage() {
           <option value="CANCELADA">Canceladas</option>
           <option value="todas">Todas</option>
         </select>
-        <select value={areaId} onChange={(e) => setAreaId(e.target.value)} className={selectCls}>
+        <select
+          value={areaId}
+          disabled={editMode}
+          onChange={(e) => setAreaId(e.target.value)}
+          className={selectCls}
+        >
           <option value="all">Todas las áreas</option>
           {areas.map((a) => (
             <option key={a.id} value={a.id}>
@@ -230,6 +350,7 @@ export default function ActividadesGestionPage() {
         </select>
         <select
           value={responsable}
+          disabled={editMode}
           onChange={(e) => setResponsable(e.target.value)}
           className={selectCls}
         >
@@ -241,10 +362,15 @@ export default function ActividadesGestionPage() {
             </option>
           ))}
         </select>
+        {editMode && (
+          <span className="text-[11px] italic text-[var(--text-secondary)]">
+            Orden congelado mientras editás
+          </span>
+        )}
         <button
           type="button"
-          onClick={fetchList}
-          disabled={loading}
+          onClick={() => fetchList()}
+          disabled={loading || editMode}
           aria-label="Actualizar"
           className="ml-auto inline-flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] p-1.5 text-[var(--text-primary)] disabled:opacity-50"
         >
@@ -258,7 +384,6 @@ export default function ActividadesGestionPage() {
         </div>
       )}
 
-      {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
         <table className="w-full min-w-[860px] text-sm">
           <thead className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-white/5">
@@ -279,22 +404,23 @@ export default function ActividadesGestionPage() {
                   {h}
                 </th>
               ))}
+              {editMode && <th className="px-3 py-2.5" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-color)]">
-            {loading && activities.length === 0 ? (
+            {!editMode && loading && activities.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={COLS}
                   className="px-3 py-10 text-center text-sm text-[var(--text-secondary)]"
                 >
                   <RefreshCw size={16} className="mx-auto mb-2 animate-spin opacity-60" /> Cargando…
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : !editMode && rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={COLS}
                   className="px-3 py-10 text-center text-sm text-[var(--text-secondary)]"
                 >
                   {activities.length === 0
@@ -302,10 +428,34 @@ export default function ActividadesGestionPage() {
                     : 'Ninguna actividad coincide con los filtros.'}
                 </td>
               </tr>
+            ) : editMode ? (
+              <>
+                {editRows.map((a, idx) => (
+                  <EditRow
+                    key={a.id}
+                    activity={a}
+                    areaById={areaById}
+                    activeAreas={activeAreas}
+                    members={members}
+                    nextId={idx + 1 < editRows.length ? editRows[idx + 1].id : 'new'}
+                    busy={busyId === a.id}
+                    onStatusChange={changeStatus}
+                    onSaved={onRowSaved}
+                    onDeleted={onRowDeleted}
+                    onOpenDetail={setSelected}
+                  />
+                ))}
+                <NewRow
+                  draft={newDraft}
+                  setDraft={setNewDraft}
+                  activeAreas={activeAreas}
+                  members={members}
+                  onCreated={onNewCreated}
+                />
+              </>
             ) : (
               rows.map((a) => {
                 const area = areaById.get(a.areaId);
-                const st = STATUS_STYLE[a.status];
                 return (
                   <tr key={a.id} className="hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]">
                     <td className="px-3 py-2.5">
@@ -333,50 +483,18 @@ export default function ActividadesGestionPage() {
                       {formatCierre(a.dueDate)}
                     </td>
                     <td className="px-3 py-2.5">
-                      {canWrite ? (
-                        <select
-                          value={a.status}
-                          disabled={busyId === a.id}
-                          onChange={(e) => changeStatus(a, e.target.value as ActivityStatus)}
-                          className="rounded-md border px-2 py-1 text-xs font-medium disabled:opacity-60"
-                          style={{ borderColor: st.color, background: st.bg, color: st.color }}
-                        >
-                          <option value={a.status}>{STATUS_LABEL[a.status]}</option>
-                          {STATUS_TARGETS[a.status].map((t) => (
-                            <option key={t} value={t}>
-                              {STATUS_LABEL[t]}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span
-                          className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
-                          style={{ background: st.bg, color: st.color }}
-                        >
-                          {STATUS_LABEL[a.status]}
-                        </span>
-                      )}
+                      <StatusCell
+                        activity={a}
+                        canWrite={canWrite}
+                        busy={busyId === a.id}
+                        onChange={changeStatus}
+                      />
                     </td>
                     <td className="px-3 py-2.5">
-                      {a.overdue && (
-                        <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:bg-red-900/40 dark:text-red-300">
-                          Atrasada
-                        </span>
-                      )}
+                      <AtrasadoBadge overdue={a.overdue} />
                     </td>
                     <td className="px-3 py-2.5">
-                      {a.latestNote ? (
-                        <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
-                          <span className="truncate">{truncate(a.latestNote.text)}</span>
-                          {!!a.notesCount && (
-                            <span className="shrink-0 rounded-full bg-[var(--border-color)] px-1.5 text-[10px] text-[var(--text-secondary)]">
-                              {a.notesCount}
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--text-secondary)] opacity-50">—</span>
-                      )}
+                      <ObsCell activity={a} />
                     </td>
                   </tr>
                 );
@@ -395,7 +513,7 @@ export default function ActividadesGestionPage() {
           onClose={() => setSelected(null)}
           onChanged={() => {
             setSelected(null);
-            fetchList();
+            fetchList(editMode);
           }}
           onEdit={(act) => {
             setSelected(null);
@@ -413,7 +531,7 @@ export default function ActividadesGestionPage() {
           onClose={() => setFormOpen(false)}
           onSaved={() => {
             setFormOpen(false);
-            fetchList();
+            fetchList(editMode);
           }}
         />
       )}
@@ -421,12 +539,375 @@ export default function ActividadesGestionPage() {
   );
 }
 
+/* ── Shared cells (identical in both modes) ─────────────────────────────────────────── */
+
+function StatusCell({
+  activity,
+  canWrite,
+  busy,
+  onChange,
+}: {
+  activity: CalendarActivity;
+  canWrite: boolean;
+  busy: boolean;
+  onChange: (a: CalendarActivity, s: ActivityStatus) => void;
+}) {
+  const st = STATUS_STYLE[activity.status];
+  if (!canWrite) {
+    return (
+      <span
+        className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
+        style={{ background: st.bg, color: st.color }}
+      >
+        {STATUS_LABEL[activity.status]}
+      </span>
+    );
+  }
+  return (
+    <select
+      value={activity.status}
+      disabled={busy}
+      onChange={(e) => onChange(activity, e.target.value as ActivityStatus)}
+      className="rounded-md border px-2 py-1 text-xs font-medium disabled:opacity-60"
+      style={{ borderColor: st.color, background: st.bg, color: st.color }}
+    >
+      <option value={activity.status}>{STATUS_LABEL[activity.status]}</option>
+      {STATUS_TARGETS[activity.status].map((t) => (
+        <option key={t} value={t}>
+          {STATUS_LABEL[t]}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function AtrasadoBadge({ overdue }: { overdue?: boolean }) {
+  if (!overdue) return null;
+  return (
+    <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:bg-red-900/40 dark:text-red-300">
+      Atrasada
+    </span>
+  );
+}
+
+function ObsCell({ activity }: { activity: CalendarActivity }) {
+  if (!activity.latestNote)
+    return <span className="text-[var(--text-secondary)] opacity-50">—</span>;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
+      <span className="truncate">{truncate(activity.latestNote.text)}</span>
+      {!!activity.notesCount && (
+        <span className="shrink-0 rounded-full bg-[var(--border-color)] px-1.5 text-[10px] text-[var(--text-secondary)]">
+          {activity.notesCount}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* ── CAL-011: the editable row (per-row autosave on blur) ───────────────────────────── */
+
+function EditRow({
+  activity,
+  areaById,
+  activeAreas,
+  members,
+  nextId,
+  busy,
+  onStatusChange,
+  onSaved,
+  onDeleted,
+  onOpenDetail,
+}: {
+  activity: CalendarActivity;
+  areaById: Map<string, ActivityArea>;
+  activeAreas: ActivityArea[];
+  members: MemberOption[];
+  nextId: string;
+  busy: boolean;
+  onStatusChange: (a: CalendarActivity, s: ActivityStatus) => void;
+  onSaved: () => void;
+  onDeleted: (id: string) => void;
+  onOpenDetail: (a: CalendarActivity) => void;
+}) {
+  const currentCierre = () => (activity.dueDate ?? activity.startDate).slice(0, 10);
+  const [title, setTitle] = useState(activity.title);
+  const [areaId, setAreaId] = useState(activity.areaId);
+  const [assigneeId, setAssigneeId] = useState(activity.assigneeId ?? '');
+  const [cierre, setCierre] = useState(currentCierre());
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  // Área options: active areas + the current area if it is now inactive (CAL-003 rule).
+  const cur = areaById.get(activity.areaId);
+  const areaOptions =
+    cur && !cur.active ? [cur, ...activeAreas.filter((a) => a.id !== cur.id)] : activeAreas;
+
+  const save = async () => {
+    const diff = buildRowDiff(activity, { title, areaId, assigneeId, cierre });
+    if (Object.keys(diff).length === 0) return;
+    setState('saving');
+    setErrMsg(null);
+    try {
+      await apiClient.patch(`/api/actividades/activities/${activity.id}`, diff);
+      setState('saved');
+      onSaved();
+      window.setTimeout(() => setState((s) => (s === 'saved' ? 'idle' : s)), 1500);
+    } catch (e) {
+      // Keep local values (nothing lost); surface the backend's Spanish message VERBATIM.
+      setState('error');
+      setErrMsg(e instanceof ApiError ? e.message : 'No se pudo guardar.');
+    }
+  };
+
+  // Row lost focus entirely (focus did not stay within the row) → autosave.
+  const onRowBlur = (e: React.FocusEvent<HTMLTableRowElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    save();
+  };
+
+  const key = (field: RowField) => (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      focusCell(nextId, field);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (field === 'title') setTitle(activity.title);
+      if (field === 'area') setAreaId(activity.areaId);
+      if (field === 'assignee') setAssigneeId(activity.assigneeId ?? '');
+      if (field === 'cierre') setCierre(currentCierre());
+    }
+  };
+
+  const rowBg =
+    state === 'error'
+      ? 'bg-red-50 dark:bg-red-950/30'
+      : 'hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]';
+
+  return (
+    <>
+      <tr className={rowBg} onBlur={onRowBlur}>
+        <td className="px-3 py-1.5">
+          <input
+            data-cell={`${activity.id}:title`}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={key('title')}
+            className={CELL_INPUT}
+          />
+        </td>
+        <td className="px-3 py-1.5">
+          <select
+            data-cell={`${activity.id}:area`}
+            value={areaId}
+            onChange={(e) => setAreaId(e.target.value)}
+            onKeyDown={key('area')}
+            className={CELL_INPUT}
+          >
+            {areaOptions.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {!a.active ? ' (inactiva)' : ''}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-3 py-1.5">
+          <select
+            data-cell={`${activity.id}:assignee`}
+            value={assigneeId}
+            onChange={(e) => setAssigneeId(e.target.value)}
+            onKeyDown={key('assignee')}
+            className={CELL_INPUT}
+          >
+            <option value="">Sin responsable</option>
+            {members.map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.displayName}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-3 py-1.5">
+          <input
+            type="date"
+            data-cell={`${activity.id}:cierre`}
+            value={cierre}
+            onChange={(e) => setCierre(e.target.value)}
+            onKeyDown={key('cierre')}
+            className={CELL_INPUT}
+          />
+        </td>
+        <td className="px-3 py-1.5">
+          {/* Estado stays LIVE in edit mode — an action, not data editing. */}
+          <StatusCell activity={activity} canWrite busy={busy} onChange={onStatusChange} />
+        </td>
+        <td className="px-3 py-1.5">
+          <AtrasadoBadge overdue={activity.overdue} />
+        </td>
+        <td className="px-3 py-1.5">
+          <ObsCell activity={activity} />
+        </td>
+        <td className="px-3 py-1.5">
+          <div className="flex items-center justify-end gap-1.5">
+            {state === 'saving' && (
+              <RefreshCw size={13} className="animate-spin text-[var(--text-secondary)]" />
+            )}
+            {state === 'saved' && <Check size={14} className="text-green-600" />}
+            <button
+              type="button"
+              onClick={() => onOpenDetail(activity)}
+              title="Abrir detalle / bitácora"
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <Maximize2 size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`¿Eliminar la actividad "${activity.title}"?`))
+                  onDeleted(activity.id);
+              }}
+              title="Eliminar"
+              className="text-red-600 hover:text-red-700"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </td>
+      </tr>
+      {state === 'error' && errMsg && (
+        <tr className="bg-red-50 dark:bg-red-950/30">
+          <td colSpan={8} className="px-3 pb-2 text-xs text-red-600">
+            {errMsg}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/* ── CAL-011: the persistent bottom new-row ─────────────────────────────────────────── */
+
+function NewRow({
+  draft,
+  setDraft,
+  activeAreas,
+  members,
+  onCreated,
+}: {
+  draft: RowDraft;
+  setDraft: (d: RowDraft) => void;
+  activeAreas: ActivityArea[];
+  members: MemberOption[];
+  onCreated: (id: string) => void;
+}) {
+  const [state, setState] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  const create = async () => {
+    if (!newRowReady(draft)) return;
+    setState('saving');
+    setErrMsg(null);
+    try {
+      const created = await apiClient.post<CalendarActivity>('/api/actividades/activities', {
+        title: draft.title.trim(),
+        areaId: draft.areaId,
+        startDate: draft.cierre, // a new row is a single day; cierre = startDate (status forced server-side)
+        assigneeId: draft.assigneeId || null,
+      });
+      onCreated(created.id);
+      setState('idle');
+    } catch (e) {
+      setState('error');
+      setErrMsg(e instanceof ApiError ? e.message : 'No se pudo crear.');
+    }
+  };
+
+  const onRowBlur = (e: React.FocusEvent<HTMLTableRowElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    if (newRowReady(draft)) create();
+  };
+
+  return (
+    <>
+      <tr className="bg-[rgba(37,99,235,0.03)]" onBlur={onRowBlur}>
+        <td className="px-3 py-1.5">
+          <input
+            value={draft.title}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            placeholder="Nueva tarea…"
+            className={CELL_INPUT}
+          />
+        </td>
+        <td className="px-3 py-1.5">
+          <select
+            value={draft.areaId}
+            onChange={(e) => setDraft({ ...draft, areaId: e.target.value })}
+            className={CELL_INPUT}
+          >
+            <option value="">Área…</option>
+            {activeAreas.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-3 py-1.5">
+          <select
+            value={draft.assigneeId}
+            onChange={(e) => setDraft({ ...draft, assigneeId: e.target.value })}
+            className={CELL_INPUT}
+          >
+            <option value="">Sin responsable</option>
+            {members.map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.displayName}
+              </option>
+            ))}
+          </select>
+        </td>
+        <td className="px-3 py-1.5">
+          <input
+            type="date"
+            value={draft.cierre}
+            onChange={(e) => setDraft({ ...draft, cierre: e.target.value })}
+            className={CELL_INPUT}
+          />
+        </td>
+        <td className="px-3 py-1.5 text-[11px] text-[var(--text-secondary)]" colSpan={3}>
+          {state === 'saving'
+            ? 'Creando…'
+            : newRowPartial(draft)
+              ? 'Completa título, área y fecha para crear la tarea.'
+              : 'Fila nueva'}
+        </td>
+        <td className="px-3 py-1.5">
+          {state === 'saving' && (
+            <RefreshCw size={13} className="animate-spin text-[var(--text-secondary)]" />
+          )}
+        </td>
+      </tr>
+      {state === 'error' && errMsg && (
+        <tr className="bg-red-50 dark:bg-red-950/30">
+          <td colSpan={8} className="px-3 pb-2 text-xs text-red-600">
+            {errMsg}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 function Chip({
   active,
+  disabled,
   onClick,
   children,
 }: {
   active: boolean;
+  disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -434,7 +915,8 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border px-3 py-1 text-xs font-medium transition"
+      disabled={disabled}
+      className="rounded-full border px-3 py-1 text-xs font-medium transition disabled:opacity-50"
       style={{
         borderColor: active ? '#2563eb' : 'var(--border-color)',
         background: active ? 'rgba(37,99,235,0.12)' : 'transparent',
