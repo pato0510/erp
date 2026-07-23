@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Cake, ChevronDown, ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react';
+import { Cake, ChevronDown, ChevronLeft, ChevronRight, Cog, Plus, RefreshCw } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { MonthView } from '../../../../components/calendar/MonthView';
 import { WeekView } from '../../../../components/calendar/WeekView';
@@ -122,6 +122,9 @@ export default function ActividadesCalendarioPage() {
 
   const [filterAreaId, setFilterAreaId] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'PENDIENTE' | 'HECHA'>('all');
+  // CAL-014 — segmented control over the module's OWN rows (kind); default Todos. Birthdays are a
+  // separate collection and ALWAYS render regardless.
+  const [kindSeg, setKindSeg] = useState<'todos' | 'ACTIVIDAD' | 'SERVICIO'>('todos');
 
   const [selected, setSelected] = useState<CalendarActivity | null>(null);
   const [selectedBirthday, setSelectedBirthday] = useState<BirthdayEntry | null>(null);
@@ -207,10 +210,11 @@ export default function ActividadesCalendarioPage() {
     () =>
       activities.filter(
         (a) =>
+          (kindSeg === 'todos' || a.kind === kindSeg) && // CAL-014 — client-side kind segment
           (filterAreaId === 'all' || a.areaId === filterAreaId) &&
           (filterStatus === 'all' || a.status === filterStatus),
       ),
-    [activities, filterAreaId, filterStatus],
+    [activities, kindSeg, filterAreaId, filterStatus],
   );
 
   const chips = useMemo<CalChip[]>(() => {
@@ -230,9 +234,15 @@ export default function ActividadesCalendarioPage() {
   const getChipBadge = useCallback((chip: CalChip) => chipBadgeFor(chip, areaById), [areaById]);
   // getEventTime returns the RAW wall-clock string (no Date); birthdays are untimed → null.
   const getEventTime = useCallback((chip: CalChip) => eventTimeFor(chip), []);
-  // Birthdays carry the festive Cake icon on every view; activities carry none.
+  // Birthdays carry the Cake icon; SERVICIO activities carry the Cog (CAL-014 — distinct at a
+  // glance from area-colored actividades, which carry none).
   const getChipIcon = useCallback(
-    (chip: CalChip) => (chip.kind === 'birthday' ? <Cake size={11} /> : null),
+    (chip: CalChip) =>
+      chip.kind === 'birthday' ? (
+        <Cake size={11} />
+      ) : chip.activity.kind === 'SERVICIO' ? (
+        <Cog size={11} />
+      ) : null,
     [],
   );
   const onSelectEvent = useCallback((chip: CalChip) => {
@@ -343,6 +353,23 @@ export default function ActividadesCalendarioPage() {
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2.5 shadow-sm">
+        {/* CAL-014 — segmented control over the module's own rows (kind). Birthdays always show. */}
+        <div className="inline-flex overflow-hidden rounded-md border border-[var(--border-color)] text-xs">
+          {(['todos', 'ACTIVIDAD', 'SERVICIO'] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKindSeg(k)}
+              className={`px-2.5 py-1 font-medium transition ${
+                kindSeg === k
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]'
+              }`}
+            >
+              {k === 'todos' ? 'Todos' : k === 'ACTIVIDAD' ? 'Actividades' : 'Servicios'}
+            </button>
+          ))}
+        </div>
         <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Área
           <select

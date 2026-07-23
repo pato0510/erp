@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
-import type { ActivityArea, CalendarActivity, MemberOption } from './activityTypes';
+import type { ActivityArea, ActivityKind, CalendarActivity, MemberOption } from './activityTypes';
 
 /* CAL-005 — create / edit a calendar activity. Editing is allowed in ANY status (the deliberate
    contrast with campaigns — CAL-003). The área select offers ACTIVE areas only; when editing an
@@ -38,6 +38,7 @@ export function ActivityFormModal({
   onSaved: () => void;
 }) {
   const [title, setTitle] = useState(editing?.title ?? '');
+  const [kind, setKind] = useState<ActivityKind>(editing?.kind ?? 'ACTIVIDAD');
   const [areaId, setAreaId] = useState(editing?.areaId ?? '');
   const [assigneeId, setAssigneeId] = useState(editing?.assigneeId ?? '');
   const [startDate, setStartDate] = useState(toDateInput(editing?.startDate ?? null));
@@ -74,6 +75,7 @@ export function ActivityFormModal({
     // a provided field — including null — is applied; an absent field is left unchanged).
     const body = {
       title: title.trim(),
+      kind,
       areaId,
       assigneeId: assigneeId || null,
       startDate,
@@ -118,6 +120,17 @@ export function ActivityFormModal({
               className={INPUT}
               placeholder="Ej. Reunión de coordinación"
             />
+          </Field>
+
+          <Field label="Tipo">
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as ActivityKind)}
+              className={INPUT}
+            >
+              <option value="ACTIVIDAD">Actividad</option>
+              <option value="SERVICIO">Servicio</option>
+            </select>
           </Field>
 
           <Field label="Área">

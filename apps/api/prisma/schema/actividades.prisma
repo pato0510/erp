@@ -40,6 +40,13 @@ enum ActivityStatus {
   CANCELADA
 }
 
+/* CAL-014 — a LENS on the same row, not a machine: a SERVICIO is a manual service (a ranged
+ * activity) that runs the SAME status machine as an ACTIVIDAD. It only segments the views. */
+enum ActivityKind {
+  ACTIVIDAD
+  SERVICIO
+}
+
 model CalendarActivity {
   id         String         @id @default(uuid()) @db.Uuid
   companyId  String         @db.Uuid
@@ -50,6 +57,7 @@ model CalendarActivity {
   startTime  String? // wall-clock "HH:mm" — a validated STRING, never a timestamp (§2.2 / f)
   assigneeId String?        @db.Uuid
   status     ActivityStatus @default(PENDIENTE)
+  kind       ActivityKind   @default(ACTIVIDAD) // CAL-014 — view lens (ACTIVIDAD | SERVICIO)
   notes      String?
   createdBy  String         @db.Uuid
   createdAt  DateTime       @default(now())

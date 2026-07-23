@@ -1,4 +1,13 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import { ActivityKind } from '@prisma/client';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 /* CAL-003 — create a calendar activity. `status` is DELIBERATELY ABSENT: create always forces
  * PENDIENTE in the service (never trust the client for a state-machine value). Dates are
@@ -35,6 +44,11 @@ export class CreateActivityDto {
   @IsOptional()
   @IsUUID()
   assigneeId?: string;
+
+  // CAL-014 — the view lens. Optional; the service defaults it to ACTIVIDAD on create.
+  @IsOptional()
+  @IsEnum(ActivityKind)
+  kind?: ActivityKind;
 
   @IsOptional()
   @IsString()

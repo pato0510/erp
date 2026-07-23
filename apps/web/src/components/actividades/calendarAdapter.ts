@@ -142,11 +142,15 @@ function hexToRgba(hex: string, alpha: number): string {
 
 /** Chip background + text/border color from the AREA's catalog color (neutral fallback when the
  *  area or its color is missing). HECHA renders dimmed (decision e): lower alpha on both. */
+const SERVICE_COLOR = '#4f46e5'; // CAL-014 — indigo; SERVICIO chips read as services, NOT area-colored
+
 export function chipStyle(
   activity: CalendarActivity,
   area: ActivityArea | undefined,
 ): { bg: string; color: string } {
-  const base = area?.color ?? NEUTRAL_COLOR;
+  // CAL-014 — a SERVICIO uses a fixed service color (distinct from every area color), so it's
+  // distinguishable at a glance from area-colored actividades (paired with the Cog icon).
+  const base = activity.kind === 'SERVICIO' ? SERVICE_COLOR : (area?.color ?? NEUTRAL_COLOR);
   if (activity.status === 'HECHA') {
     return { bg: hexToRgba(base, 0.07), color: hexToRgba(base, 0.6) };
   }

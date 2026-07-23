@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ActivityStatus, Prisma } from '@prisma/client';
+import { ActivityKind, ActivityStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
@@ -9,6 +9,7 @@ interface ListFilters {
   status?: ActivityStatus;
   areaId?: string;
   assigneeId?: string;
+  kind?: string; // CAL-014 — raw query value, validated via parseKind
   from?: string;
   to?: string;
 }
@@ -133,11 +134,24 @@ export class ActivitiesService {
     return { ...activity, dueDate, overdue };
   }
 
+  /** CAL-014 — validate the ?kind= query value → ActivityKind | undefined (absent = both kinds).
+   *  Shared by findAll AND monthFeed so the two reads reject a bad kind identically (the lockstep,
+   *  recon Q4). */
+  parseKind(kind?: string): ActivityKind | undefined {
+    if (kind === undefined || kind === '') return undefined;
+    if (!(Object.values(ActivityKind) as string[]).includes(kind)) {
+      throw new BadRequestException('El tipo debe ser ACTIVIDAD o SERVICIO.');
+    }
+    return kind as ActivityKind;
+  }
+
   async findAll(companyId: string, filters: ListFilters = {}) {
     const where: Prisma.CalendarActivityWhereInput = { companyId };
     if (filters.status) where.status = filters.status;
     if (filters.areaId) where.areaId = filters.areaId;
     if (filters.assigneeId) where.assigneeId = filters.assigneeId;
+    const kind = this.parseKind(filters.kind); // CAL-014 LOCKSTEP read #1
+    if (kind) where.kind = kind;
     if (filters.from || filters.to) {
       where.startDate = {};
       if (filters.from) where.startDate.gte = this.toDateOnly(filters.from);
@@ -280,6 +294,8 @@ export class ActivitiesService {
           notes: dto.notes ?? null,
           // status is NEVER taken from the DTO — a fresh activity is always PENDIENTE.
           status: ActivityStatus.PENDIENTE,
+          // CAL-014 — kind IS accepted (a lens, not a machine); default ACTIVIDAD server-side.
+          kind: dto.kind ?? ActivityKind.ACTIVIDAD,
         },
       });
     });
@@ -312,6 +328,7 @@ export class ActivitiesService {
     if (dto.startTime !== undefined) data.startTime = dto.startTime ?? null;
     if (dto.assigneeId !== undefined) data.assigneeId = dto.assigneeId ?? null;
     if (dto.notes !== undefined) data.notes = dto.notes ?? null;
+    if (dto.kind !== undefined) data.kind = dto.kind; // CAL-014 — the lens is editable
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.calendarActivity.update({ where: { id }, data });
@@ -362,8 +379,9 @@ export class ActivitiesService {
     return { year, mon };
   }
 
-  async monthFeed(companyId: string, month: string) {
+  async monthFeed(companyId: string, month: string, kind?: string) {
     const { year, mon } = this.parseMonth(month);
+    const kindFilter = this.parseKind(kind); // CAL-014 LOCKSTEP read #2
     const monthStart = new Date(Date.UTC(year, mon - 1, 1));
     const nextMonthStart = new Date(Date.UTC(year, mon, 1));
 
@@ -371,6 +389,7 @@ export class ActivitiesService {
       where: {
         companyId,
         status: { not: ActivityStatus.CANCELADA },
+        ...(kindFilter ? { kind: kindFilter } : {}),
         OR: [
           // Single-day: no endDate, startDate lands inside the month.
           { endDate: null, startDate: { gte: monthStart, lt: nextMonthStart } },

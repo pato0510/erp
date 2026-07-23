@@ -73,10 +73,14 @@ export class ActividadesController {
      exposure. Bad month → 400 (validated once via parseMonth). */
   @Get('calendar')
   @CheckPolicies((ability) => ability.can('read', CalendarActivitySubject))
-  async calendar(@CurrentCompany() companyId: string, @Query('month') month: string) {
+  async calendar(
+    @CurrentCompany() companyId: string,
+    @Query('month') month: string,
+    @Query('kind') kind?: string,
+  ) {
     const { mon } = this.activities.parseMonth(month);
     const [feed, birthdays] = await Promise.all([
-      this.activities.monthFeed(companyId, month),
+      this.activities.monthFeed(companyId, month, kind),
       this.birthdays.listForMonth(companyId, mon),
     ]);
     return { activities: feed.activities, birthdays };

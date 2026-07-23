@@ -116,6 +116,8 @@ export default function ActividadesGestionPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // CAL-014 — the Tipo lens; DEFAULT 'ACTIVIDAD' so current users see exactly today's view.
+  const [tipo, setTipo] = useState<'ACTIVIDAD' | 'SERVICIO' | 'todos'>('ACTIVIDAD');
   const [estado, setEstado] = useState<EstadoFilter>('abiertas');
   const [areaId, setAreaId] = useState<string>('all');
   const [responsable, setResponsable] = useState<string>('all');
@@ -168,14 +170,21 @@ export default function ActividadesGestionPage() {
 
   const week = useMemo(() => chileanWeek(), []);
 
-  /* View-mode rows: filter + sort over fresh data. Also the snapshot source for the order freeze. */
+  /* CAL-014 — THE COHERENCE RULE: both the table (rows) AND the dashboard (stats) derive from the
+     SAME kind-scoped set — what you see is what is counted. */
+  const kindScoped = useMemo(
+    () => activities.filter((a) => tipo === 'todos' || a.kind === tipo),
+    [activities, tipo],
+  );
+
+  /* View-mode rows: filter + sort over the kind-scoped set. Also the snapshot source for the freeze. */
   const rows = useMemo(() => {
     const matchEstado = (s: ActivityStatus) => {
       if (estado === 'todas') return true;
       if (estado === 'abiertas') return s === 'PENDIENTE' || s === 'EN_EJECUCION';
       return s === estado;
     };
-    const filtered = activities.filter((a) => {
+    const filtered = kindScoped.filter((a) => {
       if (!matchEstado(a.status)) return false;
       if (areaId !== 'all' && a.areaId !== areaId) return false;
       if (responsable === 'none' && a.assigneeId) return false;
@@ -195,7 +204,7 @@ export default function ActividadesGestionPage() {
       if (da !== db) return da < db ? -1 : 1;
       return a.title.localeCompare(b.title);
     });
-  }, [activities, estado, areaId, responsable, onlyOverdue, onlyThisWeek, week]);
+  }, [kindScoped, estado, areaId, responsable, onlyOverdue, onlyThisWeek, week]);
 
   /* CAL-013 — the Monday numbers, derived CLIENT-SIDE from the fetched set (which carries every
      status; small volumes; the server's derived flags are the truth — overdue is NEVER recomputed
@@ -212,7 +221,8 @@ export default function ActividadesGestionPage() {
     let atrasadas = 0;
     let hechasSemana = 0;
     const byResponsable = new Map<string, number>(); // (assigneeId ?? '__none__') → open count
-    for (const a of activities) {
+    for (const a of kindScoped) {
+      // CAL-014 — over the SAME kind-scoped set the table shows (coherence: seen == counted).
       if (a.status === 'PENDIENTE') pendientes++;
       else if (a.status === 'EN_EJECUCION') enEjecucion++;
       if (a.overdue) atrasadas++; // the SERVER flag — never recomputed
@@ -226,7 +236,7 @@ export default function ActividadesGestionPage() {
       }
     }
     return { pendientes, enEjecucion, atrasadas, hechasSemana, byResponsable };
-  }, [activities, week]);
+  }, [kindScoped, week]);
 
   /* CAL-013 — each card toggles the matching table filter; clicking an active card clears it. */
   const clearCardFilters = () => {
@@ -439,6 +449,17 @@ export default function ActividadesGestionPage() {
           Esta semana
         </Chip>
         <span className="mx-1 h-4 w-px bg-[var(--border-color)]" />
+        {/* CAL-014 — Tipo lens (default Actividades). Cards + table both scope to this. */}
+        <select
+          value={tipo}
+          disabled={editMode}
+          onChange={(e) => setTipo(e.target.value as 'ACTIVIDAD' | 'SERVICIO' | 'todos')}
+          className={selectCls}
+        >
+          <option value="ACTIVIDAD">Actividades</option>
+          <option value="SERVICIO">Servicios</option>
+          <option value="todos">Todos los tipos</option>
+        </select>
         <select
           value={estado}
           disabled={editMode}
@@ -613,6 +634,7 @@ export default function ActividadesGestionPage() {
                 onCreated={onNewCreated}
                 editMode={editMode}
                 cols={COLS}
+                kind={tipo === 'SERVICIO' ? 'SERVICIO' : 'ACTIVIDAD'}
               />
             )}
           </tbody>
@@ -1006,6 +1028,7 @@ function NewRow({
   onCreated,
   editMode,
   cols,
+  kind,
 }: {
   draft: RowDraft;
   setDraft: (d: RowDraft) => void;
@@ -1014,6 +1037,7 @@ function NewRow({
   onCreated: (id: string) => void;
   editMode: boolean;
   cols: number;
+  kind: 'ACTIVIDAD' | 'SERVICIO'; // CAL-014 — the writing row creates in the current Tipo lens
 }) {
   const [state, setState] = useState<'idle' | 'saving' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -1025,6 +1049,7 @@ function NewRow({
     try {
       const created = await apiClient.post<CalendarActivity>('/api/actividades/activities', {
         title: draft.title.trim(),
+        kind, // CAL-014 — born in the current Tipo lens (SERVICIO when Tipo=Servicios)
         areaId: draft.areaId,
         startDate: draft.cierre, // a new row is a single day; cierre = startDate (status forced server-side)
         assigneeId: draft.assigneeId || null,

@@ -4,6 +4,7 @@
    startTime is a wall-clock "HH:mm" STRING, never a timestamp. */
 
 export type ActivityStatus = 'PENDIENTE' | 'EN_EJECUCION' | 'HECHA' | 'CANCELADA';
+export type ActivityKind = 'ACTIVIDAD' | 'SERVICIO'; // CAL-014 — the view lens
 
 export interface CalendarActivity {
   id: string;
@@ -15,6 +16,7 @@ export interface CalendarActivity {
   startTime: string | null; // "HH:mm" wall-clock, or null (untimed)
   assigneeId: string | null;
   status: ActivityStatus;
+  kind: ActivityKind; // CAL-014 — ACTIVIDAD | SERVICIO
   notes: string | null;
   createdAt: string;
   updatedAt: string;
