@@ -111,11 +111,66 @@ export class ServiceOrdersService {
     return this.prisma.serviceOrder.findMany({ where, orderBy: [{ createdAt: 'desc' }] });
   }
 
+  /** CAL-015 — "Servicios activos": orders still in flight (RECIBIDA + EN_EJECUCION), where the
+   *  ops team sets execution dates. Completed/cancelled orders are out of scope. Same read shape
+   *  as findAll (raw rows, no enrichment). */
+  async listActive(companyId: string) {
+    return this.prisma.serviceOrder.findMany({
+      where: {
+        companyId,
+        status: { in: [ServiceOrderStatus.RECIBIDA, ServiceOrderStatus.EN_EJECUCION] },
+      },
+      orderBy: [{ executionStart: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
   /** Company-scoped raw fetch (no enrichment) — the existence guard for update/status. */
   private async getOrderOrThrow(id: string, companyId: string) {
     const order = await this.prisma.serviceOrder.findFirst({ where: { id, companyId } });
     if (!order) throw new NotFoundException('Orden de servicio no encontrada');
     return order;
+  }
+
+  /** CAL-015 — anchor a YYYY-MM-DD string to UTC midnight so an @db.Date column never suffers the
+   *  timezone off-by-one (HR-004b). */
+  private toDateOnly(dateStr: string): Date {
+    const d = new Date(dateStr);
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  }
+
+  /** CAL-015 — set/clear the execution window. Both fields optional AND nullable (null clears);
+   *  executionEnd ≥ executionStart when BOTH present (effective, post-write values) → else 400.
+   *  Pure scheduling data — NO status-machine involvement. Write via executeWithRls. */
+  async setExecutionDates(
+    companyId: string,
+    userId: string,
+    id: string,
+    dto: { executionStart?: string | null; executionEnd?: string | null },
+  ) {
+    const order = await this.getOrderOrThrow(id, companyId);
+    const start =
+      dto.executionStart !== undefined
+        ? dto.executionStart
+          ? this.toDateOnly(dto.executionStart)
+          : null
+        : order.executionStart;
+    const end =
+      dto.executionEnd !== undefined
+        ? dto.executionEnd
+          ? this.toDateOnly(dto.executionEnd)
+          : null
+        : order.executionEnd;
+    if (start && end && end.getTime() < start.getTime()) {
+      throw new BadRequestException(
+        'La fecha de fin de ejecución no puede ser anterior a la de inicio.',
+      );
+    }
+    const data: Prisma.ServiceOrderUncheckedUpdateInput = {};
+    if (dto.executionStart !== undefined) data.executionStart = start;
+    if (dto.executionEnd !== undefined) data.executionEnd = end;
+    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      return tx.serviceOrder.update({ where: { id }, data });
+    });
   }
 
   async findOne(id: string, companyId: string, ability: AppAbility) {

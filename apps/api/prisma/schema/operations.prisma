@@ -1197,6 +1197,11 @@ model ServiceOrder {
   companyId           String             @db.Uuid
   orderNumber         String // per-company sequential, e.g. OS-0001
   status              ServiceOrderStatus @default(RECIBIDA)
+  // CAL-015 — execution window, set by ops "cuando se empiezan las órdenes". Nullable BOTH; an
+  // order without dates simply never reaches the calendar (CAL-016). NOT part of the status
+  // machine — pure scheduling data. This is the calendar's date SOURCE (recon Q1: none existed).
+  executionStart      DateTime?          @db.Date
+  executionEnd        DateTime?          @db.Date
   clientName          String // denormalized copy of the account name (always present)
   counterpartyId      String?            @db.Uuid // optional fiscal identity (may be linked later)
   title               String
@@ -1219,6 +1224,7 @@ model ServiceOrder {
   @@unique([companyId, orderNumber])
   @@index([companyId])
   @@index([companyId, sourceOpportunityId])
+  @@index([companyId, executionStart]) // CAL-015 — the CAL-016 month-range queries will use this
   @@map("service_orders")
 }
 

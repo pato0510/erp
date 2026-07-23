@@ -9,6 +9,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PoliciesGuard } from '../../common/guards/policies.guard';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { ChangeServiceOrderStatusDto } from './dto/change-service-order-status.dto';
+import { SetExecutionDatesDto } from './dto/set-execution-dates.dto';
 import { ServiceOrdersService } from './service-orders.service';
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto';
 
@@ -39,6 +40,14 @@ export class ServiceOrdersController {
     });
   }
 
+  /* CAL-015 — "Servicios activos": in-flight orders (RECIBIDA + EN_EJECUCION) where ops sets the
+     execution window. Declared BEFORE :id so the literal path wins over the param route. */
+  @Get('active')
+  @CheckPolicies((ability) => ability.can('read', ServiceOrderSubject))
+  listActive(@CurrentCompany() companyId: string) {
+    return this.service.listActive(companyId);
+  }
+
   @Get(':id')
   @CheckPolicies((ability) => ability.can('read', ServiceOrderSubject))
   findOne(
@@ -59,6 +68,19 @@ export class ServiceOrdersController {
     @Body() dto: UpdateServiceOrderDto,
   ) {
     return this.service.update(companyId, user.id, id, dto);
+  }
+
+  /* CAL-015 — set/clear the execution dates (ops writers). Focused sub-route mirroring the
+     :id/status convention; NOT the status machine — pure scheduling. */
+  @Patch(':id/execution-dates')
+  @CheckPolicies((ability) => ability.can('update', ServiceOrderSubject))
+  setExecutionDates(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: SetExecutionDatesDto,
+  ) {
+    return this.service.setExecutionDates(companyId, user.id, id, dto);
   }
 
   /* Canonical status-transition path — all machine rules enforced here. */
