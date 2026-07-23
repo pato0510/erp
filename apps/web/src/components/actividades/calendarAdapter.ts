@@ -1,5 +1,11 @@
 import { dateKey } from '../calendar/dateGrid';
-import type { ActivityArea, BirthdayEntry, CalendarActivity } from './activityTypes';
+import type {
+  ActivityArea,
+  BirthdayEntry,
+  CalendarActivity,
+  ServicioCalendarEntry,
+  VencimientoCalendarEntry,
+} from './activityTypes';
 
 /* CAL-005 — the adapter between CalendarActivity rows and the shared generic calendar views
    (the MKT-004/CAL-004 recipe). It turns each activity into one or more render "chips":
@@ -31,8 +37,31 @@ export interface BirthdayChip {
   birthday: BirthdayEntry;
 }
 
+/* CAL-016 — an ops SERVICIO render chip (a service order's execution window). Ranged like an
+   activity → per-day expansion; untimed by nature. Carries the money-free ServicioCalendarEntry. */
+export interface ServicioChip {
+  kind: 'servicio';
+  id: string;
+  date: string;
+  servicio: ServicioCalendarEntry;
+}
+
+/* CAL-016 — a VENCIMIENTO render chip (a single-day document expiration). Untimed → all-day. */
+export interface VencimientoChip {
+  kind: 'vencimiento';
+  id: string;
+  date: string;
+  vencimiento: VencimientoCalendarEntry;
+}
+
 /* The unified chip the calendar page feeds to the shared generic views. */
-export type CalChip = ActivityChip | BirthdayChip;
+export type CalChip = ActivityChip | BirthdayChip | ServicioChip | VencimientoChip;
+
+/* CAL-016 — fixed collection styles, deliberately distinct from BOTH area colors AND the manual
+   SERVICIO indigo (SERVICE_COLOR below): an ops servicio reads teal, a vencimiento reads amber
+   (warning family). Paired with their own icons via the views' getChipIcon slot. */
+export const OPS_SERVICIO_STYLE = { bg: 'rgba(13,148,136,0.16)', color: '#0d9488' } as const; // teal
+export const VENCIMIENTO_STYLE = { bg: 'rgba(217,119,6,0.16)', color: '#d97706' } as const; // amber
 
 /* Fixed festive style for birthday chips — deliberately NOT an area color, so a birthday reads
    as a birthday on any view (paired with the Cake icon via the views' getChipIcon slot). */
@@ -207,41 +236,96 @@ export function birthdayToChip(
   };
 }
 
+/* ── CAL-016: ops servicios (ranged) + vencimientos (single-day) chip expanders ───────── */
+
+/** Expand one ops servicio into per-day chips within [gridStart, gridEnd] — identical shape to a
+ *  ranged activity (one local-midnight chip per covered day, clamped to the span), so a
+ *  jul-21→ago-01 order paints in BOTH July and August. Days are stepped in UTC (DST-immune). */
+export function servicioToChips(
+  servicio: ServicioCalendarEntry,
+  gridStart: Date,
+  gridEnd: Date,
+): ServicioChip[] {
+  const start = utcParts(servicio.executionStart);
+  const end = utcParts(servicio.executionEnd);
+  const chips: ServicioChip[] = [];
+  let cursor = Date.UTC(start.y, start.m, start.d);
+  const lastUtc = Date.UTC(end.y, end.m, end.d);
+  while (cursor <= lastUtc) {
+    const c = new Date(cursor);
+    const localMidnight = new Date(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate(), 0, 0);
+    if (inSpan(localMidnight, gridStart, gridEnd)) {
+      chips.push({
+        kind: 'servicio',
+        id: `svc:${servicio.serviceOrderId}:${dateKey(localMidnight)}`,
+        date: localMidnight.toISOString(),
+        servicio,
+      });
+    }
+    cursor += 86_400_000;
+  }
+  return chips;
+}
+
+/** Place a single-day vencimiento on its expiration day within the visible span. */
+export function vencimientoToChip(
+  vencimiento: VencimientoCalendarEntry,
+  gridStart: Date,
+  gridEnd: Date,
+): VencimientoChip | null {
+  const { y, m, d } = utcParts(vencimiento.date);
+  const localMidnight = new Date(y, m, d, 0, 0);
+  if (!inSpan(localMidnight, gridStart, gridEnd)) return null;
+  return {
+    kind: 'vencimiento',
+    id: `venc:${vencimiento.id}`,
+    date: localMidnight.toISOString(),
+    vencimiento,
+  };
+}
+
 /** Chip background/color: area color for activities (dimmed if HECHA), fixed festive for
- *  birthdays. */
+ *  birthdays, teal for ops servicios, amber (warning) for vencimientos. */
 export function chipStyleFor(
   chip: CalChip,
   areaById: Map<string, ActivityArea>,
 ): { bg: string; color: string } {
   if (chip.kind === 'birthday') return { ...BIRTHDAY_STYLE };
+  if (chip.kind === 'servicio') return { ...OPS_SERVICIO_STYLE };
+  if (chip.kind === 'vencimiento') return { ...VENCIMIENTO_STYLE };
   return chipStyle(chip.activity, areaById.get(chip.activity.areaId));
 }
 
-/** Chip label: activity title (✓ if HECHA), or the birthday's fullName. */
+/** Chip label: activity title (✓ if HECHA), birthday fullName, or the ops entry label. */
 export function chipLabelFor(chip: CalChip): string {
-  return chip.kind === 'birthday' ? chip.birthday.fullName : chipLabel(chip.activity);
+  if (chip.kind === 'birthday') return chip.birthday.fullName;
+  if (chip.kind === 'servicio') return chip.servicio.label;
+  if (chip.kind === 'vencimiento') return chip.vencimiento.label;
+  return chipLabel(chip.activity);
 }
 
-/** Week/Day chip badge: area initials for activities, a short "CUMPLE" for birthdays. */
+/** Week/Day chip badge: area initials for activities, short tags for the other collections. */
 export function chipBadgeFor(chip: CalChip, areaById: Map<string, ActivityArea>): string {
   if (chip.kind === 'birthday') return 'CUMPLE';
+  if (chip.kind === 'servicio') return 'OPS';
+  if (chip.kind === 'vencimiento') return 'VENCE';
   return areaBadge(areaById.get(chip.activity.areaId)?.name ?? '—');
 }
 
-/** getEventTime: the raw wall-clock string for a timed activity; birthdays are always untimed. */
+/** getEventTime: the raw wall-clock string for a timed activity; every other collection is
+ *  untimed (birthdays, ops servicios, vencimientos) → null. */
 export function eventTimeFor(chip: CalChip): string | null {
-  if (chip.kind === 'birthday') return null;
-  return chip.activity.startTime ?? null;
+  if (chip.kind === 'activity') return chip.activity.startTime ?? null;
+  return null;
 }
 
-/** Within-day ordering: untimed first (birthdays included), then startTime asc, then label. */
+/** Within-day ordering: untimed first (birthdays/servicios/vencimientos included), then startTime
+ *  asc, then label. */
 export function compareCalChips(a: CalChip, b: CalChip): number {
   const ta = a.kind === 'activity' ? a.activity.startTime : null;
   const tb = b.kind === 'activity' ? b.activity.startTime : null;
   if (!ta && tb) return -1;
   if (ta && !tb) return 1;
   if (ta && tb && ta !== tb) return ta < tb ? -1 : 1;
-  const la = a.kind === 'birthday' ? a.birthday.fullName : a.activity.title;
-  const lb = b.kind === 'birthday' ? b.birthday.fullName : b.activity.title;
-  return la.localeCompare(lb);
+  return chipLabelFor(a).localeCompare(chipLabelFor(b));
 }

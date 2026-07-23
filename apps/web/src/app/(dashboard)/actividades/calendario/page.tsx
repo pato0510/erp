@@ -1,7 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Cake, ChevronDown, ChevronLeft, ChevronRight, Cog, Plus, RefreshCw } from 'lucide-react';
+import {
+  AlertTriangle,
+  Cake,
+  CalendarClock,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Cog,
+  Plus,
+  RefreshCw,
+} from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { MonthView } from '../../../../components/calendar/MonthView';
 import { WeekView } from '../../../../components/calendar/WeekView';
@@ -26,16 +36,25 @@ import {
   eventTimeFor,
   monthsInSpan,
   monthYearMap,
+  servicioToChips,
+  vencimientoToChip,
+  OPS_SERVICIO_STYLE,
+  VENCIMIENTO_STYLE,
+  BIRTHDAY_STYLE,
   type CalChip,
 } from '../../../../components/actividades/calendarAdapter';
 import { ActivityDetailModal } from '../../../../components/actividades/ActivityDetailModal';
 import { ActivityFormModal } from '../../../../components/actividades/ActivityFormModal';
 import { BirthdayModal } from '../../../../components/actividades/BirthdayModal';
+import { ServicioCalendarModal } from '../../../../components/actividades/ServicioCalendarModal';
+import { VencimientoCalendarModal } from '../../../../components/actividades/VencimientoCalendarModal';
 import type {
   ActivityArea,
   BirthdayEntry,
   CalendarActivity,
   MemberOption,
+  ServicioCalendarEntry,
+  VencimientoCalendarEntry,
 } from '../../../../components/actividades/activityTypes';
 import { useCanWriteActividades } from '../../../../hooks/useActividadesPermissions';
 
@@ -116,6 +135,9 @@ export default function ActividadesCalendarioPage() {
   const [members, setMembers] = useState<MemberOption[]>([]);
   const [activities, setActivities] = useState<CalendarActivity[]>([]);
   const [birthdays, setBirthdays] = useState<BirthdayEntry[]>([]);
+  // CAL-016 — the two Operaciones collections folded into the same feed.
+  const [servicios, setServicios] = useState<ServicioCalendarEntry[]>([]);
+  const [vencimientos, setVencimientos] = useState<VencimientoCalendarEntry[]>([]);
   const [cancelled, setCancelled] = useState<CalendarActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,9 +147,18 @@ export default function ActividadesCalendarioPage() {
   // CAL-014 — segmented control over the module's OWN rows (kind); default Todos. Birthdays are a
   // separate collection and ALWAYS render regardless.
   const [kindSeg, setKindSeg] = useState<'todos' | 'ACTIVIDAD' | 'SERVICIO'>('todos');
+  // CAL-016 — per-collection legend toggles (session state; user prefs = V2 seed). ON by default.
+  // Birthdays stay always-on (no toggle). These are INDEPENDENT of the kind segmented control — a
+  // manual SERVICIO (a calendar_activity) and an ops servicio are DIFFERENT things.
+  const [showServicios, setShowServicios] = useState(true);
+  const [showVencimientos, setShowVencimientos] = useState(true);
 
   const [selected, setSelected] = useState<CalendarActivity | null>(null);
   const [selectedBirthday, setSelectedBirthday] = useState<BirthdayEntry | null>(null);
+  const [selectedServicio, setSelectedServicio] = useState<ServicioCalendarEntry | null>(null);
+  const [selectedVencimiento, setSelectedVencimiento] = useState<VencimientoCalendarEntry | null>(
+    null,
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarActivity | null>(null);
   const [cancelledOpen, setCancelledOpen] = useState(false);
@@ -149,8 +180,9 @@ export default function ActividadesCalendarioPage() {
 
   /* Feed: fetch EVERY month the visible grid touches and merge. Activities dedupe by id (a
      cross-month range fetched from both months collapses to one row). Birthdays (CAL-006) are
-     deduped by employeeId+month — each birthday belongs to one month, so the concat across
-     months is naturally disjoint; the Map is belt-and-suspenders. */
+     deduped by employeeId+month. CAL-016 — servicios dedupe by serviceOrderId (a cross-month
+     execution window fetched from both months collapses to one entry, then re-expanded per day by
+     the adapter); vencimientos dedupe by id. */
   const fetchFeed = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -159,19 +191,28 @@ export default function ActividadesCalendarioPage() {
       const months = monthsInSpan(gridStart, gridEnd);
       const feeds = await Promise.all(
         months.map((m) =>
-          apiClient.get<{ activities: CalendarActivity[]; birthdays: BirthdayEntry[] }>(
-            `/api/actividades/calendar?month=${m}`,
-          ),
+          apiClient.get<{
+            activities: CalendarActivity[];
+            birthdays: BirthdayEntry[];
+            servicios: ServicioCalendarEntry[];
+            vencimientos: VencimientoCalendarEntry[];
+          }>(`/api/actividades/calendar?month=${m}`),
         ),
       );
       const byId = new Map<string, CalendarActivity>();
       const bdayById = new Map<string, BirthdayEntry>();
+      const svcById = new Map<string, ServicioCalendarEntry>();
+      const vencById = new Map<string, VencimientoCalendarEntry>();
       for (const f of feeds) {
         for (const a of f.activities) byId.set(a.id, a);
         for (const b of f.birthdays) bdayById.set(`${b.employeeId}:${b.month}`, b);
+        for (const s of f.servicios ?? []) svcById.set(s.serviceOrderId, s);
+        for (const v of f.vencimientos ?? []) vencById.set(v.id, v);
       }
       setActivities([...byId.values()]);
       setBirthdays([...bdayById.values()]);
+      setServicios([...svcById.values()]);
+      setVencimientos([...vencById.values()]);
     } catch {
       setError('No se pudieron cargar las actividades.');
     } finally {
@@ -225,8 +266,27 @@ export default function ActividadesCalendarioPage() {
     const birthdayChips = birthdays
       .map((b) => birthdayToChip(b, monthToYear, gridStart, gridEnd))
       .filter((c): c is NonNullable<typeof c> => c !== null);
-    return [...activityChips, ...birthdayChips];
-  }, [filtered, birthdays, view, focusedDate]);
+    // CAL-016 — foreign collections, each behind its own legend toggle, independent of kind/área/
+    // estado. Servicios are ranged (per-day expansion); vencimientos are single-day.
+    const servicioChips = showServicios
+      ? servicios.flatMap((s) => servicioToChips(s, gridStart, gridEnd))
+      : [];
+    const vencimientoChips = showVencimientos
+      ? vencimientos
+          .map((v) => vencimientoToChip(v, gridStart, gridEnd))
+          .filter((c): c is NonNullable<typeof c> => c !== null)
+      : [];
+    return [...activityChips, ...birthdayChips, ...servicioChips, ...vencimientoChips];
+  }, [
+    filtered,
+    birthdays,
+    servicios,
+    vencimientos,
+    showServicios,
+    showVencimientos,
+    view,
+    focusedDate,
+  ]);
 
   /* ---- shared wiring (identical accessors across the three views; union-aware) ---- */
   const getChipStyle = useCallback((chip: CalChip) => chipStyleFor(chip, areaById), [areaById]);
@@ -234,19 +294,18 @@ export default function ActividadesCalendarioPage() {
   const getChipBadge = useCallback((chip: CalChip) => chipBadgeFor(chip, areaById), [areaById]);
   // getEventTime returns the RAW wall-clock string (no Date); birthdays are untimed → null.
   const getEventTime = useCallback((chip: CalChip) => eventTimeFor(chip), []);
-  // Birthdays carry the Cake icon; SERVICIO activities carry the Cog (CAL-014 — distinct at a
-  // glance from area-colored actividades, which carry none).
-  const getChipIcon = useCallback(
-    (chip: CalChip) =>
-      chip.kind === 'birthday' ? (
-        <Cake size={11} />
-      ) : chip.activity.kind === 'SERVICIO' ? (
-        <Cog size={11} />
-      ) : null,
-    [],
-  );
+  // Icons distinguish the collections at a glance: birthday → Cake; ops servicio → CalendarClock;
+  // vencimiento → AlertTriangle; a manual SERVICIO activity → Cog (CAL-014); plain actividades none.
+  const getChipIcon = useCallback((chip: CalChip) => {
+    if (chip.kind === 'birthday') return <Cake size={11} />;
+    if (chip.kind === 'servicio') return <CalendarClock size={11} />;
+    if (chip.kind === 'vencimiento') return <AlertTriangle size={11} />;
+    return chip.activity.kind === 'SERVICIO' ? <Cog size={11} /> : null;
+  }, []);
   const onSelectEvent = useCallback((chip: CalChip) => {
     if (chip.kind === 'birthday') setSelectedBirthday(chip.birthday);
+    else if (chip.kind === 'servicio') setSelectedServicio(chip.servicio);
+    else if (chip.kind === 'vencimiento') setSelectedVencimiento(chip.vencimiento);
     else setSelected(chip.activity);
   }, []);
 
@@ -399,6 +458,53 @@ export default function ActividadesCalendarioPage() {
         </label>
       </div>
 
+      {/* CAL-016 — collection legend. Birthdays are ALWAYS on (static swatch); Servicios /
+          Vencimientos toggle their chips on the grid (session state). Independent of the kind
+          segmented control above. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+          Colecciones
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1 text-xs text-[var(--text-secondary)]">
+          <span
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ background: BIRTHDAY_STYLE.color }}
+            aria-hidden
+          />
+          Cumpleaños
+        </span>
+        <button
+          type="button"
+          aria-pressed={showServicios}
+          onClick={() => setShowServicios((s) => !s)}
+          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition"
+          style={{
+            borderColor: OPS_SERVICIO_STYLE.color,
+            background: showServicios ? OPS_SERVICIO_STYLE.bg : 'transparent',
+            color: showServicios ? OPS_SERVICIO_STYLE.color : 'var(--text-secondary)',
+            opacity: showServicios ? 1 : 0.6,
+          }}
+        >
+          <CalendarClock size={12} />
+          Servicios (Operaciones)
+        </button>
+        <button
+          type="button"
+          aria-pressed={showVencimientos}
+          onClick={() => setShowVencimientos((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition"
+          style={{
+            borderColor: VENCIMIENTO_STYLE.color,
+            background: showVencimientos ? VENCIMIENTO_STYLE.bg : 'transparent',
+            color: showVencimientos ? VENCIMIENTO_STYLE.color : 'var(--text-secondary)',
+            opacity: showVencimientos ? 1 : 0.6,
+          }}
+        >
+          <AlertTriangle size={12} />
+          Vencimientos
+        </button>
+      </div>
+
       {error && (
         <div className="mb-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
           {error}
@@ -523,6 +629,20 @@ export default function ActividadesCalendarioPage() {
 
       {selectedBirthday && (
         <BirthdayModal birthday={selectedBirthday} onClose={() => setSelectedBirthday(null)} />
+      )}
+
+      {selectedServicio && (
+        <ServicioCalendarModal
+          servicio={selectedServicio}
+          onClose={() => setSelectedServicio(null)}
+        />
+      )}
+
+      {selectedVencimiento && (
+        <VencimientoCalendarModal
+          vencimiento={selectedVencimiento}
+          onClose={() => setSelectedVencimiento(null)}
+        />
       )}
     </div>
   );

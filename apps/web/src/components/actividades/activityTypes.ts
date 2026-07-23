@@ -63,3 +63,30 @@ export interface BirthdayEntry {
   day: number;
   month: number;
 }
+
+/* CAL-016 — the ops status vocabulary, VERBATIM (RECIBIDA·EN_EJECUCION·COMPLETADA·CANCELADA).
+   Kept as its own union, NEVER mapped to ActivityStatus (the vocabulary-coexistence doctrine —
+   these are different machines for different things). */
+export type ServiceOrderStatusVM = 'RECIBIDA' | 'EN_EJECUCION' | 'COMPLETADA' | 'CANCELADA';
+
+/* CAL-016 — the two Operaciones collections folded into the SAME calendar envelope
+   (GET /actividades/calendar → { activities, birthdays, servicios, vencimientos }). Mirrors the
+   backend OpsCalendarReadService narrowed contracts. STRUCTURALLY money-free: a servicio carries
+   a label + range + ops status and NOTHING else — there is no netAmount/total/currency here, by
+   design (the signed matrix). `link` is ability-shaped by the SERVER: null = the caller cannot
+   read the target (the chip modal opens without a door). */
+export interface ServicioCalendarEntry {
+  serviceOrderId: string;
+  label: string;
+  executionStart: string; // "YYYY-MM-DDT00:00:00.000Z"
+  executionEnd: string; // "YYYY-MM-DDT00:00:00.000Z"
+  status: ServiceOrderStatusVM; // ops vocabulary, verbatim
+  link: string | null; // server-shaped: '/operaciones/servicios-activos' | null
+}
+
+export interface VencimientoCalendarEntry {
+  id: string;
+  label: string;
+  date: string; // "YYYY-MM-DDT00:00:00.000Z"
+  link: string | null; // server-shaped: '/operaciones/documentos' | null
+}
