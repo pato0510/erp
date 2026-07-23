@@ -197,6 +197,74 @@ export default function ActividadesGestionPage() {
     });
   }, [activities, estado, areaId, responsable, onlyOverdue, onlyThisWeek, week]);
 
+  /* CAL-013 — the Monday numbers, derived CLIENT-SIDE from the fetched set (which carries every
+     status; small volumes; the server's derived flags are the truth — overdue is NEVER recomputed
+     here). CANCELADA counts nowhere. Definitions:
+     - Pendientes           = status PENDIENTE (open).
+     - En ejecución         = status EN_EJECUCION (open).
+     - Atrasadas            = a.overdue (the SERVER flag; only open items are ever overdue).
+     - Hechas de la semana  = status HECHA AND fechaCierre (dueDate) within the CURRENT CHILEAN WEEK
+       (reuse chileanWeek(), CAL-008b; an item done early still counts by its cierre).
+     Por responsable        = OPEN items (PENDIENTE + EN_EJECUCION) grouped by assignee. */
+  const stats = useMemo(() => {
+    let pendientes = 0;
+    let enEjecucion = 0;
+    let atrasadas = 0;
+    let hechasSemana = 0;
+    const byResponsable = new Map<string, number>(); // (assigneeId ?? '__none__') → open count
+    for (const a of activities) {
+      if (a.status === 'PENDIENTE') pendientes++;
+      else if (a.status === 'EN_EJECUCION') enEjecucion++;
+      if (a.overdue) atrasadas++; // the SERVER flag — never recomputed
+      if (a.status === 'HECHA') {
+        const cierre = a.dueDate?.slice(0, 10);
+        if (cierre && cierre >= week.monday && cierre <= week.sunday) hechasSemana++;
+      }
+      if (a.status === 'PENDIENTE' || a.status === 'EN_EJECUCION') {
+        const key = a.assigneeId ?? '__none__';
+        byResponsable.set(key, (byResponsable.get(key) ?? 0) + 1);
+      }
+    }
+    return { pendientes, enEjecucion, atrasadas, hechasSemana, byResponsable };
+  }, [activities, week]);
+
+  /* CAL-013 — each card toggles the matching table filter; clicking an active card clears it. */
+  const clearCardFilters = () => {
+    setEstado('abiertas');
+    setOnlyOverdue(false);
+    setOnlyThisWeek(false);
+  };
+  const cardActive = {
+    pendientes: estado === 'PENDIENTE' && !onlyOverdue && !onlyThisWeek,
+    enEjecucion: estado === 'EN_EJECUCION' && !onlyOverdue && !onlyThisWeek,
+    atrasadas: onlyOverdue,
+    hechasSemana: estado === 'HECHA' && onlyThisWeek,
+  };
+  const onPendientes = () => {
+    if (cardActive.pendientes) return clearCardFilters();
+    setEstado('PENDIENTE');
+    setOnlyOverdue(false);
+    setOnlyThisWeek(false);
+  };
+  const onEnEjecucion = () => {
+    if (cardActive.enEjecucion) return clearCardFilters();
+    setEstado('EN_EJECUCION');
+    setOnlyOverdue(false);
+    setOnlyThisWeek(false);
+  };
+  const onAtrasadas = () => {
+    if (cardActive.atrasadas) return clearCardFilters();
+    setEstado('abiertas');
+    setOnlyOverdue(true);
+    setOnlyThisWeek(false);
+  };
+  const onHechasSemana = () => {
+    if (cardActive.hechasSemana) return clearCardFilters();
+    setEstado('HECHA');
+    setOnlyThisWeek(true);
+    setOnlyOverdue(false);
+  };
+
   /* CAL-011 — ORDER FREEZE: entering edit mode snapshots the current filtered+sorted ids; edit
      mode renders strictly in that order (each row looked up live by id), so a save that flips a
      row's overdue/cierre/estado updates its cells IN PLACE but never reorders or filters it out.
@@ -305,6 +373,62 @@ export default function ActividadesGestionPage() {
           </div>
         )}
       </div>
+
+      {/* CAL-013 — the Monday numbers (readers see them too: the open module's read surface).
+          Each card toggles the matching table filter; disabled while editing (order frozen). */}
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <KpiCard
+          label="Pendientes"
+          value={stats.pendientes}
+          color="#1d4ed8"
+          active={cardActive.pendientes}
+          disabled={editMode}
+          onClick={onPendientes}
+        />
+        <KpiCard
+          label="En ejecución"
+          value={stats.enEjecucion}
+          color="#b45309"
+          active={cardActive.enEjecucion}
+          disabled={editMode}
+          onClick={onEnEjecucion}
+        />
+        <KpiCard
+          label="Atrasadas"
+          value={stats.atrasadas}
+          color="#b91c1c"
+          active={cardActive.atrasadas}
+          disabled={editMode}
+          onClick={onAtrasadas}
+        />
+        <KpiCard
+          label="Hechas de la semana"
+          value={stats.hechasSemana}
+          color="#15803d"
+          active={cardActive.hechasSemana}
+          disabled={editMode}
+          onClick={onHechasSemana}
+        />
+      </div>
+
+      {stats.byResponsable.size > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <span className="font-semibold uppercase tracking-wide">Por responsable</span>
+          {[...stats.byResponsable.entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([key, count]) => (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-color)] px-2 py-0.5"
+              >
+                {key === '__none__' ? 'Sin responsable' : memberName(key)}
+                <span className="rounded-full bg-[var(--border-color)] px-1.5 text-[10px]">
+                  {count}
+                </span>
+              </span>
+            ))}
+        </div>
+      )}
 
       {/* Filters — disabled while editing (the order is frozen). */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2.5 shadow-sm">
@@ -997,6 +1121,42 @@ function NewRow({
         </tr>
       )}
     </>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  color,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex flex-col rounded-xl border bg-[var(--bg-card)] px-3 py-2.5 text-left shadow-sm transition hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))] disabled:opacity-60 disabled:hover:bg-[var(--bg-card)]"
+      style={{
+        borderColor: active ? color : 'var(--border-color)',
+        boxShadow: active ? `0 0 0 1px ${color}` : undefined,
+      }}
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+        {label}
+      </span>
+      <span className="font-mono text-2xl font-semibold leading-tight" style={{ color }}>
+        {value}
+      </span>
+    </button>
   );
 }
 
