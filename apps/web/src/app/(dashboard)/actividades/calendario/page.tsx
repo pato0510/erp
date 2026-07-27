@@ -9,8 +9,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Cog,
+  Megaphone,
   Plus,
   RefreshCw,
+  Target,
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { MonthView } from '../../../../components/calendar/MonthView';
@@ -29,6 +31,8 @@ import {
 import {
   activityToChips,
   birthdayToChip,
+  campaignToChips,
+  cierreToChip,
   chipBadgeFor,
   chipLabelFor,
   chipStyleFor,
@@ -40,6 +44,8 @@ import {
   vencimientoToChip,
   OPS_SERVICIO_STYLE,
   VENCIMIENTO_STYLE,
+  CAMPANA_STYLE,
+  CIERRE_STYLE,
   BIRTHDAY_STYLE,
   type CalChip,
 } from '../../../../components/actividades/calendarAdapter';
@@ -48,10 +54,14 @@ import { ActivityFormModal } from '../../../../components/actividades/ActivityFo
 import { BirthdayModal } from '../../../../components/actividades/BirthdayModal';
 import { ServicioCalendarModal } from '../../../../components/actividades/ServicioCalendarModal';
 import { VencimientoCalendarModal } from '../../../../components/actividades/VencimientoCalendarModal';
+import { CampaignCalendarModal } from '../../../../components/actividades/CampaignCalendarModal';
+import { CierreCalendarModal } from '../../../../components/actividades/CierreCalendarModal';
 import type {
   ActivityArea,
   BirthdayEntry,
   CalendarActivity,
+  CampaignCalendarEntry,
+  CierreCalendarEntry,
   MemberOption,
   ServicioCalendarEntry,
   VencimientoCalendarEntry,
@@ -138,6 +148,11 @@ export default function ActividadesCalendarioPage() {
   // CAL-016 — the two Operaciones collections folded into the same feed.
   const [servicios, setServicios] = useState<ServicioCalendarEntry[]>([]);
   const [vencimientos, setVencimientos] = useState<VencimientoCalendarEntry[]>([]);
+  // CAL-017 — Marketing campañas (all six roles) + Comercial cierres. `cierres === null` means the
+  // collection is ABSENT from the envelope (the caller cannot read Opportunity) — the data's
+  // absence, NOT client role logic, drives whether the chip + legend entry exist.
+  const [campanas, setCampanas] = useState<CampaignCalendarEntry[]>([]);
+  const [cierres, setCierres] = useState<CierreCalendarEntry[] | null>(null);
   const [cancelled, setCancelled] = useState<CalendarActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +167,10 @@ export default function ActividadesCalendarioPage() {
   // manual SERVICIO (a calendar_activity) and an ops servicio are DIFFERENT things.
   const [showServicios, setShowServicios] = useState(true);
   const [showVencimientos, setShowVencimientos] = useState(true);
+  // CAL-017 — legend toggles for the commercial collections (session state). The cierres toggle is
+  // only ever shown when the collection exists in the envelope (cierres !== null).
+  const [showCampanas, setShowCampanas] = useState(true);
+  const [showCierres, setShowCierres] = useState(true);
 
   const [selected, setSelected] = useState<CalendarActivity | null>(null);
   const [selectedBirthday, setSelectedBirthday] = useState<BirthdayEntry | null>(null);
@@ -159,6 +178,8 @@ export default function ActividadesCalendarioPage() {
   const [selectedVencimiento, setSelectedVencimiento] = useState<VencimientoCalendarEntry | null>(
     null,
   );
+  const [selectedCampana, setSelectedCampana] = useState<CampaignCalendarEntry | null>(null);
+  const [selectedCierre, setSelectedCierre] = useState<CierreCalendarEntry | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarActivity | null>(null);
   const [cancelledOpen, setCancelledOpen] = useState(false);
@@ -196,6 +217,10 @@ export default function ActividadesCalendarioPage() {
             birthdays: BirthdayEntry[];
             servicios: ServicioCalendarEntry[];
             vencimientos: VencimientoCalendarEntry[];
+            campanas: CampaignCalendarEntry[];
+            // CAL-017 — cierres is OPTIONAL: the server omits the key entirely for callers who
+            // cannot read Opportunity. `undefined` here = the gated-out collection.
+            cierres?: CierreCalendarEntry[];
           }>(`/api/actividades/calendar?month=${m}`),
         ),
       );
@@ -203,16 +228,28 @@ export default function ActividadesCalendarioPage() {
       const bdayById = new Map<string, BirthdayEntry>();
       const svcById = new Map<string, ServicioCalendarEntry>();
       const vencById = new Map<string, VencimientoCalendarEntry>();
+      const campById = new Map<string, CampaignCalendarEntry>();
+      const cierreById = new Map<string, CierreCalendarEntry>();
+      // The collection EXISTS iff at least one fetched month carried the key. (Every month for a
+      // given caller agrees — the gate is per-caller, not per-month — but this is robust either way.)
+      let cierresPresent = false;
       for (const f of feeds) {
         for (const a of f.activities) byId.set(a.id, a);
         for (const b of f.birthdays) bdayById.set(`${b.employeeId}:${b.month}`, b);
         for (const s of f.servicios ?? []) svcById.set(s.serviceOrderId, s);
         for (const v of f.vencimientos ?? []) vencById.set(v.id, v);
+        for (const c of f.campanas ?? []) campById.set(c.campaignId, c);
+        if (f.cierres !== undefined) {
+          cierresPresent = true;
+          for (const c of f.cierres) cierreById.set(c.opportunityId, c);
+        }
       }
       setActivities([...byId.values()]);
       setBirthdays([...bdayById.values()]);
       setServicios([...svcById.values()]);
       setVencimientos([...vencById.values()]);
+      setCampanas([...campById.values()]);
+      setCierres(cierresPresent ? [...cierreById.values()] : null);
     } catch {
       setError('No se pudieron cargar las actividades.');
     } finally {
@@ -276,14 +313,36 @@ export default function ActividadesCalendarioPage() {
           .map((v) => vencimientoToChip(v, gridStart, gridEnd))
           .filter((c): c is NonNullable<typeof c> => c !== null)
       : [];
-    return [...activityChips, ...birthdayChips, ...servicioChips, ...vencimientoChips];
+    // CAL-017 — campañas (ranged) always available; cierres only when the collection exists AND its
+    // toggle is on. `cierres === null` (gated out) yields no chips — the absence flows through.
+    const campanaChips = showCampanas
+      ? campanas.flatMap((c) => campaignToChips(c, gridStart, gridEnd))
+      : [];
+    const cierreChips =
+      showCierres && cierres
+        ? cierres
+            .map((c) => cierreToChip(c, gridStart, gridEnd))
+            .filter((c): c is NonNullable<typeof c> => c !== null)
+        : [];
+    return [
+      ...activityChips,
+      ...birthdayChips,
+      ...servicioChips,
+      ...vencimientoChips,
+      ...campanaChips,
+      ...cierreChips,
+    ];
   }, [
     filtered,
     birthdays,
     servicios,
     vencimientos,
+    campanas,
+    cierres,
     showServicios,
     showVencimientos,
+    showCampanas,
+    showCierres,
     view,
     focusedDate,
   ]);
@@ -300,12 +359,16 @@ export default function ActividadesCalendarioPage() {
     if (chip.kind === 'birthday') return <Cake size={11} />;
     if (chip.kind === 'servicio') return <CalendarClock size={11} />;
     if (chip.kind === 'vencimiento') return <AlertTriangle size={11} />;
+    if (chip.kind === 'campana') return <Megaphone size={11} />;
+    if (chip.kind === 'cierre') return <Target size={11} />;
     return chip.activity.kind === 'SERVICIO' ? <Cog size={11} /> : null;
   }, []);
   const onSelectEvent = useCallback((chip: CalChip) => {
     if (chip.kind === 'birthday') setSelectedBirthday(chip.birthday);
     else if (chip.kind === 'servicio') setSelectedServicio(chip.servicio);
     else if (chip.kind === 'vencimiento') setSelectedVencimiento(chip.vencimiento);
+    else if (chip.kind === 'campana') setSelectedCampana(chip.campana);
+    else if (chip.kind === 'cierre') setSelectedCierre(chip.cierre);
     else setSelected(chip.activity);
   }, []);
 
@@ -503,6 +566,42 @@ export default function ActividadesCalendarioPage() {
           <AlertTriangle size={12} />
           Vencimientos
         </button>
+        {/* CAL-017 — Campañas: all six roles. */}
+        <button
+          type="button"
+          aria-pressed={showCampanas}
+          onClick={() => setShowCampanas((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition"
+          style={{
+            borderColor: CAMPANA_STYLE.color,
+            background: showCampanas ? CAMPANA_STYLE.bg : 'transparent',
+            color: showCampanas ? CAMPANA_STYLE.color : 'var(--text-secondary)',
+            opacity: showCampanas ? 1 : 0.6,
+          }}
+        >
+          <Megaphone size={12} />
+          Campañas
+        </button>
+        {/* CAL-017 — Cierres esperados: THE GATED chip. It renders ONLY when the collection exists
+            in the envelope (cierres !== null). The data's absence drives the UI — no client-side
+            role logic; a non-Opportunity-reader never sees this control. */}
+        {cierres !== null && (
+          <button
+            type="button"
+            aria-pressed={showCierres}
+            onClick={() => setShowCierres((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition"
+            style={{
+              borderColor: CIERRE_STYLE.color,
+              background: showCierres ? CIERRE_STYLE.bg : 'transparent',
+              color: showCierres ? CIERRE_STYLE.color : 'var(--text-secondary)',
+              opacity: showCierres ? 1 : 0.6,
+            }}
+          >
+            <Target size={12} />
+            Cierres esperados
+          </button>
+        )}
       </div>
 
       {error && (
@@ -643,6 +742,14 @@ export default function ActividadesCalendarioPage() {
           vencimiento={selectedVencimiento}
           onClose={() => setSelectedVencimiento(null)}
         />
+      )}
+
+      {selectedCampana && (
+        <CampaignCalendarModal campana={selectedCampana} onClose={() => setSelectedCampana(null)} />
+      )}
+
+      {selectedCierre && (
+        <CierreCalendarModal cierre={selectedCierre} onClose={() => setSelectedCierre(null)} />
       )}
     </div>
   );

@@ -3,6 +3,8 @@ import type {
   ActivityArea,
   BirthdayEntry,
   CalendarActivity,
+  CampaignCalendarEntry,
+  CierreCalendarEntry,
   ServicioCalendarEntry,
   VencimientoCalendarEntry,
 } from './activityTypes';
@@ -54,14 +56,41 @@ export interface VencimientoChip {
   vencimiento: VencimientoCalendarEntry;
 }
 
+/* CAL-017 — a CAMPANA render chip (a marketing campaign range). Ranged → per-day expansion. */
+export interface CampaignChip {
+  kind: 'campana';
+  id: string;
+  date: string;
+  campana: CampaignCalendarEntry;
+}
+
+/* CAL-017 — a CIERRE render chip (an expected opportunity close). Single-day → all-day. */
+export interface CierreChip {
+  kind: 'cierre';
+  id: string;
+  date: string;
+  cierre: CierreCalendarEntry;
+}
+
 /* The unified chip the calendar page feeds to the shared generic views. */
-export type CalChip = ActivityChip | BirthdayChip | ServicioChip | VencimientoChip;
+export type CalChip =
+  | ActivityChip
+  | BirthdayChip
+  | ServicioChip
+  | VencimientoChip
+  | CampaignChip
+  | CierreChip;
 
 /* CAL-016 — fixed collection styles, deliberately distinct from BOTH area colors AND the manual
    SERVICIO indigo (SERVICE_COLOR below): an ops servicio reads teal, a vencimiento reads amber
    (warning family). Paired with their own icons via the views' getChipIcon slot. */
 export const OPS_SERVICIO_STYLE = { bg: 'rgba(13,148,136,0.16)', color: '#0d9488' } as const; // teal
 export const VENCIMIENTO_STYLE = { bg: 'rgba(217,119,6,0.16)', color: '#d97706' } as const; // amber
+
+/* CAL-017 — campaign chips read violet (own family, distinct from teal/amber/indigo/pink/area);
+   cierre chips read rose-red with a flag/target icon (an expected close is a deadline to hit). */
+export const CAMPANA_STYLE = { bg: 'rgba(124,58,237,0.16)', color: '#7c3aed' } as const; // violet
+export const CIERRE_STYLE = { bg: 'rgba(225,29,72,0.14)', color: '#e11d48' } as const; // rose
 
 /* Fixed festive style for birthday chips — deliberately NOT an area color, so a birthday reads
    as a birthday on any view (paired with the Cake icon via the views' getChipIcon slot). */
@@ -284,8 +313,59 @@ export function vencimientoToChip(
   };
 }
 
+/* ── CAL-017: campañas (ranged, may be open-ended single-day) + cierres (single-day) ────── */
+
+/** Expand one campaign into per-day chips within [gridStart, gridEnd]. A campaign with an endDate
+ *  paints across its whole range (per-day, DST-immune UTC stepping, like a ranged servicio); an
+ *  open-ended campaign (endDate null) paints on its startDate only. A campaign with no startDate
+ *  is unplaceable and yields nothing (the backend already excludes those). */
+export function campaignToChips(
+  campana: CampaignCalendarEntry,
+  gridStart: Date,
+  gridEnd: Date,
+): CampaignChip[] {
+  if (!campana.startDate) return [];
+  const start = utcParts(campana.startDate);
+  const end = campana.endDate ? utcParts(campana.endDate) : start;
+  const chips: CampaignChip[] = [];
+  let cursor = Date.UTC(start.y, start.m, start.d);
+  const lastUtc = Date.UTC(end.y, end.m, end.d);
+  while (cursor <= lastUtc) {
+    const c = new Date(cursor);
+    const localMidnight = new Date(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate(), 0, 0);
+    if (inSpan(localMidnight, gridStart, gridEnd)) {
+      chips.push({
+        kind: 'campana',
+        id: `camp:${campana.campaignId}:${dateKey(localMidnight)}`,
+        date: localMidnight.toISOString(),
+        campana,
+      });
+    }
+    cursor += 86_400_000;
+  }
+  return chips;
+}
+
+/** Place a single-day cierre on its expected-close day within the visible span. */
+export function cierreToChip(
+  cierre: CierreCalendarEntry,
+  gridStart: Date,
+  gridEnd: Date,
+): CierreChip | null {
+  const { y, m, d } = utcParts(cierre.expectedDate);
+  const localMidnight = new Date(y, m, d, 0, 0);
+  if (!inSpan(localMidnight, gridStart, gridEnd)) return null;
+  return {
+    kind: 'cierre',
+    id: `cierre:${cierre.opportunityId}`,
+    date: localMidnight.toISOString(),
+    cierre,
+  };
+}
+
 /** Chip background/color: area color for activities (dimmed if HECHA), fixed festive for
- *  birthdays, teal for ops servicios, amber (warning) for vencimientos. */
+ *  birthdays, teal for ops servicios, amber for vencimientos, violet for campañas, rose for
+ *  cierres. */
 export function chipStyleFor(
   chip: CalChip,
   areaById: Map<string, ActivityArea>,
@@ -293,14 +373,18 @@ export function chipStyleFor(
   if (chip.kind === 'birthday') return { ...BIRTHDAY_STYLE };
   if (chip.kind === 'servicio') return { ...OPS_SERVICIO_STYLE };
   if (chip.kind === 'vencimiento') return { ...VENCIMIENTO_STYLE };
+  if (chip.kind === 'campana') return { ...CAMPANA_STYLE };
+  if (chip.kind === 'cierre') return { ...CIERRE_STYLE };
   return chipStyle(chip.activity, areaById.get(chip.activity.areaId));
 }
 
-/** Chip label: activity title (✓ if HECHA), birthday fullName, or the ops entry label. */
+/** Chip label: activity title (✓ if HECHA), birthday fullName, or the foreign entry name/label. */
 export function chipLabelFor(chip: CalChip): string {
   if (chip.kind === 'birthday') return chip.birthday.fullName;
   if (chip.kind === 'servicio') return chip.servicio.label;
   if (chip.kind === 'vencimiento') return chip.vencimiento.label;
+  if (chip.kind === 'campana') return chip.campana.name;
+  if (chip.kind === 'cierre') return chip.cierre.name;
   return chipLabel(chip.activity);
 }
 
@@ -309,11 +393,13 @@ export function chipBadgeFor(chip: CalChip, areaById: Map<string, ActivityArea>)
   if (chip.kind === 'birthday') return 'CUMPLE';
   if (chip.kind === 'servicio') return 'OPS';
   if (chip.kind === 'vencimiento') return 'VENCE';
+  if (chip.kind === 'campana') return 'MKT';
+  if (chip.kind === 'cierre') return 'CIERRE';
   return areaBadge(areaById.get(chip.activity.areaId)?.name ?? '—');
 }
 
-/** getEventTime: the raw wall-clock string for a timed activity; every other collection is
- *  untimed (birthdays, ops servicios, vencimientos) → null. */
+/** getEventTime: the raw wall-clock string for a timed activity; every foreign collection is
+ *  untimed → null. */
 export function eventTimeFor(chip: CalChip): string | null {
   if (chip.kind === 'activity') return chip.activity.startTime ?? null;
   return null;

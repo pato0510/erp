@@ -90,3 +90,28 @@ export interface VencimientoCalendarEntry {
   date: string; // "YYYY-MM-DDT00:00:00.000Z"
   link: string | null; // server-shaped: '/operaciones/documentos' | null
 }
+
+/* CAL-017 — the Marketing campaign status vocabulary, verbatim. Own union (not mapped). */
+export type CampaignStatusVM = 'BORRADOR' | 'ACTIVA' | 'PAUSADA' | 'FINALIZADA' | 'CANCELADA';
+
+/* CAL-017 — the two commercial-side collections in the SAME envelope. `campanas` is visible to all
+   six roles; `cierres` is THE GATED collection — the KEY IS ABSENT for non-Opportunity-readers, so
+   the page type marks it optional (undefined = the caller may not see it; the UI renders no chip
+   and no legend entry). Both are STRUCTURALLY minimal: a campaign carries name + status + range and
+   NO money; a cierre carries name + expected date and NO amount, NO stage. `link` is server-shaped
+   (null = no door). */
+export interface CampaignCalendarEntry {
+  campaignId: string;
+  name: string;
+  status: CampaignStatusVM;
+  startDate: string | null; // "YYYY-MM-DDT00:00:00.000Z" | null
+  endDate: string | null; // "YYYY-MM-DDT00:00:00.000Z" | null
+  link: string | null; // server-shaped: '/marketing/campanas/{id}' | null
+}
+
+export interface CierreCalendarEntry {
+  opportunityId: string;
+  name: string;
+  expectedDate: string; // "YYYY-MM-DDT00:00:00.000Z"
+  link: string | null; // server-shaped: '/comercial/pipeline/{id}' | null (never null in practice)
+}

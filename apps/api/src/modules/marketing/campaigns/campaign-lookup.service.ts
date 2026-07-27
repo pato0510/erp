@@ -30,4 +30,42 @@ export class CampaignLookupService {
       select: { id: true, name: true, status: true },
     });
   }
+
+  /** CAL-017 — the campaigns intersecting [start, end], for the master calendar's `campanas`
+   * collection. REPLICATES, byte-for-byte, the derivation of the GET /marketing/campaigns/calendar
+   * endpoint (CampaignsService.calendar, campaigns.service.ts:146-175) so the master shows THE SAME
+   * SET Marketing shows. The rule, quoted from that method:
+   *   - EXCLUDED: CANCELADA, and campaigns without startDate (unplaceable drafts).
+   *   - Ranged (endDate set): intersects iff startDate <= end AND endDate >= start.
+   *   - Open-ended (endDate null): appears ONLY when its startDate falls inside [start, end].
+   * The endpoint computes end = Date.UTC(year, mon, 0) (last day, UTC midnight); the composer here
+   * passes the last-millisecond of the month. For @db.Date columns (always UTC midnight) the two
+   * are DAY-EQUIVALENT — no stored date lies strictly between last-day-00:00 and last-day-23:59 —
+   * so the produced set is identical. STRUCTURAL: the projection is money-free by construction
+   * (no budgetAmount / spent / any money key), exactly like the endpoint's select. */
+  async listForCalendarRange(companyId: string, start: Date, end: Date) {
+    const campaigns = await this.prisma.campaign.findMany({
+      where: {
+        companyId,
+        status: { not: CampaignStatus.CANCELADA },
+        OR: [
+          // Ranged: both dates set, range intersects the window.
+          {
+            AND: [{ startDate: { not: null, lte: end } }, { endDate: { not: null, gte: start } }],
+          },
+          // Open-ended: no endDate, startDate falls inside the window.
+          { endDate: null, startDate: { not: null, gte: start, lte: end } },
+        ],
+      },
+      select: { id: true, name: true, status: true, startDate: true, endDate: true },
+      orderBy: [{ startDate: 'asc' }],
+    });
+    return campaigns.map((c) => ({
+      campaignId: c.id,
+      name: c.name,
+      status: c.status,
+      startDate: c.startDate ? c.startDate.toISOString() : null,
+      endDate: c.endDate ? c.endDate.toISOString() : null,
+    }));
+  }
 }
