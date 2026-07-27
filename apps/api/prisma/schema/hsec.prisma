@@ -1,0 +1,53 @@
+/* HSEC-002 — HSEC schema. First HSEC table: incidents. Model verbatim from
+   docs/EXCELSIA-HSEC-PLAN-PART1-DATAMODEL.md §2 with the two planned deltas: the
+   `persons HsecIncidentPerson[]` relation arrives with the child table (HSEC-003)
+   and enum HsecTrainingType arrives with trainings (HSEC-006). Enums use
+   ASCII-only members (the Prisma enum Ñ gotcha — DANO_MATERIAL); display labels
+   live in the UI layer. The platform invariant (RLS + audit trigger + app_user
+   GRANT) ships in migration 20260727150000_add_hsec_incidents. */
+
+enum HsecIncidentType {
+  ACCIDENTE_TRABAJO
+  ACCIDENTE_TRAYECTO
+  CASI_INCIDENTE
+  DANO_MATERIAL
+  AMBIENTAL
+}
+
+enum HsecIncidentSeverity {
+  LEVE
+  GRAVE
+  FATAL
+}
+
+enum HsecIncidentStatus {
+  REPORTADO
+  EN_INVESTIGACION
+  CERRADO
+}
+
+model HsecIncident {
+  id                 String               @id @default(uuid()) @db.Uuid
+  companyId          String               @db.Uuid
+  incidentNumber     String // "INC-{YYYY}-{0000}" per-company sequential (ServiceOrder orderNumber precedent)
+  type               HsecIncidentType
+  severity           HsecIncidentSeverity
+  status             HsecIncidentStatus   @default(REPORTADO)
+  occurredDate       DateTime             @db.Date
+  occurredTime       String? // wall-clock "HH:mm" — never a timestamp (CAL doctrine)
+  location           String
+  description        String
+  immediateCause     String?
+  correctiveActions  String? // free text in V1; actions-as-entities = seed
+  sourceWorkPermitId String?              @db.Uuid // soft pointer, NO FK, no picker in V1 (decision 8)
+  attachments        Json                 @default("[]") // max 5 — mirror the WorkPermit attachments convention (MinIO-or-blob)
+  createdBy          String               @db.Uuid
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@unique([companyId, incidentNumber])
+  @@index([companyId])
+  @@index([companyId, occurredDate])
+  @@index([companyId, status])
+  @@map("hsec_incidents")
+}
