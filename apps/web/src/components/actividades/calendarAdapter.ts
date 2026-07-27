@@ -1,6 +1,7 @@
 import { dateKey } from '../calendar/dateGrid';
 import type {
   ActivityArea,
+  AusenciaCalendarEntry,
   BirthdayEntry,
   CalendarActivity,
   CampaignCalendarEntry,
@@ -72,6 +73,14 @@ export interface CierreChip {
   cierre: CierreCalendarEntry;
 }
 
+/* CAL-018 — an AUSENCIA render chip (an RRHH not-available window). Ranged → per-day expansion. */
+export interface AusenciaChip {
+  kind: 'ausencia';
+  id: string;
+  date: string;
+  ausencia: AusenciaCalendarEntry;
+}
+
 /* The unified chip the calendar page feeds to the shared generic views. */
 export type CalChip =
   | ActivityChip
@@ -79,7 +88,8 @@ export type CalChip =
   | ServicioChip
   | VencimientoChip
   | CampaignChip
-  | CierreChip;
+  | CierreChip
+  | AusenciaChip;
 
 /* CAL-016 — fixed collection styles, deliberately distinct from BOTH area colors AND the manual
    SERVICIO indigo (SERVICE_COLOR below): an ops servicio reads teal, a vencimiento reads amber
@@ -91,6 +101,11 @@ export const VENCIMIENTO_STYLE = { bg: 'rgba(217,119,6,0.16)', color: '#d97706' 
    cierre chips read rose-red with a flag/target icon (an expected close is a deadline to hit). */
 export const CAMPANA_STYLE = { bg: 'rgba(124,58,237,0.16)', color: '#7c3aed' } as const; // violet
 export const CIERRE_STYLE = { bg: 'rgba(225,29,72,0.14)', color: '#e11d48' } as const; // rose
+
+/* CAL-018 — ausencia chips read NEUTRAL SLATE (deliberately colorless — an absence is an
+   information marker, not an alert; distinct from every vivid collection color), with a person
+   icon and the "No disponible" badge. */
+export const AUSENCIA_STYLE = { bg: 'rgba(100,116,139,0.16)', color: '#475569' } as const; // slate
 
 /* Fixed festive style for birthday chips — deliberately NOT an area color, so a birthday reads
    as a birthday on any view (paired with the Cake icon via the views' getChipIcon slot). */
@@ -363,6 +378,39 @@ export function cierreToChip(
   };
 }
 
+/* ── CAL-018: ausencias (ranged) chip expander ──────────────────────────────────────────── */
+
+/** Expand one ausencia into per-day chips within [gridStart, gridEnd] — ranged like a servicio (one
+ *  local-midnight chip per covered day, clamped to the span). The chip id keys on employee +
+ *  range + day (the payload carries no record id — the four-key privacy shape), keeping each
+ *  window's chips distinct even when one employee has two overlapping windows. */
+export function ausenciaToChips(
+  ausencia: AusenciaCalendarEntry,
+  gridStart: Date,
+  gridEnd: Date,
+): AusenciaChip[] {
+  const start = utcParts(ausencia.startDate);
+  const end = utcParts(ausencia.endDate);
+  const windowKey = `${ausencia.startDate.slice(0, 10)}_${ausencia.endDate.slice(0, 10)}`;
+  const chips: AusenciaChip[] = [];
+  let cursor = Date.UTC(start.y, start.m, start.d);
+  const lastUtc = Date.UTC(end.y, end.m, end.d);
+  while (cursor <= lastUtc) {
+    const c = new Date(cursor);
+    const localMidnight = new Date(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate(), 0, 0);
+    if (inSpan(localMidnight, gridStart, gridEnd)) {
+      chips.push({
+        kind: 'ausencia',
+        id: `aus:${ausencia.employeeId}:${windowKey}:${dateKey(localMidnight)}`,
+        date: localMidnight.toISOString(),
+        ausencia,
+      });
+    }
+    cursor += 86_400_000;
+  }
+  return chips;
+}
+
 /** Chip background/color: area color for activities (dimmed if HECHA), fixed festive for
  *  birthdays, teal for ops servicios, amber for vencimientos, violet for campañas, rose for
  *  cierres. */
@@ -375,6 +423,7 @@ export function chipStyleFor(
   if (chip.kind === 'vencimiento') return { ...VENCIMIENTO_STYLE };
   if (chip.kind === 'campana') return { ...CAMPANA_STYLE };
   if (chip.kind === 'cierre') return { ...CIERRE_STYLE };
+  if (chip.kind === 'ausencia') return { ...AUSENCIA_STYLE };
   return chipStyle(chip.activity, areaById.get(chip.activity.areaId));
 }
 
@@ -385,6 +434,7 @@ export function chipLabelFor(chip: CalChip): string {
   if (chip.kind === 'vencimiento') return chip.vencimiento.label;
   if (chip.kind === 'campana') return chip.campana.name;
   if (chip.kind === 'cierre') return chip.cierre.name;
+  if (chip.kind === 'ausencia') return chip.ausencia.fullName;
   return chipLabel(chip.activity);
 }
 
@@ -395,6 +445,7 @@ export function chipBadgeFor(chip: CalChip, areaById: Map<string, ActivityArea>)
   if (chip.kind === 'vencimiento') return 'VENCE';
   if (chip.kind === 'campana') return 'MKT';
   if (chip.kind === 'cierre') return 'CIERRE';
+  if (chip.kind === 'ausencia') return 'No disp.';
   return areaBadge(areaById.get(chip.activity.areaId)?.name ?? '—');
 }
 

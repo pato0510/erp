@@ -115,3 +115,15 @@ export interface CierreCalendarEntry {
   expectedDate: string; // "YYYY-MM-DDT00:00:00.000Z"
   link: string | null; // server-shaped: '/comercial/pipeline/{id}' | null (never null in practice)
 }
+
+/* CAL-018 — an RRHH not-available window (ausencia). STRUCTURALLY minimal: employeeId + fullName +
+   range. NO category, NO medicalFolio, NO healthEntity, NO type/motivo, NO status — the health PII
+   has no slot to leak into (the CAL-006 discipline). "No disponible" is a UI constant, not a field.
+   Visible to all six roles; `link` is server-shaped (Employee readers only → RRHH employee page). */
+export interface AusenciaCalendarEntry {
+  employeeId: string;
+  fullName: string;
+  startDate: string; // "YYYY-MM-DDT00:00:00.000Z"
+  endDate: string; // "YYYY-MM-DDT00:00:00.000Z"
+  link: string | null; // server-shaped: '/rrhh/trabajadores/{id}' | null
+}

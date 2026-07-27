@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { RrhhBirthdayReadModule } from '../rrhh/birthday-read/birthday-read.module';
+import { RrhhAbsenceReadModule } from '../rrhh/absence-read/absence-read.module';
 import { OpsCalendarReadModule } from '../operations/calendar-read/ops-calendar-read.module';
 import { CampaignsModule } from '../marketing/campaigns/campaigns.module';
 import { ComercialCierresReadModule } from '../comercial/cierres-read/cierres-read.module';
@@ -19,15 +20,17 @@ import { ActividadesController } from './actividades.controller';
  * collections into that same envelope); CAL-017 CampaignsModule (Marketing — reused via its
  * already-exported CampaignLookupService, now also serving `campanas`) + ComercialCierresReadModule
  * (the Comercial leaf, whose ComercialCierresReadService feeds `cierres`). The graph is acyclic by
- * construction — ActividadesModule → { RrhhBirthdayReadModule, OpsCalendarReadModule,
- * ComercialCierresReadModule } (all leaves that import NOTHING) + CampaignsModule (whose only edge
- * is → AttributionReadModule, itself a leaf) — no forwardRef. PoliciesGuard / CaslAbilityFactory /
- * PrismaService come from the global Casl/Prisma modules. */
+ * construction — ActividadesModule → { RrhhBirthdayReadModule, RrhhAbsenceReadModule,
+ * OpsCalendarReadModule, ComercialCierresReadModule } (all leaves that import NOTHING) +
+ * CampaignsModule (whose only edge is → AttributionReadModule, itself a leaf) — no forwardRef.
+ * CAL-018 closes the arc: the master now eats from FOUR leaves + the CampaignLookup reuse.
+ * PoliciesGuard / CaslAbilityFactory / PrismaService come from the global Casl/Prisma modules. */
 @Module({
   imports: [
     AreasModule,
     ActivitiesModule,
     RrhhBirthdayReadModule,
+    RrhhAbsenceReadModule,
     OpsCalendarReadModule,
     CampaignsModule,
     ComercialCierresReadModule,

@@ -719,7 +719,75 @@ Puntos clave:
   fundador 2026-07-22: edición/borrado libre por writers; auditoría conserva el
   contenido previo); Escape cancela, vacío no hace nada, 4xx verbatim inline.
 
-Última actualización: 2026-07-22
+## Feed unificado del calendario (CAL-013R, CAL-014…CAL-018)
+
+El calendario maestro (GET /actividades/calendar?month=YYYY-MM) creció de
+`{ activities, birthdays }` a UN SOBRE de N colecciones, construido serialmente.
+Doc fuente: docs/EXCELSIA-CALENDARIO-FEEDS-PLAN.md.
+
+- EL SOBRE: `{ activities, birthdays, servicios, vencimientos, campanas,
+ausencias, cierres* }` — \*`cierres` es la ÚNICA colección con llave GATED
+  (presente solo para lectores de Opportunity). Cada colección tiene clamp de
+  mes en UTC independiente.
+
+- LA MATRIZ FIRMADA (§2, validada por el fundador — 2026-07-23) — VERBATIM:
+
+  | Colección              | Visible para                                               | Payload (nunca más)                                                                            |
+  | ---------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+  | activities + birthdays | los 6 roles (sin cambio)                                   | como hoy                                                                                       |
+  | servicios              | los 6                                                      | service label + rango — NUNCA montos                                                           |
+  | vencimientos (docs)    | los 6                                                      | document label + fecha                                                                         |
+  | campañas               | los 6                                                      | name + status + rango (la proyección nació sin dinero)                                         |
+  | cierres esperados      | solo lectores de Opportunity (MANAGER/ADMIN/SA/ACCOUNTANT) | opportunity name + fecha esperada                                                              |
+  | ausencias              | los 6                                                      | employee name + rango + "No disponible" genérico — NUNCA category/motivo/folio (línea COM-012) |
+
+- INVENTARIO DE HOJAS (leaf modules — cada una IMPORTA NADA, contrato
+  angosto): RrhhBirthdayRead · RrhhAbsenceRead · OpsCalendarRead ·
+  ComercialCierresRead + el REUSO de CampaignLookupService (Marketing, ya
+  exportado). Grafo ACÍCLICO por construcción: ActividadesModule →
+  { las 4 hojas } + CampaignsModule (cuyo único borde es → AttributionRead,
+  otra hoja) — SIN forwardRef. El maestro NUNCA importa el type-union gordo de
+  un vecino (recon Q3: contrato angosto sobre export delgado).
+
+- DISCIPLINA DE IDENTIDAD-DE-DERIVACIÓN: cada set foráneo REPLICA la derivación
+  de su dueño byte-por-byte, citada de la fuente —
+  vencimientos ≡ OperationsCalendarService.fetchDocumentExpirations
+  (operations-calendar.service.ts:211-282, el WHERE isActive+APPROVED+
+  no-reemplazado+expiración-en-rango);
+  campanas ≡ CampaignsService.calendar (campaigns.service.ts:146-175, excluye
+  CANCELADA + sin startDate, rango intersecta);
+  ausencias ≡ DisponibilidadService.loadCoveringMaps
+  (disponibilidad.service.ts:79-124: Absence status APROBADO + blocksAvailability
+  true; VacationRequest status IN (APROBADO,TOMADO); solo empleados ACTIVO).
+  El único ajuste permitido es punto→intervalo en el predicado de fecha (el
+  dueño evalúa una fecha; la hoja, un rango). Cuando la expectativa del ticket
+  difiere del dueño, MANDA EL DUEÑO (CAL-018: la ausencia exige también
+  status=APROBADO, no solo blocksAvailability — se siguió Disponibilidad).
+
+- KEY-ABSENCE SHAPING: una colección gated se OMITE como LLAVE del sobre para
+  quien no la puede ver — JAMÁS un array vacío (precedente `cierres`: MANAGER/
+  ACCOUNTANT llevan la llave, ANALYST/VIEWER no la tienen). Un lector legítimo
+  con cero filas sí recibe `[]` (la llave presente). Los `link` de cada entrada
+  son ability-shaped (null = sin puerta; "el chip no es una puerta"). CERO
+  strings de rol en toda la superficie — puro `ability.can('read', Subject)`.
+
+- LEY DE COEXISTENCIA DE VOCABULARIO: ServiceOrderStatus (RECIBIDA·EN_EJECUCION·
+  COMPLETADA·CANCELADA) y ActivityStatus (PENDIENTE·EN_EJECUCION·HECHA·CANCELADA)
+  se solapan en palabras pero son MÁQUINAS DISTINTAS para cosas distintas. Nunca
+  unificar, nunca mapear, nunca "arreglar".
+
+- KIND (filas propias) vs COLECCIONES (foráneas) — mecanismos INDEPENDIENTES:
+  el control segmentado Actividades/Servicios gobierna el `kind` de las filas
+  PROPIAS del módulo (calendar_activities); los toggles de leyenda gobiernan las
+  colecciones foráneas. Un SERVICIO manual (una calendar_activity) y un servicio
+  de Operaciones son cosas DIFERENTES con estilos DIFERENTES.
+
+- LA DEUDA DEL LEDGER, SALDADA: Dashboard de Gestión (CAL-013, viajó dentro de
+  a567db4 durante un commit de docs): tarjetas Pendientes · En ejecución ·
+  Atrasadas · Hechas de la semana + Por responsable, derivadas del set
+  kind-scoped, clickeables como filtros. El registro deja de mentir por omisión.
+
+Última actualización: 2026-07-27 (CAL-018 — arco del feed unificado cerrado)
 
 # Próximos pasos
 
@@ -729,8 +797,13 @@ Puntos clave:
   la reunión semanal de AGS migró de la planilla al módulo (tabla con estado
   inline, atrasadas derivadas con fecha chilena, bitácora inmutable). Detalle
   en el bloque del módulo arriba.
-- Feed unificado cross-módulo del calendario (V2, scope en el doc de Gestión
-  §4 y el plan Part 1 §1).
+- Feed unificado cross-módulo del calendario — LISTO (CAL-014…CAL-018, live
+  2026-07-27): el sobre come de sus cuatro vecinos (Operaciones, Marketing,
+  Comercial, RRHH) vía hojas que no importan nada. Detalle + matriz firmada en
+  el bloque del módulo arriba (§ Feed unificado del calendario).
+- Semillas V2 (feed unificado, plan §5): preferencias de leyenda por usuario ·
+  deep links por colección · filtros de vencimientos por tipo de documento ·
+  medio-días de ausencia.
 - Semillas V2 (Gestión de actividades): asignados múltiples (M2M) · política
   de corrección/borrado de notas · recordatorios de actividades atrasadas ·
   export semanal de la vista.

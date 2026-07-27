@@ -4,6 +4,7 @@ import {
   CalendarActivitySubject,
   CampaignSubject,
   DocumentRecordSubject,
+  EmployeeSubject,
   OpportunitySubject,
   ServiceOrderSubject,
 } from '../common/casl/casl-ability.factory';
@@ -13,6 +14,7 @@ import { CurrentAbility } from '../common/decorators/current-ability.decorator';
 import { CurrentCompany } from '../common/decorators/current-company.decorator';
 import { PoliciesGuard } from '../common/guards/policies.guard';
 import { BirthdayReadService } from '../rrhh/birthday-read/birthday-read.service';
+import { RrhhAbsenceReadService } from '../rrhh/absence-read/absence-read.service';
 import { OpsCalendarReadService } from '../operations/calendar-read/ops-calendar-read.service';
 import { CampaignLookupService } from '../marketing/campaigns/campaign-lookup.service';
 import { ComercialCierresReadService } from '../comercial/cierres-read/cierres-read.service';
@@ -37,6 +39,10 @@ export class ActividadesController {
     // CAL-006 — the RRHH birthday leaf (exported by RrhhBirthdayReadModule). The @CheckPolicies
     // all-roles read gate on GET /calendar IS the founder-signed exposure (decision d).
     private readonly birthdays: BirthdayReadService,
+    // CAL-018 — the RRHH absence leaf (exported by RrhhAbsenceReadModule). Feeds `ausencias` (name +
+    // range + the UI constant "No disponible") to all six roles per the matrix — NEVER the motivo/
+    // health PII (structurally impossible); the ability only shapes each entry's link.
+    private readonly absences: RrhhAbsenceReadService,
     // CAL-016 — the Operaciones calendar leaf (exported by OpsCalendarReadModule). Feeds the
     // `servicios` + `vencimientos` collections into the SAME envelope, both visible to all six
     // roles per the signed matrix; the ability only shapes each entry's link (below).
@@ -85,9 +91,9 @@ export class ActividadesController {
     };
   }
 
-  /* CAL-003/006/016/017 — the month FEED. Canonical public path GET /actividades/calendar?month=
-     YYYY-MM (Part 1 §3). Envelope { activities, birthdays, servicios, vencimientos, campanas[,
-     cierres] }:
+  /* CAL-003/006/016/017/018 — the month FEED. Canonical public path GET /actividades/calendar?
+     month=YYYY-MM (Part 1 §3). Envelope { activities, birthdays, servicios, vencimientos, campanas,
+     ausencias[, cierres] }:
      - activities from ActivitiesService.monthFeed (UTC-clamped, CANCELADA excluded — decision e).
        The ?kind= param governs THESE rows ONLY (activities); the foreign collections below are
        independent of it.
@@ -95,8 +101,11 @@ export class ActividadesController {
      - servicios + vencimientos (CAL-016) from the Operaciones leaf.
      - campanas (CAL-017) from Marketing's CampaignLookupService: campaigns intersecting the month.
        Visible to ALL SIX roles (the matrix); ability only shapes the link.
+     - ausencias (CAL-018) from the RRHH absence leaf: ACTIVE employees' not-available windows
+       (name + range + the UI constant "No disponible" — NEVER the motivo/health PII). Visible to
+       ALL SIX roles (the matrix); ability shapes only the link to the RRHH employee.
      - cierres (CAL-017) from the Comercial leaf: open opportunities with an expected close in the
-       month. THE FIRST GATED collection — present ONLY when ability.can('read', Opportunity)
+       month. THE ONLY GATED collection — present ONLY when ability.can('read', Opportunity)
        (MANAGER/ADMIN/SA/ACCOUNTANT). When the caller CANNOT read Opportunity, the `cierres` KEY IS
        ABSENT from the envelope (not an empty array — the collection does not exist for them).
      All six-role collections are ability-shaped only on their `link` (the OriginCard precedent):
@@ -121,23 +130,26 @@ export class ActividadesController {
 
     const canReadOpportunity = ability.can('read', OpportunitySubject);
 
-    const [feed, birthdays, servicios, vencimientos, campanas, cierres] = await Promise.all([
-      this.activities.monthFeed(companyId, month, kind),
-      this.birthdays.listForMonth(companyId, mon),
-      this.opsCalendar.listServiciosForRange(companyId, monthStart, monthEndInclusive),
-      this.opsCalendar.listVencimientosForRange(companyId, monthStart, monthEndInclusive),
-      this.campaignLookup.listForCalendarRange(companyId, monthStart, monthEndInclusive),
-      // Only query Comercial when the caller may see it — no point fetching a collection we will
-      // then omit. This IS the gate; the key-absence below reflects the same condition.
-      canReadOpportunity
-        ? this.cierres.listCierresForRange(companyId, monthStart, monthEndInclusive)
-        : Promise.resolve(null),
-    ]);
+    const [feed, birthdays, servicios, vencimientos, campanas, ausencias, cierres] =
+      await Promise.all([
+        this.activities.monthFeed(companyId, month, kind),
+        this.birthdays.listForMonth(companyId, mon),
+        this.opsCalendar.listServiciosForRange(companyId, monthStart, monthEndInclusive),
+        this.opsCalendar.listVencimientosForRange(companyId, monthStart, monthEndInclusive),
+        this.campaignLookup.listForCalendarRange(companyId, monthStart, monthEndInclusive),
+        this.absences.listAusenciasForRange(companyId, monthStart, monthEndInclusive),
+        // Only query Comercial when the caller may see it — no point fetching a collection we will
+        // then omit. This IS the gate; the key-absence below reflects the same condition.
+        canReadOpportunity
+          ? this.cierres.listCierresForRange(companyId, monthStart, monthEndInclusive)
+          : Promise.resolve(null),
+      ]);
 
     // Ability-shaped links (per collection, no role strings).
     const canOpenServicio = ability.can('read', ServiceOrderSubject);
     const canOpenVencimiento = ability.can('read', DocumentRecordSubject);
     const canOpenCampaign = ability.can('read', CampaignSubject);
+    const canOpenEmployee = ability.can('read', EmployeeSubject);
 
     const envelope: {
       activities: unknown;
@@ -145,6 +157,7 @@ export class ActividadesController {
       servicios: unknown;
       vencimientos: unknown;
       campanas: unknown;
+      ausencias: unknown;
       cierres?: unknown;
     } = {
       activities: feed.activities,
@@ -160,6 +173,10 @@ export class ActividadesController {
       campanas: campanas.map((c) => ({
         ...c,
         link: canOpenCampaign ? `/marketing/campanas/${c.campaignId}` : null,
+      })),
+      ausencias: ausencias.map((a) => ({
+        ...a,
+        link: canOpenEmployee ? `/rrhh/trabajadores/${a.employeeId}` : null,
       })),
     };
     // THE SHAPING: add the `cierres` KEY only for Opportunity readers. cierres is non-null exactly

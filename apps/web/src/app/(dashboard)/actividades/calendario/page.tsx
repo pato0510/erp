@@ -13,6 +13,7 @@ import {
   Plus,
   RefreshCw,
   Target,
+  UserRound,
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { MonthView } from '../../../../components/calendar/MonthView';
@@ -42,11 +43,13 @@ import {
   monthYearMap,
   servicioToChips,
   vencimientoToChip,
+  ausenciaToChips,
   OPS_SERVICIO_STYLE,
   VENCIMIENTO_STYLE,
   CAMPANA_STYLE,
   CIERRE_STYLE,
   BIRTHDAY_STYLE,
+  AUSENCIA_STYLE,
   type CalChip,
 } from '../../../../components/actividades/calendarAdapter';
 import { ActivityDetailModal } from '../../../../components/actividades/ActivityDetailModal';
@@ -56,8 +59,10 @@ import { ServicioCalendarModal } from '../../../../components/actividades/Servic
 import { VencimientoCalendarModal } from '../../../../components/actividades/VencimientoCalendarModal';
 import { CampaignCalendarModal } from '../../../../components/actividades/CampaignCalendarModal';
 import { CierreCalendarModal } from '../../../../components/actividades/CierreCalendarModal';
+import { AusenciaCalendarModal } from '../../../../components/actividades/AusenciaCalendarModal';
 import type {
   ActivityArea,
+  AusenciaCalendarEntry,
   BirthdayEntry,
   CalendarActivity,
   CampaignCalendarEntry,
@@ -153,6 +158,8 @@ export default function ActividadesCalendarioPage() {
   // absence, NOT client role logic, drives whether the chip + legend entry exist.
   const [campanas, setCampanas] = useState<CampaignCalendarEntry[]>([]);
   const [cierres, setCierres] = useState<CierreCalendarEntry[] | null>(null);
+  // CAL-018 — RRHH ausencias (all six roles; unconditional key).
+  const [ausencias, setAusencias] = useState<AusenciaCalendarEntry[]>([]);
   const [cancelled, setCancelled] = useState<CalendarActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +178,8 @@ export default function ActividadesCalendarioPage() {
   // only ever shown when the collection exists in the envelope (cierres !== null).
   const [showCampanas, setShowCampanas] = useState(true);
   const [showCierres, setShowCierres] = useState(true);
+  // CAL-018 — ausencias legend toggle (session state). All six roles → always shown.
+  const [showAusencias, setShowAusencias] = useState(true);
 
   const [selected, setSelected] = useState<CalendarActivity | null>(null);
   const [selectedBirthday, setSelectedBirthday] = useState<BirthdayEntry | null>(null);
@@ -180,6 +189,7 @@ export default function ActividadesCalendarioPage() {
   );
   const [selectedCampana, setSelectedCampana] = useState<CampaignCalendarEntry | null>(null);
   const [selectedCierre, setSelectedCierre] = useState<CierreCalendarEntry | null>(null);
+  const [selectedAusencia, setSelectedAusencia] = useState<AusenciaCalendarEntry | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarActivity | null>(null);
   const [cancelledOpen, setCancelledOpen] = useState(false);
@@ -218,6 +228,8 @@ export default function ActividadesCalendarioPage() {
             servicios: ServicioCalendarEntry[];
             vencimientos: VencimientoCalendarEntry[];
             campanas: CampaignCalendarEntry[];
+            // CAL-018 — ausencias: all six roles, unconditional key.
+            ausencias: AusenciaCalendarEntry[];
             // CAL-017 — cierres is OPTIONAL: the server omits the key entirely for callers who
             // cannot read Opportunity. `undefined` here = the gated-out collection.
             cierres?: CierreCalendarEntry[];
@@ -230,6 +242,9 @@ export default function ActividadesCalendarioPage() {
       const vencById = new Map<string, VencimientoCalendarEntry>();
       const campById = new Map<string, CampaignCalendarEntry>();
       const cierreById = new Map<string, CierreCalendarEntry>();
+      // CAL-018 — ausencias dedupe by employee + window (an employee may have >1 window; a
+      // cross-month window fetched from both months collapses to one entry).
+      const ausById = new Map<string, AusenciaCalendarEntry>();
       // The collection EXISTS iff at least one fetched month carried the key. (Every month for a
       // given caller agrees — the gate is per-caller, not per-month — but this is robust either way.)
       let cierresPresent = false;
@@ -239,6 +254,8 @@ export default function ActividadesCalendarioPage() {
         for (const s of f.servicios ?? []) svcById.set(s.serviceOrderId, s);
         for (const v of f.vencimientos ?? []) vencById.set(v.id, v);
         for (const c of f.campanas ?? []) campById.set(c.campaignId, c);
+        for (const a of f.ausencias ?? [])
+          ausById.set(`${a.employeeId}:${a.startDate.slice(0, 10)}:${a.endDate.slice(0, 10)}`, a);
         if (f.cierres !== undefined) {
           cierresPresent = true;
           for (const c of f.cierres) cierreById.set(c.opportunityId, c);
@@ -249,6 +266,7 @@ export default function ActividadesCalendarioPage() {
       setServicios([...svcById.values()]);
       setVencimientos([...vencById.values()]);
       setCampanas([...campById.values()]);
+      setAusencias([...ausById.values()]);
       setCierres(cierresPresent ? [...cierreById.values()] : null);
     } catch {
       setError('No se pudieron cargar las actividades.');
@@ -324,6 +342,10 @@ export default function ActividadesCalendarioPage() {
             .map((c) => cierreToChip(c, gridStart, gridEnd))
             .filter((c): c is NonNullable<typeof c> => c !== null)
         : [];
+    // CAL-018 — ausencias (ranged), behind their own toggle.
+    const ausenciaChips = showAusencias
+      ? ausencias.flatMap((a) => ausenciaToChips(a, gridStart, gridEnd))
+      : [];
     return [
       ...activityChips,
       ...birthdayChips,
@@ -331,6 +353,7 @@ export default function ActividadesCalendarioPage() {
       ...vencimientoChips,
       ...campanaChips,
       ...cierreChips,
+      ...ausenciaChips,
     ];
   }, [
     filtered,
@@ -339,10 +362,12 @@ export default function ActividadesCalendarioPage() {
     vencimientos,
     campanas,
     cierres,
+    ausencias,
     showServicios,
     showVencimientos,
     showCampanas,
     showCierres,
+    showAusencias,
     view,
     focusedDate,
   ]);
@@ -361,6 +386,7 @@ export default function ActividadesCalendarioPage() {
     if (chip.kind === 'vencimiento') return <AlertTriangle size={11} />;
     if (chip.kind === 'campana') return <Megaphone size={11} />;
     if (chip.kind === 'cierre') return <Target size={11} />;
+    if (chip.kind === 'ausencia') return <UserRound size={11} />;
     return chip.activity.kind === 'SERVICIO' ? <Cog size={11} /> : null;
   }, []);
   const onSelectEvent = useCallback((chip: CalChip) => {
@@ -369,6 +395,7 @@ export default function ActividadesCalendarioPage() {
     else if (chip.kind === 'vencimiento') setSelectedVencimiento(chip.vencimiento);
     else if (chip.kind === 'campana') setSelectedCampana(chip.campana);
     else if (chip.kind === 'cierre') setSelectedCierre(chip.cierre);
+    else if (chip.kind === 'ausencia') setSelectedAusencia(chip.ausencia);
     else setSelected(chip.activity);
   }, []);
 
@@ -602,6 +629,22 @@ export default function ActividadesCalendarioPage() {
             Cierres esperados
           </button>
         )}
+        {/* CAL-018 — Ausencias: all six roles (unconditional). */}
+        <button
+          type="button"
+          aria-pressed={showAusencias}
+          onClick={() => setShowAusencias((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition"
+          style={{
+            borderColor: AUSENCIA_STYLE.color,
+            background: showAusencias ? AUSENCIA_STYLE.bg : 'transparent',
+            color: showAusencias ? AUSENCIA_STYLE.color : 'var(--text-secondary)',
+            opacity: showAusencias ? 1 : 0.6,
+          }}
+        >
+          <UserRound size={12} />
+          Ausencias
+        </button>
       </div>
 
       {error && (
@@ -750,6 +793,13 @@ export default function ActividadesCalendarioPage() {
 
       {selectedCierre && (
         <CierreCalendarModal cierre={selectedCierre} onClose={() => setSelectedCierre(null)} />
+      )}
+
+      {selectedAusencia && (
+        <AusenciaCalendarModal
+          ausencia={selectedAusencia}
+          onClose={() => setSelectedAusencia(null)}
+        />
       )}
     </div>
   );
