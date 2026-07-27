@@ -15,6 +15,11 @@ import {
   ContactSubject,
   EmployeeCompensationSubject,
   EmployeeSubject,
+  HsecEppDeliverySubject,
+  HsecEppItemSubject,
+  HsecIncidentPersonSubject,
+  HsecIncidentSubject,
+  HsecTrainingSubject,
   JobPositionSubject,
   OpportunitySubject,
   QuoteSubject,
@@ -182,5 +187,54 @@ describe('CaslAbilityFactory — Comercial floor fully retired (COM-001…COM-01
         expect(a.can(action, subject)).toBe(false);
       }
     }
+  });
+});
+
+/* HSEC-001 (2026-07-27) — proves the HSEC authorization shell against the FOUNDER-SIGNED
+ * matrix (PART1 decision 3): the ENTIRE module is MANAGER/ADMIN/SUPER_ADMIN. MANAGER full
+ * CRUD on all five subjects; ADMIN/SUPER_ADMIN via `manage all`; ACCOUNTANT/ANALYST/VIEWER
+ * fully floored (no re-grants — no money in HSEC, but health-adjacent PII; the Actividades
+ * open-read matrix is NOT a template here). */
+describe('CaslAbilityFactory — HSEC shell floor + MANAGER grants (HSEC-001)', () => {
+  const factory = new CaslAbilityFactory();
+  const ALL_HSEC = [
+    HsecIncidentSubject,
+    HsecIncidentPersonSubject,
+    HsecTrainingSubject,
+    HsecEppDeliverySubject,
+    HsecEppItemSubject,
+  ];
+
+  it('MANAGER can create HsecIncident and read ALL five HSEC subjects', () => {
+    const m = factory.defineAbilityFor(UserRole.MANAGER);
+    expect(m.can('create', HsecIncidentSubject)).toBe(true);
+    for (const subject of ALL_HSEC) {
+      expect(m.can('read', subject)).toBe(true);
+    }
+  });
+
+  it('MANAGER carries the full uniform matrix — create/update/delete on all five', () => {
+    const m = factory.defineAbilityFor(UserRole.MANAGER);
+    for (const subject of ALL_HSEC) {
+      for (const action of ['create', 'update', 'delete'] as const) {
+        expect(m.can(action, subject)).toBe(true);
+      }
+    }
+  });
+
+  it('ACCOUNTANT, ANALYST and VIEWER cannot read ANY HSEC subject (default-deny floor)', () => {
+    for (const role of [UserRole.ACCOUNTANT, UserRole.ANALYST, UserRole.VIEWER]) {
+      const ab = factory.defineAbilityFor(role);
+      for (const subject of ALL_HSEC) {
+        expect(ab.can('read', subject)).toBe(false);
+      }
+    }
+  });
+
+  it('ADMIN manages HsecIncident (via `manage all` — never floored)', () => {
+    expect(factory.defineAbilityFor(UserRole.ADMIN).can('manage', HsecIncidentSubject)).toBe(true);
+    expect(factory.defineAbilityFor(UserRole.SUPER_ADMIN).can('manage', HsecIncidentSubject)).toBe(
+      true,
+    );
   });
 });

@@ -60,6 +60,11 @@ type Subjects =
       | typeof PresenceSnapshotSubject
       | typeof CalendarActivitySubject
       | typeof ActivityAreaSubject
+      | typeof HsecIncidentSubject
+      | typeof HsecIncidentPersonSubject
+      | typeof HsecTrainingSubject
+      | typeof HsecEppDeliverySubject
+      | typeof HsecEppItemSubject
     >
   | 'all';
 
@@ -286,6 +291,30 @@ class ActivityAreaSubject {
   static readonly modelName = 'ActivityArea' as const;
 }
 
+/* HSEC-001 (2026-07-27) — HSEC module subjects, FOUNDER-SIGNED MATRIX (PART1 decision 3):
+   the ENTIRE module is MANAGER/ADMIN/SUPER_ADMIN. MANAGER gets full CRUD on all five
+   subjects (the matrix is uniform — grants land in this same ticket); ADMIN/SUPER_ADMIN
+   via `manage all` (never receive cannot()). ACCOUNTANT/ANALYST/VIEWER: NO access in V1 —
+   default-deny floor with no re-grants (COM-001 pattern). No money in HSEC, but
+   health-adjacent PII (lesión/parte del cuerpo, atención médica): the Actividades
+   open-read matrix is explicitly NOT a template here. Widening is a future dated founder
+   decision. */
+class HsecIncidentSubject {
+  static readonly modelName = 'HsecIncident' as const;
+}
+class HsecIncidentPersonSubject {
+  static readonly modelName = 'HsecIncidentPerson' as const;
+}
+class HsecTrainingSubject {
+  static readonly modelName = 'HsecTraining' as const;
+}
+class HsecEppDeliverySubject {
+  static readonly modelName = 'HsecEppDelivery' as const;
+}
+class HsecEppItemSubject {
+  static readonly modelName = 'HsecEppItem' as const;
+}
+
 /* All RRHH subjects — granted/revoked in bulk by the baseline role rules. */
 const RRHH_SUBJECTS = [
   EmployeeSubject,
@@ -330,6 +359,16 @@ const MARKETING_FINANCIAL_SUBJECTS = [CampaignSubject, MarketingExpenseSubject];
 /* CAL-001 — Calendario de Actividades subjects. The floor is applied per blanket-read
    branch, then read is re-granted to ALL SIX roles (write stays MANAGER+). */
 const CALENDARIO_SUBJECTS = [CalendarActivitySubject, ActivityAreaSubject];
+/* HSEC-001 — all HSEC subjects. Establishes the default-deny READ floor (COM-001 shape):
+   the blanket-`read all` roles revoke their inherited HSEC read in their branches below;
+   ONLY MANAGER re-grants (full CRUD — the founder-signed matrix is uniform). */
+const HSEC_SUBJECTS = [
+  HsecIncidentSubject,
+  HsecIncidentPersonSubject,
+  HsecTrainingSubject,
+  HsecEppDeliverySubject,
+  HsecEppItemSubject,
+];
 
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
@@ -436,6 +475,11 @@ export {
   PresenceSnapshotSubject,
   CalendarActivitySubject,
   ActivityAreaSubject,
+  HsecIncidentSubject,
+  HsecIncidentPersonSubject,
+  HsecTrainingSubject,
+  HsecEppDeliverySubject,
+  HsecEppItemSubject,
 };
 
 @Injectable()
@@ -562,6 +606,11 @@ export class CaslAbilityFactory {
         CALENDARIO_SUBJECTS.forEach((subject) =>
           can(['read', 'create', 'update', 'delete'], subject),
         );
+        /* HSEC-001 (2026-07-27) — default-deny floor on the HSEC subjects, then re-grant
+           full CRUD AFTER the revoke (last-rule-wins): MANAGER owns the whole HSEC
+           workflow (founder-signed matrix — uniform on all five subjects). */
+        HSEC_SUBJECTS.forEach((subject) => cannot('read', subject));
+        HSEC_SUBJECTS.forEach((subject) => can(['read', 'create', 'update', 'delete'], subject));
         break;
 
       case UserRole.ACCOUNTANT:
@@ -623,6 +672,10 @@ export class CaslAbilityFactory {
            both (no money here → ACCOUNTANT reads like everyone else). No write. Per §4. */
         CALENDARIO_SUBJECTS.forEach((subject) => cannot('read', subject));
         CALENDARIO_SUBJECTS.forEach((subject) => can('read', subject));
+        /* HSEC-001 (2026-07-27) — default-deny floor on the HSEC subjects, NO re-grant:
+           ACCOUNTANT has no HSEC access in V1 (no money in the module; health-adjacent
+           PII stays MANAGER+). Founder-signed matrix. */
+        HSEC_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
 
       case UserRole.ANALYST:
@@ -654,6 +707,9 @@ export class CaslAbilityFactory {
            the calendar carries no money, so "todos lo ven" (Q4). No write. Per §4. */
         CALENDARIO_SUBJECTS.forEach((subject) => cannot('read', subject));
         CALENDARIO_SUBJECTS.forEach((subject) => can('read', subject));
+        /* HSEC-001 (2026-07-27) — default-deny floor on the HSEC subjects, NO re-grant:
+           ANALYST has no HSEC access in V1. Founder-signed matrix. */
+        HSEC_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
 
       case UserRole.VIEWER:
@@ -709,6 +765,12 @@ export class CaslAbilityFactory {
            idiom), nothing to floor. Read on both subjects; no write. Per §4. */
         can('read', CalendarActivitySubject);
         can('read', ActivityAreaSubject);
+        /* HSEC-001 (2026-07-27) — default-deny floor on the HSEC subjects, NO re-grant:
+           VIEWER has no HSEC access in V1. VIEWER carries no blanket `read all`, so this
+           cannot() is technically redundant (granting nothing IS the floor — the MKT-001
+           idiom); it is written out explicitly per the ticket so the five HSEC floors read
+           uniformly across the four non-admin branches. Founder-signed matrix. */
+        HSEC_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
     }
 

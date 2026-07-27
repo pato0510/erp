@@ -367,11 +367,14 @@ const MODULES: ModuleDef[] = [
     svg: <OperacionesSvg />,
   },
   {
+    // HSEC-001 (2026-07-27) — shell ticket, step 1 of the COM-015/MKT-010/CAL-007 two-step
+    // pattern: the card gains its href but STAYS gated ("Próximamente") through the HSEC
+    // arc; the close ticket (HSEC-011) flips active. Pages reachable by direct URL only.
     key: 'hsec',
     name: 'HSEC',
     description: 'Salud, seguridad, medio ambiente y comunidades',
     gradient: 'linear-gradient(135deg, #10B981, #059669)',
-    href: null,
+    href: '/hsec',
     active: false,
     svg: <HsecSvg />,
   },

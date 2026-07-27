@@ -23,6 +23,7 @@ import { DashboardModule } from '../modules/dashboard/dashboard.module';
 import { CatalogsModule } from '../modules/catalogs/catalogs.module';
 import { CompaniesModule } from '../modules/companies/companies.module';
 import { HealthModule } from '../modules/health/health.module';
+import { HsecModule } from '../modules/hsec/hsec.module';
 import { IamModule } from '../modules/iam/iam.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
 import { MarketingModule } from '../modules/marketing/marketing.module';
@@ -72,6 +73,7 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 100;
     CatalogsModule,
     CompaniesModule,
     HealthModule,
+    HsecModule,
     IamModule,
     JobsModule,
     DomainEventsModule,
