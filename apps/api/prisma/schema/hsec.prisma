@@ -1,11 +1,11 @@
-/* HSEC-002 — HSEC schema. First HSEC table: incidents. Model verbatim from
-   docs/EXCELSIA-HSEC-PLAN-PART1-DATAMODEL.md §2. HSEC-003 lands the
-   HsecIncidentPerson child table + the persons relation; the remaining planned
-   delta is enum HsecTrainingType (arrives with trainings, HSEC-006). Enums use
-   ASCII-only members (the Prisma enum Ñ gotcha — DANO_MATERIAL); display labels
-   live in the UI layer. The platform invariant (RLS + audit trigger + app_user
-   GRANT) ships per-table: 20260727150000_add_hsec_incidents,
-   20260727180000_add_hsec_incident_persons. */
+/* HSEC-002 — HSEC schema. Models verbatim from
+   docs/EXCELSIA-HSEC-PLAN-PART1-DATAMODEL.md §2: incidents (HSEC-002), the
+   HsecIncidentPerson child + persons relation (HSEC-003), trainings + attendees
+   (HSEC-006). Enums use ASCII-only members (the Prisma enum Ñ gotcha —
+   DANO_MATERIAL); display labels live in the UI layer. The platform invariant
+   (RLS + audit trigger + app_user GRANT) ships per-table:
+   20260727150000_add_hsec_incidents, 20260727180000_add_hsec_incident_persons,
+   20260728120000_add_hsec_trainings. */
 
 enum HsecIncidentType {
   ACCIDENTE_TRABAJO
@@ -72,4 +72,59 @@ model HsecIncidentPerson {
   @@unique([incidentId, employeeId])
   @@index([companyId])
   @@map("hsec_incident_persons")
+}
+
+enum HsecTrainingType {
+  CHARLA
+  INDUCCION
+  CAPACITACION
+}
+
+/* HSEC-006 — a training EVENT (fecha + tema + relator + asistentes). COEXISTENCE DOCTRINE
+   (PART1 decision 9, the ActivityArea↔AreaRRHH class): this event ≠ an RRHH
+   EmployeeDocumentType acuse ('ODI', 'Inducción de seguridad', 'Certificado de capacitación')
+   ≠ an RRHH CertificationType credential. Three surfaces, three natures (event / per-person
+   document / expiring credential) — NO future ticket unifies or maps them without an express
+   founder decision. */
+model HsecTraining {
+  id              String           @id @default(uuid()) @db.Uuid
+  companyId       String           @db.Uuid
+  type            HsecTrainingType
+  topic           String
+  date            DateTime         @db.Date
+  time            String? // "HH:mm"
+  durationMinutes Int?
+  instructorName  String // free text — covers external relator/mutual; employee link = seed
+  notes           String?
+  // single optional inline file (the signed planilla scan) — the EXACT inline-file column
+  // shapes used by Procedure (operations.prisma), nullable here because the file is optional:
+  // fileName / mimeType / fileSize / filePath / fileData
+  fileName        String?
+  mimeType        String?
+  fileSize        Int?
+  filePath        String?
+  fileData        Bytes?
+  createdBy       String           @db.Uuid
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  attendees HsecTrainingAttendee[]
+
+  @@index([companyId])
+  @@index([companyId, date])
+  @@map("hsec_trainings")
+}
+
+model HsecTrainingAttendee {
+  id         String   @id @default(uuid()) @db.Uuid
+  companyId  String   @db.Uuid
+  trainingId String   @db.Uuid
+  employeeId String   @db.Uuid // bare — leaf-resolved
+  createdAt  DateTime @default(now())
+
+  training HsecTraining @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingId, employeeId])
+  @@index([companyId])
+  @@map("hsec_training_attendees")
 }
