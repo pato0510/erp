@@ -5,7 +5,7 @@
    DANO_MATERIAL); display labels live in the UI layer. The platform invariant
    (RLS + audit trigger + app_user GRANT) ships per-table:
    20260727150000_add_hsec_incidents, 20260727180000_add_hsec_incident_persons,
-   20260728120000_add_hsec_trainings. */
+   20260728120000_add_hsec_trainings, 20260728150000_add_hsec_epp. */
 
 enum HsecIncidentType {
   ACCIDENTE_TRABAJO
@@ -127,4 +127,66 @@ model HsecTrainingAttendee {
   @@unique([trainingId, employeeId])
   @@index([companyId])
   @@map("hsec_training_attendees")
+}
+
+/* HSEC-008 — the EPP surface: a per-company item catalog + delivery events with lines.
+   "Entrega de EPP" here is the PHYSICAL delivery record (what/when/how many, per worker) —
+   coexists WITHOUT mapping with the RRHH 'Entrega de EPP' EmployeeDocumentType label and the
+   'Uso de EPP' CertificationType (decision 9's vocabulary-collision line: three surfaces,
+   three natures). */
+model HsecEppItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines HsecEppDeliveryLine[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("hsec_epp_items")
+}
+
+model HsecEppDelivery {
+  id         String   @id @default(uuid()) @db.Uuid
+  companyId  String   @db.Uuid
+  employeeId String   @db.Uuid // bare — leaf-resolved
+  date       DateTime @db.Date
+  notes      String?
+  // single optional inline file (signed acuse scan) — same Procedure-shaped columns as
+  // HsecTraining: fileName / mimeType / fileSize / filePath / fileData
+  fileName   String?
+  mimeType   String?
+  fileSize   Int?
+  filePath   String?
+  fileData   Bytes?
+  createdBy  String   @db.Uuid
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  lines HsecEppDeliveryLine[]
+
+  @@index([companyId])
+  @@index([companyId, employeeId])
+  @@index([companyId, date])
+  @@map("hsec_epp_deliveries")
+}
+
+model HsecEppDeliveryLine {
+  id         String   @id @default(uuid()) @db.Uuid
+  companyId  String   @db.Uuid
+  deliveryId String   @db.Uuid
+  eppItemId  String   @db.Uuid
+  quantity   Int // > 0, validated 400 verbatim
+  size       String? // talla
+  createdAt  DateTime @default(now())
+
+  delivery HsecEppDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  item     HsecEppItem     @relation(fields: [eppItemId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([deliveryId])
+  @@map("hsec_epp_delivery_lines")
 }
