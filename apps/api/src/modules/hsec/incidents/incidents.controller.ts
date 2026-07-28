@@ -7,8 +7,13 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 import { HsecIncidentSubject } from '../../common/casl/casl-ability.factory';
 import { CheckPolicies } from '../../common/decorators/check-policies.decorator';
 import { CurrentCompany } from '../../common/decorators/current-company.decorator';
@@ -18,7 +23,7 @@ import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { ChangeIncidentStatusDto } from './dto/change-incident-status.dto';
 import { CreateIncidentDto } from './dto/create-incident.dto';
 import { UpdateIncidentDto } from './dto/update-incident.dto';
-import { IncidentsService } from './incidents.service';
+import { ATTACHMENT_MAX_BYTES, IncidentsService } from './incidents.service';
 
 /* HSEC-002 — incident CRUD + status machine. EVERY endpoint declares @CheckPolicies on
  * HsecIncidentSubject (PoliciesGuard fails OPEN). The founder-signed matrix (PART1 decision
@@ -83,5 +88,50 @@ export class IncidentsController {
     @CurrentUser() user: { id: string },
   ) {
     return this.service.remove(id, companyId, user.id);
+  }
+
+  /* HSEC-004 — attachments, the WorkPermit controller idiom (work-permits.controller.ts:65-82,
+     207-229) with by-id addressing. Upload/delete gate on `update` (attachments mutate the
+     incident); download gates on `read`. */
+  @Post(':id/attachments')
+  @CheckPolicies((ability) => ability.can('update', HsecIncidentSubject))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: ATTACHMENT_MAX_BYTES } }))
+  addAttachment(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.addAttachment(id, companyId, user.id, file);
+  }
+
+  @Get(':id/attachments/:attachmentId')
+  @CheckPolicies((ability) => ability.can('read', HsecIncidentSubject))
+  async downloadAttachment(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @CurrentCompany() companyId: string,
+    @Query('download') download: string | undefined,
+    @Res() res: Response,
+  ) {
+    const file = await this.service.getAttachment(id, companyId, attachmentId);
+    const disposition = download === '1' ? 'attachment' : 'inline';
+    res.set({
+      'Content-Type': file.mimeType,
+      'Content-Disposition': `${disposition}; filename="${encodeURIComponent(file.fileName)}"`,
+      'Cache-Control': 'private, max-age=300',
+    });
+    res.send(file.buffer);
+  }
+
+  @Delete(':id/attachments/:attachmentId')
+  @CheckPolicies((ability) => ability.can('update', HsecIncidentSubject))
+  deleteAttachment(
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.deleteAttachment(id, companyId, user.id, attachmentId);
   }
 }
