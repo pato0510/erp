@@ -1,10 +1,11 @@
 /* HSEC-002 — HSEC schema. First HSEC table: incidents. Model verbatim from
-   docs/EXCELSIA-HSEC-PLAN-PART1-DATAMODEL.md §2 with the two planned deltas: the
-   `persons HsecIncidentPerson[]` relation arrives with the child table (HSEC-003)
-   and enum HsecTrainingType arrives with trainings (HSEC-006). Enums use
+   docs/EXCELSIA-HSEC-PLAN-PART1-DATAMODEL.md §2. HSEC-003 lands the
+   HsecIncidentPerson child table + the persons relation; the remaining planned
+   delta is enum HsecTrainingType (arrives with trainings, HSEC-006). Enums use
    ASCII-only members (the Prisma enum Ñ gotcha — DANO_MATERIAL); display labels
    live in the UI layer. The platform invariant (RLS + audit trigger + app_user
-   GRANT) ships in migration 20260727150000_add_hsec_incidents. */
+   GRANT) ships per-table: 20260727150000_add_hsec_incidents,
+   20260727180000_add_hsec_incident_persons. */
 
 enum HsecIncidentType {
   ACCIDENTE_TRABAJO
@@ -45,9 +46,30 @@ model HsecIncident {
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
+  persons HsecIncidentPerson[]
+
   @@unique([companyId, incidentNumber])
   @@index([companyId])
   @@index([companyId, occurredDate])
   @@index([companyId, status])
   @@map("hsec_incidents")
+}
+
+model HsecIncidentPerson {
+  id               String   @id @default(uuid()) @db.Uuid
+  companyId        String   @db.Uuid
+  incidentId       String   @db.Uuid
+  employeeId       String   @db.Uuid // bare — resolved via RrhhEmployeeRead leaf (decision 4/5)
+  injuryType       String?
+  bodyPart         String?
+  medicalAttention Boolean  @default(false)
+  lostDays         Int?
+  detail           String?
+  createdAt        DateTime @default(now())
+
+  incident HsecIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@unique([incidentId, employeeId])
+  @@index([companyId])
+  @@map("hsec_incident_persons")
 }

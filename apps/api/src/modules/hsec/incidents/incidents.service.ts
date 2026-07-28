@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { HsecIncidentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
+import { RrhhEmployeeReadService } from '../../rrhh/employee-read/employee-read.service';
 import { CreateIncidentDto } from './dto/create-incident.dto';
 import { UpdateIncidentDto } from './dto/update-incident.dto';
 
@@ -54,6 +55,7 @@ export class IncidentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rlsService: RlsService,
+    private readonly employeeRead: RrhhEmployeeReadService,
   ) {}
 
   /** Anchor a YYYY-MM-DD string to UTC midnight (the RRHH HR-004b convention). */
@@ -84,8 +86,30 @@ export class IncidentsService {
     });
   }
 
+  /** HSEC-003 — detail embeds persons[] with fullName resolved via ONE resolveNamesByIds
+   *  batch (no N+1; the leaf's two-key signed contract). A name that no longer resolves
+   *  (employee hard-deleted from RRHH) degrades to null — the afectado row itself stays. */
   async findOne(id: string, companyId: string) {
-    return this.getIncidentOrThrow(id, companyId);
+    const incident = await this.getIncidentOrThrow(id, companyId);
+    const rows = await this.prisma.hsecIncidentPerson.findMany({
+      where: { companyId, incidentId: id },
+      orderBy: { createdAt: 'asc' },
+    });
+    const names = await this.employeeRead.resolveNamesByIds(
+      companyId,
+      rows.map((r) => r.employeeId),
+    );
+    const persons = rows.map((r) => ({
+      id: r.id,
+      employeeId: r.employeeId,
+      fullName: names[r.employeeId] ?? null,
+      injuryType: r.injuryType,
+      bodyPart: r.bodyPart,
+      medicalAttention: r.medicalAttention,
+      lostDays: r.lostDays,
+      detail: r.detail,
+    }));
+    return { ...incident, persons };
   }
 
   /** "INC-{YYYY}-{0000}" — YYYY is the CHILEAN calendar year NOW (creation time, not the
