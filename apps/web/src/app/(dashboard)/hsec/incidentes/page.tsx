@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { IncidentFormModal } from '../../../../components/hsec/IncidentFormModal';
@@ -28,20 +28,47 @@ import {
 
 type EstadoFilter = 'todos' | HsecIncidentStatus;
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/* HSEC-010 — useSearchParams requires a Suspense boundary (the operaciones/alertas idiom). */
 export default function HsecIncidentesPage() {
+  return (
+    <Suspense fallback={null}>
+      <HsecIncidentesContent />
+    </Suspense>
+  );
+}
+
+function HsecIncidentesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<HsecIncident[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  /* HSEC-010 — SEARCHPARAMS INITIALIZATION: the dashboard cards deep-link here with
+     ?estado / ?severidad / ?tipo / ?desde / ?hasta. Params only seed the EXISTING filter
+     state (validated; invalid values fall back to defaults) — no new filter logic. */
+  const spEstado = searchParams.get('estado');
+  const spTipo = searchParams.get('tipo');
+  const spSeveridad = searchParams.get('severidad');
+  const spDesde = searchParams.get('desde');
+  const spHasta = searchParams.get('hasta');
+
   // Server-side estado; client-side lenses.
-  const [estado, setEstado] = useState<EstadoFilter>('todos');
-  const [tipo, setTipo] = useState<'todos' | HsecIncidentType>('todos');
-  const [severidad, setSeveridad] = useState<'todos' | HsecIncidentSeverity>('todos');
-  const [desde, setDesde] = useState('');
-  const [hasta, setHasta] = useState('');
+  const [estado, setEstado] = useState<EstadoFilter>(
+    spEstado && spEstado in STATUS_LABEL ? (spEstado as HsecIncidentStatus) : 'todos',
+  );
+  const [tipo, setTipo] = useState<'todos' | HsecIncidentType>(
+    spTipo && spTipo in TYPE_LABEL ? (spTipo as HsecIncidentType) : 'todos',
+  );
+  const [severidad, setSeveridad] = useState<'todos' | HsecIncidentSeverity>(
+    spSeveridad && spSeveridad in SEVERITY_LABEL ? (spSeveridad as HsecIncidentSeverity) : 'todos',
+  );
+  const [desde, setDesde] = useState(spDesde && DATE_RE.test(spDesde) ? spDesde : '');
+  const [hasta, setHasta] = useState(spHasta && DATE_RE.test(spHasta) ? spHasta : '');
 
   const fetchList = useCallback(() => {
     setLoading(true);

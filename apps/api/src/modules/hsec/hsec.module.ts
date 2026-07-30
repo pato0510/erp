@@ -3,6 +3,8 @@ import { RrhhEmployeeReadModule } from '../rrhh/employee-read/employee-read.modu
 import { EppModule } from './epp/epp.module';
 import { IncidentsModule } from './incidents/incidents.module';
 import { TrainingsModule } from './trainings/trainings.module';
+import { HsecDashboardController } from './dashboard.controller';
+import { HsecDashboardService } from './dashboard.service';
 import { HsecRosterController } from './roster.controller';
 
 /* HSEC-001 — HSEC module aggregator (mirrors the COM-001/MKT-001/CAL-001 scaffold).
@@ -16,6 +18,7 @@ import { HsecRosterController } from './roster.controller';
  * matrix is uniform — PART1 decision 3). */
 @Module({
   imports: [IncidentsModule, TrainingsModule, EppModule, RrhhEmployeeReadModule],
-  controllers: [HsecRosterController],
+  controllers: [HsecRosterController, HsecDashboardController],
+  providers: [HsecDashboardService],
 })
 export class HsecModule {}

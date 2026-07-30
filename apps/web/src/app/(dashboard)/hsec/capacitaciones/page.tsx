@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Paperclip, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { TrainingFormModal } from '../../../../components/hsec/TrainingFormModal';
@@ -19,19 +19,43 @@ import {
  * the shipped list payload (fileName non-null). DIRECTOR RULING (HSEC-006 review): every
  * mutation refetches the shaped GET — no response body ever becomes state. */
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/* HSEC-010 — useSearchParams requires a Suspense boundary (the operaciones/alertas idiom). */
 export default function HsecCapacitacionesPage() {
+  return (
+    <Suspense fallback={null}>
+      <HsecCapacitacionesContent />
+    </Suspense>
+  );
+}
+
+function HsecCapacitacionesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<TrainingListRow[]>([]);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  /* HSEC-010 — SEARCHPARAMS INITIALIZATION: ?tipo / ?empleado / ?desde / ?hasta seed the
+     EXISTING filter state (validated; invalid → defaults) — no new filter logic. */
+  const spTipo = searchParams.get('tipo');
+  const spEmpleado = searchParams.get('empleado');
+  const spDesde = searchParams.get('desde');
+  const spHasta = searchParams.get('hasta');
+
   // Server-side filters; client-side date range.
-  const [tipo, setTipo] = useState<'todos' | HsecTrainingType>('todos');
-  const [asistente, setAsistente] = useState('');
-  const [desde, setDesde] = useState('');
-  const [hasta, setHasta] = useState('');
+  const [tipo, setTipo] = useState<'todos' | HsecTrainingType>(
+    spTipo && spTipo in TRAINING_TYPE_LABEL ? (spTipo as HsecTrainingType) : 'todos',
+  );
+  const [asistente, setAsistente] = useState(
+    spEmpleado && UUID_RE.test(spEmpleado) ? spEmpleado : '',
+  );
+  const [desde, setDesde] = useState(spDesde && DATE_RE.test(spDesde) ? spDesde : '');
+  const [hasta, setHasta] = useState(spHasta && DATE_RE.test(spHasta) ? spHasta : '');
 
   const fetchList = useCallback(() => {
     setLoading(true);

@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Paperclip, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { EppDeliveryFormModal } from '../../../../components/hsec/EppDeliveryFormModal';
@@ -18,8 +18,21 @@ function truncate(text: string, n = 40): string {
   return text.length > n ? text.slice(0, n - 1) + '…' : text;
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/* HSEC-010 — useSearchParams requires a Suspense boundary (the operaciones/alertas idiom). */
 export default function HsecEppPage() {
+  return (
+    <Suspense fallback={null}>
+      <HsecEppContent />
+    </Suspense>
+  );
+}
+
+function HsecEppContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<EppDeliveryListRow[]>([]);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [items, setItems] = useState<EppItem[]>([]);
@@ -27,9 +40,17 @@ export default function HsecEppPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const [empleado, setEmpleado] = useState('');
-  const [desde, setDesde] = useState('');
-  const [hasta, setHasta] = useState('');
+  /* HSEC-010 — SEARCHPARAMS INITIALIZATION: ?empleado / ?desde / ?hasta seed the EXISTING
+     filter state (validated; invalid → defaults) — no new filter logic. */
+  const spEmpleado = searchParams.get('empleado');
+  const spDesde = searchParams.get('desde');
+  const spHasta = searchParams.get('hasta');
+
+  const [empleado, setEmpleado] = useState(
+    spEmpleado && UUID_RE.test(spEmpleado) ? spEmpleado : '',
+  );
+  const [desde, setDesde] = useState(spDesde && DATE_RE.test(spDesde) ? spDesde : '');
+  const [hasta, setHasta] = useState(spHasta && DATE_RE.test(spHasta) ? spHasta : '');
 
   const fetchList = useCallback(() => {
     setLoading(true);
