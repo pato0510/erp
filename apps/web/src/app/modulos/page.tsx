@@ -367,7 +367,7 @@ const MODULES: ModuleDef[] = [
     svg: <OperacionesSvg />,
   },
   {
-    // HSEC-011 (2026-07-30) — un-gated: HSEC is live (incidentes + afectados + adjuntos +
+    // HSEC-011 (2026-08-03) — un-gated: HSEC is live (incidentes + afectados + adjuntos +
     // notificación GRAVE/FATAL, capacitaciones + planilla, EPP con catálogo chileno +
     // entregas + acuse, dashboard mensual). Was gated ("Próximamente") through HSEC-001..010
     // (COM-015/MKT-010/CAL-007 pattern).

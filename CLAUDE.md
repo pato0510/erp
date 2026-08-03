@@ -791,7 +791,7 @@ ausencias, cierres* }` — \*`cierres` es la ÚNICA colección con llave GATED
 
 ═══════════════════════════════════════════════════════════════════
 
-# 🏁 MÓDULO HSEC — V1 COMPLETO (HSEC-000..011, live 2026-07-30)
+# 🏁 MÓDULO HSEC — V1 COMPLETO (HSEC-000..011, live 2026-08-03)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -882,7 +882,7 @@ migración hand-authored (template calendar_activity_notes).
   · comité paritario · faena (backlog global) · ampliaciones de lectura CASL
   · extracción módulo-local de storeFile y date-utils (opcionales).
 
-Última actualización: 2026-07-30 (HSEC-011 — cierre del módulo)
+Última actualización: 2026-08-03 (HSEC-011 — cierre del módulo)
 
 # Próximos pasos
 
@@ -902,7 +902,7 @@ migración hand-authored (template calendar_activity_notes).
 - Semillas V2 (Gestión de actividades): asignados múltiples (M2M) · política
   de corrección/borrado de notas · recordatorios de actividades atrasadas ·
   export semanal de la vista.
-- HSEC V1 COMPLETO (HSEC-000..011, live 2026-07-30) — detalle y matriz
+- HSEC V1 COMPLETO (HSEC-000..011, live 2026-08-03) — detalle y matriz
   firmada en el bloque del módulo arriba. Micro-tickets EN COLA: OPS-038
   (persistir el evento procedure.acknowledgment-expired con aggregateId UUID
   real — hoy compone un string procedureId:userId que emit() traga en
