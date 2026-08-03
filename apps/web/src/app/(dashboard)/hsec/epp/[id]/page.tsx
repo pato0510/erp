@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Download, Paperclip, Pencil, Trash2, Upload } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
 import { EppDeliveryFormModal } from '../../../../../components/hsec/EppDeliveryFormModal';
-import { formatFileSize, formatIncidentDate } from '../../../../../components/hsec/incidentTypes';
+import { formatFileSize, formatDbDate } from '../../../../../components/hsec/incidentTypes';
 import type { RosterEntry } from '../../../../../components/hsec/incidentTypes';
 import type { EppDeliveryDetail, EppItem } from '../../../../../components/hsec/eppTypes';
 
@@ -57,7 +57,7 @@ export default function HsecEppDeliveryDetailPage() {
     if (!delivery) return;
     if (
       !window.confirm(
-        `¿Eliminar la entrega de ${delivery.fullName ?? 'este trabajador'} del ${formatIncidentDate(delivery.date)}? Se eliminarán también sus líneas.`,
+        `¿Eliminar la entrega de ${delivery.fullName ?? 'este trabajador'} del ${formatDbDate(delivery.date)}? Se eliminarán también sus líneas.`,
       )
     )
       return;
@@ -157,7 +157,7 @@ export default function HsecEppDeliveryDetailPage() {
             {delivery.fullName ?? delivery.employeeId}
           </h1>
           <span className="text-sm text-[var(--text-secondary)]">
-            {formatIncidentDate(delivery.date)}
+            {formatDbDate(delivery.date)}
           </span>
         </div>
         <div className="flex items-center gap-2">

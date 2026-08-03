@@ -12,7 +12,7 @@ import type {
   HsecIncidentType,
 } from '../../../../components/hsec/incidentTypes';
 import {
-  formatIncidentDate,
+  formatDbDate,
   SEVERITY_LABEL,
   SEVERITY_STYLE,
   STATUS_LABEL,
@@ -246,7 +246,7 @@ function HsecIncidentesContent() {
                     {r.incidentNumber}
                   </td>
                   <td className="px-3 py-2.5 text-[var(--text-primary)]">
-                    {formatIncidentDate(r.occurredDate)}
+                    {formatDbDate(r.occurredDate)}
                     {r.occurredTime && (
                       <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-[var(--text-secondary)] dark:bg-white/10">
                         {r.occurredTime}

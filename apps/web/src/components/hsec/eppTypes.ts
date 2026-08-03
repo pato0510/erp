@@ -14,7 +14,7 @@ export interface EppItem {
 export interface EppDeliveryListRow {
   id: string;
   employeeId: string;
-  date: string; // @db.Date UTC-midnight ISO — render ONLY via formatIncidentDate
+  date: string; // @db.Date UTC-midnight ISO — render ONLY via formatDbDate
   notes: string | null;
   fileName: string | null; // acuse indicator: non-null = has file
   fileSize: number | null;

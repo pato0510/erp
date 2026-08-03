@@ -30,7 +30,7 @@ PART2.
    leaf `RrhhEmployeeReadModule` (imports NOTHING) exposes exactly two
    methods: `listActiveLite(companyId)` → `{ employeeId, fullName }[]`
    (pickers; ACTIVO only) and `resolveNamesByIds(companyId, ids)` →
-   `Map<employeeId, fullName>` (display; any status — a DESVINCULADO afectado
+   `Record<employeeId, fullName>` (display; any status — a DESVINCULADO afectado
    keeps their name in old records). STRUCTURAL two-key contract — no rut, no
    area, no status, no email can travel. Signature recorded in the service
    header and CLAUDE.md at close.

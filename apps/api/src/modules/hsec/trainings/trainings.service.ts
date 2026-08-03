@@ -134,8 +134,17 @@ export class TrainingsService {
     };
   }
 
+  /** HSEC-011 — write responses are SHAPED like the detail read (fileData stripped, hasFile
+   *  derived): the blob never rides a create/update/upload response. */
+  private shapeWriteResponse<
+    T extends { fileName: string | null; filePath: string | null; fileData: Uint8Array | null },
+  >(row: T) {
+    const { fileData, ...rest } = row;
+    return { ...rest, hasFile: !!(row.fileName && (row.filePath || fileData)) };
+  }
+
   async create(companyId: string, userId: string, dto: CreateTrainingDto) {
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+    const row = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.hsecTraining.create({
         data: {
           companyId,
@@ -151,6 +160,7 @@ export class TrainingsService {
         },
       });
     });
+    return this.shapeWriteResponse(row);
   }
 
   /** Free general-field edit (decision 6). */
@@ -165,9 +175,10 @@ export class TrainingsService {
     if (dto.instructorName !== undefined) data.instructorName = dto.instructorName.trim();
     if (dto.notes !== undefined) data.notes = dto.notes ?? null;
 
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+    const row = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.hsecTraining.update({ where: { id }, data });
     });
+    return this.shapeWriteResponse(row);
   }
 
   /** DELETE always (decision 6) — cascades attendees; the audit trigger keeps every row. */
@@ -273,8 +284,7 @@ export class TrainingsService {
         },
       });
     });
-    const { fileData: _stripped, ...rest } = row;
-    return { ...rest, hasFile: true };
+    return this.shapeWriteResponse(row);
   }
 
   /** DB blob wins when present (already in memory); otherwise pull from MinIO. */

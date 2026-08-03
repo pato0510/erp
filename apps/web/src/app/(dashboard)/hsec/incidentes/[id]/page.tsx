@@ -14,7 +14,7 @@ import type {
 } from '../../../../../components/hsec/incidentTypes';
 import {
   formatFileSize,
-  formatIncidentDate,
+  formatDbDate,
   INCIDENT_STATUS_TARGETS,
   SEVERITY_LABEL,
   SEVERITY_STYLE,
@@ -215,7 +215,7 @@ export default function HsecIncidentDetailPage() {
             {STATUS_LABEL[incident.status]}
           </span>
           <span className="text-sm text-[var(--text-secondary)]">
-            {formatIncidentDate(incident.occurredDate)}
+            {formatDbDate(incident.occurredDate)}
             {incident.occurredTime ? ` · ${incident.occurredTime}` : ''}
           </span>
         </div>

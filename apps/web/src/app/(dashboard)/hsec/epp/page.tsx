@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Paperclip, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { EppDeliveryFormModal } from '../../../../components/hsec/EppDeliveryFormModal';
-import { formatIncidentDate } from '../../../../components/hsec/incidentTypes';
+import { formatDbDate } from '../../../../components/hsec/incidentTypes';
 import type { RosterEntry } from '../../../../components/hsec/incidentTypes';
 import type { EppDeliveryListRow, EppItem } from '../../../../components/hsec/eppTypes';
 
@@ -189,9 +189,7 @@ function HsecEppContent() {
                   onClick={() => router.push(`/hsec/epp/${r.id}`)}
                   className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5"
                 >
-                  <td className="px-3 py-2.5 text-[var(--text-primary)]">
-                    {formatIncidentDate(r.date)}
-                  </td>
+                  <td className="px-3 py-2.5 text-[var(--text-primary)]">{formatDbDate(r.date)}</td>
                   <td className="px-3 py-2.5 font-medium text-[var(--text-primary)]">
                     {r.fullName ?? r.employeeId}
                   </td>

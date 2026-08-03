@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Download, Paperclip, Pencil, Trash2, Upload, UserPlus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
 import { TrainingFormModal } from '../../../../../components/hsec/TrainingFormModal';
-import { formatFileSize, formatIncidentDate } from '../../../../../components/hsec/incidentTypes';
+import { formatFileSize, formatDbDate } from '../../../../../components/hsec/incidentTypes';
 import type { RosterEntry } from '../../../../../components/hsec/incidentTypes';
 import type {
   TrainingAttendee,
@@ -209,7 +209,7 @@ export default function HsecTrainingDetailPage() {
             {TRAINING_TYPE_LABEL[training.type]}
           </span>
           <span className="text-sm text-[var(--text-secondary)]">
-            {formatIncidentDate(training.date)}
+            {formatDbDate(training.date)}
             {training.time ? ` · ${training.time}` : ''}
             {training.durationMinutes ? ` · ${training.durationMinutes} min` : ''}
             {` · ${training.instructorName}`}

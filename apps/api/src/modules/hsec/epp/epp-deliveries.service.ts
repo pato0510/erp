@@ -140,6 +140,15 @@ export class EppDeliveriesService {
     };
   }
 
+  /** HSEC-011 — write responses are SHAPED like the detail read (fileData stripped, hasFile
+   *  derived): the blob never rides a create/update/upload response. */
+  private shapeWriteResponse<
+    T extends { fileName: string | null; filePath: string | null; fileData: Uint8Array | null },
+  >(row: T) {
+    const { fileData, ...rest } = row;
+    return { ...rest, hasFile: !!(row.fileName && (row.filePath || fileData)) };
+  }
+
   /** ONE executeWithRls transaction: header + lines together. */
   async create(companyId: string, userId: string, dto: CreateEppDeliveryDto) {
     const names = await this.employeeRead.resolveNamesByIds(companyId, [dto.employeeId]);
@@ -147,7 +156,7 @@ export class EppDeliveriesService {
       throw new BadRequestException('El empleado no pertenece a la empresa.');
     }
     await this.assertLinesUsable(companyId, dto.lines);
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+    const row = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       const delivery = await tx.hsecEppDelivery.create({
         data: {
           companyId,
@@ -169,6 +178,7 @@ export class EppDeliveriesService {
       });
       return delivery;
     });
+    return this.shapeWriteResponse(row);
   }
 
   /** Header fields date/notes only (employeeId IMMUTABLE — see the DTO). Optional lines[]
@@ -181,8 +191,8 @@ export class EppDeliveriesService {
     if (dto.date !== undefined) data.date = this.toDateOnly(dto.date);
     if (dto.notes !== undefined) data.notes = dto.notes ?? null;
 
-    return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
-      const row = await tx.hsecEppDelivery.update({ where: { id }, data });
+    const row = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      const updated = await tx.hsecEppDelivery.update({ where: { id }, data });
       if (dto.lines) {
         await tx.hsecEppDeliveryLine.deleteMany({ where: { companyId, deliveryId: id } });
         await tx.hsecEppDeliveryLine.createMany({
@@ -195,8 +205,9 @@ export class EppDeliveriesService {
           })),
         });
       }
-      return row;
+      return updated;
     });
+    return this.shapeWriteResponse(row);
   }
 
   /** DELETE always (decision 6) — cascades lines; the audit trigger keeps every row. */
@@ -258,8 +269,7 @@ export class EppDeliveriesService {
         },
       });
     });
-    const { fileData: _stripped, ...rest } = row;
-    return { ...rest, hasFile: true };
+    return this.shapeWriteResponse(row);
   }
 
   /** DB blob wins when present; otherwise pull from MinIO (the house read-path idiom). */

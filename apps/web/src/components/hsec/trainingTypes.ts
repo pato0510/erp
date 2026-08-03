@@ -15,7 +15,7 @@ export interface TrainingListRow {
   id: string;
   type: HsecTrainingType;
   topic: string;
-  date: string; // @db.Date UTC-midnight ISO — render ONLY via formatIncidentDate
+  date: string; // @db.Date UTC-midnight ISO — render ONLY via formatDbDate
   time: string | null; // wall-clock "HH:mm" string — never parsed as a Date
   durationMinutes: number | null;
   instructorName: string;

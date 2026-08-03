@@ -36,7 +36,7 @@ export interface HsecIncident {
   type: HsecIncidentType;
   severity: HsecIncidentSeverity;
   status: HsecIncidentStatus;
-  occurredDate: string; // @db.Date UTC-midnight ISO — render ONLY via formatIncidentDate
+  occurredDate: string; // @db.Date UTC-midnight ISO — render ONLY via formatDbDate
   occurredTime: string | null; // wall-clock "HH:mm" string — never parsed as a Date
   location: string;
   description: string;
@@ -104,7 +104,7 @@ export const SEVERITY_STYLE: Record<
    @db.Date UTC-midnight ISO; formatting it in the browser's LOCAL zone (Chile, UTC-3/-4)
    would render the PREVIOUS day. `timeZone: 'UTC'` pins the formatter to the stored
    calendar day — the value never passes through a local-zone Date render. */
-export function formatIncidentDate(iso: string | undefined): string {
+export function formatDbDate(iso: string | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('es-CL', {
     timeZone: 'UTC',

@@ -120,8 +120,8 @@ export default function HsecDashboardPage() {
           </Link>
         </div>
 
-        {/* En investigación (all-time status view — no month range, per the plan) */}
-        <Link href="/hsec/incidentes?estado=EN_INVESTIGACION" className={CARD}>
+        {/* En investigación — month-scoped like its count (HSEC-010 review ruling). */}
+        <Link href={`/hsec/incidentes?estado=EN_INVESTIGACION&${range}`} className={CARD}>
           <div className="mb-1 flex items-center gap-2 text-[var(--text-secondary)]">
             <Search size={15} />
             <span className="text-xs font-semibold uppercase tracking-wide">En investigación</span>

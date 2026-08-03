@@ -789,6 +789,101 @@ ausencias, cierres* }` — \*`cierres` es la ÚNICA colección con llave GATED
 
 Última actualización: 2026-07-27 (CAL-018 — arco del feed unificado cerrado)
 
+═══════════════════════════════════════════════════════════════════
+
+# 🏁 MÓDULO HSEC — V1 COMPLETO (HSEC-000..011, live 2026-07-30)
+
+═══════════════════════════════════════════════════════════════════
+
+Status: V1 completo, card viva en /modulos, ruta /hsec. Las TRES planillas
+vivas de AGS migraron al módulo: registro de incidentes (con afectados,
+adjuntos y notificación GRAVE/FATAL), capacitaciones/charlas/inducciones
+(con asistentes y planilla firmada) y entregas de EPP (catálogo chileno +
+líneas + acuse), más un dashboard mensual 100% derivado.
+Ledger: HSEC-000 recon · 001 shell+CASL · 002 incidentes core · 003 leaf
+roster+afectados · 004 adjuntos+notificación · 005 FE incidentes · 006
+capacitaciones BE · 007 FE · 008 EPP BE · 009 FE · 010 dashboard · 011 cierre.
+Schema: apps/api/prisma/schema/hsec.prisma
+Backend: apps/api/src/modules/hsec/ · Frontend: /hsec/...
+
+Tablas (7) y sus migraciones (73–76): hsec_incidents (73:
+20260727150000_add_hsec_incidents) · hsec_incident_persons (74:
+20260727180000_add_hsec_incident_persons) · hsec_trainings +
+hsec_training_attendees (75: 20260728120000_add_hsec_trainings) ·
+hsec_epp_items + hsec_epp_deliveries + hsec_epp_delivery_lines (76:
+20260728150000_add_hsec_epp). Cada una con RLS + audit trigger + GRANT en su
+migración hand-authored (template calendar_activity_notes).
+
+- MATRIZ CASL FIRMADA POR EL FUNDADOR (2026-07-27, PART1 decisión 3) —
+  VERBATIM: el módulo ENTERO es MANAGER/ADMIN/SUPER_ADMIN. Cinco subjects
+  (HsecIncident · HsecIncidentPerson · HsecTraining · HsecEppDelivery ·
+  HsecEppItem): MANAGER CRUD completo y uniforme; ADMIN/SUPER_ADMIN vía
+  `manage all` (jamás reciben cannot()); ACCOUNTANT/ANALYST/VIEWER: NADA en
+  V1 — piso default-deny (patrón COM-001) sin re-grants. No hay dinero en
+  HSEC, pero sí PII adyacente a salud (lesión/parte del cuerpo/atención
+  médica): la matriz abierta de Actividades NO es plantilla acá. Ampliar es
+  decisión futura fechada del fundador; es aditivo por construcción.
+  Asistentes y líneas NO tienen subject propio (cambiar la composición ES
+  update del padre — la matriz tiene exactamente cinco).
+- EXPOSICIÓN FIRMADA — RRHH roster-lite → HSEC (2026-07-27, PART1 decisión
+  4): RrhhEmployeeReadModule (hoja que NO importa nada) expone EXACTAMENTE
+  dos métodos con contrato ESTRUCTURAL de dos llaves { employeeId, fullName }
+  — listActiveLite (pickers; solo ACTIVO) y resolveNamesByIds (display;
+  CUALQUIER estado — un afectado DESVINCULADO conserva su nombre en la
+  historia; ids ajenos caen en silencio). Jamás rut/area/status/email — no
+  hay slot donde filtrarlos. Ampliar el contrato exige NUEVA firma fechada
+  en el header del service y acá.
+- Decisiones registradas (fechadas 2026-07-27, PART1): afectados = empleados
+  PROPIOS en V1 (externos = semilla). EDICIÓN Y BORRADO LIBRES en cualquier
+  estado (decisión 6, doctrina bitácora CAL-012) — el audit trigger es la
+  capa forense; caveat aceptado: borrar el último incidente del año libera
+  su número (INC-{YYYY}-{0000}, next = max+1; UUID + audit desambiguan; sin
+  tabla contador). Notificación GRAVE/FATAL a usuarios ADMIN por el PATH
+  FINO (createGeneric directo, precedente RRHH — sin cron, sin motor ops)
+  con SEMÁNTICA DE CLASE: entra a {GRAVE,FATAL} desde fuera → notifica;
+  GRAVE→GRAVE y GRAVE→FATAL (dentro de la clase) NO re-notifican.
+  sourceWorkPermitId = puntero blando SIN FK y SIN join en V1 (decisión 8:
+  WorkPermit.incidentsReported y este registro COEXISTEN sin join; picker =
+  semilla). Numeración con AÑO CHILENO (todayInSantiago, doctrina CAL-008b),
+  secuencia por empresa Y por año, computada dentro de la transacción del
+  create (precedente orderNumber).
+- DOCTRINA DE COEXISTENCIA (decisión 9, la clase ActivityArea↔AreaRRHH): un
+  EVENTO de capacitación HSEC (fecha + tema + relator + asistentes) ≠ un
+  acuse documental RRHH ('ODI', 'Inducción de seguridad', 'Certificado de
+  capacitación' — EmployeeDocumentType) ≠ una credencial con vencimiento
+  ('Inducción de seguridad', 'Uso de EPP' — CertificationType). Tres
+  superficies, tres naturalezas — NINGÚN ticket futuro las unifica o mapea
+  sin decisión expresa del fundador. Igual con la entrega física de EPP
+  (hsec_epp_deliveries) vs la etiqueta 'Entrega de EPP' documental.
+- DIAT interno-solamente (decisión 10): incidente + afectado cubren el core
+  DIAT (afectado, fecha/hora — occurredTime "HH:mm" string, doctrina CAL —,
+  lugar, descripción, lesión/parte del cuerpo); export DIAT/DIEP e
+  integración con la mutual = semillas V2.
+- Archivos: adjuntos de incidente = convención WorkPermit (Json max 5,
+  MinIO-or-blob base64, direccionados por id); planilla de capacitación y
+  acuse de entrega = slot ÚNICO con columnas Procedure-shaped nullable y
+  REEMPLAZO al re-subir (storeFile copy-adapt de employee-documents, citado
+  por archivo; lecturas prefieren el blob). Las respuestas de escritura van
+  SHAPED (fileData jamás viaja; hasFile derivado — regla HSEC-011).
+- Dashboard /hsec: conteos del MES CHILENO derivados EN VIVO al leer
+  (groupBy + counts; cero rollups, cero cron — precedente CAL-013), tarjetas
+  clickeables que aterrizan en las listas pre-filtradas vía searchParams
+  (inicialización validada de estado existente, idioma operaciones/alertas).
+- INVENTARIO DE HOJAS actualizado: RrhhEmployeeRead se suma — ahora SEIS
+  hojas import-nothing (RrhhBirthdayRead · RrhhAbsenceRead · OpsCalendarRead ·
+  ComercialCierresRead · AttributionRead · RrhhEmployeeRead). Grafo acíclico:
+  Hsec → hoja → nada; sin forwardRef.
+- Semillas V2 (HSEC): inspecciones + hallazgos/acciones como entidades ·
+  indicadores IF/IG/tasas (derivados, jamás almacenados) · comunidades ·
+  afectados externos · export DIAT/DIEP + integración mutual · acuse digital
+  de asistencia · "EPP vigente" por trabajador + vidas útiles + stock ·
+  picker/join sourceWorkPermitId · vínculo incidente↔activo · colecciones
+  HSEC en el calendario maestro (requiere NUEVA matriz de exposición firmada)
+  · comité paritario · faena (backlog global) · ampliaciones de lectura CASL
+  · extracción módulo-local de storeFile y date-utils (opcionales).
+
+Última actualización: 2026-07-30 (HSEC-011 — cierre del módulo)
+
 # Próximos pasos
 
 - Módulos V1 completos: Finanzas, Operaciones, RRHH, Comercial, Marketing,
@@ -807,7 +902,15 @@ ausencias, cierres* }` — \*`cierres` es la ÚNICA colección con llave GATED
 - Semillas V2 (Gestión de actividades): asignados múltiples (M2M) · política
   de corrección/borrado de notas · recordatorios de actividades atrasadas ·
   export semanal de la vista.
+- HSEC V1 COMPLETO (HSEC-000..011, live 2026-07-30) — detalle y matriz
+  firmada en el bloque del módulo arriba. Micro-tickets EN COLA: OPS-038
+  (persistir el evento procedure.acknowledgment-expired con aggregateId UUID
+  real — hoy compone un string procedureId:userId que emit() traga en
+  silencio) y PLAT-001 (SentryExceptionFilter debe superficiar los mensajes
+  de class-validator — hoy los arrays de constraints colapsan en "Bad
+  Request Exception"; hallazgo HSEC-008).
 - Manual de Comercial (V1 ya en producción).
+- Manual de HSEC (V1 ya en producción — se suma a los manuales pendientes).
 - Bump rutinario de dependencias (incorpora el fix de Next.js PR #88688,
   que elimina el warning dev-only "negative time stamp").
 - ROTACIÓN R2: credenciales nuevas operando en producción desde 2026-07-15;

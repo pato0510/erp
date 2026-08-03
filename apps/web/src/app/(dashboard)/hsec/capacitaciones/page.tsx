@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Paperclip, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { TrainingFormModal } from '../../../../components/hsec/TrainingFormModal';
-import { formatIncidentDate } from '../../../../components/hsec/incidentTypes';
+import { formatDbDate } from '../../../../components/hsec/incidentTypes';
 import type { RosterEntry } from '../../../../components/hsec/incidentTypes';
 import type { HsecTrainingType, TrainingListRow } from '../../../../components/hsec/trainingTypes';
 import {
@@ -220,7 +220,7 @@ function HsecCapacitacionesContent() {
                   </td>
                   <td className="px-3 py-2.5 font-medium text-[var(--text-primary)]">{r.topic}</td>
                   <td className="px-3 py-2.5 text-[var(--text-primary)]">
-                    {formatIncidentDate(r.date)}
+                    {formatDbDate(r.date)}
                     {r.time && (
                       <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-[var(--text-secondary)] dark:bg-white/10">
                         {r.time}
