@@ -913,6 +913,19 @@ migración hand-authored (template calendar_activity_notes).
 - Manual de HSEC (V1 ya en producción — se suma a los manuales pendientes).
 - Bump rutinario de dependencias (incorpora el fix de Next.js PR #88688,
   que elimina el warning dev-only "negative time stamp").
+- FASE 0 — PROVEEDOR SII VERIFICADO Y CERRADO (2026-08-03): tax*sync_runs
+  en producción tiene UN solo proveedor histórico, 'baseapi' — cero filas
+  'mock-sii' desde el primer run (2026-04-22) hasta hoy; 318 corridas, 300
+  exitosas, 2.059 documentos sincronizados, última corrida 2026-08-03
+  13:38. Barrido de huellas sobre tax_documents (2.046 filas): CERO en las
+  tres marcas del mock (metadata provider, prefijos SII-EMI-/SII-REC- en
+  externalId, RUT demo 76.123.456-7). La integración corre contra BaseAPI
+  real y la data fiscal está limpia. TAX-001 (2026-08-03) eliminó el
+  DEFAULT 'mock-sii' de la columna: sin default y con NOT NULL, un INSERT
+  crudo que omita provider ahora FALLA en vez de rotular data real como
+  mock. Doctrina: BaseAPI = sync SII (BASEAPI_KEY / SII_RUT /
+  SII_PASSWORD); LibreDTE = test de conexión por certificado
+  (LIBREDTE*\*) — jobs distintos, no confundir las llaves.
 
 - DECISIÓN DE POLÍTICA (2026-07-15, fundador): VIEWER es un rol de lectura
   financiera POR DISEÑO — mantiene read sobre Movement/caja/compromisos,

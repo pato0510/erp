@@ -56,7 +56,11 @@ model TaxSyncRun {
   companyId       String            @db.Uuid
   fiscalPeriodId  String?           @db.Uuid
   status          SyncStatus        @default(PENDING)
-  provider        String            @default("mock-sii")
+  // TAX-001 — NO @default on purpose. TaxService always supplies `provider`
+  // explicitly (baseapi), so no app path needs a default; a raw INSERT that
+  // omits it must FAIL LOUDLY (NOT NULL violation) rather than silently label
+  // real fiscal data as 'mock-sii'. FASE 0 verified prod is 100% baseapi.
+  provider        String
   direction       DocumentDirection
   startedAt       DateTime          @default(now())
   completedAt     DateTime?
