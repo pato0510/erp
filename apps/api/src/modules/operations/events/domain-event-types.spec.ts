@@ -7,6 +7,7 @@ import {
   aggregateTypeForEvent,
   ComercialOpportunityWonEvent,
   EVENT_TYPES,
+  ProcedureAcknowledgmentExpiredEvent,
 } from './domain-event-types';
 
 const event: ComercialOpportunityWonEvent = {
@@ -41,5 +42,25 @@ describe('COM-013b — comercial.opportunity-won registry entry', () => {
 
   it('is registered in EVENT_TYPES', () => {
     expect(EVENT_TYPES).toContain('comercial.opportunity-won');
+  });
+
+  /* OPS-038 — pins the formerly guilty case itself: aggregateId is the acknowledgment
+     row's own UUID PK, never the procedureId:userId composite that made emit() swallow
+     every row since OPS-032. */
+  it('aggregateIdForEvent(acknowledgment-expired) → the acknowledgmentId verbatim (never a composite string)', () => {
+    const ackEvent: ProcedureAcknowledgmentExpiredEvent = {
+      type: 'procedure.acknowledgment-expired',
+      companyId: 'c1',
+      acknowledgmentId: '66666666-7777-8888-9999-aaaaaaaaaaaa',
+      procedureId: 'p1',
+      procedureCode: 'PROC-001',
+      procedureTitle: 'Procedimiento de prueba',
+      userId: 'u1',
+      userEmail: 'user@excelsia.dev',
+      occurredAt: '2026-08-03T12:00:00.000Z',
+    };
+    const id = aggregateIdForEvent(ackEvent);
+    expect(id).toBe('66666666-7777-8888-9999-aaaaaaaaaaaa');
+    expect(id).not.toContain(':'); // the composite landmine, pinned on the case that had it
   });
 });

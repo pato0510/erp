@@ -103,12 +103,16 @@ export interface PermitRenewalImminentEvent {
 /** A pending procedure acknowledgment passed its dueDate without
  *  the user signing.
  *  Emitted by: AcknowledgmentsService.processExpiredForAllCompanies.
- *  Aggregate: ProcedureAcknowledgment
+ *  Aggregate: ProcedureAcknowledgment (aggregateId = acknowledgmentId,
+ *  the row's own UUID PK — OPS-038; the earlier composite
+ *  procedureId:userId string made emit() swallow every row).
  *  Consumed by: Finance OPS-033 → currently no-op (logged for
  *  compliance dashboards). */
 export interface ProcedureAcknowledgmentExpiredEvent {
   type: 'procedure.acknowledgment-expired';
   companyId: string;
+  /** The acknowledgment row's own UUID PK — the aggregate identity. */
+  acknowledgmentId: string;
   procedureId: string;
   procedureCode: string;
   procedureTitle: string;
@@ -230,9 +234,13 @@ export function aggregateIdForEvent(event: OperationsDomainEvent): string {
     case 'work-permit.closed':
       return event.workPermitId;
     case 'procedure.acknowledgment-expired':
-      /* Compose a stable key — no single id identifies a per-user
-         per-procedure acknowledgment in the event surface. */
-      return `${event.procedureId}:${event.userId}`;
+      /* OPS-038 — the acknowledgment row's own UUID PK. The original composite
+         `${procedureId}:${userId}` violated the rule below: aggregateId is a
+         @db.Uuid column, so a composite STRING makes emit() silently swallow
+         the row — every emission since OPS-032 persisted nothing. General
+         landmine for future event authors: aggregateId must ALWAYS be a real
+         UUID, never a composed string. */
+      return event.acknowledgmentId;
     case 'operational.cost':
       return event.sourceId;
     case 'comercial.opportunity-won':

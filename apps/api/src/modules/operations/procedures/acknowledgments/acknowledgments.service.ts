@@ -485,6 +485,8 @@ export class AcknowledgmentsService {
           await this.domainEvents.emit({
             type: 'procedure.acknowledgment-expired',
             companyId: c.companyId,
+            // OPS-038 — the row's own UUID PK is the aggregate identity.
+            acknowledgmentId: c.id,
             procedureId: c.procedureId,
             procedureCode: proc?.code ?? '?',
             procedureTitle: proc?.title ?? '?',
