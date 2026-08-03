@@ -913,10 +913,7 @@ migración hand-authored (template calendar_activity_notes).
 - Manual de HSEC (V1 ya en producción — se suma a los manuales pendientes).
 - Bump rutinario de dependencias (incorpora el fix de Next.js PR #88688,
   que elimina el warning dev-only "negative time stamp").
-- ROTACIÓN R2: credenciales nuevas operando en producción desde 2026-07-15;
-  REVOCACIÓN DEL TOKEN VIEJO SIN CONFIRMAR por el fundador — hasta
-  confirmación, la credencial expuesta debe asumirse viva. Pendiente:
-  confirmar revocación en Cloudflare.
+
 - DECISIÓN DE POLÍTICA (2026-07-15, fundador): VIEWER es un rol de lectura
   financiera POR DISEÑO — mantiene read sobre Movement/caja/compromisos,
   montos incluidos (herencia deliberada de la era Finanzas, confirmada con
@@ -928,3 +925,5 @@ migración hand-authored (template calendar_activity_notes).
   gasto↔Movement (link movementId); APIs de ads/analytics (Google,
   LinkedIn) + crawler SEO; notificaciones de marketing por path fino
   propio (precedente RRHH, no el motor de alertas de Operaciones).
+- ROTACIÓN R2 CERRADA (2026-08-03): token nuevo creado con permiso Object Read & Write acotado al bucket; swap de MINIO_ACCESS_KEY + MINIO_SECRET_KEY en una sola edición del servicio api; verificado con subida nueva (filePath no nulo), descarga nueva y descarga de objeto PREVIO a la rotación; token viejo REVOCADO y re-verificado post-revocación. La credencial expuesta ya NO se considera viva. Ítem de seguridad cerrado.
+- NOTA DE ENTORNO: las credenciales de Cloudflare R2 en producción viven bajo nombres MINIO*\* (MINIO_ENDPOINT / MINIO_ACCESS_KEY / MINIO_SECRET_KEY / MINIO_BUCKET / MINIO_PORT=443 / MINIO_USE_SSL=true). NO existen variables R2*\*: storage.service.ts es un cliente S3 único para MinIO local y R2 productivo (region 'auto', forcePathStyle, ver comentarios del constructor). Solo el servicio api las tiene — web y CI no.
