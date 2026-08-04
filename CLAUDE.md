@@ -884,6 +884,148 @@ migración hand-authored (template calendar_activity_notes).
 
 Última actualización: 2026-08-03 (HSEC-011 — cierre del módulo)
 
+═══════════════════════════════════════════════════════════════════
+
+# 🔒 ARCO DE HARDENING — AISLAMIENTO DE TENANT (ABIERTO)
+
+═══════════════════════════════════════════════════════════════════
+
+Status: arco **ABIERTO**. Nace de una pregunta con fecha: producción tiene UNA
+sola empresa, así que nada de esto es explotable hoy — la pregunta es qué debe
+ser verdad ANTES de dar de alta al segundo cliente.
+Ledger: HARDEN-000 (recon read-only, 17269d6) · DOC-PERMS-001 (matriz de
+permisos de plataforma, a707e8f) · HARDEN-001 (gateó los 9 endpoints abiertos
+del dashboard de Operaciones, 18d7473) · HARDEN-002 (gateó los 4 del calendario
+de Operaciones y REGISTRÓ el PoliciesGuard que faltaba, 66e7758) ·
+DOC-HARDEN-001 (correcciones de documentación, 2026-08-04).
+PENDIENTES: **HARDEN-003** (recon read-only del switch de rol de base de datos)
+y **HARDEN-004** (el switch en sí — el deploy de mayor riesgo del proyecto).
+Docs: docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING.md (contrato VIVO del arco) ·
+docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
+
+- **LAS DOS CAPAS, NUNCA UNA.** El poder real de un rol es la INTERSECCIÓN de
+  (a) su ability CASL y (b) si el endpoint efectivamente pregunta. Una matriz
+  construida solo sobre (a) está equivocada justo donde importa: trece endpoints
+  shipearon con una historia CASL impecable y CERO gate. PoliciesGuard falla
+  ABIERTO — devuelve true cuando el handler no lleva @CheckPolicies
+  (policies.guard.ts:19) y lo hace ANTES del chequeo de usuario, ANTES del
+  chequeo de x-company-id y ANTES del lookup de membresía, así que un handler sin
+  gate corre con CERO validación de tenant. Y está registrado POR CONTROLADOR vía
+  @UseGuards, NO globalmente (el único APP_GUARD es el ThrottlerGuard,
+  app.module.ts:96-99): sobre un controlador que solo lleva
+  @UseGuards(JwtAuthGuard), agregar @CheckPolicies NO HACE NADA — ningún guard lo
+  lee. **Los dos deben estar presentes.** Lección pagada en HARDEN-002.
+- **IDENTIDAD DE TENANT DESDE UN HEADER DEL CLIENTE.** TenantMiddleware
+  (rls.middleware.ts) y el decorador @CurrentCompany (current-company.decorator.ts)
+  toman x-company-id CRUDO, sin validar. El ÚNICO lugar donde la membresía se
+  verifica es dentro de PoliciesGuard (policies.guard.ts:33-38) — que se saltea en
+  rutas sin gate. Ergo: ungated + @CurrentCompany = cualquier autenticado puede
+  nombrar cualquier empresa.
+- **REGLA STEP 0 (corregida 2026-08-04).** Antes de gatear cualquier endpoint, la
+  pregunta NO es "¿se rompe VIEWER?" sino: **para los SEIS roles, ¿la ability dice
+  que sí sobre este Subject?**. Hay DOS mecanismos independientes que dejan un rol
+  afuera: (1) VIEWER por ENUMERACIÓN — no tiene read all, así que un Subject que
+  nadie le otorgue explícitamente es "—" por construcción (por eso HARDEN-001 y
+  HARDEN-002 necesitaron exactamente un grant cada uno,
+  casl-ability.factory.ts:772 y :779); y (2) MANAGER/ACCOUNTANT/ANALYST por el
+  PISO default-deny (SUBJECTS.forEach(s => cannot('read', s)) — patrón COM-001 /
+  MKT-001 / HSEC-001) cuando el re-grant no viene DESPUÉS del piso, por
+  last-rule-wins. Corolario de nomenclatura, ya casi una trampa:
+  OperationsCalendarSubject (:177) NO pertenece a CALENDARIO_SUBJECTS (:370, que
+  es CalendarActivity + ActivityArea), así que los pisos de Calendario
+  (:615/:683/:718) no lo tocan — leer el ARRAY, jamás el nombre.
+- **ESTADO RLS EN RUNTIME: POLÍTICAS INERTES.** 87 políticas sobre 90 tablas de
+  negocio (ENABLE y CREATE POLICY son un 1:1 perfecto en 87 cada uno), 3 sin
+  política (users, tenants, audit_logs — NINGUNA con columna companyId; audit_logs
+  se scopea por tenantId y es un sumidero cross-tenant en reposo, gap propio), y
+  **0 FORCE**. La app conecta como postgres (superusuario + BYPASSRLS), así que
+  las 87 políticas están INERTES en runtime. app_user existe (creado en
+  20260417171836_add_rls_policies:27-31), rolsuper=false, rolbypassrls=false, y
+  NUNCA se enchufó — no hay SET ROLE ni SET SESSION AUTHORIZATION en todo
+  apps/api/src. Como app_user NO es dueño de las tablas, **ENABLE alcanza — FORCE
+  no hace falta** (FORCE solo importa para que el DUEÑO de una tabla no saltee sus
+  propias políticas). La pieza que falta para aislamiento real YA EXISTE; solo
+  nunca se enchufó.
+- **"RLS ES EL RESPALDO" ES FALSO** (transversal). Varios controladores
+  justificaban dejar lecturas abiertas con un comentario que decía, en efecto,
+  "igual RLS scopea los datos a la empresa". Es falso en runtime por TRES razones
+  independientes: el rol de conexión bypassa RLS; RLS es ENABLE y no FORCE; y
+  varias de esas lecturas pegan contra VISTAS MATERIALIZADAS, que PostgreSQL no
+  puede someter a RLS. Donde vuelva a aparecer ese comentario, es BANDERA ROJA, no
+  justificación: el chequeo de membresía es la única frontera de tenant en esas
+  superficies.
+- **EL SWITCH DE ROL NO VUELVE REDUNDANTE A HARDEN-001/002.** Las 4 vistas
+  materializadas del dashboard seguirán sin poder llevar política pase lo que
+  pase con el rol de conexión, así que su frontera de tenant sigue siendo el
+  @CheckPolicies (el chequeo de membresía) MÁS el WHERE company_id = $1::uuid
+  explícito de la capa de aplicación. Ningún ticket futuro debe retirar esos
+  gates "porque ahora RLS funciona".
+- **TRAMPA DEL POOL (doctrina — leer antes de "arreglar" nada).** Setear
+  rls.company_id UNA vez por request, SIN LOCAL, sobre una conexión pooleada deja
+  la GUC PEGADA en esa conexión, y se la come el request siguiente — que puede ser
+  de otra empresa. El atajo obvio fabrica exactamente la fuga cross-tenant que el
+  arco viene a cerrar. **Solo SET LOCAL, siempre dentro de la transacción**, que es
+  lo que hace RlsService.executeWithRls (rls.service.ts:22-33: abre
+  prisma.$transaction y setea rls.company_id, audit.company_id y — con userId —
+  audit.user_id y rls.user_id; SET LOCAL muere en el COMMIT). Nota de higiene ya
+  registrada: esos SET LOCAL interpolan el valor como string en $executeRawUnsafe
+  en vez de bindearlo — superficie de inyección si alguna vez llega un valor sin
+  validar.
+- **ANÁLISIS NO VERIFICADO EN RUNTIME (marcado como tal, 2026-08-04).**
+  memberships y companies SÍ tienen política RLS
+  (20260417171836_add_rls_policies:13-22), y PoliciesGuard resuelve la membresía
+  con un prisma.membership.findUnique PELADO, fuera de executeWithRls y fuera de
+  toda transacción (policies.guard.ts:33-35), es decir SIN la GUC seteada.
+  Consecuencia ESPERADA bajo app_user: TODO endpoint gateado devolvería 403 'No
+  active membership for this company' para los SEIS roles — cerrado con llave, no
+  degradado en silencio, y con un mensaje que CULPA a la membresía cuando la causa
+  real es la GUC ausente. Los endpoints NO gateados degradarían al modo OPUESTO:
+  lectura ciega, cero filas, sin error. **Los dos modos conviven** y hay que
+  esperarlos juntos. A VERIFICAR en HARDEN-003 — es análisis, no evidencia.
+- **CREDENCIAL DE app_user NO PROBADA.** La migración hace CREATE ROLE app_user
+  LOGIN **sin cláusula PASSWORD** (20260417171836_add_rls_policies:29) y no hay
+  ningún otro punto de aprovisionamiento en las 77 migraciones. rolcanlogin=true
+  dice que el CATÁLOGO lo permite, no que exista una contraseña funcionando.
+  Fijarla es escritura de producción: acción del FUNDADOR en HARDEN-004, jamás de
+  un recon.
+- **HUECOS DE GRANT conocidos.** El GRANT SELECT/INSERT/UPDATE/DELETE ON ALL
+  TABLES IN SCHEMA public (20260417171836_add_rls_policies:33) es una FOTO del
+  2026-04-17: no alcanza a nada creado después. El ALTER DEFAULT PRIVILEGES (:34)
+  cubre solo objetos creados POR EL ROL que lo ejecutó y solo la clase TABLES — no
+  SEQUENCES, no FUNCTIONS, no USAGE de schema. Y existe UNA sola concesión de
+  secuencia en todo el árbol de migraciones (work_permit_number_seq, en
+  20260428240000_add_work_permits). Inventariar tabla por tabla es el ítem 1 de
+  HARDEN-003.
+- **DEUDA DE SUSTRATO DE PRUEBA.** seed.ts crea UNA sola empresa y CINCO de los
+  seis roles (admin/manager/accountant/analyst/viewer@excelsia.dev, con el rol en
+  la Membership; **falta SUPER_ADMIN**), y los cuatro no-admin están detrás de
+  NODE_ENV !== 'production' (seed.ts:84). La empresa ajena "HARDEN-001 Foreign Co"
+  que sostuvo las pruebas BEFORE/AFTER del arco existe SOLO como fila en una base
+  local: el string aparece únicamente en el handoff, en NINGÚN spec, seed ni
+  migración. SECURITY_AUDIT.md nombra otro fixture ("Empresa Test") igual de
+  inexistente. **La prueba cross-tenant no es reproducible desde el repo** —
+  precondición pendiente de decisión del fundador para HARDEN-004.
+- **UNGATED VIVOS: 15 handlers** (6 públicos legítimos + 9 en revisión), tras
+  cerrar 4 en HARDEN-002. Inventario en docs/MATRIZ-DE-PERMISOS.md §4, CON LA
+  SALVEDAD de que su conteo de 19 y sus hallazgos D1 (calendario abierto) y D4
+  (SECURITY_AUDIT.md sin corregir) son ANTERIORES a HARDEN-002 y quedaron viejos.
+  Entre los 9 vivos: operations/health y health/crons (D3, info-leak de
+  infraestructura a cualquier autenticado de cualquier empresa) siguen esperando
+  decisión.
+- **PRECEDENCIA.** Los docs de recon y auditoría en docs/ son FOTOS FECHADAS del
+  día en que se escribieron y **no se retro-editan** (HARDENING-RECON.md y
+  MATRIZ-DE-PERMISOS.md, congelados). Sus derivas se registran ACÁ. El handoff
+  docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING.md es la excepción: es contrato VIVO y
+  sí se corrige. Donde cualquiera de ellos discrepe con este archivo, **manda
+  CLAUDE.md**.
+- **JUICIO (la lección del arco).** Cada hallazgo serio salió de NO confiarle a un
+  documento: el "app_user tiene BYPASSRLS" resultó falso; el "RLS scopea los
+  datos" resultó falso; y una auditoría que decía "revisé todos los controladores
+  de operaciones" nunca había visto el controlador del calendario. Leer el código.
+  Después decidir.
+
+Última actualización: 2026-08-04 (DOC-HARDEN-001 — correcciones de documentación)
+
 # Próximos pasos
 
 - Módulos V1 completos: Finanzas, Operaciones, RRHH, Comercial, Marketing,
@@ -903,12 +1045,21 @@ migración hand-authored (template calendar_activity_notes).
   de corrección/borrado de notas · recordatorios de actividades atrasadas ·
   export semanal de la vista.
 - HSEC V1 COMPLETO (HSEC-000..011, live 2026-08-03) — detalle y matriz
-  firmada en el bloque del módulo arriba. Micro-tickets EN COLA: OPS-038
-  (persistir el evento procedure.acknowledgment-expired con aggregateId UUID
-  real — hoy compone un string procedureId:userId que emit() traga en
-  silencio) y PLAT-001 (SentryExceptionFilter debe superficiar los mensajes
-  de class-validator — hoy los arrays de constraints colapsan en "Bad
-  Request Exception"; hallazgo HSEC-008).
+  firmada en el bloque del módulo arriba. Micro-tickets CERRADOS (2026-08-03):
+  OPS-038 — el evento procedure.acknowledgment-expired componía un string
+  procedureId:userId contra una columna @db.Uuid, así que emit() se tragaba
+  cada fila en silencio desde OPS-032; hoy el aggregateId es el UUID PK propio
+  del acuse (acknowledgments.service.ts:488-489 —
+  "// OPS-038 — the row's own UUID PK is the aggregate identity." +
+  acknowledgmentId: c.id; el campo en domain-event-types.ts:115 y su resolución
+  en :243), PINEADO contra regresión en domain-event-types.spec.ts:47-50 (el
+  caso culpable, con assert de que el id nunca contiene ':'). PLAT-001 — el
+  SentryExceptionFilter solo leía exception.message, así que los mensajes de
+  class-validator colapsaban en "Bad Request Exception" a nivel PLATAFORMA
+  (hallazgo HSEC-008); hoy lee getResponse() (sentry-exception.filter.ts:38) y
+  une los arrays de constraints con ' · ' (:46), dejando el path de string
+  byte-idéntico. Deuda registrada: el filtro sigue SIN spec (tres ramas:
+  string, string[], no-HttpException) — crear una cuando se lo toque.
 - Manual de Comercial (V1 ya en producción).
 - Manual de HSEC (V1 ya en producción — se suma a los manuales pendientes).
 - Bump rutinario de dependencias (incorpora el fix de Next.js PR #88688,

@@ -172,11 +172,36 @@ These were observed while running `nx lint api` and confirmed not introduced by 
 
 Reviewed every operations controller. No missing guards, no missing CASL policies on writes, no controller exposing a service method that bypasses `executeWithRls`. The public scan endpoint is rate-limited and returns deliberately limited data.
 
+> **CORRECTION (DOC-HARDEN-001, 2026-08-04).** This verdict was **false**, and the
+> claim "reviewed every operations controller" is exactly why: the review never
+> reached `operations/calendar/operations-calendar.controller.ts`. That controller
+> carried `@UseGuards(JwtAuthGuard)` **only — no `PoliciesGuard`** — and four
+> **ungated, company-scoped** GETs (`/events`, `/events/by-date`, `/month-summary`,
+> `/export`), each taking `@CurrentCompany()` straight from the raw `x-company-id`
+> header. So any authenticated user could read another company's operations calendar
+> by changing one header, and `GET /export` handed it over as a **downloadable
+> `.ics` file** to a non-member. Found by the 94-controller sweep of
+> **DOC-PERMS-001** (`docs/MATRIZ-DE-PERMISOS.md` §4/§6 D1), closed by
+> **HARDEN-002** — see "Calendar reads" above. Two lessons stand: a "reviewed
+> everything" verdict needs a per-file list to be checkable, and a `@CheckPolicies`
+> is **inert** unless the controller also registers `PoliciesGuard`.
+
 ### Suggestions for V2
 
 - Extract a `WithRls` decorator to enforce `executeWithRls` is called inside service methods that take `(companyId, userId)`.
 - Add an integration test that fails CI if any controller adds a write endpoint without `@CheckPolicies`.
 - Tighten the `app_user` Postgres role to remove `BYPASSRLS` once migrations are routed through a separate migrator account.
+
+  > **CORRECTION (DOC-HARDEN-001, 2026-08-04).** The first half is **false and
+  > dangerous to design on**: a `pg_roles` query run on 2026-08-04 returned
+  > `app_user` with `rolsuper=false` and `rolbypassrls=false`. **`app_user` has
+  > never held `BYPASSRLS`** — there is nothing to tighten. The role that does
+  > bypass is the one the app actually connects as (`postgres`, superuser), which is
+  > why the 87 policies are inert at runtime; and because `app_user` does not own the
+  > tables, `ENABLE` is sufficient — `FORCE` is not required. The **second half is
+  > still live work**: routing migrations through a separate migrator account, so the
+  > runtime role holds no DDL rights, is item 5 of
+  > `docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING.md` §5.1 (HARDEN-003).
 
 ---
 

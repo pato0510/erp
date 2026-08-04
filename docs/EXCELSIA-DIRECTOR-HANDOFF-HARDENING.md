@@ -161,7 +161,11 @@ never been plugged in.**
 
 ### 3.7 RLS coverage and its holes
 
-- 90 business tables carry a policy, 1:1 with `ENABLE`.
+- **87 of 90** business tables carry a policy — `ENABLE ROW LEVEL SECURITY` and
+  `CREATE POLICY` are a perfect 1:1 set at **87 each**, and `FORCE` appears **zero**
+  times anywhere. None of the 3 remaining tables has a `companyId` column to scope
+  on (`audit_logs` carries `tenantId` instead), which is why the gap below needs a
+  design and not a copy-pasted policy.
 - 3 tables have none: `users`, `tenants` (no `companyId` column, by nature) and
   **`audit_logs`** — which stores `oldData`/`newData` for every company with no
   isolation. That is a real gap needing its own design.
@@ -231,10 +235,14 @@ whole product.
 
 The recon must answer, with `file:line` citations and migration greps:
 
-1. **GRANT inventory** — for all 90 policied tables plus sequences and the 4
-   materialized views: does `app_user` hold SELECT/INSERT/UPDATE/DELETE? Name every
-   gap. (Every table migration since the house template includes a 4-verb GRANT —
-   verify the _older_ tables specifically.)
+1. **GRANT inventory** — for the **87 policied tables** (of 90 business tables), plus
+   sequences and the 4 materialized views: does `app_user` hold
+   SELECT/INSERT/UPDATE/DELETE? Name every gap. (Every table migration since the
+   house template includes a 4-verb GRANT — verify the _older_ tables specifically.)
+   **The 3 policy-less tables are in scope for this inventory too**: `users`,
+   `tenants` and `audit_logs` carry no policy, but `app_user` still needs the GRANT
+   to read them at all — and login, tenancy resolution and the audit trigger all
+   depend on them.
 2. **Where `rls.company_id` is set** — quote `RlsService.executeWithRls` exactly:
    what it sets, on which connection, and whether the setting survives outside the
    transaction (`SET LOCAL` does not).
