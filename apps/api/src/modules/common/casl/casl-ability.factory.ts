@@ -751,6 +751,15 @@ export class CaslAbilityFactory {
         /* OPS-028 — VIEWER can acknowledge their own readings.
            Coverage dashboards stay gated by the service. */
         can(['read', 'acknowledge'], ProcedureAcknowledgmentSubject);
+        /* HARDEN-001 (2026-08-03) — VIEWER reads the Operations dashboard. The
+           nine dashboard endpoints gained @CheckPolicies('read',
+           OperationsDashboardSubject) to restore the membership check; VIEWER
+           has no blanket `read all`, so without this explicit grant it would be
+           locked out of the module landing page it has always reached. Purely
+           ADDITIVE grant-by-enumeration (no floor on this subject) — the
+           COM-002/CalendarActivity idiom. Read only; `manage` (refresh-views)
+           stays ADMIN/SUPER_ADMIN. */
+        can('read', OperationsDashboardSubject);
         /* COM-013 — VIEWER gets NO read on ServiceOrderSubject: service orders carry
            contract money amounts and VIEWER never sees monetary values. VIEWER has no
            blanket `read all`, so simply granting nothing here is the revoke. */

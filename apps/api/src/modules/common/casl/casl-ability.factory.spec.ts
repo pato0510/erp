@@ -21,6 +21,7 @@ import {
   HsecIncidentSubject,
   HsecTrainingSubject,
   JobPositionSubject,
+  OperationsDashboardSubject,
   OpportunitySubject,
   QuoteSubject,
   SalaryRecordSubject,
@@ -236,5 +237,46 @@ describe('CaslAbilityFactory — HSEC shell floor + MANAGER grants (HSEC-001)', 
     expect(factory.defineAbilityFor(UserRole.SUPER_ADMIN).can('manage', HsecIncidentSubject)).toBe(
       true,
     );
+  });
+});
+
+/* HARDEN-001 (2026-08-03) — the nine Operations dashboard read endpoints are now
+ * gated on `read OperationsDashboardSubject`. This pins that EVERY role keeps read
+ * access (so the gate never locks anyone out of the module landing page) while
+ * `manage` (refresh-views) stays ADMIN/SUPER_ADMIN only. VIEWER's read comes from
+ * the explicit grant added in the same change. */
+describe('CaslAbilityFactory — Operations dashboard gate (HARDEN-001)', () => {
+  const factory = new CaslAbilityFactory();
+  const ALL_ROLES = [
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.ACCOUNTANT,
+    UserRole.ANALYST,
+    UserRole.VIEWER,
+  ];
+
+  it('every role can READ OperationsDashboardSubject (no role is locked out)', () => {
+    for (const role of ALL_ROLES) {
+      expect(factory.defineAbilityFor(role).can('read', OperationsDashboardSubject)).toBe(true);
+    }
+  });
+
+  it('VIEWER reads the dashboard but cannot MANAGE it (refresh-views stays admin-only)', () => {
+    const v = factory.defineAbilityFor(UserRole.VIEWER);
+    expect(v.can('read', OperationsDashboardSubject)).toBe(true);
+    expect(v.can('manage', OperationsDashboardSubject)).toBe(false);
+  });
+
+  it('only ADMIN/SUPER_ADMIN can MANAGE OperationsDashboardSubject (refresh-views)', () => {
+    expect(factory.defineAbilityFor(UserRole.ADMIN).can('manage', OperationsDashboardSubject)).toBe(
+      true,
+    );
+    expect(
+      factory.defineAbilityFor(UserRole.SUPER_ADMIN).can('manage', OperationsDashboardSubject),
+    ).toBe(true);
+    for (const role of [UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.ANALYST, UserRole.VIEWER]) {
+      expect(factory.defineAbilityFor(role).can('manage', OperationsDashboardSubject)).toBe(false);
+    }
   });
 });
