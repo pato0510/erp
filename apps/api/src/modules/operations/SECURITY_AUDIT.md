@@ -98,7 +98,7 @@ Every state-changing endpoint gated. `WorkPermitSubject` has the richest action 
 
 ### Operations Dashboard MV refresh (OPS-034)
 
-`manage` on `OperationsDashboardSubject` for `POST /dashboard/refresh-views` (ADMIN-only). Read endpoints stay open.
+`manage` on `OperationsDashboardSubject` for `POST /dashboard/refresh-views` (ADMIN-only). **CORRECTION (HARDEN-001, 2026-08-03):** the nine dashboard read endpoints are NO LONGER open — they now carry `@CheckPolicies((a) => a.can('read', OperationsDashboardSubject))`, so `PoliciesGuard` runs the membership check. Read stays granted to every role by CASL (VIEWER via an explicit grant).
 
 ### Audit packages (OPS-036)
 
@@ -109,13 +109,26 @@ Every state-changing endpoint gated. `WorkPermitSubject` has the richest action 
 
 ---
 
-## Endpoints WITHOUT `@CheckPolicies` (read-only, all authenticated roles)
+## Endpoints WITHOUT `@CheckPolicies`
 
-These are intentionally open to every authenticated user in the company. RLS scopes the data to their company; the absence of a policy is documented per controller.
+> **CORRECTION (HARDEN-000/001/002, 2026-08-03/04).** The original claim here —
+> "intentionally open to every authenticated user in the company; RLS scopes the
+> data to their company" — was **false on two counts** and has been fixed:
+> (1) the dashboard reads (HARDEN-001) and the calendar reads (HARDEN-002) are now
+> GATED, so `PoliciesGuard` performs the membership check; (2) **RLS does not scope
+> the data at runtime** — the DB connection role bypasses RLS (BYPASSRLS/superuser)
+> and RLS is `ENABLE`-only, not `FORCE` (see `docs/HARDENING-RECON.md`). RLS is not
+> a backstop; `@CheckPolicies` is the tenant boundary. The remaining ungated
+> handlers (health, notifications, public-QR) are inventoried in
+> `docs/MATRIZ-DE-PERMISOS.md` §4.
 
-### Dashboard reads (`/operations/dashboard/*`)
+### Dashboard reads (`/operations/dashboard/*`) — GATED since HARDEN-001
 
-`GET /overview`, `/action-items`, `/upcoming-events`, `/top-assets-at-risk`, `/recent-activity`, `/my-tasks`, `/asset-distribution`, `/compliance-by-category`, `/freshness`. **Justification:** the dashboard is the module's landing page and must render for VIEWER through ADMIN. The data exposed is the per-company aggregate that every per-feature page already shows in detail.
+`GET /overview`, `/action-items`, `/upcoming-events`, `/top-assets-at-risk`, `/recent-activity`, `/my-tasks`, `/asset-distribution`, `/compliance-by-category`, `/freshness` now each carry `@CheckPolicies((a) => a.can('read', OperationsDashboardSubject))`. They still render for VIEWER through ADMIN (read granted to every role), but a caller with no membership in the target company gets **403** instead of that company's data.
+
+### Calendar reads (`/operations/calendar/*`) — GATED since HARDEN-002 (2026-08-04)
+
+`GET /events`, `/events/by-date`, `/month-summary`, `/export` now carry `@CheckPolicies((a) => a.can('read', OperationsCalendarSubject))`, and `PoliciesGuard` was added to the controller's `@UseGuards` (it was `JwtAuthGuard`-only before, so a policy alone would not have run). Before HARDEN-002 these were ungated and company-scoped via the raw `x-company-id` header — `GET /export` in particular streamed another company's calendar as a downloadable `.ics` to any authenticated non-member. Read stays granted to every role (VIEWER via an explicit grant); a non-member now gets **403**.
 
 ### Health (`/operations/health`, `/operations/health/crons`)
 
@@ -185,7 +198,7 @@ Run before declaring the module ready for new clients. Not automated — require
 2. **Logout, login as User B.** localStorage `selectedCompanyId` should now point to Company B.
 3. **Try cross-tenant reads:**
    - `GET /api/operations/assets/<X>` with `x-company-id: <B>` → expected **404** (asset belongs to A; B can't see it).
-   - `GET /api/operations/dashboard/overview` with `x-company-id: <B>` → expected to return **only Company B's data** (zero assets if B is fresh).
+   - `GET /api/operations/dashboard/overview` with `x-company-id: <B>` → **CORRECTION (HARDEN-001):** now expected **403 "No active membership for this company"** when B is a company the caller is not a member of (the read is gated; the old "returns only B's data" behavior was the cross-tenant leak this closed). Same for `GET /api/operations/calendar/export` (HARDEN-002).
    - `GET /api/operations/public/asset/<A's qrToken>/authenticated` → expected **404** (qrToken exists but the asset isn't in Company B).
 4. **Try header-spoofing as User B:**
    - `GET /api/operations/assets` with `x-company-id: <A>` → expected **403 Forbidden** ("No active membership for this company") from `PoliciesGuard.canActivate`.

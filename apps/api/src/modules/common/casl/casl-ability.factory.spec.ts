@@ -21,6 +21,7 @@ import {
   HsecIncidentSubject,
   HsecTrainingSubject,
   JobPositionSubject,
+  OperationsCalendarSubject,
   OperationsDashboardSubject,
   OpportunitySubject,
   QuoteSubject,
@@ -278,5 +279,33 @@ describe('CaslAbilityFactory — Operations dashboard gate (HARDEN-001)', () => 
     for (const role of [UserRole.MANAGER, UserRole.ACCOUNTANT, UserRole.ANALYST, UserRole.VIEWER]) {
       expect(factory.defineAbilityFor(role).can('manage', OperationsDashboardSubject)).toBe(false);
     }
+  });
+});
+
+/* HARDEN-002 (2026-08-04) — the four Operations calendar read endpoints are now gated
+ * on `read OperationsCalendarSubject` (and PoliciesGuard was added to the controller).
+ * Pins that EVERY role keeps read access — no role loses the calendar. There is no
+ * `manage`/write on this subject (the calendar is read-only). */
+describe('CaslAbilityFactory — Operations calendar gate (HARDEN-002)', () => {
+  const factory = new CaslAbilityFactory();
+  const ALL_ROLES = [
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.ACCOUNTANT,
+    UserRole.ANALYST,
+    UserRole.VIEWER,
+  ];
+
+  it('every role can READ OperationsCalendarSubject (no role is locked out)', () => {
+    for (const role of ALL_ROLES) {
+      expect(factory.defineAbilityFor(role).can('read', OperationsCalendarSubject)).toBe(true);
+    }
+  });
+
+  it('VIEWER reads the calendar via its explicit grant (no blanket read-all)', () => {
+    expect(factory.defineAbilityFor(UserRole.VIEWER).can('read', OperationsCalendarSubject)).toBe(
+      true,
+    );
   });
 });

@@ -34,6 +34,7 @@ type Subjects =
       | typeof DomainEventSubject
       | typeof CommitmentTemplateSubject
       | typeof OperationsDashboardSubject
+      | typeof OperationsCalendarSubject
       | typeof AuditPackageSubject
       | typeof ServiceOrderSubject
       | typeof EmployeeSubject
@@ -167,6 +168,14 @@ class CommitmentTemplateSubject {
    only ADMIN/SUPER_ADMIN have it via `manage all`. */
 class OperationsDashboardSubject {
   static readonly modelName = 'OperationsDashboard' as const;
+}
+/* HARDEN-002 (2026-08-04) — the Operations calendar read feed (OPS-030). Mirrors
+   OperationsDashboardSubject: gates the four read endpoints so PoliciesGuard runs
+   the membership check. Read is open to every role by grant (SA/ADMIN manage-all;
+   MANAGER/ACCOUNTANT/ANALYST read-all; VIEWER via an explicit grant). No write
+   verb — the calendar is read-only. */
+class OperationsCalendarSubject {
+  static readonly modelName = 'OperationsCalendar' as const;
 }
 /* OPS-036 — packaged compliance evidence (audit packages).
    ADMIN + MANAGER can generate (create) and read; only ADMIN can
@@ -449,6 +458,7 @@ export {
   DomainEventSubject,
   CommitmentTemplateSubject,
   OperationsDashboardSubject,
+  OperationsCalendarSubject,
   AuditPackageSubject,
   ServiceOrderSubject,
   EmployeeSubject,
@@ -760,6 +770,13 @@ export class CaslAbilityFactory {
            COM-002/CalendarActivity idiom. Read only; `manage` (refresh-views)
            stays ADMIN/SUPER_ADMIN. */
         can('read', OperationsDashboardSubject);
+        /* HARDEN-002 (2026-08-04) — VIEWER reads the Operations calendar. The four
+           calendar endpoints gained @CheckPolicies('read', OperationsCalendarSubject)
+           (and PoliciesGuard, previously absent) to restore the membership check;
+           VIEWER has no blanket `read all`, so without this explicit grant it would
+           lose the calendar it has always read. Purely ADDITIVE grant-by-enumeration
+           (no floor on this subject) — the HARDEN-001/OperationsDashboard idiom. */
+        can('read', OperationsCalendarSubject);
         /* COM-013 — VIEWER gets NO read on ServiceOrderSubject: service orders carry
            contract money amounts and VIEWER never sees monetary values. VIEWER has no
            blanket `read all`, so simply granting nothing here is the revoke. */

@@ -1,7 +1,10 @@
 import { Controller, Get, ParseIntPipe, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
+import { OperationsCalendarSubject } from '../../common/casl/casl-ability.factory';
+import { CheckPolicies } from '../../common/decorators/check-policies.decorator';
 import { CurrentCompany } from '../../common/decorators/current-company.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PoliciesGuard } from '../../common/guards/policies.guard';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import {
   CalendarEventType,
@@ -21,16 +24,32 @@ const ALL_TYPE_VALUES: CalendarEventType[] = [
 
 const SEVERITY_VALUES: CalendarSeverity[] = ['INFO', 'WARNING', 'CRITICAL', 'BLOCKING'];
 
-/* OPS-030 — read-only calendar feed. Mirrors the dashboard
-   controller's posture: any authenticated user can read; RLS scopes
-   data per company; no CASL because the calendar surfaces data the
-   caller is already authorized to see on the source pages. */
+/* OPS-030 — read-only calendar feed over the Operations module (events, by-date,
+   month-summary, iCal export).
+
+   HARDEN-002 (2026-08-04) — the four read endpoints are now gated on
+   `read OperationsCalendarSubject`, AND PoliciesGuard is now registered on this
+   controller (it was previously @UseGuards(JwtAuthGuard) ONLY, so a @CheckPolicies
+   would have done nothing — no guard read it). The reads STAY OPEN to every role by
+   CASL grant (SA/ADMIN via `manage all`; MANAGER/ACCOUNTANT/ANALYST via `read all`;
+   VIEWER via an explicit `can('read', OperationsCalendarSubject)`), so no role loses
+   the calendar. The POINT of the gate is the MEMBERSHIP CHECK: PoliciesGuard
+   validates the x-company-id header against the caller's memberships before the
+   handler runs. Previously ungated, every handler took @CurrentCompany (the raw
+   header), so any authenticated user could read — and `export` could DOWNLOAD as a
+   .ics file — another company's operations calendar by changing one header.
+
+   CORRECTION to the old OPS-030 note: RLS is NOT the backstop. At runtime the DB
+   role bypasses RLS (BYPASSRLS/superuser) and RLS is ENABLE-only (not FORCE); the
+   membership check this gate restores is the only tenant boundary on this surface.
+   See docs/HARDENING-RECON.md and the HARDEN-001 dashboard precedent. */
 @Controller('operations/calendar')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PoliciesGuard)
 export class OperationsCalendarController {
   constructor(private readonly service: OperationsCalendarService) {}
 
   @Get('events')
+  @CheckPolicies((ability) => ability.can('read', OperationsCalendarSubject))
   events(
     @CurrentCompany() companyId: string,
     @CurrentUser() user: { id: string },
@@ -56,6 +75,7 @@ export class OperationsCalendarController {
   }
 
   @Get('events/by-date')
+  @CheckPolicies((ability) => ability.can('read', OperationsCalendarSubject))
   eventsByDate(
     @CurrentCompany() companyId: string,
     @CurrentUser() user: { id: string },
@@ -66,6 +86,7 @@ export class OperationsCalendarController {
   }
 
   @Get('month-summary')
+  @CheckPolicies((ability) => ability.can('read', OperationsCalendarSubject))
   monthSummary(
     @CurrentCompany() companyId: string,
     @CurrentUser() user: { id: string },
@@ -80,6 +101,7 @@ export class OperationsCalendarController {
      We use @Res() because NestJS's default JSON serializer would
      wrap the body in quotes and break iCal parsers. */
   @Get('export')
+  @CheckPolicies((ability) => ability.can('read', OperationsCalendarSubject))
   async export(
     @CurrentCompany() companyId: string,
     @CurrentUser() user: { id: string },
