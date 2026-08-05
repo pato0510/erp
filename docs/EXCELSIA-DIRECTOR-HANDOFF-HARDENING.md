@@ -149,15 +149,26 @@ postgres   rolsuper=true    rolbypassrls=true    rolcanlogin=true
 - The role `excelsia` **does not exist** (the query returned 2 rows, not 3). Two old
   docs disagreed about the runtime user; this settles it — **the app connects as
   `postgres`**, superuser with bypass, so **every RLS policy is inert today**.
-- **`app_user` is correctly provisioned and can log in** — no superuser, no bypass.
-  The `SECURITY_AUDIT.md` V2 note claiming `app_user` carries BYPASSRLS is **wrong**;
+- **`app_user` is correctly provisioned** — no superuser, no bypass. The
+  `SECURITY_AUDIT.md` V2 note claiming `app_user` carries BYPASSRLS is **wrong**;
   do not design on it.
+  **CORRECTION (DOC-HARDEN-002, 2026-08-05).** "and can log in" was the wrong
+  reading of `rolcanlogin=true`: that flag says the catalog _permits_ login, not
+  that a credential exists. The founder's 2026-08-05 production query returned
+  **`rolpassword IS NULL`** — `app_user` has **no usable password in production**
+  and cannot authenticate today. That is currently a safety net, not a defect: a
+  mis-set `DATABASE_URL` fails to boot instead of silently breaking the product,
+  which is why the founder signed off on creating the password **last** in the arc
+  (see `CLAUDE.md` § Decisiones firmadas).
 - Because `app_user` does not own the tables, **`ENABLE` is sufficient — `FORCE` is
   not required** (FORCE only matters so a table's _owner_ cannot skip its own
   policies).
 
 **Net: the missing piece for real tenant isolation already exists and has simply
-never been plugged in.**
+never been plugged in.** — **qualified (DOC-HARDEN-002, 2026-08-05):** the _role_
+exists and its grants are complete (zero gaps, verified in production), but
+plugging it in is not a one-variable change. It needs a credential that does not
+exist yet, and a code campaign ahead of it (§5.2).
 
 ### 3.7 RLS coverage and its holes
 
@@ -223,10 +234,22 @@ calendar's `export` endpoint returned another company's full calendar as a
 
 ## 5. What is left — the next director's mission
 
-### 5.1 HARDEN-003 — recon of the database-role switch (do this FIRST, read-only)
+### 5.1 HARDEN-003 — recon of the database-role switch — ✅ DONE
 
-**Goal:** know exactly what breaks before changing the runtime connection from
-`postgres` to `app_user`.
+**Shipped:** `docs/HARDEN-003-ROLE-SWITCH-RECON.md`, commit `fd40530`. It is a
+dated snapshot and is never retro-edited; its LOCAL DB caveats stand as written.
+The production queries it asked for were run by the founder on **2026-08-05** and
+the results — plus the two decisions that followed — are recorded in **`CLAUDE.md`**
+(§ Verificación en producción, § Decisiones firmadas), which wins on precedence.
+
+**Headline:** item 1 below (the GRANT inventory) came back with **ZERO gaps in
+production**, verified 2026-08-05 — all 91 tables and all 4 materialized views
+already carry the four verbs for `app_user`. The expectation that drove this item
+was wrong; no GRANT work is needed. The one real hole is **ownership**, not
+privilege: `REFRESH MATERIALIZED VIEW` requires it and `app_user` has none.
+
+**Goal (as written when this was still open):** know exactly what breaks before
+changing the runtime connection from `postgres` to `app_user`.
 
 Why it is the riskiest change of the arc: with RLS actually enforced, **any read
 that never sets `rls.company_id` returns zero rows**, and any missing GRANT throws.
@@ -260,11 +283,35 @@ The recon must answer, with `file:line` citations and migration greps:
 7. **A staged rollout plan**, including how to test with RLS on locally before
    touching production, and the rollback (revert one env var).
 
-### 5.2 HARDEN-004 — the switch itself
+### 5.2 HARDEN-004 — **not "the switch": a code campaign whose last step is the switch**
 
-Only after 5.1. Expect it to be a small env change plus whatever the recon says the
-code needs. Treat it as the highest-risk deploy of the project: verify every module
-end-to-end afterwards, per role.
+**CORRECTION (DOC-HARDEN-002, 2026-08-05).** This section used to read, in full:
+"Only after 5.1. Expect it to be a small env change plus whatever the recon says
+the code needs. Treat it as the highest-risk deploy of the project: verify every
+module end-to-end afterwards, per role."
+The recon's evidence makes that framing wrong, and dangerously so: **810 GUC-less
+read call sites across 116 files** against 318 `executeWithRls` sites, with roughly
+500 of 578 handlers returning nothing if the variable were flipped on today's code.
+Changing `DATABASE_URL` alone is not a partial improvement — it is an outage.
+Treat HARDEN-004 as a **code campaign whose final step is the variable change**.
+
+The four-piece shape now proposed — (A) the SII sync writing inside
+`executeWithRls`, which covers 99.4% of the write problem; (B) the bootstrap knot,
+16 enumerated identity reads; (C) the read campaign, 810 sites, the only piece
+needing a new mechanism; (D) the start-command split plus the `DATABASE_URL`
+change, last — is recorded in **`CLAUDE.md`** (§ Forma propuesta de HARDEN-004),
+along with the founder's signed decisions on the `app_user` password and the
+migrator role. It is the director's proposal and is **not yet signed**. The
+analysis is not restated here; `CLAUDE.md` is the living record and wins.
+
+Still true, and now more so: it is the highest-risk deploy of the project. Verify
+every module end-to-end afterwards, per role. The rollback remains one env var —
+which only stays true if the switch deploy carries no migration.
+
+**Derived rule (founder, 2026-08-05):** the start-command split lands **before or
+with** the `DATABASE_URL` change, never after. The boot-loop window opens the
+instant the switch happens — with no `CREATE` on `public`, the next migration to
+run as `app_user` fails at its first DDL and `&&` takes the boot down with it.
 
 ### 5.3 Remaining ungated endpoints
 

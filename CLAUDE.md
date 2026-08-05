@@ -897,9 +897,13 @@ Ledger: HARDEN-000 (recon read-only, 17269d6) · DOC-PERMS-001 (matriz de
 permisos de plataforma, a707e8f) · HARDEN-001 (gateó los 9 endpoints abiertos
 del dashboard de Operaciones, 18d7473) · HARDEN-002 (gateó los 4 del calendario
 de Operaciones y REGISTRÓ el PoliciesGuard que faltaba, 66e7758) ·
-DOC-HARDEN-001 (correcciones de documentación, 2026-08-04).
-PENDIENTES: **HARDEN-003** (recon read-only del switch de rol de base de datos)
-y **HARDEN-004** (el switch en sí — el deploy de mayor riesgo del proyecto).
+DOC-HARDEN-001 (correcciones de documentación, 2026-08-04) · **HARDEN-003**
+(recon read-only del switch de rol de base de datos → docs/HARDEN-003-ROLE-SWITCH-RECON.md,
+fd40530) · DOC-HARDEN-002 (verificación en producción + decisiones firmadas,
+2026-08-05).
+PENDIENTE: **HARDEN-004** — que ya NO es "el switch": la evidencia lo convirtió en
+una CAMPAÑA DE CÓDIGO cuyo ÚLTIMO paso es cambiar la variable (ver § Forma
+propuesta de HARDEN-004).
 Docs: docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING.md (contrato VIVO del arco) ·
 docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
 
@@ -971,31 +975,43 @@ docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
   registrada: esos SET LOCAL interpolan el valor como string en $executeRawUnsafe
   en vez de bindearlo — superficie de inyección si alguna vez llega un valor sin
   validar.
-- **ANÁLISIS NO VERIFICADO EN RUNTIME (marcado como tal, 2026-08-04).**
-  memberships y companies SÍ tienen política RLS
-  (20260417171836_add_rls_policies:13-22), y PoliciesGuard resuelve la membresía
-  con un prisma.membership.findUnique PELADO, fuera de executeWithRls y fuera de
-  toda transacción (policies.guard.ts:33-35), es decir SIN la GUC seteada.
-  Consecuencia ESPERADA bajo app_user: TODO endpoint gateado devolvería 403 'No
-  active membership for this company' para los SEIS roles — cerrado con llave, no
-  degradado en silencio, y con un mensaje que CULPA a la membresía cuando la causa
-  real es la GUC ausente. Los endpoints NO gateados degradarían al modo OPUESTO:
-  lectura ciega, cero filas, sin error. **Los dos modos conviven** y hay que
-  esperarlos juntos. A VERIFICAR en HARDEN-003 — es análisis, no evidencia.
-- **CREDENCIAL DE app_user NO PROBADA.** La migración hace CREATE ROLE app_user
-  LOGIN **sin cláusula PASSWORD** (20260417171836_add_rls_policies:29) y no hay
-  ningún otro punto de aprovisionamiento en las 77 migraciones. rolcanlogin=true
-  dice que el CATÁLOGO lo permite, no que exista una contraseña funcionando.
-  Fijarla es escritura de producción: acción del FUNDADOR en HARDEN-004, jamás de
-  un recon.
+- **EL NUDO DE ARRANQUE — ANÁLISIS, NO EVIDENCIA DE RUNTIME (corregido por
+  HARDEN-003, 2026-08-05).** memberships y companies SÍ tienen política RLS
+  (20260417171836_add_rls_policies:13-22). La versión anterior de este bullet decía
+  que bajo app_user TODO endpoint gateado devolvería 403 'No active membership for
+  this company'. **Está corregido: la rotura es AGUAS ARRIBA del guard.**
+  GET /auth/me lee memberships y companies con un cliente PELADO, en un select
+  anidado (auth.service.ts:94-118), y TenantMiddleware está EXCLUIDO de api/auth/\*
+  (app.module.ts:110-115), así que ahí no hay header x-company-id ni puede haberlo.
+  Bajo app_user ese select devuelve cero filas ⇒ el selector de empresa llega
+  VACÍO ⇒ **nunca se produce un x-company-id** ⇒ el guard jamás llega a rechazar
+  nada. El lookup pelado del propio guard
+  (prisma.membership.findUnique fuera de executeWithRls y de toda transacción,
+  policies.guard.ts:33-35) es la SEGUNDA rotura, no la primera: el usuario se loguea
+  bien y queda mirando un selector vacío. Los DOS MODOS SIGUEN CONVIVIENDO y hay que
+  esperarlos juntos: gateado ⇒ cierre duro (403 con un mensaje que CULPA a la
+  membresía cuando la causa real es la GUC ausente); NO gateado ⇒ el modo opuesto,
+  lectura ciega, cero filas, sin error. Sigue siendo **análisis** — nadie ha corrido
+  todavía la app contra app_user; eso es el paso 4 del rollout local.
+- **CREDENCIAL DE app_user: INEXISTENTE — VERIFICADO EN PRODUCCIÓN 2026-08-05.**
+  La migración hace CREATE ROLE app_user LOGIN **sin cláusula PASSWORD**
+  (20260417171836_add_rls_policies:29) y no hay ningún otro punto de
+  aprovisionamiento en las 77 migraciones. rolcanlogin=true dice que el CATÁLOGO lo
+  permite, no que exista una contraseña funcionando — y la consulta del fundador
+  confirmó rolpassword IS NULL en producción (ver § Verificación en producción).
+  Fijarla es escritura de producción: acción del FUNDADOR, jamás de un recon, y
+  por decisión firmada va AL FINAL del arco (ver § Decisiones firmadas).
 - **HUECOS DE GRANT conocidos.** El GRANT SELECT/INSERT/UPDATE/DELETE ON ALL
   TABLES IN SCHEMA public (20260417171836_add_rls_policies:33) es una FOTO del
   2026-04-17: no alcanza a nada creado después. El ALTER DEFAULT PRIVILEGES (:34)
   cubre solo objetos creados POR EL ROL que lo ejecutó y solo la clase TABLES — no
   SEQUENCES, no FUNCTIONS, no USAGE de schema. Y existe UNA sola concesión de
   secuencia en todo el árbol de migraciones (work_permit_number_seq, en
-  20260428240000_add_work_permits). Inventariar tabla por tabla es el ítem 1 de
-  HARDEN-003.
+  20260428240000_add_work_permits). **CIERRE (2026-08-05): el inventario tabla por
+  tabla se hizo y volvió con CERO huecos en producción** — los tres agujeros
+  estructurales de arriba son reales como mecanismo, pero en los hechos ninguno
+  dejó una tabla sin GRANT (ver § Verificación en producción). El único hueco vivo
+  no es de privilegio sino de PROPIEDAD: el REFRESH de las vistas materializadas.
 - **DEUDA DE SUSTRATO DE PRUEBA.** seed.ts crea UNA sola empresa y CINCO de los
   seis roles (admin/manager/accountant/analyst/viewer@excelsia.dev, con el rol en
   la Membership; **falta SUPER_ADMIN**), y los cuatro no-admin están detrás de
@@ -1004,7 +1020,11 @@ docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
   local: el string aparece únicamente en el handoff, en NINGÚN spec, seed ni
   migración. SECURITY_AUDIT.md nombra otro fixture ("Empresa Test") igual de
   inexistente. **La prueba cross-tenant no es reproducible desde el repo** —
-  precondición pendiente de decisión del fundador para HARDEN-004.
+  precondición pendiente de decisión del fundador para HARDEN-004. **SIGUE ABIERTA
+  al 2026-08-05**: no bloquea el DISEÑO de HARDEN-004 (las cuatro piezas de abajo
+  se pueden escribir sin ella), bloquea su VERIFICACIÓN HONESTA — sin una segunda
+  empresa sembrada y un SUPER_ADMIN, la evidencia 200 → 403 del arco no la puede
+  re-derivar nadie más que quien tenga la fila en su notebook.
 - **UNGATED VIVOS: 15 handlers** (6 públicos legítimos + 9 en revisión), tras
   cerrar 4 en HARDEN-002. Inventario en docs/MATRIZ-DE-PERMISOS.md §4, CON LA
   SALVEDAD de que su conteo de 19 y sus hallazgos D1 (calendario abierto) y D4
@@ -1024,7 +1044,168 @@ docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
   de operaciones" nunca había visto el controlador del calendario. Leer el código.
   Después decidir.
 
-Última actualización: 2026-08-04 (DOC-HARDEN-001 — correcciones de documentación)
+## Verificación en producción (2026-08-05, consultas read-only del fundador)
+
+HECHO ESTABLECIDO, con la procedencia a la vista: esto NO sale de inspeccionar
+código ni de la base local — son consultas que el FUNDADOR corrió contra la base de
+producción el 2026-08-05, respondiendo el pedido explícito del recon HARDEN-003.
+
+- **app_user**: rolsuper=false, rolbypassrls=false, rolcanlogin=true y
+  **rolpassword IS NULL**. NO existe una credencial usable en producción: hoy un
+  DATABASE_URL apuntando a app_user no autenticaría — el servicio no arrancaría.
+- **postgres**: rolsuper=true, rolbypassrls=true. **Es el rol que conecta**, y es
+  la razón por la que las 87 políticas están inertes. La pregunta de HARDEN-000
+  queda cerrada con evidencia, no con inferencia.
+- **El rol `excelsia` NO EXISTE en producción** (la consulta no devolvió fila). Por
+  lo tanto `.env.example`, que documenta al usuario `excelsia` y su BYPASSRLS
+  (`.env.example:24` y `:33-35`), **está equivocado respecto de producción** —
+  describe el docker-compose local, no el entorno real.
+- **HUECOS DE GRANT: CERO.** Las 91 tablas (90 de negocio + \_prisma_migrations) y
+  las 4 vistas materializadas YA tienen SELECT/INSERT/UPDATE/DELETE para app_user.
+  El universo coincide EXACTAMENTE con el local: r=91, m=4, S=1. Esto **INVIERTE la
+  expectativa del recon**: no hay trabajo de GRANT que hacer.
+- **pg_default_acl**: UNA fila viva, keyeada a `postgres`, `{app_user=arwd/postgres}`.
+  Es la razón por la que las tablas creadas después del 2026-04-17 quedaron
+  cubiertas sin depender del GRANT por tabla. Aplica SOLO a objetos creados por
+  postgres — dato PORTANTE para la decisión del rol migrador.
+- **Las 4 vistas materializadas son propiedad de `postgres`.** REFRESH MATERIALIZED
+  VIEW exige **PROPIEDAD, no privilegio**: bajo app_user el refresh se rompe y
+  **ningún GRANT lo arregla**. Ítem abierto de HARDEN-004.
+- **Schema public para app_user**: USAGE=true, CREATE=false. Confirma que el
+  peligro de boot-loop es real en producción — una migración futura corriendo como
+  app_user falla en su primer DDL.
+
+## El hallazgo SII — rehace la forma del trabajo
+
+audit_logs en producción al 2026-08-05: **7.342 filas**, de las cuales **6.892 sin
+contexto de empresa (93,9%)**, en un rango que va del 2026-04-22 al 2026-08-05.
+
+- **La cifra local era 37,5% y el director asumió que estaba inflada por la semilla.
+  Estaba equivocado, y equivocado en la DIRECCIÓN: producción es mucho PEOR.** Se
+  registra el error, no solo el número.
+- **Pero el desglose por tabla cambia el significado por completo**: tax_documents
+  4.131 · movements 2.072 · counterparties 351 · users 298 · y después 40 filas
+  repartidas en 7 tablas (fiscal_periods 12, categories 12, domain_events 8,
+  cost_centers 3, company_settings 2, memberships 2, companies 1).
+- Las tres primeras son **UN SOLO camino de código**: el sync SII (factura →
+  movimiento auto-creado → contraparte auto-creada desde el RUT).
+- `users` **no tiene política RLS**, así que sus 298 escrituras sobreviven el
+  switch (sin atribuir, como hoy). Excluyéndolas quedan **6.594 que sí se
+  romperían**, de las cuales el sync SII es **6.554 — el 99,4%**. Las 40 restantes
+  son el setup único de abril 2026.
+- **Conclusión que reordena el trabajo: las escrituras NO son una campaña
+  sistémica, son UNA integración con nombre y apellido más un puñado de caminos de
+  bajísimo volumen.** Arreglar el sync SII para que escriba dentro de
+  executeWithRls cubre el 99,4% del problema de escritura.
+- **DOS SALVEDADES que hay que escribir al lado del número, siempre**: (1)
+  audit_logs registra **SOLO ESCRITURAS** — los 810 sitios de LECTURA sin GUC son
+  invisibles en estos datos y siguen siendo el trabajo pesado; (2) el trigger de
+  auditoría cubre **83 de 90** tablas de negocio, así que las escrituras a las
+  otras 7 no aparecen acá en absoluto.
+
+## Hallazgos del recon HARDEN-003 que corrigen premisas del director
+
+- **NO EXISTE UN TEST QUE FALLE SI RLS SE ROMPE.** `rls.security.spec.ts:19-23`
+  afirma que el chequeo end-to-end "lives as a standalone script (kept out of Jest
+  via testPathIgnorePatterns)"; `jest.config.ts:12` excluye ÚNICAMENTE
+  `audit.spec.ts` y **ese script no existe en ningún lado**. El spec que sí existe
+  mockea `$transaction`, o sea prueba que la app emite los SET LOCAL correctos y no
+  puede probar que PostgreSQL los honre. Es la TERCERA aparición del patrón
+  característico del arco: un comentario que declara una cobertura que nunca
+  estuvo.
+- **audit_logs."tenantId" GUARDA UN companyId.** El trigger escribe
+  `current_setting('audit.company_id')` en la columna `"tenantId"`
+  (20260417172748_add_audit_triggers:36) y el servicio filtra `tenantId: companyId`
+  para coincidir (audit.service.ts:10, :19, :28). La tabla YA lleva alcance por
+  empresa, bajo un nombre que miente — por eso el ítem 4 del backlog V2 es un
+  RENAME más una política, **NO un backfill**.
+- **EL TRIGGER DE AUDITORÍA SOBREVIVE EL CAMBIO.** `audit_trigger_function` es
+  SECURITY DEFINER y su dueño es un superusuario, así que escribe con los
+  privilegios del DUEÑO y no los de la sesión — seguiría escribiendo bajo app_user,
+  e incluso seguiría escribiendo si audit_logs ganara una política más adelante
+  (lo cual es exactamente lo que se quiere de un sumidero de auditoría). **La
+  premisa del director en Q7 ("el trigger escribe como el rol de sesión") era
+  FALSA.**
+- **LA ESCALADA DE BYPASSRLS ESTÁ AUSENTE POR ACCIDENTE, NO POR DISEÑO.** Una
+  migración futura que llevara `ALTER ROLE current_user BYPASSRLS` **NO** le daría
+  bypass a app_user: solo un superusuario puede setear ese atributo, y el bloque
+  atrapa el fallo con `EXCEPTION WHEN insufficient_privilege` y lo degrada a un
+  NOTICE (20260417171836_add_rls_policies:36-47). **La premisa del director era
+  FALSA.** El peligro real está un paso ANTES y es más ruidoso: sin CREATE en
+  public, una migración futura falla en su primer DDL y el `&&` del start command
+  se lleva puesto el arranque. Se RE-ARMA si algún día app_user llega a
+  superusuario o si alguien "limpia" ese EXCEPTION handler.
+
+## Decisiones firmadas del fundador (2026-08-05)
+
+Cada una con su razonamiento, porque el razonamiento es lo que un lector futuro
+necesita para no "corregirlas".
+
+- **CONTRASEÑA DE app_user.** Generada por un gestor de contraseñas, guardada
+  ÚNICAMENTE en el store de variables de Railway — NO duplicada en un gestor
+  personal. Jamás tipeada a mano, jamás pegada en un chat. Se fija PRIMERO en
+  LOCAL (para reproducir los cuatro modos de falla) y en PRODUCCIÓN AL FINAL, al
+  cierre del arco. **RAZONAMIENTO:** mientras el rol no tenga credencial, el switch
+  es IMPOSIBLE de hacer por accidente — un DATABASE_URL mal puesto no arranca en
+  vez de romper el producto. Esa red de seguridad se pierde en el instante en que
+  la contraseña existe, así que se crea lo más tarde posible. Perder la copia no
+  cuesta nada: un ALTER ROLE la regenera en segundos, así que una copia de respaldo
+  no compra nada y duplica la superficie de fuga.
+- **ROL MIGRADOR: sigue siendo `postgres`.** El start command toma la URL
+  privilegiada de una SEGUNDA variable para el paso de migración; la app arranca
+  como app_user. **RAZONAMIENTO:** la fila de pg_default_acl ya está keyeada a
+  postgres y verificada funcionando (cero huecos); un migrador dedicado costaría
+  CUATRO escrituras de producción (crear rol, otorgar DDL, otorgar BYPASSRLS — que
+  a su vez exige un superusuario — y ALTER DEFAULT PRIVILEGES FOR ROLE) y rompería
+  esa segunda capa de cobertura de grants. **El aislamiento de tenant depende del
+  rol de RUNTIME, no del migrador.** Un migrador dedicado queda diferido al backlog
+  de endurecimiento V2.
+- **REGLA DERIVADA:** la división del start command entra **ANTES o JUNTO CON** el
+  cambio de DATABASE_URL, **nunca después**. La ventana de boot-loop se abre en el
+  instante mismo del switch.
+
+## Forma propuesta de HARDEN-004 (propuesta del DIRECTOR, todavía SIN firmar)
+
+Ya no es un ticket: son **CUATRO piezas separadas**. Se registra como propuesta,
+no como decisión — el fundador todavía no la firmó.
+
+- **(A) El sync SII escribiendo dentro de executeWithRls.** Cubre el 99,4% del
+  problema de escritura (6.554 de 6.594 filas). Pieza acotada, con nombre propio.
+- **(B) El nudo de arranque.** Las 16 lecturas de identidad enumeradas en el recon
+  (Q1.2), empezando por GET /auth/me. Sin esto no hay login utilizable.
+- **(C) La campaña de lectura.** 810 sitios sin GUC en 116 archivos. **Es la ÚNICA
+  pieza que necesita un mecanismo nuevo**, y por lo tanto la única que necesita una
+  decisión de diseño del fundador (las opciones y sus costos están en el recon).
+- **(D) La división del start command más el cambio de DATABASE_URL.** ÚLTIMA, y
+  sujeta a la regla derivada de arriba.
+
+## Backlog de endurecimiento V2 (diferido a propósito)
+
+Cada ítem con la línea de por qué es seguro diferirlo:
+
+1. **Migrador dedicado no-superusuario** con su propio ALTER DEFAULT PRIVILEGES FOR
+   ROLE — seguro de diferir: el aislamiento lo da el rol de runtime, no el
+   migrador, y postgres ya está verificado con cero huecos.
+2. **SET search_path = public, pg_temp en audit_trigger_function** — seguro de
+   diferir: hoy está desactivado por accidente (app_user no puede CREATE en
+   public), pero **desactivado no es cerrado**; se re-arma si alguien le da a
+   app_user derechos de creación en cualquier schema de su search_path.
+3. **set_config(...) en vez de interpolar strings en executeWithRls** — seguro de
+   diferir: es latente, no vivo; hoy todos los llamadores validan el valor antes.
+4. **audit_logs: renombrar tenantId → companyId y agregarle política** — seguro de
+   diferir: la tabla no tiene controlador ni consumidor (AuditService no lo usa
+   nadie), así que la exposición es EN REPOSO. Deja de ser diferible el día que
+   alguien construya un visor de auditoría.
+5. **Test end-to-end de RLS como gate de CI** — seguro de diferir solo mientras el
+   switch no ocurra; después del switch pasa a ser la única red que detecta una
+   regresión silenciosa.
+6. **Test de concurrencia del pool** — seguro de diferir hasta que exista un
+   mecanismo de contexto nuevo que testear (pieza C).
+7. **Revocar la escritura de app_user sobre \_prisma_migrations** — seguro de
+   diferir: endurecimiento fino; el runtime no toca esa tabla, solo el migrador.
+
+Última actualización: 2026-08-05 (DOC-HARDEN-002 — verificación en producción +
+decisiones firmadas del fundador)
 
 # Próximos pasos
 
@@ -1052,7 +1233,7 @@ docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
   del acuse (acknowledgments.service.ts:488-489 —
   "// OPS-038 — the row's own UUID PK is the aggregate identity." +
   acknowledgmentId: c.id; el campo en domain-event-types.ts:115 y su resolución
-  en :243), PINEADO contra regresión en domain-event-types.spec.ts:47-50 (el
+  en :243), PINEADO contra regresión en domain-event-types.spec.ts:47-65 (el
   caso culpable, con assert de que el id nunca contiene ':'). PLAT-001 — el
   SentryExceptionFilter solo leía exception.message, así que los mensajes de
   class-validator colapsaban en "Bad Request Exception" a nivel PLATAFORMA
