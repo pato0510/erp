@@ -10,6 +10,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { RlsService } from '../common/rls/rls.service';
 import { DEFAULT_SII_PROVIDER, SiiProviderFactory } from './providers/sii-provider.factory';
 import { TaxDocumentResult } from './providers/sii-provider.interface';
 import { CategoryRulesService } from '../catalogs/category-rules.service';
@@ -63,6 +64,7 @@ export class TaxService {
     private readonly prisma: PrismaService,
     private readonly providerFactory: SiiProviderFactory,
     private readonly categoryRulesService: CategoryRulesService,
+    private readonly rlsService: RlsService,
   ) {}
 
   async syncDocuments(
@@ -83,15 +85,20 @@ export class TaxService {
 
     const provider = this.providerFactory.getProvider(providerName);
 
-    const syncRun = await this.prisma.taxSyncRun.create({
-      data: {
-        companyId,
-        fiscalPeriodId,
-        provider: providerName,
-        direction,
-        status: 'RUNNING',
-      },
-    });
+    /* HARDEN-004A — scope 1 of 4: the run row gets its OWN committed
+       transaction, before the loop, so it exists even if everything after it
+       fails and the catch block below has a row to mark FAILED. */
+    const syncRun = await this.rlsService.executeWithRls(companyId, userId, async (tx) =>
+      tx.taxSyncRun.create({
+        data: {
+          companyId,
+          fiscalPeriodId,
+          provider: providerName,
+          direction,
+          status: 'RUNNING',
+        },
+      }),
+    );
 
     try {
       const siiPeriod = { year: period.year, month: period.month };
@@ -120,21 +127,51 @@ export class TaxService {
 
       for (const doc of documents) {
         try {
-          const { id: taxDocId, created } = await this.upsertDocument(
+          /* HARDEN-004A — scope 3 of 4: TWO transactions PER DOCUMENT, one for
+             the document and one for its movement. They are deliberately NOT
+             merged.
+             WHY THEY MUST STAY SEPARATE (director ruling, 2026-08-05): a
+             tax_document with no movement is a FIRST-CLASS designed state —
+             isReconciled:false feeds the pendingReconciliation counter that
+             getSummary returns and the UI renders. Sharing one transaction
+             would roll the document insert back when its movement failed, and
+             the invoice would vanish from the product entirely instead of
+             showing up as unreconciled. Do not "simplify" these into one.
+             The sync also stays RESILIENT PER DOCUMENT (founder decision,
+             2026-08-05): either transaction failing pushes to errors[] and the
+             loop continues, with earlier documents already committed.
+             Deliberately NOT one transaction around the whole loop either —
+             that would change the failure semantics and hold a pooled
+             connection for the length of the run. */
+          const { id: taxDocId, created } = await this.rlsService.executeWithRls(
             companyId,
-            fiscalPeriodId,
-            doc,
+            userId,
+            async (tx) => this.upsertDocument(tx, companyId, fiscalPeriodId, doc),
           );
           if (created) synced++;
           else skipped++;
 
           if (defaultCategories) {
-            const movementCreated = await this.createMovementFromDocument(
+            /* The duplicate-movement fix lives HERE, and never depended on
+               sharing a transaction with the document insert: movement.create
+               and the taxDocument.update that links them are both inside
+               createMovementFromDocument, so this one scope makes them atomic.
+               Previously they were two unrelated statements — a failure of the
+               second left an ORPHAN movement whose document still had a null
+               movementId, so the idempotency guard would not fire and the next
+               run created a DUPLICATE financial record. */
+            const movementCreated = await this.rlsService.executeWithRls(
               companyId,
               userId,
-              taxDocId,
-              fiscalPeriodId,
-              defaultCategories,
+              async (tx) =>
+                this.createMovementFromDocument(
+                  tx,
+                  companyId,
+                  userId,
+                  taxDocId,
+                  fiscalPeriodId,
+                  defaultCategories,
+                ),
             );
             if (movementCreated) movementsCreated++;
           }
@@ -146,13 +183,16 @@ export class TaxService {
         }
       }
 
-      await this.prisma.taxSyncRun.update({
-        where: { id: syncRun.id },
-        data: {
-          status: 'SUCCESS',
-          completedAt: new Date(),
-          documentsSynced: synced,
-        },
+      /* HARDEN-004A — scope 4a of 4: the SUCCESS update, on its own. */
+      await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+        await tx.taxSyncRun.update({
+          where: { id: syncRun.id },
+          data: {
+            status: 'SUCCESS',
+            completedAt: new Date(),
+            documentsSynced: synced,
+          },
+        });
       });
 
       return { synced, skipped, movementsCreated, errors, syncRunId: syncRun.id };
@@ -161,9 +201,14 @@ export class TaxService {
       this.logger.warn(
         `syncDocuments failed company=${companyId} period=${fiscalPeriodId} direction=${direction}: ${message}`,
       );
-      await this.prisma.taxSyncRun.update({
-        where: { id: syncRun.id },
-        data: { status: 'FAILED', completedAt: new Date(), errorMessage: message },
+      /* HARDEN-004A — scope 4b of 4: the FAILED update opens its OWN
+         transaction rather than reusing anything from the try block, so it
+         still works when the run itself failed. */
+      await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+        await tx.taxSyncRun.update({
+          where: { id: syncRun.id },
+          data: { status: 'FAILED', completedAt: new Date(), errorMessage: message },
+        });
       });
       return {
         synced: 0,
@@ -371,13 +416,19 @@ export class TaxService {
     }
   }
 
+  /* HARDEN-004A — `tx` is threaded in explicitly: a `this.prisma` call inside an
+     executeWithRls callback escapes the transaction onto another pooled
+     connection and carries NO GUC, which is the exact bug this ticket removes.
+     The idempotency read below now runs on the same GUC-carrying connection as
+     the insert that follows it, so both see one consistent view. */
   private async upsertDocument(
+    tx: Prisma.TransactionClient,
     companyId: string,
     fiscalPeriodId: string,
     doc: TaxDocumentResult,
   ): Promise<{ id: string; created: boolean }> {
     // Unique on (companyId, type, folio, direction) gives us idempotency.
-    const existing = await this.prisma.taxDocument.findUnique({
+    const existing = await tx.taxDocument.findUnique({
       where: {
         companyId_type_folio_direction: {
           companyId,
@@ -393,7 +444,7 @@ export class TaxService {
       return { id: existing.id, created: false };
     }
 
-    const newDoc = await this.prisma.taxDocument.create({
+    const newDoc = await tx.taxDocument.create({
       data: {
         companyId,
         fiscalPeriodId,
@@ -423,25 +474,36 @@ export class TaxService {
    *  - "Productos no categorizados" (INCOME and EXPENSE) for fallback
    * Idempotent via @@unique([companyId, name, type]).
    */
-  async ensureDefaultCategories(companyId: string, _userId: string): Promise<DefaultCategoryIds> {
+  async ensureDefaultCategories(companyId: string, userId: string): Promise<DefaultCategoryIds> {
     const seeds: { name: string; type: CategoryType; color: string }[] = [
       { name: SALES_INCOME_CATEGORY_NAME, type: CategoryType.INCOME, color: '#2563EB' },
       { name: UNCATEGORIZED_CATEGORY_NAME, type: CategoryType.EXPENSE, color: '#94A3B8' },
       { name: UNCATEGORIZED_CATEGORY_NAME, type: CategoryType.INCOME, color: '#94A3B8' },
     ];
 
-    const upserted = await Promise.all(
-      seeds.map((s) =>
-        this.prisma.category.upsert({
-          where: {
-            companyId_name_type: { companyId, name: s.name, type: s.type },
-          },
-          create: { companyId, name: s.name, type: s.type, color: s.color },
-          update: {},
-          select: { id: true, name: true, type: true },
-        }),
-      ),
-    );
+    /* HARDEN-004A — scope 2 of 4: its own transaction, opened here because this
+       runs exactly once, before the document loop. `userId` is no longer
+       ignored: executeWithRls turns it into audit.user_id, so the audit trigger
+       attributes these category rows to the person who ran the sync.
+       The three upserts run SEQUENTIALLY on `tx` — an interactive transaction is
+       one connection, so the previous Promise.all would have interleaved
+       statements on it. */
+    const upserted = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      const rows: { id: string; name: string; type: CategoryType }[] = [];
+      for (const s of seeds) {
+        rows.push(
+          await tx.category.upsert({
+            where: {
+              companyId_name_type: { companyId, name: s.name, type: s.type },
+            },
+            create: { companyId, name: s.name, type: s.type, color: s.color },
+            update: {},
+            select: { id: true, name: true, type: true },
+          }),
+        );
+      }
+      return rows;
+    });
 
     const find = (name: string, type: CategoryType) =>
       upserted.find((c) => c.name === name && c.type === type)!.id;
@@ -460,6 +522,7 @@ export class TaxService {
    * uncategorized-expense for RECIBIDO).
    */
   async applyCategoryRules(
+    tx: Prisma.TransactionClient,
     direction: DocumentDirection,
     defaults: DefaultCategoryIds,
     companyId: string,
@@ -469,11 +532,16 @@ export class TaxService {
     const movementType =
       direction === DocumentDirection.EMITIDO ? MovementType.INCOME : MovementType.EXPENSE;
 
+    /* HARDEN-004A — `tx` is forwarded so the rules lookup runs on the
+       GUC-carrying connection. Without it the read would see zero rules under a
+       live policy and every document would silently fall through to the default
+       category — miscategorisation, not an error. */
     const ruleMatch = await this.categoryRulesService.applyRules(
       companyId,
       rut,
       razonSocial,
       movementType,
+      tx,
     );
     if (ruleMatch) return ruleMatch;
 
@@ -482,20 +550,28 @@ export class TaxService {
       : defaults.uncategorizedExpense;
   }
 
+  /* HARDEN-004A — `_userId` KEEPS its underscore on purpose. This helper never
+     opens a transaction of its own: it runs inside the per-document scope the
+     caller opened, and that call is what set audit.user_id. So the value is
+     genuinely unused HERE, unlike in ensureDefaultCategories where it now feeds
+     executeWithRls directly. Kept in the signature so the call site stays
+     readable and so a future refactor that gives this helper its own scope has
+     the value already threaded. */
   async findOrCreateCounterparty(
+    tx: Prisma.TransactionClient,
     companyId: string,
     _userId: string,
     rut: string,
     name: string,
     direction: DocumentDirection,
   ): Promise<string> {
-    const existing = await this.prisma.counterparty.findUnique({
+    const existing = await tx.counterparty.findUnique({
       where: { companyId_taxId: { companyId, taxId: rut } },
       select: { id: true },
     });
     if (existing) return existing.id;
 
-    const created = await this.prisma.counterparty.create({
+    const created = await tx.counterparty.create({
       data: {
         companyId,
         name,
@@ -513,13 +589,14 @@ export class TaxService {
    * a duplicate. Returns true when a new movement was created.
    */
   async createMovementFromDocument(
+    tx: Prisma.TransactionClient,
     companyId: string,
     userId: string,
     taxDocId: string,
     fiscalPeriodId: string,
     defaults: DefaultCategoryIds,
   ): Promise<boolean> {
-    const taxDoc = await this.prisma.taxDocument.findUnique({
+    const taxDoc = await tx.taxDocument.findUnique({
       where: { id: taxDocId },
       select: {
         id: true,
@@ -544,6 +621,7 @@ export class TaxService {
     const counterpartyName = isIncome ? taxDoc.receiverName : taxDoc.issuerName;
 
     const counterpartyId = await this.findOrCreateCounterparty(
+      tx,
       companyId,
       userId,
       counterpartyRut,
@@ -552,6 +630,7 @@ export class TaxService {
     );
 
     const categoryId = await this.applyCategoryRules(
+      tx,
       taxDoc.direction,
       defaults,
       companyId,
@@ -562,7 +641,7 @@ export class TaxService {
     const typeLabel = DOCUMENT_TYPE_LABELS[taxDoc.type] ?? taxDoc.type;
     const description = `${typeLabel} #${taxDoc.folio} - ${counterpartyName}`;
 
-    const movement = await this.prisma.movement.create({
+    const movement = await tx.movement.create({
       data: {
         companyId,
         fiscalPeriodId,
@@ -583,7 +662,7 @@ export class TaxService {
       select: { id: true },
     });
 
-    await this.prisma.taxDocument.update({
+    await tx.taxDocument.update({
       where: { id: taxDoc.id },
       data: { movementId: movement.id, isReconciled: true },
     });

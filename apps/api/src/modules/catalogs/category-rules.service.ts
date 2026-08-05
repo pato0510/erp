@@ -130,13 +130,23 @@ export class CategoryRulesService {
    *  2. KEYWORD substring match on razonSocial (case-insensitive)
    * Each lookup is filtered to rules whose movementType matches the document
    * direction (INCOME / EXPENSE) or BOTH.
+   *
+   * HARDEN-004A — `tx` is OPTIONAL and additive: existing callers are unchanged.
+   * A caller already inside an executeWithRls scope (the SII sync) passes its
+   * transaction client so this lookup runs on the GUC-carrying connection.
+   * Without it, under a live RLS policy on `category_rules` the two reads below
+   * return ZERO rows and every document falls through to the caller's default
+   * category — silent miscategorisation rather than an error.
    */
   async applyRules(
     companyId: string,
     rut: string,
     razonSocial: string,
     movementType: CategoryRuleMatchableMovementType,
+    tx?: Prisma.TransactionClient,
   ): Promise<string | null> {
+    const db: Prisma.TransactionClient = tx ?? this.prisma;
+
     const movementFilter: CategoryRuleMovementType[] = [
       movementType === MovementType.INCOME
         ? CategoryRuleMovementType.INCOME
@@ -144,7 +154,7 @@ export class CategoryRulesService {
       CategoryRuleMovementType.BOTH,
     ];
 
-    const rutMatch = await this.prisma.categoryRule.findFirst({
+    const rutMatch = await db.categoryRule.findFirst({
       where: {
         companyId,
         isActive: true,
@@ -162,7 +172,7 @@ export class CategoryRulesService {
     // matchValue is contained in it (rule.matchValue ⊂ razonSocial).
     // Pull all keyword rules and test in JS so the comparison matches the
     // ticket's spec exactly (razonSocial.toUpperCase().includes(matchValue.toUpperCase())).
-    const keywordRules = await this.prisma.categoryRule.findMany({
+    const keywordRules = await db.categoryRule.findMany({
       where: {
         companyId,
         isActive: true,
