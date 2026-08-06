@@ -897,13 +897,15 @@ Ledger: HARDEN-000 (recon read-only, 17269d6) · DOC-PERMS-001 (matriz de
 permisos de plataforma, a707e8f) · HARDEN-001 (gateó los 9 endpoints abiertos
 del dashboard de Operaciones, 18d7473) · HARDEN-002 (gateó los 4 del calendario
 de Operaciones y REGISTRÓ el PoliciesGuard que faltaba, 66e7758) ·
-DOC-HARDEN-001 (correcciones de documentación, 2026-08-04) · **HARDEN-003**
+DOC-HARDEN-001 (correcciones de documentación, 24c2796) · **HARDEN-003**
 (recon read-only del switch de rol de base de datos → docs/HARDEN-003-ROLE-SWITCH-RECON.md,
 fd40530) · DOC-HARDEN-002 (verificación en producción + decisiones firmadas,
-2026-08-05).
+c9dfeeb) · **HARDEN-004A** (las escrituras del sync SII dentro de executeWithRls,
+f6855df) · DOC-HARDEN-003 (traspaso de dirección → docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING-2.md,
+SHA pendiente al commit).
 PENDIENTE: **HARDEN-004** — que ya NO es "el switch": la evidencia lo convirtió en
-una CAMPAÑA DE CÓDIGO cuyo ÚLTIMO paso es cambiar la variable (ver § Forma
-propuesta de HARDEN-004).
+una CAMPAÑA DE CÓDIGO cuyo ÚLTIMO paso es cambiar la variable. Firmado en CINCO
+piezas, orden **B → E → C → D** (ver § Plan firmado de HARDEN-004).
 Docs: docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING.md (contrato VIVO del arco) ·
 docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
 
@@ -1164,20 +1166,128 @@ necesita para no "corregirlas".
   cambio de DATABASE_URL, **nunca después**. La ventana de boot-loop se abre en el
   instante mismo del switch.
 
-## Forma propuesta de HARDEN-004 (propuesta del DIRECTOR, todavía SIN firmar)
+## Plan firmado de HARDEN-004 (FIRMADO por el fundador 2026-08-05)
 
-Ya no es un ticket: son **CUATRO piezas separadas**. Se registra como propuesta,
-no como decisión — el fundador todavía no la firmó.
+Ya no es un ticket: son **CINCO piezas separadas**, en orden **B → E → C → D**, con
+**E BLOQUEANTE antes de D**. (A) ya está en producción.
 
-- **(A) El sync SII escribiendo dentro de executeWithRls.** Cubre el 99,4% del
-  problema de escritura (6.554 de 6.594 filas). Pieza acotada, con nombre propio.
+- **(A) El sync SII escribiendo dentro de executeWithRls.** ✅ LISTO (f6855df).
+  Cubrió el 99,4% del problema de escritura (6.554 de 6.594 filas).
 - **(B) El nudo de arranque.** Las 16 lecturas de identidad enumeradas en el recon
-  (Q1.2), empezando por GET /auth/me. Sin esto no hay login utilizable.
+  (Q1.2), empezando por GET /auth/me. Sin esto no hay login utilizable. B1 escrita
+  sin commitear (ver § Estado de la pieza B).
+- **(E) Los FLUJOS que se apagan en silencio — BLOQUEANTE antes de D.** Cuatro
+  barridos de cron (contratos, certificaciones, documentos RRHH, escalamiento de
+  alertas) hacen el DESCUBRIMIENTO de empresas leyendo tablas con política sobre el
+  cliente pelado: bajo RLS viva eso devuelve cero filas, el cuerpo del loop no corre
+  nunca y **el job reporta éxito sin hacer nada**. Se suma NotificationService: sus
+  ESCRITURAS están perfectamente envueltas, pero sus resolutores de destinatarios
+  (resolveRoleUsers, resolveAlertRecipients y las lecturas de activo dentro de
+  createForAssetBlocked) corren en el cliente pelado — así que el wrapper es
+  INALCANZABLE: la escritura no ocurre porque la lectura que la alimenta no encontró
+  a nadie. **El descubrimiento cross-tenant necesita un REDISEÑO (enumerar empresas
+  primero, después iterar con contexto por empresa), no un wrapper** — no hay un
+  companyId único al que scopear un barrido que es estructuralmente cross-company.
 - **(C) La campaña de lectura.** 810 sitios sin GUC en 116 archivos. **Es la ÚNICA
   pieza que necesita un mecanismo nuevo**, y por lo tanto la única que necesita una
-  decisión de diseño del fundador (las opciones y sus costos están en el recon).
-- **(D) La división del start command más el cambio de DATABASE_URL.** ÚLTIMA, y
-  sujeta a la regla derivada de arriba.
+  decisión de diseño del fundador — **todavía NO tomada** (las opciones y sus costos
+  están en el recon, Q1.3 y Q4.3). No se empieza C escribiendo código.
+- **(D) La división del start command más el cambio de DATABASE_URL.** ÚLTIMA,
+  siempre, y sujeta a la regla derivada de arriba.
+
+## HARDEN-004A — cerrado (f6855df)
+
+- **Decisión firmada (2026-08-05): el sync es RESILIENTE POR DOCUMENTO.** Un
+  documento que falla cae en errors[] y el loop sigue; los anteriores quedan
+  commiteados y la corrida reporta éxito parcial.
+- **DOS transacciones POR DOCUMENTO, no una** — y esto corrige un spec equivocado
+  del propio director. La primera implementación envolvía upsertDocument y
+  createMovementFromDocument en UNA sola transacción, lo que cambiaba los contadores:
+  un documento cuyo movimiento fallaba dejaba de persistir. **Está mal, porque un
+  tax_document SIN movimiento es un estado DISEÑADO de primera clase**:
+  isReconciled:false alimenta el contador pendingReconciliation que devuelve
+  getSummary y que la UI renderiza. Hacer rollback del documento haría DESAPARECER
+  una factura del producto. Con dos transacciones, los contadores coinciden con el
+  comportamiento previo en los cuatro casos. **Que nadie las "simplifique" a una.**
+- **Bug pre-existente CERRADO:** movement.create y el taxDocument.update que los
+  enlaza eran dos sentencias sueltas; si fallaba la segunda quedaba un movimiento
+  HUÉRFANO con el documento sin movementId, el guard de idempotencia no disparaba y
+  la corrida siguiente creaba un **registro financiero DUPLICADO**. Ahora son
+  atómicos dentro de la misma transacción.
+- **Idempotencia verificada EN PRODUCCIÓN por el fundador**: re-sincronizar un
+  período ya sincronizado dio **puros skips** — sin documentos ni movimientos
+  duplicados.
+- **NO EJERCITADO: el camino de reglas de categorización.** No existe ninguna fila
+  CategoryRule en producción, así que applyRules devuelve null siempre y todo
+  documento toma la rama de categoría por defecto. **Queda pendiente de verificar
+  cuando se cree la primera regla.**
+
+## El caso forense COPEC (2026-08-05)
+
+Apareció un movimiento con una categoría que no era la default y sin ninguna regla
+que lo explicara. Dos consultas a audit_logs lo resolvieron: la fila se creó **00:19
+con la categoría por defecto del sistema y userId NULL** (el sync SII, que entonces
+escribía fuera de executeWithRls y por eso no dejaba audit.user_id), y fue
+**recategorizada 00:29 por un usuario identificado** — una persona, en la UI. Jamás
+existió una fila CategoryRule. **Qué probó:** (1) el trigger de auditoría funciona de
+verdad como CAPA FORENSE — respondió una pregunta que ningún log de aplicación podía;
+(2) **applyCategoryRules NO tiene heurísticas ocultas** — hace exactamente lo que
+dice, cae al default cuando ninguna regla matchea, y la anomalía fue acción humana,
+no código.
+
+## Decisiones firmadas — tenancy y pieza B (2026-08-05)
+
+- **V1: un tenant = una company.** Un usuario pertenece exactamente a una empresa.
+- **V2: un tenant puede tener VARIAS companies** (holdings chilenos); un usuario
+  puede entonces tener varias membresías, siempre dentro de SU tenant, **nunca
+  cruzando tenants**.
+- **EL ESQUEMA YA SOPORTA V2 — que nadie lo "simplifique"**: getMe devuelve un
+  ARRAY `companies`, el frontend ya tiene PICKER, y memberships lleva el único
+  compuesto (userId, companyId). Que hoy exista una sola empresa NO es motivo para
+  colapsar nada de eso.
+- **Opción 1 FIRMADA para memberships**: una SEGUNDA política, user-scoped y de SOLO
+  LECTURA, en vez de una función SECURITY DEFINER — esta última habría agregado una
+  segunda puerta privilegiada que custodiar.
+
+## Doctrina nueva — auditar FLUJOS, no escrituras
+
+> **"Una escritura correctamente envuelta no vale nada si la lectura que la alimenta
+> no tiene contexto."** (fundador, 2026-08-05)
+
+Un censo por-escritura — la forma que usó HARDEN-004A — marcaría NotificationService
+en verde. **No está en verde.** Cuando se audite el resto de la plataforma se auditan
+FLUJOS completos (descubrimiento → resolución → escritura), no sentencias sueltas.
+**ENGINE_USER_ID** ('00000000-0000-0000-0000-000000000000') es la identidad sintética
+SANCIONADA para escrituras de cron (precedente OPS-022); ya se usa en
+exceptions.service.ts:22, alert-escalation.service.ts:8 y alert-engine.service.ts:31.
+No inventar una segunda convención.
+
+## Estado de la pieza B (al cierre de esta dirección)
+
+- **B1 ESCRITA Y SIN COMMITEAR**: el directorio
+  `apps/api/prisma/schema/migrations/20260805120000_add_membership_user_read_policy/`
+  existe SOLO en el working tree del fundador. Queda transcrita ÍNTEGRA en el
+  apéndice de docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING-2.md por si se pierde.
+  **No se shippea hasta que se firme la decisión de companies, y la segunda política
+  va en el MISMO archivo** — una migración por problema, no una por tabla.
+- **B1-VERIFY midió (b): SE NECESITA UNA SEGUNDA POLÍTICA SOBRE companies.** Prisma
+  emite TRES sentencias separadas para getMe (no hay relationJoins), así que
+  companies se evalúa por su cuenta: con rls.user_id seteado y rls.company_id sin
+  setear, membership_self_read admite las filas del llamador pero company_isolation
+  evalúa NULL y la tercera sentencia devuelve CERO filas. El mapeo de getMe
+  desreferencia m.company.id sin guardas (auth.service.ts:130) y con company null
+  tira TypeError. **NO MEDIDO**: si Prisma devuelve company:null o descarta la
+  membresía — el rol local tiene BYPASSRLS, que es absoluto (ni FORCE ayudaría).
+- **La SQL propuesta (company_self_read) NO está firmada** y carga TRES decisiones
+  del fundador: (1) una política es a nivel de FILA, así que expone las ONCE columnas
+  de companies —incluido el JSON `settings`—, no las tres que usa getMe; (2) ensancha
+  más allá de getMe: con ambas GUC seteadas, CUALQUIER consulta a companies ve todas
+  las empresas del llamador, decisión de producto real bajo V2 (p. ej. el camino
+  tenancy.service.ts:23-25); (3) la condición isActive es elección de CC, con la
+  consecuencia de que desactivar una membresía apaga la visibilidad de esa empresa.
+- **Claims que el director saliente NO verificó** y el entrante debe chequear antes
+  de confiar: la SQL capturada, las mediciones de predicados,
+  tenancy.service.ts:23-25, el claim de no-recursión y iam.prisma:29-43.
 
 ## Backlog de endurecimiento V2 (diferido a propósito)
 
@@ -1204,8 +1314,35 @@ Cada ítem con la línea de por qué es seguro diferirlo:
 7. **Revocar la escritura de app_user sobre \_prisma_migrations** — seguro de
    diferir: endurecimiento fino; el runtime no toca esa tabla, solo el migrador.
 
-Última actualización: 2026-08-05 (DOC-HARDEN-002 — verificación en producción +
-decisiones firmadas del fundador)
+## Mejoras diferidas (nuevas, 2026-08-05)
+
+- **UX-001** — movimientos sin categorizar al final + sección colapsable. Va en el
+  sprint de mejoras; el freeze de frontend se mantiene hasta entonces.
+- **Sprint de mejoras** — categorías + las primeras reglas de categorización; UI de
+  historial de auditoría que responda "quién cambió esta categoría" (la pregunta
+  COPEC, vuelta autoservicio).
+- **CompaniesService.getSettings es un UPSERT disfrazado de getter**, sobre cliente
+  pelado — y calza con las 2 filas de company_settings sin contexto del audit de
+  producción.
+- **El barrido de flujos** — la generalización de la pieza E más allá de los cinco
+  sitios ya encontrados (escritura envuelta detrás de lectura rota).
+- **Limpieza de tax.service** — cuatro helpers deberían ser `private` (no tienen
+  llamadores externos), y el parámetro opcional `tx?` de
+  CategoryRulesService.applyRules es un footgun: si alguien lo olvida, la llamada se
+  escapa de la transacción en silencio.
+- **Asimetría fecha-vs-período del SII** — comportamiento DOCUMENTADO, no un bug.
+- **Verificación del camino de reglas** — pendiente de que exista la primera
+  CategoryRule (ver § HARDEN-004A).
+
+## Traspaso de dirección (2026-08-05)
+
+Sesión de director CERRADA el 2026-08-05. **La entrada del nuevo director es
+docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING-2.md** (orden de lectura, estado del arco,
+las dos planillas de roles, el plan firmado, el ledger diferido y el checklist de la
+primera hora). handoff-1 queda como HISTORIA: sigue siendo válido en sus
+correcciones en sitio, pero ya no es el punto de entrada.
+
+Última actualización: 2026-08-05 (DOC-HARDEN-003 — traspaso de dirección)
 
 # Próximos pasos
 

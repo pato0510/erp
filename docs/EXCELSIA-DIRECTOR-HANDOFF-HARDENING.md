@@ -1,5 +1,13 @@
 # Excelsia — Director Handoff: the Hardening Arc (roles, access, tenant isolation)
 
+> **SUPERSEDED AS THE ENTRY POINT (2026-08-05).** The current entry point for an
+> incoming director is **`docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING-2.md`**. This file
+> is kept **intact as history** — it is the record of the arc's first leg. Its
+> in-place corrections (the 87-of-90 RLS counts in §3.7, the §5.1 GRANT-inventory
+> scope, the §5.2 code-campaign correction, and the §3.6 `app_user` credential note)
+> **remain valid** and were not rolled back. Where this file and `CLAUDE.md`
+> disagree, `CLAUDE.md` wins, as always.
+
 **Written by:** the outgoing technical director, 2026-08-04
 **For:** the incoming technical director (and a fresh Claude Code session)
 **HEAD at handoff:** `66e7758` — `fix(operations): gate the four open calendar endpoints (HARDEN-002)`
