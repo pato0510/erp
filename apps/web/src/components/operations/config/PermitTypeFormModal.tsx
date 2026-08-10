@@ -63,7 +63,6 @@ export interface PermitTypeSubmit {
   description?: string;
   icon?: string;
   color?: string;
-  isActive: boolean;
 }
 
 interface Props {
@@ -97,7 +96,6 @@ export function PermitTypeFormModal({ mode, permitType, onClose, onSave }: Props
   const [description, setDescription] = useState(permitType?.description ?? '');
   const [icon, setIcon] = useState(permitType?.icon ?? '');
   const [color, setColor] = useState(permitType?.color ?? DEFAULT_COLOR);
-  const [isActive, setIsActive] = useState(permitType?.isActive ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -135,7 +133,6 @@ export function PermitTypeFormModal({ mode, permitType, onClose, onSave }: Props
         description: description.trim() || undefined,
         icon: icon.trim() || undefined,
         color: color || undefined,
-        isActive,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar.');
@@ -333,22 +330,11 @@ export function PermitTypeFormModal({ mode, permitType, onClose, onSave }: Props
         </ConfigField>
       </ConfigGrid>
 
-      {mode === 'edit' && (
-        <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-[var(--border-color)] hover:bg-[var(--input-bg)]">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            className="mt-0.5"
-          />
-          <div
-            className="text-sm text-[var(--text-primary)]"
-            style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
-          >
-            Activo
-          </div>
-        </label>
-      )}
+      {/* Deactivation is deliberately NOT part of this form: it goes through
+          the list's delete action → DELETE /permit-types/:id, whose service
+          enforces the active-permits usage guard (PermitTypesService.remove).
+          Reactivation has no path today — registered as a product decision
+          (OPS-039). */}
     </ConfigModalShell>
   );
 }
