@@ -164,7 +164,7 @@ synthetic identity for cron writes** (OPS-022 precedent). It is already used at
 a background write, use this — do not invent a second convention.
 
 **Seeded substrate — the debt that blocks honest verification.** `prisma/seed.ts`
-creates **one company** and **five of the six roles** (no SUPER_ADMIN), the four
+creates **one company** and **five of the six roles** (no `SUPER_ADMIN`), the four
 non-admin ones behind `NODE_ENV !== 'production'` (`seed.ts:84`). There is **no
 foreign-company fixture in the repo** — "HARDEN-001 Foreign Co" exists only as a row
 in a local database. The cross-tenant evidence the arc runs on is therefore **not
@@ -375,7 +375,8 @@ are perfectly wrapped but whose **recipient resolvers** — `resolveRoleUsers`,
 the bare client. The wrapper is therefore **unreachable**: the write never happens
 because the read that feeds it found nobody.
 
-**The doctrine, verbatim, in the founder's words:**
+**The doctrine, verbatim — the previous director's words, signed by the founder
+(2026-08-05):**
 
 > _"Una escritura correctamente envuelta no vale nada si la lectura que la alimenta no
 > tiene contexto."_
@@ -491,6 +492,15 @@ not the reliable narrator either. Read the code. Measure. Then decide.
 ---
 
 ## Appendix — the uncommitted HARDEN-004B1 migration, in full
+
+> **SUPERSEDED 2026-08-10.** This appendix transcribes the **64-line, B1-only
+> draft**. The migration that actually shipped (commit `c7d0ef7`, deployed
+> 2026-08-10) carries **BOTH** policies — B1 `membership_self_read` **and** B2
+> `company_self_read` — and the committed file
+> `apps/api/prisma/schema/migrations/20260805120000_add_membership_user_read_policy/migration.sql`
+> is the **sole source of truth**. The three §4 `company_self_read` questions were
+> **signed by the founder on 2026-08-06**; the acta is in the `CLAUDE.md` ledger
+> (§ HARDEN-004B1/B2). This appendix is kept **as history** and is not updated.
 
 Path:
 `apps/api/prisma/schema/migrations/20260805120000_add_membership_user_read_policy/migration.sql`

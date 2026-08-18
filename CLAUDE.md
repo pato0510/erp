@@ -902,6 +902,9 @@ DOC-HARDEN-001 (correcciones de documentación, 24c2796) · **HARDEN-003**
 fd40530) · DOC-HARDEN-002 (verificación en producción + decisiones firmadas,
 c9dfeeb) · **HARDEN-004A** (las escrituras del sync SII dentro de executeWithRls,
 f6855df) · DOC-HARDEN-003 (traspaso de dirección → docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING-2.md,
+0806fb3) · **HARDEN-004B1/B2** (el nudo de arranque: UNA migración con DOS
+políticas —membership_self_read + company_self_read—, c7d0ef7, desplegada
+2026-08-10) · DOC-HARDEN-004 (firmas, incidentes y correcciones de esta sesión,
 SHA pendiente al commit).
 PENDIENTE: **HARDEN-004** — que ya NO es "el switch": la evidencia lo convirtió en
 una CAMPAÑA DE CÓDIGO cuyo ÚLTIMO paso es cambiar la variable. Firmado en CINCO
@@ -1262,15 +1265,70 @@ SANCIONADA para escrituras de cron (precedente OPS-022); ya se usa en
 exceptions.service.ts:22, alert-escalation.service.ts:8 y alert-engine.service.ts:31.
 No inventar una segunda convención.
 
-## Estado de la pieza B (al cierre de esta dirección)
+## HARDEN-004B1/B2 — cerrado (c7d0ef7, desplegado 2026-08-10)
 
-- **B1 ESCRITA Y SIN COMMITEAR**: el directorio
-  `apps/api/prisma/schema/migrations/20260805120000_add_membership_user_read_policy/`
-  existe SOLO en el working tree del fundador. Queda transcrita ÍNTEGRA en el
-  apéndice de docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING-2.md por si se pierde.
-  **No se shippea hasta que se firme la decisión de companies, y la segunda política
-  va en el MISMO archivo** — una migración por problema, no una por tabla.
-- **B1-VERIFY midió (b): SE NECESITA UNA SEGUNDA POLÍTICA SOBRE companies.** Prisma
+UNA migración, DOS políticas — el problema era UNO SOLO ("un usuario no puede
+arrancar en el producto") y por eso viajó en un solo archivo:
+`20260805120000_add_membership_user_read_policy`. B1 agregó **membership_self_read
+ON memberships**; B2 agregó **company_self_read ON companies**. Las dos son
+PERMISSIVE y FOR SELECT, así que ORean con las existentes y **no tocan la
+escritura**: membership_isolation y company_isolation siguen siendo las ÚNICAS que
+la habilitan (son FOR ALL sin WITH CHECK, o sea su USING hace de chequeo de
+escritura). Ritual de despliegue completo: Railway deployment abeb3105, con la
+línea literal "Applying migration 20260805120000_add_membership_user_read_policy"
+cazada en los logs de deploy de api a las 14:14:32Z.
+**Ambas políticas están INERTES hoy**: el runtime conecta como postgres
+(superusuario + BYPASSRLS), así que no muerden hasta la pieza D.
+
+```
+ACTA — company_self_read, tres decisiones del fundador (2026-08-06):
+1. NIVEL-FILA ACEPTADO: la política otorga la fila completa de companies
+   (once columnas, settings incluido) únicamente a miembros con membresía
+   activa de esa empresa — jamás a terceros. Lo que el usuario ve sigue
+   siendo el mínimo que la aplicación devuelve (getMe: id, name, taxId).
+   Exposición marginal contra el estado previo: de timing, no de datos.
+2. ENSANCHE ACEPTADO COMO SIGNIFICADO DE DISEÑO: un usuario puede leer la
+   fila de toda empresa a la que pertenece (membresía activa), en cualquier
+   consulta, antes y después de seleccionar empresa. Acotado a su propio
+   tenant por construcción; manda la pertenencia, no el holding (2 de 3 ⇒
+   ve 2). Si una superficie V2 debe mostrar menos, es un WHERE de aplicación
+   en esa superficie: la política es el piso, la aplicación angosta.
+3. CONDICIÓN isActive MANTENIDA: desactivar una membresía revoca al
+   instante, en el piso de la base, la visibilidad de la fila de esa
+   empresa. Consecuencia aceptada y fechada: una vista histórica futura que
+   resuelva el nombre vía membresía desactivada lo verá en blanco.
+   Asimetría deliberada con membership_self_read (sin isActive) registrada.
+```
+
+## Incidente de drift local — COM-010 (2026-08-10)
+
+`prisma migrate dev` detectó **drift de checksum** sobre
+`20260707120000_add_quotes`. La historia git de ese archivo tiene **UN SOLO commit**
+(3731d66, 2026-07-07 — verificado por la API de GitHub), así que el archivo
+commiteado **nunca se enmendó** y **producción coincide con el repo**: el drift era
+LOCAL. Causa: durante el loop de COM-010 la base local había aplicado un borrador
+PREVIO a la corrección — el gate de sintaxis corrió ANTES de la revisión adversarial.
+Resuelto con `prisma migrate reset`, que replayó las 78 migraciones desde cero y de
+paso sirvió como **gate de sintaxis de cadena completa para HARDEN-004B**.
+**Lección registrada: el gate de sintaxis local corre DESPUÉS de la revisión
+adversarial y de sus correcciones** — el drift de julio es la cicatriz del orden
+inverso.
+
+## Estado de la pieza B (actualizado 2026-08-10)
+
+- **DECISIONES FIRMADAS (2026-08-06) y MIGRACIÓN CERRADA**: las tres preguntas
+  abiertas sobre company_self_read quedaron firmadas por el fundador (acta completa
+  en § HARDEN-004B1/B2), la migración se commiteó en c7d0ef7 y se desplegó el
+  2026-08-10. **Las dos políticas están vivas en producción y INERTES hasta la
+  pieza D** (el runtime todavía conecta como postgres, que bypassa RLS).
+- **LO QUE QUEDA DE LA PIEZA B ES EL LADO CÓDIGO**: setear `rls.user_id` desde el
+  JWT en los caminos de lectura de identidad — getMe y la lista Q1.2 del recon. Sin
+  eso las políticas nuevas no tienen de dónde leer la GUC. **Se diseña como ticket
+  propio y bajo la DOCTRINA DEL POOL**: solo SET LOCAL, siempre dentro de la
+  transacción, con la conexión pineada — el atajo de setear la GUC una vez por
+  request sobre una conexión pooleada fabrica exactamente la fuga cross-tenant que
+  el arco viene a cerrar.
+- **B1-VERIFY, lo medido (se conserva porque sigue siendo la evidencia):** Prisma
   emite TRES sentencias separadas para getMe (no hay relationJoins), así que
   companies se evalúa por su cuenta: con rls.user_id seteado y rls.company_id sin
   setear, membership_self_read admite las filas del llamador pero company_isolation
@@ -1278,16 +1336,17 @@ No inventar una segunda convención.
   desreferencia m.company.id sin guardas (auth.service.ts:130) y con company null
   tira TypeError. **NO MEDIDO**: si Prisma devuelve company:null o descarta la
   membresía — el rol local tiene BYPASSRLS, que es absoluto (ni FORCE ayudaría).
-- **La SQL propuesta (company_self_read) NO está firmada** y carga TRES decisiones
-  del fundador: (1) una política es a nivel de FILA, así que expone las ONCE columnas
-  de companies —incluido el JSON `settings`—, no las tres que usa getMe; (2) ensancha
-  más allá de getMe: con ambas GUC seteadas, CUALQUIER consulta a companies ve todas
-  las empresas del llamador, decisión de producto real bajo V2 (p. ej. el camino
-  tenancy.service.ts:23-25); (3) la condición isActive es elección de CC, con la
-  consecuencia de que desactivar una membresía apaga la visibilidad de esa empresa.
-- **Claims que el director saliente NO verificó** y el entrante debe chequear antes
-  de confiar: la SQL capturada, las mediciones de predicados,
-  tenancy.service.ts:23-25, el claim de no-recursión y iam.prisma:29-43.
+- **Claims del §4 — TODOS CERRADOS (2026-08-06)**: `tenancy.service.ts:23-25` e
+  `iam.prisma:29-43` re-verificados EXACTOS por el director saliente (adenda
+  post-commit). La SQL capturada, las mediciones de predicados y el claim de
+  no-recursión re-verificados por el director entrante CONTRA EL REPO: el
+  mecanismo de las tres sentencias (generator sin previewFeatures, ^6.19.3,
+  getMe sin relationLoadStrategy) y los textos reales de las políticas
+  (20260417171836:15-16 y :21-22) confirman las derivaciones por lógica
+  trivaluada; búsqueda exhaustiva confirma UNA sola política commiteada por
+  tabla (no-recursión: razonamiento sobre texto verificado). Los residuos que
+  SOLO se miden en vivo (captura literal, evaluación bajo enforcement) salen
+  gratis en el rollout local con app_user.
 
 ## Backlog de endurecimiento V2 (diferido a propósito)
 
@@ -1333,6 +1392,8 @@ Cada ítem con la línea de por qué es seguro diferirlo:
 - **Asimetría fecha-vs-período del SII** — comportamiento DOCUMENTADO, no un bug.
 - **Verificación del camino de reglas** — pendiente de que exista la primera
   CategoryRule (ver § HARDEN-004A).
+- **Deprecación Prisma 7** — la configuración `package.json#prisma` debe migrar a
+  `prisma.config.ts` antes de Prisma 7; hoy solo emite un warning, es inofensiva.
 
 ## Traspaso de dirección (2026-08-05)
 
@@ -1342,7 +1403,8 @@ las dos planillas de roles, el plan firmado, el ledger diferido y el checklist d
 primera hora). handoff-1 queda como HISTORIA: sigue siendo válido en sus
 correcciones en sitio, pero ya no es el punto de entrada.
 
-Última actualización: 2026-08-05 (DOC-HARDEN-003 — traspaso de dirección)
+Última actualización: 2026-08-10 (DOC-HARDEN-004 — firmas, incidentes y
+correcciones de sesión)
 
 # Próximos pasos
 
@@ -1378,6 +1440,34 @@ correcciones en sitio, pero ya no es el punto de entrada.
   une los arrays de constraints con ' · ' (:46), dejando el path de string
   byte-idéntico. Deuda registrada: el filtro sigue SIN spec (tres ramas:
   string, string[], no-HttpException) — crear una cuando se lo toque.
+- OPS-039 — CREAR Y EDITAR tipos de permiso estaba ROTO EN PRODUCCIÓN (c89491f,
+  live 2026-08-10; api y web SUCCESS 14:59Z). El formulario mandaba siempre
+  isActive y create-permit-type.dto.ts NO lo declara — es el ÚNICO DTO de
+  configuración de la familia que lo omite: la auditoría de hermanos encontró que
+  AssetType, AssetSubtype, Location, DocumentType y WorkPermitType SÍ whitelistean
+  todos los campos que mandan sus modales, isActive incluido. Con el ValidationPipe
+  global (main.ts, whitelist + forbidNonWhitelisted) el campo colado se convierte en
+  400 tanto en create como en edit. Lo destapó el primer tipo de permiso CUSTOM
+  después del setup inicial por seed-defaults. Fix SOLO de web: el formulario dejó
+  de mandar isActive y se borró el toggle muerto de modo edición; la desactivación
+  sigue viviendo EXCLUSIVAMENTE en el DELETE guardado (PermitTypesService.remove,
+  soft-delete con guard de permisos activos). OBSERVACIÓN de familia (observación,
+  no ticket): los DTO hermanos SÍ aceptan isActive por update — bypass latente del
+  guard SI algún delete hermano llegara a llevar guard de uso. Notas de proceso: el
+  mensaje de commit se desvió del bloque aprobado (literal: "fix op: stop sending
+  isActive from the permittype form OPS039" — conventional-commit malformado, ID de
+  ticket sin guion); la historia publicada NO se reescribe, la desviación queda
+  registrada acá. Y la sesión acumuló DOS fallas de fidelidad en los reportes de CC
+  (el reporte de B2 llegó corrupto en transporte con el archivo sano debajo; el de
+  OPS-039 declaró 357→347 líneas cuando el cambio real fue −14, zanjado con los
+  stats de GitHub +5/−19) — reafirmando la doctrina: **manda la salida cruda del
+  archivo, no lo que dice el reporte**.
+- DECISIÓN DE PRODUCTO REGISTRADA, PENDIENTE (2026-08-10): **la reactivación de un
+  tipo de permiso es imposible hoy**. remove() solo setea isActive=false, ninguna
+  ruta lo vuelve a poner en true, y seed-defaults saltea los códigos existentes —
+  un tipo desactivado queda trabado para siempre. El fundador decide si se
+  construye un camino de reactivación y cuándo (necesitaría endpoint propio,
+  gating y diseño).
 - Manual de Comercial (V1 ya en producción).
 - Manual de HSEC (V1 ya en producción — se suma a los manuales pendientes).
 - Bump rutinario de dependencias (incorpora el fix de Next.js PR #88688,
