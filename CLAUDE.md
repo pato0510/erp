@@ -517,12 +517,14 @@ QA doc: docs/EXCELSIA-RRHH-QA-PRE-DESBLOQUEO.md
 ═══════════════════════════════════════════════════════════════════
 
 Status: V1 completo (COM-001…COM-015), desplegado y visible en /modulos.
-Post-V1: COM-016 (notas internas de oportunidad, 2026-09-15 — ver bloque abajo).
+Post-V1: COM-016 (notas internas de oportunidad) y COM-017 (documentos adjuntos
+de oportunidad), 2026-09-15 — ver bloques abajo.
 Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
 Tablas: service_catalog, accounts, contacts, opportunities,
-opportunity_services, activities, opportunity_notes, quotes, quote_lines
+opportunity_services, activities, opportunity_notes, opportunity_documents,
+quotes, quote_lines
 (+ service_orders en Operaciones, target del handoff COM-013a).
 
 Puntos clave:
@@ -579,8 +581,60 @@ Puntos clave:
   `activity` + `manageAny` = `manage` sobre el subject, true solo ADMIN/SUPER_ADMIN);
   el componente gatea Agregar/Editar/Eliminar SOLO con esos flags — cero strings
   de rol en el frontend; useAuth aporta únicamente el id del usuario actual.
+- COM-017 — DOCUMENTOS DE OPORTUNIDAD (2026-09-15): archivos adjuntos al
+  negocio (cotizaciones hechas FUERA de Excelsia, actas de reunión, otros) —
+  nada que ver con las cotizaciones in-app de COM-010, que son registros.
+  Tabla `opportunity_documents` (migración hand-authored
+  `20260916130000_add_opportunity_documents`: CREATE TYPE
+  `OpportunityDocumentKind` {COTIZACION, ACTA_REUNION, OTRO} + tabla + índices +
+  ENABLE RLS + política `opportunity_document_isolation` con la MISMA expresión
+  que `opportunity_note_isolation` + GRANT `app_user` + trigger
+  `audit_opportunity_documents`). HIJA DEPENDIENTE del negocio (CASCADE),
+  relación `documents` en Opportunity. MECANISMO DE STORAGE: el ÚNICO cliente
+  S3 existente (StorageService; vars MINIO_ENDPOINT / MINIO_ACCESS_KEY /
+  MINIO_SECRET_KEY / MINIO_BUCKET; bucket `MINIO_BUCKET || 'excelsia-documents'`,
+  la misma constante que RRHH) con subida SERVER-STREAMED (multipart vía
+  `FileInterceptor('file')`, como RRHH documents — no hay presigned PUT en el
+  código) y descarga STREAMED por la API (`StorageService.downloadFile` +
+  `Content-Disposition: attachment`, los mismos headers que RRHH documents; el
+  helper `getFileUrl` de URL firmada existe pero NINGÚN controlador lo usa y
+  jamás se ejercitó contra el endpoint configurado — la ruta streamed es la
+  probada en producción). Excepción firmada por el fundador (Pato, 2026-09-15):
+  `opportunity_documents` no usa el fallback de blob en DB (decisión
+  arquitectónica 10). R2 es el único almacenamiento; si storage falla, la API
+  responde 503 sin escribir fila. Motivo: a 20 MB por documento, el fallback
+  convertiría a Postgres en almacén de archivos. Key:
+  `companies/<companyId>/opportunities/<opportunityId>/<uuid>-<safeName>`.
+  Validación ANTES de tocar storage: allowlist por EXTENSIÓN {pdf, docx, xlsx,
+  png, jpg, jpeg}; el MIME declarado debe coincidir con el de la extensión o ser
+  `application/octet-stream` (Windows sin Office etiqueta así .docx/.xlsx; en
+  ese caso se almacena el MIME derivado de la extensión); cualquier otra
+  combinación → 400. Máx 20 MB (también en el
+  interceptor → 413 de multer, mapeado a español en el FE), fileName saneado
+  (sin separadores de ruta ni caracteres de control, espacios colapsados,
+  extensión preservada, tope 200). Sin sniffing de magic bytes (ningún módulo
+  lo hace). SOFT DELETE: `deletedAt`; el objeto en R2 se conserva (purga dura =
+  V2); listas y descargas excluyen borrados (404). CASL:
+  `OpportunityDocumentSubject` ESPEJA `OpportunityNoteSubject` línea a línea;
+  flag propio `opportunityDocument` (CRUD + `manageAny`) en
+  /comercial/permissions; borra el autor o quien tenga `manage`
+  (ADMIN/SUPER_ADMIN vía `@CurrentAbility`). Endpoints
+  `/comercial/opportunity-documents` (GET ?opportunityId · POST multipart · GET
+  :id/download → bytes (attachment) · DELETE :id), todos con `@CheckPolicies`.
+  FE: sección "Documentos" tras "Notas" en /comercial/pipeline/[id]
+  (`opportunity-documents.tsx`, espejo de `opportunity-notes.tsx`: select de
+  tipo + input file + "Subir documento", lista con badge de tipo, nombre =
+  descarga vía `apiClient.fetchBlob` → object URL → click de anchor (el handler
+  de `EmployeeDocumentsTab`), tamaño, autor, fecha; mutate→refetch).
+- UI-002 — Hub como landing y movimiento sobrio en tarjetas (2026-09-15): `/`
+  redirige a `/modulos` (el login ya lo hacía; sin URL de retorno en V1);
+  tarjetas del hub con entrada escalonada (240 ms, stagger 25 ms, < 400 ms
+  total) y hover/focus de −2 px + borde accent (180 ms), CSS puro sin
+  dependencias; `prefers-reduced-motion` desactiva todo; la entrada se
+  reproduce en cada montaje del hub. Archivos: `app/page.tsx`,
+  `app/modulos/page.tsx`, `global.css`.
 
-Última actualización: 2026-09-15 (COM-016)
+Última actualización: 2026-09-15 (COM-017 + UI-002)
 
 ═══════════════════════════════════════════════════════════════════
 

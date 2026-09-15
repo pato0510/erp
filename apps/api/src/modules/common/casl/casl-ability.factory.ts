@@ -55,6 +55,7 @@ type Subjects =
       | typeof OpportunitySubject
       | typeof ActivitySubject
       | typeof OpportunityNoteSubject
+      | typeof OpportunityDocumentSubject
       | typeof ServiceCatalogSubject
       | typeof QuoteSubject
       | typeof CampaignSubject
@@ -271,6 +272,13 @@ class ActivitySubject {
 class OpportunityNoteSubject {
   static readonly modelName = 'OpportunityNote' as const;
 }
+/* COM-017 — files attached to an opportunity. Grants MIRROR OpportunityNoteSubject line
+   for line (which itself mirrors Activity): MANAGER CRUD, ACCOUNTANT read, ANALYST/VIEWER
+   nothing. Author-or-ADMIN soft delete is enforced in the service (the ADMIN check is
+   `manage` on this subject — never a role string). */
+class OpportunityDocumentSubject {
+  static readonly modelName = 'OpportunityDocument' as const;
+}
 class ServiceCatalogSubject {
   static readonly modelName = 'ServiceCatalog' as const;
 }
@@ -365,6 +373,7 @@ const COMERCIAL_SUBJECTS = [
   OpportunitySubject,
   ActivitySubject,
   OpportunityNoteSubject,
+  OpportunityDocumentSubject,
   ServiceCatalogSubject,
   QuoteSubject,
 ];
@@ -489,6 +498,7 @@ export {
   OpportunitySubject,
   ActivitySubject,
   OpportunityNoteSubject,
+  OpportunityDocumentSubject,
   ServiceCatalogSubject,
   QuoteSubject,
   CampaignSubject,
@@ -612,6 +622,8 @@ export class CaslAbilityFactory {
         can(['read', 'create', 'update', 'delete'], ActivitySubject);
         /* COM-016 — opportunity notes mirror the activity profile → full CRUD. */
         can(['read', 'create', 'update', 'delete'], OpportunityNoteSubject);
+        /* COM-017 — opportunity documents mirror the note profile → full CRUD. */
+        can(['read', 'create', 'update', 'delete'], OpportunityDocumentSubject);
         /* COM-010 — quotes (quotation documents) share the same profile → full CRUD.
            This is the LAST Comercial subject to leave the COM-001 floor. */
         can(['read', 'create', 'update', 'delete'], QuoteSubject);
@@ -685,6 +697,8 @@ export class CaslAbilityFactory {
         can('read', ActivitySubject);
         /* COM-016 — opportunity notes mirror activities: ACCOUNTANT read-only. No write. */
         can('read', OpportunityNoteSubject);
+        /* COM-017 — opportunity documents mirror notes: ACCOUNTANT read-only. No write. */
+        can('read', OpportunityDocumentSubject);
         /* COM-010 — quotes: ACCOUNTANT read-only (document visibility). No write. */
         can('read', QuoteSubject);
         /* MKT-001 — default-deny floor on all Marketing subjects, then re-grant

@@ -21,6 +21,7 @@ import {
 } from '../../../../../components/comercial/stageLabels';
 import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
 import OpportunityNotes from './opportunity-notes';
+import OpportunityDocuments from './opportunity-documents';
 import { OpportunityBundle } from '../../../../../components/comercial/OpportunityBundle';
 import { OpportunityQuotes } from '../../../../../components/comercial/OpportunityQuotes';
 import { AvailableStaff } from '../../../../../components/comercial/AvailableStaff';
@@ -354,6 +355,17 @@ export default function OpportunityDetailPage() {
           Notas
         </h2>
         <OpportunityNotes opportunityId={opp.id} />
+      </div>
+
+      {/* COM-017 — files attached to the deal (external quotes, minutes, others). */}
+      <div className="mt-4">
+        <h2
+          className="mb-3 text-sm font-semibold text-[var(--text-primary)]"
+          style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
+        >
+          Documentos
+        </h2>
+        <OpportunityDocuments opportunityId={opp.id} />
       </div>
 
       {/* COM-007b — Delete danger zone (writers only). Hidden entirely for a closed

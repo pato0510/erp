@@ -4,6 +4,7 @@ import {
   ActivitySubject,
   AvailabilitySubject,
   ContactSubject,
+  OpportunityDocumentSubject,
   OpportunityNoteSubject,
   OpportunitySubject,
   QuoteSubject,
@@ -65,6 +66,7 @@ export class ComercialController {
         | typeof AccountSubject
         | typeof ActivitySubject
         | typeof ContactSubject
+        | typeof OpportunityDocumentSubject
         | typeof OpportunityNoteSubject
         | typeof OpportunitySubject
         | typeof QuoteSubject
@@ -91,6 +93,13 @@ export class ComercialController {
       opportunityNote: {
         ...flagsFor(OpportunityNoteSubject),
         manageAny: ability.can('manage', OpportunityNoteSubject),
+      },
+      // COM-017 — the document list gates upload/delete on opportunityDocument writes
+      // (mirror of opportunityNote). `manageAny` = `manage` on the subject: the same
+      // delete-any escape hatch (ADMIN/SUPER_ADMIN) the service enforces.
+      opportunityDocument: {
+        ...flagsFor(OpportunityDocumentSubject),
+        manageAny: ability.can('manage', OpportunityDocumentSubject),
       },
       // COM-010 — the quote editor gates create/edit/status/delete on quote writes;
       // ACCOUNTANT reads quotes but sees no controls.

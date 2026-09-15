@@ -186,6 +186,7 @@ model Opportunity {
   activities Activity[] // COM-008 — timeline entries linked to this deal (FK ON DELETE SET NULL)
   quotes     Quote[] // COM-010 — quotes issued for this deal (FK ON DELETE RESTRICT — blocks opp delete)
   noteThread OpportunityNote[] // COM-016 — internal note thread (FK ON DELETE CASCADE). Named noteThread: `notes` is already the COM-005 scalar
+  documents  OpportunityDocument[] // COM-017 — files attached to this deal (FK ON DELETE CASCADE; soft-deleted rows stay)
 
   @@index([companyId])
   @@index([accountId])
@@ -299,6 +300,52 @@ model OpportunityNote {
   @@index([companyId])
   @@index([opportunityId, createdAt(sort: Desc)])
   @@map("opportunity_notes")
+}
+
+/* COM-017 — document kinds for files attached to a deal. ASCII members; display
+   labels live in the UI (ACTA_REUNION → "Acta de reunión"). COTIZACION here is a
+   quote produced OUTSIDE Excelsia (a file) — unrelated to the COM-010 in-app quote
+   records. */
+enum OpportunityDocumentKind {
+  COTIZACION
+  ACTA_REUNION
+  OTRO
+}
+
+/* COM-017 — opportunity_documents: files attached to a deal (external quotes, meeting
+   minutes, other documents). A document is a DEPENDENT CHILD of the opportunity — FK
+   ON DELETE CASCADE, like notes — and NOT account history. The bytes live in object
+   storage (MinIO local / R2 prod, the single StorageService client) under
+   `storageKey` = companies/<companyId>/opportunities/<opportunityId>/<uuid>-<safeName>;
+   there is NO DB blob column (founder-signed exception, 2026-09-15), so an upload with
+   storage unavailable FAILS instead of falling back; downloads STREAM the bytes through
+   the API exactly like RRHH documents. Validation before any storage call: extension
+   allowlist (pdf/docx/xlsx/png/jpg/jpeg), declared MIME must match the extension or be
+   application/octet-stream (then the stored MIME is derived), max 20 MB, fileName
+   sanitized (1..200 chars,
+   extension preserved). SOFT DELETE: `deletedAt` keeps the audit story and the object
+   (hard purge is V2); lists and downloads exclude soft-deleted rows. createdBy is the
+   bare actor UUID from the JWT (no FK — codebase convention); the author or a caller
+   with `manage` on the subject (ADMIN/SUPER_ADMIN) deletes. Platform invariant
+   (RLS + audit + GRANT) is in migration 20260916130000_add_opportunity_documents. */
+model OpportunityDocument {
+  id            String                  @id @default(uuid()) @db.Uuid
+  companyId     String                  @db.Uuid
+  opportunityId String                  @db.Uuid
+  kind          OpportunityDocumentKind
+  fileName      String // sanitized display name, 1..200 chars, extension preserved
+  mimeType      String
+  sizeBytes     Int
+  storageKey    String // companies/<companyId>/opportunities/<opportunityId>/<uuid>-<safeName>
+  createdBy     String                  @db.Uuid // bare actor UUID from JWT, no FK (codebase convention)
+  createdAt     DateTime                @default(now())
+  deletedAt     DateTime? // soft delete; the R2 object is retained (hard purge is V2)
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([opportunityId, createdAt(sort: Desc)])
+  @@map("opportunity_documents")
 }
 
 /* COM-010 — quote lifecycle. BORRADOR (editable draft) → ENVIADA (immutable, sent to

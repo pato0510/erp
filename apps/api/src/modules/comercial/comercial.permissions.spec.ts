@@ -26,6 +26,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
       expect(p.opportunity).toEqual(FULL);
       expect(p.activity).toEqual(FULL);
       expect(p.opportunityNote).toEqual({ ...FULL, manageAny: true }); // COM-016 — delete-any via manage all
+      expect(p.opportunityDocument).toEqual({ ...FULL, manageAny: true }); // COM-017 — same shape
       expect(p.quote).toEqual(FULL);
       expect(p.serviceCatalog).toEqual(FULL);
       expect(p.availability).toEqual({ read: true }); // COM-012
@@ -39,6 +40,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
     expect(p.opportunity).toEqual(FULL);
     expect(p.activity).toEqual(FULL);
     expect(p.opportunityNote).toEqual({ ...FULL, manageAny: false }); // COM-016 — CRUD, but never delete-any
+    expect(p.opportunityDocument).toEqual({ ...FULL, manageAny: false }); // COM-017 — same shape
     expect(p.quote).toEqual(FULL);
     expect(p.serviceCatalog).toEqual(FULL);
     expect(p.availability).toEqual({ read: true }); // COM-012 — RRHH §1.2 availability audience
@@ -51,6 +53,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
     expect(p.opportunity).toEqual(READ_ONLY); // COM-007 — sees the board, cannot mutate
     expect(p.activity).toEqual(READ_ONLY); // COM-008 — sees timelines, cannot register/edit/delete
     expect(p.opportunityNote).toEqual({ ...READ_ONLY, manageAny: false }); // COM-016 — sees the thread, cannot write
+    expect(p.opportunityDocument).toEqual({ ...READ_ONLY, manageAny: false }); // COM-017 — sees files, cannot upload/delete
     expect(p.quote).toEqual(READ_ONLY); // COM-010 — sees quotes, cannot create/edit/send/delete
     expect(p.serviceCatalog).toEqual(READ_ONLY);
     expect(p.availability).toEqual({ read: false }); // COM-012 — excluded from availability
@@ -63,6 +66,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
     expect(p.opportunity).toEqual(NONE); // floored — the board 403s (sin-permiso state)
     expect(p.activity).toEqual(NONE); // floored — never reaches the timeline
     expect(p.opportunityNote).toEqual({ ...NONE, manageAny: false }); // COM-016 — floored
+    expect(p.opportunityDocument).toEqual({ ...NONE, manageAny: false }); // COM-017 — floored
     expect(p.quote).toEqual(NONE); // floored — never reaches quotes
     expect(p.serviceCatalog).toEqual(READ_ONLY);
     expect(p.availability).toEqual({ read: false }); // COM-012
@@ -75,6 +79,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
     expect(p.opportunity).toEqual(NONE);
     expect(p.activity).toEqual(NONE);
     expect(p.opportunityNote).toEqual({ ...NONE, manageAny: false }); // COM-016 — no grant by enumeration
+    expect(p.opportunityDocument).toEqual({ ...NONE, manageAny: false }); // COM-017 — no grant by enumeration
     expect(p.quote).toEqual(NONE);
     expect(p.serviceCatalog).toEqual(READ_ONLY);
     expect(p.availability).toEqual({ read: false }); // COM-012
@@ -106,6 +111,27 @@ describe('COM-016 ComercialController.permissions — opportunityNote mirrors ac
     for (const role of Object.values(UserRole)) {
       const expected = role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
       expect(perms(role).opportunityNote.manageAny).toBe(expected);
+    }
+  });
+});
+
+/* COM-017 — opportunityDocument MIRRORS opportunityNote cell by cell for every role
+ * (CRUD quartet AND manageAny), and `manageAny` is true ONLY for ADMIN/SUPER_ADMIN. */
+describe('COM-017 ComercialController.permissions — opportunityDocument mirrors opportunityNote + manageAny', () => {
+  const factory = new CaslAbilityFactory();
+  const controller = new ComercialController({} as never);
+  const perms = (role: UserRole) => controller.permissions(factory.defineAbilityFor(role));
+
+  it('opportunityDocument flags equal opportunityNote flags for every role', () => {
+    for (const role of Object.values(UserRole)) {
+      expect(perms(role).opportunityDocument).toEqual(perms(role).opportunityNote);
+    }
+  });
+
+  it('manageAny is true only for ADMIN and SUPER_ADMIN', () => {
+    for (const role of Object.values(UserRole)) {
+      const expected = role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+      expect(perms(role).opportunityDocument.manageAny).toBe(expected);
     }
   });
 });

@@ -25,6 +25,7 @@ export interface ComercialPermissions {
   opportunity: SubjectFlags; // COM-007 — the pipeline board gates on this
   activity: SubjectFlags; // COM-008 — the interaction timeline gates on this
   opportunityNote: OpportunityNoteFlags; // COM-016 — the note thread gates on this
+  opportunityDocument: OpportunityNoteFlags; // COM-017 — the document list gates on this (same shape)
   quote: SubjectFlags; // COM-011 — the quotes section gates on this
   availability: { read: boolean }; // COM-012 — RRHH availability projection (read-only)
   serviceCatalog: SubjectFlags;
@@ -38,6 +39,7 @@ const EMPTY: ComercialPermissions = {
   opportunity: NONE,
   activity: NONE,
   opportunityNote: { ...NONE, manageAny: false },
+  opportunityDocument: { ...NONE, manageAny: false },
   quote: NONE,
   availability: { read: false },
   serviceCatalog: NONE,
