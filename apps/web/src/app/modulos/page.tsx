@@ -518,12 +518,12 @@ export default function ModulosPage() {
             </div>
 
             <div className="modulos-grid">
-              {MODULES.map((mod) => {
+              {MODULES.map((mod, index) => {
                 const isActive = mod.active;
                 return (
                   <div
                     key={mod.key}
-                    className={`module-card${isActive ? ' module-card--active' : ''}`}
+                    className={`module-card${isActive ? ' module-card--active hover:border-accent focus-visible:border-accent' : ''}`}
                     onClick={() => handleSelect(mod)}
                     role={isActive ? 'button' : undefined}
                     tabIndex={isActive ? 0 : -1}
@@ -535,7 +535,7 @@ export default function ModulosPage() {
                       }
                     }}
                     aria-disabled={!isActive}
-                    style={{ background: mod.gradient }}
+                    style={{ background: mod.gradient, '--i': index } as CSSProperties}
                   >
                     <div className="module-card__svg">{mod.svg}</div>
                     <div className="module-card__shade" aria-hidden="true" />
@@ -564,6 +564,11 @@ export default function ModulosPage() {
       </div>
 
       <style jsx global>{`
+        /* The cards own the entrance; the inherited page fade would outlast them. */
+        .modulos-page-wrapper.mod-root {
+          opacity: 1;
+          animation: none;
+        }
         .mod-root {
           --ink: #eef1f7;
           --ink-dim: rgba(238, 241, 247, 0.62);
@@ -781,30 +786,39 @@ export default function ModulosPage() {
           overflow: hidden;
           opacity: 0.72;
           cursor: not-allowed;
+          border-color: transparent;
           transition:
-            transform 0.3s ease,
-            box-shadow 0.3s ease,
-            opacity 0.3s ease;
+            transform 180ms ease-out,
+            border-color 180ms ease-out;
+          animation: module-card-enter 240ms ease-out calc(var(--i) * 25ms) backwards;
           isolation: isolate;
           box-shadow:
             0 12px 36px rgba(0, 0, 0, 0.55),
             0 0 0 1px rgba(255, 255, 255, 0.04);
         }
+        /* An inset border preserves the existing card and content dimensions. */
+        .module-card::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border: 1px solid;
+          border-color: inherit;
+          border-radius: inherit;
+          pointer-events: none;
+          z-index: 3;
+        }
         .module-card--active {
           opacity: 1;
           cursor: pointer;
         }
-        .module-card--active:hover {
-          transform: translateY(-4px);
-          box-shadow:
-            0 20px 48px rgba(0, 0, 0, 0.7),
-            0 0 0 1px rgba(255, 255, 255, 0.08);
+        .module-card--active:hover,
+        .module-card--active:focus-visible {
+          --module-card-y: -2px;
+          transform: translateY(var(--module-card-y));
         }
         .module-card--active:focus-visible {
-          outline: none;
-          box-shadow:
-            0 0 0 2px rgba(120, 200, 255, 0.55),
-            0 12px 36px rgba(0, 0, 0, 0.55);
+          outline: 2px solid var(--color-accent);
+          outline-offset: 3px;
         }
         .module-card__svg {
           position: absolute;
@@ -814,11 +828,7 @@ export default function ModulosPage() {
         .module-card__svg .mod-svg {
           width: 100%;
           height: 100%;
-          transition: transform 0.6s ease;
           transform-origin: center;
-        }
-        .module-card--active:hover .module-card__svg .mod-svg {
-          transform: scale(1.08);
         }
         .module-card__shade {
           position: absolute;
@@ -856,14 +866,7 @@ export default function ModulosPage() {
           color: #ffffff;
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
-          transition:
-            background-color 0.3s ease,
-            transform 0.3s ease;
           z-index: 2;
-        }
-        .module-card--active:hover .module-card__arrow {
-          background: rgba(255, 255, 255, 0.25);
-          transform: translateX(4px);
         }
         .module-card__content {
           position: absolute;
@@ -1066,6 +1069,18 @@ export default function ModulosPage() {
         .rrhh-plus {
           opacity: 0;
           animation: rrhhplus 3s ease-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .module-card,
+          .module-card * {
+            animation: none;
+            transition: none;
+          }
+          .module-card--active:hover,
+          .module-card--active:focus-visible {
+            transform: none;
+          }
         }
       `}</style>
     </div>

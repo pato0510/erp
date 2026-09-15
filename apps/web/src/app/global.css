@@ -12,8 +12,18 @@
 
 html {
   color-scheme: light;
-  font-family: var(--font-outfit), var(--font-body), ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    var(--font-outfit),
+    var(--font-body),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
 }
 
 html.dark {
@@ -42,6 +52,18 @@ html.starfield-page body {
 html.starfield-page.dark,
 html.starfield-page.dark body {
   background-color: #000;
+}
+
+/* UI-002: one entrance per card mount; hover can adjust the final offset. */
+@keyframes module-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(var(--module-card-y, 0px));
+  }
 }
 
 /* Glassmorphism for cards in dark mode — pairs with the rgba --bg-card token
@@ -143,8 +165,14 @@ h4 {
 }
 
 @keyframes blink-cursor {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .tn-cursor {
