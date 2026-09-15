@@ -4,6 +4,7 @@ import {
   ActivitySubject,
   AvailabilitySubject,
   ContactSubject,
+  OpportunityNoteSubject,
   OpportunitySubject,
   QuoteSubject,
   ServiceCatalogSubject,
@@ -64,6 +65,7 @@ export class ComercialController {
         | typeof AccountSubject
         | typeof ActivitySubject
         | typeof ContactSubject
+        | typeof OpportunityNoteSubject
         | typeof OpportunitySubject
         | typeof QuoteSubject
         | typeof ServiceCatalogSubject,
@@ -82,6 +84,14 @@ export class ComercialController {
       // COM-008 — the activity timeline gates register/edit/delete on activity writes;
       // ACCOUNTANT reads timelines but sees no controls.
       activity: flagsFor(ActivitySubject),
+      // COM-016 — the note thread gates compose/edit/delete on opportunityNote writes
+      // (mirror of activity, ACCOUNTANT read-only). `manageAny` is the delete-any-note
+      // escape hatch: `manage` on the subject (ADMIN/SUPER_ADMIN via manage all) —
+      // the SAME check the service enforces, so the UI never reads a role string.
+      opportunityNote: {
+        ...flagsFor(OpportunityNoteSubject),
+        manageAny: ability.can('manage', OpportunityNoteSubject),
+      },
       // COM-010 — the quote editor gates create/edit/status/delete on quote writes;
       // ACCOUNTANT reads quotes but sees no controls.
       quote: flagsFor(QuoteSubject),

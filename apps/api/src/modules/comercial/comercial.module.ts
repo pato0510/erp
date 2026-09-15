@@ -5,6 +5,7 @@ import { ActivitiesModule } from './activities/activities.module';
 import { ComercialController } from './comercial.controller';
 import { ContactsModule } from './contacts/contacts.module';
 import { OpportunitiesModule } from './opportunities/opportunities.module';
+import { OpportunityNotesModule } from './opportunity-notes/opportunity-notes.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
 
@@ -12,8 +13,8 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
  * (the shared service catalog); COM-003 adds AccountsModule (the CRM core);
  * COM-004 adds ContactsModule (people within an account); COM-005 adds
  * OpportunitiesModule (the pipeline); COM-008 adds ActivitiesModule (the interaction
- * timeline). Remaining feature submodules (quotes) are imported here as their tickets
- * land, mirroring how RrhhModule / OperationsModule aggregate their feature
+ * timeline); COM-016 adds OpportunityNotesModule (the internal note thread on a deal).
+ * Remaining feature submodules are imported here as their tickets land, mirroring how RrhhModule / OperationsModule aggregate their feature
  * submodules. PoliciesGuard / CaslAbilityFactory / PrismaService are provided by the
  * global Casl/Prisma modules.
  *
@@ -27,6 +28,7 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
     ContactsModule,
     OpportunitiesModule,
     ActivitiesModule,
+    OpportunityNotesModule,
     QuotesModule,
     DisponibilidadModule,
   ],

@@ -54,6 +54,7 @@ type Subjects =
       | typeof ContactSubject
       | typeof OpportunitySubject
       | typeof ActivitySubject
+      | typeof OpportunityNoteSubject
       | typeof ServiceCatalogSubject
       | typeof QuoteSubject
       | typeof CampaignSubject
@@ -262,6 +263,14 @@ class OpportunitySubject {
 class ActivitySubject {
   static readonly modelName = 'Activity' as const;
 }
+/* COM-016 — the internal note thread on an opportunity. Grants MIRROR ActivitySubject
+   one-to-one, role by role, action by action (grant-by-enumeration doctrine): VIEWER
+   has no grant on Activity, so it has none here. Author-only edit and author-or-ADMIN
+   delete are enforced in the service (the ADMIN check is `manage` on this subject —
+   never a role string). */
+class OpportunityNoteSubject {
+  static readonly modelName = 'OpportunityNote' as const;
+}
 class ServiceCatalogSubject {
   static readonly modelName = 'ServiceCatalog' as const;
 }
@@ -355,6 +364,7 @@ const COMERCIAL_SUBJECTS = [
   ContactSubject,
   OpportunitySubject,
   ActivitySubject,
+  OpportunityNoteSubject,
   ServiceCatalogSubject,
   QuoteSubject,
 ];
@@ -478,6 +488,7 @@ export {
   ContactSubject,
   OpportunitySubject,
   ActivitySubject,
+  OpportunityNoteSubject,
   ServiceCatalogSubject,
   QuoteSubject,
   CampaignSubject,
@@ -599,6 +610,8 @@ export class CaslAbilityFactory {
         can(['read', 'create', 'update', 'delete'], OpportunitySubject);
         /* COM-008 — activities (CRM timeline) share the same profile → full CRUD. */
         can(['read', 'create', 'update', 'delete'], ActivitySubject);
+        /* COM-016 — opportunity notes mirror the activity profile → full CRUD. */
+        can(['read', 'create', 'update', 'delete'], OpportunityNoteSubject);
         /* COM-010 — quotes (quotation documents) share the same profile → full CRUD.
            This is the LAST Comercial subject to leave the COM-001 floor. */
         can(['read', 'create', 'update', 'delete'], QuoteSubject);
@@ -670,6 +683,8 @@ export class CaslAbilityFactory {
         can('read', OpportunitySubject);
         /* COM-008 — activities: ACCOUNTANT read-only (timeline visibility). No write. */
         can('read', ActivitySubject);
+        /* COM-016 — opportunity notes mirror activities: ACCOUNTANT read-only. No write. */
+        can('read', OpportunityNoteSubject);
         /* COM-010 — quotes: ACCOUNTANT read-only (document visibility). No write. */
         can('read', QuoteSubject);
         /* MKT-001 — default-deny floor on all Marketing subjects, then re-grant

@@ -14,11 +14,17 @@ export interface SubjectFlags {
   update: boolean;
   delete: boolean;
 }
+/* COM-016 — the note thread's flags: the CRUD quartet (mirror of activity) plus
+   `manageAny`, the delete-any-note escape hatch (ADMIN/SUPER_ADMIN via CASL `manage`). */
+export interface OpportunityNoteFlags extends SubjectFlags {
+  manageAny: boolean;
+}
 export interface ComercialPermissions {
   account: SubjectFlags;
   contact: SubjectFlags;
   opportunity: SubjectFlags; // COM-007 — the pipeline board gates on this
   activity: SubjectFlags; // COM-008 — the interaction timeline gates on this
+  opportunityNote: OpportunityNoteFlags; // COM-016 — the note thread gates on this
   quote: SubjectFlags; // COM-011 — the quotes section gates on this
   availability: { read: boolean }; // COM-012 — RRHH availability projection (read-only)
   serviceCatalog: SubjectFlags;
@@ -31,6 +37,7 @@ const EMPTY: ComercialPermissions = {
   contact: NONE,
   opportunity: NONE,
   activity: NONE,
+  opportunityNote: { ...NONE, manageAny: false },
   quote: NONE,
   availability: { read: false },
   serviceCatalog: NONE,

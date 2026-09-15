@@ -20,6 +20,7 @@ import {
   StageBadge,
 } from '../../../../../components/comercial/stageLabels';
 import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
+import OpportunityNotes from './opportunity-notes';
 import { OpportunityBundle } from '../../../../../components/comercial/OpportunityBundle';
 import { OpportunityQuotes } from '../../../../../components/comercial/OpportunityQuotes';
 import { AvailableStaff } from '../../../../../components/comercial/AvailableStaff';
@@ -342,6 +343,17 @@ export default function OpportunityDetailPage() {
           Actividad
         </h2>
         <ActivityTimeline scope="opportunity" scopeId={opp.id} canWrite={canWrite} />
+      </div>
+
+      {/* COM-016 — internal note thread (distinct from the Actividad timeline). */}
+      <div className="mt-4">
+        <h2
+          className="mb-3 text-sm font-semibold text-[var(--text-primary)]"
+          style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
+        >
+          Notas
+        </h2>
+        <OpportunityNotes opportunityId={opp.id} />
       </div>
 
       {/* COM-007b — Delete danger zone (writers only). Hidden entirely for a closed

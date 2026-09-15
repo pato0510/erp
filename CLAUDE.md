@@ -497,11 +497,12 @@ QA doc: docs/EXCELSIA-RRHH-QA-PRE-DESBLOQUEO.md
 ═══════════════════════════════════════════════════════════════════
 
 Status: V1 completo (COM-001…COM-015), desplegado y visible en /modulos.
+Post-V1: COM-016 (notas internas de oportunidad, 2026-09-15 — ver bloque abajo).
 Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
 Tablas: service_catalog, accounts, contacts, opportunities,
-opportunity_services, activities, quotes, quote_lines
+opportunity_services, activities, opportunity_notes, quotes, quote_lines
 (+ service_orders en Operaciones, target del handoff COM-013a).
 
 Puntos clave:
@@ -534,7 +535,32 @@ Puntos clave:
   SUPER_ADMIN full; ACCOUNTANT read-only total; ANALYST/VIEWER sin
   acceso (nunca ven montos).
 
-Última actualización: 2026-07-09
+- COM-016 — NOTAS DE OPORTUNIDAD (2026-09-15): hilo interno de comentarios
+  libres sobre el negocio, DISTINTO de las actividades (interacciones fechadas
+  con el cliente; ActivityType.NOTA queda intacto). Tabla opportunity_notes
+  (migración hand-authored 20260916120000_add_opportunity_notes con los cinco
+  bloques invariantes: tabla+índices, ENABLE RLS, política
+  opportunity_note_isolation con la MISMA expresión que activity_isolation,
+  trigger audit_opportunity_notes, GRANT a app_user). HIJA DEPENDIENTE del
+  negocio (FK ON DELETE CASCADE) y deliberadamente NO historia de la cuenta (a
+  diferencia de activities: CASCADE desde accounts, SET NULL en opportunities).
+  Relación en Opportunity = `noteThread` (porque `notes` ya es el escalar de
+  COM-005). body trimmed 1..5000 (DTO + service), createdBy del JWT (jamás del
+  DTO). CASL: OpportunityNoteSubject ESPEJA ActivitySubject uno a uno (MANAGER
+  CRUD, ACCOUNTANT read, ANALYST/VIEWER nada — VIEWER sin grant por
+  enumeración). Reglas de servicio sobre la puerta CASL: solo el autor edita
+  (403); elimina el autor o quien tenga `manage` sobre el subject (ADMIN/
+  SUPER_ADMIN vía manage all — leído del ability de PoliciesGuard con
+  @CurrentAbility, nunca de strings de rol). Endpoints
+  /comercial/opportunity-notes (GET ?opportunityId · POST · PATCH :id · DELETE
+  :id), todos con @CheckPolicies. FE: sección "Notas" junto a "Actividad" en
+  /comercial/pipeline/[id] (componente opportunity-notes.tsx, mutate→refetch).
+  /comercial/permissions expone el flag propio `opportunityNote` (CRUD espejo de
+  `activity` + `manageAny` = `manage` sobre el subject, true solo ADMIN/SUPER_ADMIN);
+  el componente gatea Agregar/Editar/Eliminar SOLO con esos flags — cero strings
+  de rol en el frontend; useAuth aporta únicamente el id del usuario actual.
+
+Última actualización: 2026-09-15 (COM-016)
 
 ═══════════════════════════════════════════════════════════════════
 

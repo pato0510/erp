@@ -185,6 +185,7 @@ model Opportunity {
   services   OpportunityService[] // COM-006 — the service bundle (FK on opportunity_services.opportunityId, ON DELETE CASCADE)
   activities Activity[] // COM-008 — timeline entries linked to this deal (FK ON DELETE SET NULL)
   quotes     Quote[] // COM-010 — quotes issued for this deal (FK ON DELETE RESTRICT — blocks opp delete)
+  noteThread OpportunityNote[] // COM-016 — internal note thread (FK ON DELETE CASCADE). Named noteThread: `notes` is already the COM-005 scalar
 
   @@index([companyId])
   @@index([accountId])
@@ -270,6 +271,34 @@ model Activity {
   @@index([opportunityId])
   @@index([activityDate])
   @@map("activities")
+}
+
+/* COM-016 — opportunity_notes: the internal comment thread on a deal (free-text notes
+   the team writes ABOUT the opportunity), deliberately distinct from activities (dated
+   interactions WITH the client — ActivityType.NOTA stays untouched). A note is a
+   DEPENDENT CHILD of the opportunity: FK ON DELETE CASCADE (deleting the deal removes
+   its thread, like opportunity_services) and deliberately NOT account history — unlike
+   activities, which cascade from the ACCOUNT and only SET NULL on the opportunity.
+   `body` is free text, trimmed, 1..5000 chars (validated in DTO + service). `createdBy`
+   is the bare actor UUID from the JWT (no FK — codebase convention); only the author
+   edits; the author or an ADMIN/SUPER_ADMIN deletes. Newest-first reads are served by
+   the (opportunityId, createdAt DESC) index. The Opportunity relation is `noteThread`
+   because `notes` is already the COM-005 scalar. Platform invariant (RLS + audit +
+   GRANT) is in migration 20260916120000_add_opportunity_notes. */
+model OpportunityNote {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @db.Uuid
+  opportunityId String   @db.Uuid
+  body          String // free text, trimmed, 1..5000 chars (validated in DTO + service)
+  createdBy     String   @db.Uuid // bare actor UUID from JWT, no FK (codebase convention)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([opportunityId, createdAt(sort: Desc)])
+  @@map("opportunity_notes")
 }
 
 /* COM-010 — quote lifecycle. BORRADOR (editable draft) → ENVIADA (immutable, sent to
