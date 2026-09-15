@@ -110,8 +110,8 @@ export function DocumentHistoryModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-        <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+        <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
             <h3
               className="text-[var(--text-primary)] flex items-center gap-2"
               style={{
@@ -122,7 +122,11 @@ export function DocumentHistoryModal({
             >
               <History size={16} /> Historial de versiones — {documentTypeName}
             </h3>
-            <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
+            <button
+              onClick={onClose}
+              className="p-1 rounded hover:bg-subtle-hover"
+              aria-label="Cerrar"
+            >
               <X size={16} />
             </button>
           </div>
@@ -196,7 +200,7 @@ export function DocumentHistoryModal({
                   color: 'var(--text-muted)',
                 }}
               >
-                <History size={28} style={{ margin: '0 auto 8px', color: '#cbd5e1' }} />
+                <History size={28} style={{ margin: '0 auto 8px', color: 'var(--text-muted)' }} />
                 <p className="text-sm">No hay versiones registradas para este documento.</p>
               </div>
             )}
@@ -231,14 +235,14 @@ export function DocumentHistoryModal({
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => setPreviewing(v)}
-                              className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                              className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                               title="Vista previa"
                             >
                               <Eye size={13} />
                             </button>
                             <button
                               onClick={() => triggerDownload(v)}
-                              className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                              className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                               title="Descargar"
                             >
                               <Download size={13} />
@@ -355,10 +359,10 @@ export function DocumentHistoryModal({
             )}
           </div>
 
-          <div className="flex items-center justify-end px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+          <div className="flex items-center justify-end px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
               style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
             >
               Cerrar

@@ -627,8 +627,8 @@ function ModalShell({
 }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
           <h3
             className="text-[var(--text-primary)] flex items-center gap-2"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 600, fontSize: 16 }}
@@ -636,7 +636,11 @@ function ModalShell({
             {icon}
             {title}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-subtle-hover"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
@@ -687,7 +691,7 @@ function Footer({
   confirmTone: 'primary' | 'success' | 'warning' | 'danger';
 }) {
   const tones: Record<typeof confirmTone, string> = {
-    primary: '#1C1C1E',
+    primary: 'var(--color-dark)',
     success: '#15803d',
     warning: '#D97706',
     danger: '#DC2626',
@@ -696,7 +700,7 @@ function Footer({
     <div className="flex items-center justify-end gap-2 mt-5 pt-4 border-t border-[var(--border-color)]">
       <button
         onClick={onCancel}
-        className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+        className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
       >
         Cancelar

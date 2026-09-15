@@ -337,7 +337,7 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
             <ActionBtn
               icon={ChevronRight}
               label="Enviar a autorización"
-              color="#2563EB"
+              color="var(--color-accent)"
               onClick={() => handleSimpleAction('submit')}
             />
           )}
@@ -921,7 +921,7 @@ function AttachmentsCard({
           {attachments.map((a, idx) => (
             <li
               key={a.id}
-              className="flex items-center justify-between text-sm py-1.5 px-2 rounded-md hover:bg-gray-50"
+              className="flex items-center justify-between text-sm py-1.5 px-2 rounded-md hover:bg-subtle-hover"
             >
               <span className="truncate">
                 {a.fileName}
@@ -932,7 +932,7 @@ function AttachmentsCard({
               <span className="flex items-center gap-1 ml-2">
                 <button
                   onClick={() => handleDownload(idx, a.fileName)}
-                  className="p-1 rounded hover:bg-gray-100 text-[var(--text-secondary)]"
+                  className="p-1 rounded hover:bg-subtle-hover text-[var(--text-secondary)]"
                   title="Descargar"
                 >
                   <Download size={13} />
@@ -962,7 +962,7 @@ function AttachmentsCard({
       <button
         onClick={() => fileRef.current?.click()}
         disabled={uploading || attachments.length >= 5}
-        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border border-line text-fg hover:bg-subtle-hover disabled:opacity-50"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
       >
         <FileUp size={12} /> {uploading ? 'Subiendo...' : 'Cargar adjunto'}
@@ -1006,7 +1006,7 @@ function GasMeasurementsCard({
       <button
         onClick={onAdd}
         disabled={disabled}
-        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border border-line text-fg hover:bg-subtle-hover disabled:opacity-50"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
       >
         <Gauge size={12} /> Registrar medición
@@ -1057,10 +1057,10 @@ function ReasonModal({
   };
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-lg">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-lg">
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)]">
           <h3 className="text-base font-semibold">{title}</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>
@@ -1081,7 +1081,7 @@ function ReasonModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-full"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-full"
             disabled={submitting}
           >
             Cancelar
@@ -1144,10 +1144,10 @@ function CloseModal({
   };
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-lg">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-lg">
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)]">
           <h3 className="text-base font-semibold">Cerrar permiso</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>
@@ -1188,7 +1188,7 @@ function CloseModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-full"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-full"
             disabled={submitting}
           >
             Cancelar
@@ -1249,10 +1249,10 @@ function GasMeasurementModal({
   };
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)]">
           <h3 className="text-base font-semibold">Registrar medición de gas</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>
@@ -1294,7 +1294,7 @@ function GasMeasurementModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-full"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-full"
             disabled={submitting}
           >
             Cancelar

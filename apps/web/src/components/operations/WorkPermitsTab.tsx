@@ -296,7 +296,7 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
           onClick={() => setCreateOpen(true)}
           className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
           style={{
-            background: '#2563EB',
+            background: 'var(--color-accent)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: 600,
           }}
@@ -398,7 +398,7 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
               setStatusFilter([]);
               setPage(1);
             }}
-            className="px-3 py-2 text-xs rounded-full border border-gray-300 hover:bg-gray-50 text-[var(--text-secondary)] inline-flex items-center gap-1"
+            className="px-3 py-2 text-xs rounded-full border border-line hover:bg-subtle-hover text-[var(--text-secondary)] inline-flex items-center gap-1"
           >
             <X size={12} /> Limpiar
           </button>
@@ -414,7 +414,7 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
           <div className="p-10 text-center text-[var(--text-secondary)]">Cargando...</div>
         ) : !permits || permits.data.length === 0 ? (
           <div className="p-10 text-center text-[var(--text-secondary)]">
-            <Wrench size={32} className="mx-auto mb-2 text-gray-300" />
+            <Wrench size={32} className="mx-auto mb-2 text-fg-muted" />
             <p>No hay permisos de trabajo registrados todavía.</p>
           </div>
         ) : (
@@ -506,14 +506,14 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="px-3 py-1.5 text-xs border border-gray-300 rounded-full disabled:opacity-50"
+              className="px-3 py-1.5 text-xs border border-line text-fg rounded-full disabled:opacity-50"
             >
               Anterior
             </button>
             <button
               disabled={page >= permits.totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 text-xs border border-gray-300 rounded-full disabled:opacity-50"
+              className="px-3 py-1.5 text-xs border border-line text-fg rounded-full disabled:opacity-50"
             >
               Siguiente
             </button>
@@ -600,9 +600,9 @@ function Chip({
       onClick={onClick}
       className="px-3 py-1.5 text-xs rounded-full border transition"
       style={{
-        background: active ? '#2563EB' : 'transparent',
+        background: active ? 'var(--color-accent)' : 'transparent',
         color: active ? '#fff' : 'var(--text-secondary)',
-        borderColor: active ? '#2563EB' : 'var(--border-color)',
+        borderColor: active ? 'var(--color-accent)' : 'var(--border-color)',
         fontFamily: 'var(--font-outfit), sans-serif',
         fontWeight: active ? 600 : 500,
       }}
@@ -689,7 +689,7 @@ function ActionButtons({
     buttons.push({
       label: 'Enviar',
       icon: ChevronRight,
-      color: '#2563EB',
+      color: 'var(--color-accent)',
       onClick: () => onAction(permit.id, 'submit'),
     });
   }
@@ -732,7 +732,7 @@ function ActionButtons({
       })}
       <Link
         href={`/operaciones/permisos/trabajo/${permit.id}`}
-        className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+        className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
         title="Ver detalle"
       >
         <ChevronRight size={14} />

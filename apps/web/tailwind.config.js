@@ -11,13 +11,33 @@
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     './{src,pages,components,app}/**/*.{ts,tsx,js,jsx,html}',
     '!./{src,pages,components,app}/**/*.{stories,spec}.{ts,tsx,js,jsx,html}',
     //     ...createGlobPatternsForDependencies(__dirname)
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        surface: 'var(--bg-primary)',
+        'surface-2': 'var(--bg-secondary)',
+        subtle: 'var(--bg-subtle)',
+        'subtle-hover': 'var(--bg-subtle-hover)',
+        card: 'var(--bg-card)',
+        'card-solid': 'var(--bg-card-solid)',
+        fg: 'var(--text-primary)',
+        'fg-secondary': 'var(--text-secondary)',
+        'fg-muted': 'var(--text-muted)',
+        line: 'var(--border-color)',
+        input: 'var(--input-bg)',
+        accent: 'var(--color-accent)',
+        'accent-light': 'var(--color-accent-light)',
+        'accent-muted': 'var(--color-accent-muted)',
+        'accent-dim': 'var(--color-accent-dim)',
+        'accent-surface': 'var(--color-accent-surface)',
+      },
+    },
   },
   plugins: [],
 };

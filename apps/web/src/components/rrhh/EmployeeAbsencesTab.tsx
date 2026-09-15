@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, FileText, Plus, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 
-const ACCENT = '#2563eb';
+const ACCENT = 'var(--color-accent)';
 
 const CATEGORY_LABELS: Record<string, string> = { PERMISO: 'Permiso', LICENCIA: 'Licencia médica' };
 const UNIT_LABELS: Record<string, string> = {
@@ -484,7 +484,7 @@ function AbsenceFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"
@@ -698,7 +698,7 @@ function RejectModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="w-full max-w-md rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"

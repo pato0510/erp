@@ -66,7 +66,7 @@ export function ProcedureNewVersionModal({ sourceProcedureId, onClose, onSaved }
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-        <div className="bg-[var(--bg-card)] rounded-xl shadow-xl p-6 text-sm">
+        <div className="bg-card-solid rounded-xl shadow-xl p-6 text-sm">
           Cargando procedimiento origen...
         </div>
       </div>
@@ -75,11 +75,11 @@ export function ProcedureNewVersionModal({ sourceProcedureId, onClose, onSaved }
   if (error || !source) {
     return (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-        <div className="bg-[var(--bg-card)] rounded-xl shadow-xl p-6 text-sm">
+        <div className="bg-card-solid rounded-xl shadow-xl p-6 text-sm">
           <p className="text-red-600 mb-3">{error ?? 'Error desconocido.'}</p>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-full"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-full"
           >
             Cerrar
           </button>

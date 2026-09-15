@@ -75,7 +75,7 @@ export function CampaignRetorno({
                     <Link
                       href={`/comercial/pipeline/${d.opportunityId}`}
                       className="hover:underline"
-                      style={{ color: '#2563eb' }}
+                      style={{ color: 'var(--color-accent)' }}
                     >
                       {d.name}
                     </Link>

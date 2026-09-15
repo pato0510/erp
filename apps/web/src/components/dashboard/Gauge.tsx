@@ -23,7 +23,7 @@ export function Gauge({ percentage, fillColor, centerText, ariaLabel }: GaugePro
       <path
         d="M 20 100 A 80 80 0 0 1 180 100"
         fill="none"
-        stroke="#e8eaed"
+        stroke="var(--border-color)"
         strokeWidth={14}
         strokeLinecap="round"
       />

@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, Pencil, Plus, Sliders, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 
-const ACCENT = '#2563eb';
+const ACCENT = 'var(--color-accent)';
 
 const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   PENDIENTE: { label: 'Pendiente', bg: 'rgba(37,99,235,0.12)', fg: '#1d4ed8' },
@@ -394,7 +394,7 @@ function RequestModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="w-full max-w-md rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"
@@ -522,7 +522,7 @@ function SettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="w-full max-w-sm rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"
@@ -604,7 +604,7 @@ function RejectModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="w-full max-w-md rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"

@@ -86,7 +86,7 @@ export function ActivityDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-start justify-between border-b border-[var(--border-color)] px-5 py-4">
           <div className="flex items-start gap-2.5">
             <span
@@ -336,7 +336,7 @@ function BitacoraSection({
               onClick={add}
               disabled={posting}
               className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
-              style={{ background: '#2563eb' }}
+              style={{ background: 'var(--color-accent)' }}
             >
               <Send size={13} /> Agregar entrada
             </button>

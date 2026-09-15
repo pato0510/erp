@@ -38,7 +38,7 @@ const LABELS: Record<TaxDocumentType, { label: string; cls: string }> = {
 export function TaxDocumentTypeBadge({ type }: { type: string }) {
   const entry = LABELS[type as TaxDocumentType] ?? {
     label: type,
-    cls: 'bg-gray-100 text-gray-700',
+    cls: 'bg-subtle text-fg',
   };
   return (
     <span

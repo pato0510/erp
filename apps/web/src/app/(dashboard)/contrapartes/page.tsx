@@ -38,15 +38,15 @@ interface Paginated<T> {
 }
 
 const TYPE_META: Record<CounterpartyType, { label: string; color: string; badgeCls: string }> = {
-  CLIENT: { label: 'Cliente', color: '#2563EB', badgeCls: 'bg-blue-50 text-blue-700' },
-  SUPPLIER: { label: 'Proveedor', color: '#64748B', badgeCls: 'bg-slate-100 text-slate-700' },
+  CLIENT: { label: 'Cliente', color: 'var(--color-accent)', badgeCls: 'bg-blue-50 text-blue-700' },
+  SUPPLIER: { label: 'Proveedor', color: '#64748B', badgeCls: 'bg-subtle text-fg' },
   BANK: { label: 'Banco', color: '#1E3A5F', badgeCls: 'bg-indigo-50 text-indigo-800' },
   GOVERNMENT: {
     label: 'Gobierno',
     color: '#475569',
-    badgeCls: 'bg-gray-100 text-[var(--text-secondary)]',
+    badgeCls: 'bg-subtle text-[var(--text-secondary)]',
   },
-  OTHER: { label: 'Otro', color: '#94A3B8', badgeCls: 'bg-gray-50 text-[var(--text-secondary)]' },
+  OTHER: { label: 'Otro', color: '#94A3B8', badgeCls: 'bg-subtle text-[var(--text-secondary)]' },
 };
 
 const PAGE_SIZE = 20;
@@ -166,7 +166,7 @@ export default function ContrapartesPage() {
           onClick={() => setModal({ mode: 'create' })}
           className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
           style={{
-            background: '#1C1C1E',
+            background: 'var(--color-dark)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: 500,
           }}
@@ -190,7 +190,7 @@ export default function ContrapartesPage() {
             className="cp-input pl-9"
           />
         </div>
-        <div className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex flex-wrap gap-1 bg-subtle rounded-lg p-1">
           {(
             [
               { v: '', label: 'Todos' },
@@ -223,17 +223,17 @@ export default function ContrapartesPage() {
           <div className="divide-y divide-[var(--border-color)]">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="px-5 py-4 animate-pulse flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gray-200" />
+                <div className="w-10 h-10 rounded-full bg-subtle-hover" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-48" />
-                  <div className="h-3 bg-gray-200 rounded w-32" />
+                  <div className="h-4 bg-subtle-hover rounded w-48" />
+                  <div className="h-3 bg-subtle-hover rounded w-32" />
                 </div>
               </div>
             ))}
           </div>
         ) : !data || data.data.length === 0 ? (
           <div className="p-12 text-center">
-            <Users size={36} className="mx-auto text-gray-300 mb-3" />
+            <Users size={36} className="mx-auto text-fg-muted mb-3" />
             <p className="text-[var(--text-secondary)] font-medium">
               No se encontraron contrapartes
             </p>
@@ -246,7 +246,7 @@ export default function ContrapartesPage() {
               onClick={() => setModal({ mode: 'create' })}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -305,14 +305,14 @@ export default function ContrapartesPage() {
                     </div>
                     <button
                       onClick={() => setModal({ mode: 'edit', counterparty: c })}
-                      className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                      className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                       title="Editar"
                     >
                       <Pencil size={14} />
                     </button>
                     <button
                       onClick={() => handleToggle(c)}
-                      className="p-2 rounded-md hover:bg-gray-100"
+                      className="p-2 rounded-md hover:bg-subtle-hover"
                       title={c.isActive ? 'Desactivar' : 'Activar'}
                       style={{ color: c.isActive ? '#64748B' : '#16A34A' }}
                     >
@@ -324,7 +324,7 @@ export default function ContrapartesPage() {
             </div>
 
             {data.totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)] bg-gray-50">
+              <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)] bg-subtle">
                 <p className="text-xs text-[var(--text-secondary)]">
                   {data.total} contrapartes · Página {data.page} de {data.totalPages}
                 </p>
@@ -332,14 +332,14 @@ export default function ContrapartesPage() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((p) => p - 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                   >
                     <ChevronLeft size={16} />
                   </button>
                   <button
                     disabled={page >= data.totalPages}
                     onClick={() => setPage((p) => p + 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -428,12 +428,12 @@ function CounterpartyModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)]">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid">
           <h3 className="text-base font-semibold text-[var(--text-primary)]">
             {modal.mode === 'create' ? 'Nueva contraparte' : 'Editar contraparte'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>
@@ -508,10 +508,10 @@ function CounterpartyModal({
           </Field>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar
@@ -521,7 +521,7 @@ function CounterpartyModal({
             disabled={!name.trim() || submitting}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}

@@ -658,7 +658,7 @@ function GeneratorCard({
                 className="audit-btn-ghost"
                 style={{
                   background: preset === p ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
-                  borderColor: preset === p ? '#2563eb' : 'var(--border-color)',
+                  borderColor: preset === p ? 'var(--color-accent)' : 'var(--border-color)',
                   color: preset === p ? '#1d4ed8' : 'var(--text-secondary)',
                 }}
               >
@@ -722,7 +722,7 @@ function GeneratorCard({
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleReport(r.code)}
-                    style={{ accentColor: '#2563eb' }}
+                    style={{ accentColor: 'var(--color-accent)' }}
                   />
                   <span
                     style={{
@@ -840,7 +840,7 @@ function HistoryCard({
         </div>
       ) : !history || history.data.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-          <Package size={32} style={{ margin: '0 auto 10px', color: '#cbd5e1' }} />
+          <Package size={32} style={{ margin: '0 auto 10px', color: 'var(--text-muted)' }} />
           <div style={{ fontSize: 14 }}>Aún no se han generado paquetes de auditoría</div>
         </div>
       ) : (
@@ -995,7 +995,7 @@ function ValidatorCard({
         onClick={() => inputRef.current?.click()}
         style={{
           border: '2px dashed',
-          borderColor: dragOver ? '#2563eb' : 'var(--border-color)',
+          borderColor: dragOver ? 'var(--color-accent)' : 'var(--border-color)',
           borderRadius: 12,
           padding: 28,
           textAlign: 'center',
@@ -1004,7 +1004,7 @@ function ValidatorCard({
           transition: 'all 150ms ease',
         }}
       >
-        <Upload size={26} style={{ color: '#94a3b8', margin: '0 auto 8px' }} />
+        <Upload size={26} style={{ color: 'var(--text-muted)', margin: '0 auto 8px' }} />
         {file ? (
           <div>
             <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: 14 }}>

@@ -237,12 +237,12 @@ export function ProcedureFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
           <h3 className="text-base font-semibold text-[var(--text-primary)]">
             {mode === 'new-version' ? 'Nueva versión de procedimiento' : 'Nuevo procedimiento'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>
@@ -374,7 +374,7 @@ export function ProcedureFormModal({
                 />
                 <button
                   onClick={addKeyword}
-                  className="px-3 py-1.5 text-xs rounded-full border border-gray-300 hover:bg-gray-50"
+                  className="px-3 py-1.5 text-xs rounded-full border border-line text-fg hover:bg-subtle-hover"
                   type="button"
                 >
                   <Plus size={12} />
@@ -481,10 +481,10 @@ export function ProcedureFormModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-full"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-full"
             disabled={submitting !== false}
           >
             Cancelar
@@ -492,7 +492,7 @@ export function ProcedureFormModal({
           <button
             onClick={() => submit('draft')}
             disabled={submitting !== false}
-            className="px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            className="px-4 py-2 text-sm rounded-full border border-line text-fg hover:bg-subtle-hover disabled:opacity-50"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             {submitting === 'draft' ? 'Guardando...' : 'Guardar como borrador'}
@@ -502,7 +502,7 @@ export function ProcedureFormModal({
             disabled={submitting !== false}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#2563EB',
+              background: 'var(--color-accent)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 600,
             }}

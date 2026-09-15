@@ -70,18 +70,18 @@ export default function ReportesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl text-gray-900 mb-6">Reportes y Exportaciones</h1>
+      <h1 className="text-2xl text-fg mb-6">Reportes y Exportaciones</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Export Movements */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-card border border-line rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-blue-100 rounded-lg">
               <FileSpreadsheet size={20} className="text-blue-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">Movimientos</h3>
+            <h3 className="font-semibold text-fg">Movimientos</h3>
           </div>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-fg-secondary mb-4">
             Exporta todos los movimientos con categorías, contrapartes y montos.
           </p>
           <div className="space-y-3">
@@ -98,14 +98,14 @@ export default function ReportesPage() {
         </div>
 
         {/* Export Cashflow */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-card border border-line rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-green-100 rounded-lg">
               <FileSpreadsheet size={20} className="text-green-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">Caja y Tesorería</h3>
+            <h3 className="font-semibold text-fg">Caja y Tesorería</h3>
           </div>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-fg-secondary mb-4">
             Exporta posición de caja, compromisos y cuentas bancarias.
           </p>
           <div className="space-y-3">
@@ -122,14 +122,14 @@ export default function ReportesPage() {
         </div>
 
         {/* Executive Summary */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="bg-card border border-line rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-purple-100 rounded-lg">
               <FileText size={20} className="text-purple-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">Resumen Ejecutivo</h3>
+            <h3 className="font-semibold text-fg">Resumen Ejecutivo</h3>
           </div>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-fg-secondary mb-4">
             Genera un resumen imprimible con todos los KPIs del período.
           </p>
           <div className="space-y-3">
@@ -150,18 +150,18 @@ export default function ReportesPage() {
       {summary && (
         <div
           id="executive-summary"
-          className="bg-white border border-gray-200 rounded-xl shadow-sm print:shadow-none print:border-0"
+          className="bg-card border border-line rounded-xl shadow-sm print:shadow-none print:border-0"
         >
-          <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between print:border-b-2">
+          <div className="px-8 py-6 border-b border-line flex items-center justify-between print:border-b-2">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">{summary.company.name}</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="text-xl font-bold text-fg">{summary.company.name}</h2>
+              <p className="text-sm text-fg-secondary">
                 RUT: {summary.company.taxId} · Período: {summary.company.period}
               </p>
             </div>
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition print:hidden"
+              className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition print:hidden"
             >
               <Printer size={16} /> Imprimir
             </button>
@@ -170,7 +170,7 @@ export default function ReportesPage() {
           <div className="p-8 space-y-8">
             {/* Cash KPIs */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <h3 className="text-sm font-semibold text-fg-secondary uppercase tracking-wide mb-3">
                 Posición de Caja
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -182,10 +182,10 @@ export default function ReportesPage() {
                     value: summary.cash.committed,
                     color: 'text-orange-700',
                   },
-                  { label: 'Apertura', value: summary.cash.opening, color: 'text-gray-700' },
+                  { label: 'Apertura', value: summary.cash.opening, color: 'text-fg' },
                 ].map((kpi) => (
-                  <div key={kpi.label} className="bg-gray-50 rounded-lg p-3">
-                    <p className="label text-[11px] text-gray-500">{kpi.label}</p>
+                  <div key={kpi.label} className="bg-subtle rounded-lg p-3">
+                    <p className="label text-[11px] text-fg-secondary">{kpi.label}</p>
                     <p className={`amount text-lg mt-0.5 ${kpi.color}`}>{formatCLP(kpi.value)}</p>
                   </div>
                 ))}
@@ -194,7 +194,7 @@ export default function ReportesPage() {
 
             {/* Movements */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <h3 className="text-sm font-semibold text-fg-secondary uppercase tracking-wide mb-3">
                 Movimientos del Período
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -216,9 +216,9 @@ export default function ReportesPage() {
                     {formatCLP(summary.movements.balance)}
                   </p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="label text-[11px] text-gray-500">Confirmados</p>
-                  <p className="amount text-lg mt-0.5 text-gray-700">{summary.movements.count}</p>
+                <div className="bg-subtle rounded-lg p-3">
+                  <p className="label text-[11px] text-fg-secondary">Confirmados</p>
+                  <p className="amount text-lg mt-0.5 text-fg">{summary.movements.count}</p>
                 </div>
               </div>
             </div>
@@ -226,23 +226,23 @@ export default function ReportesPage() {
             {/* Top Categories */}
             {summary.topCategories.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                <h3 className="text-sm font-semibold text-fg-secondary uppercase tracking-wide mb-3">
                   Principales Categorías de Gasto
                 </h3>
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 font-medium text-gray-500">Categoría</th>
-                      <th className="text-right py-2 font-medium text-gray-500">Monto</th>
-                      <th className="text-right py-2 font-medium text-gray-500">%</th>
+                    <tr className="border-b border-line">
+                      <th className="text-left py-2 font-medium text-fg-secondary">Categoría</th>
+                      <th className="text-right py-2 font-medium text-fg-secondary">Monto</th>
+                      <th className="text-right py-2 font-medium text-fg-secondary">%</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.topCategories.map((cat) => (
-                      <tr key={cat.name} className="border-b border-gray-100">
-                        <td className="py-2 text-gray-900">{cat.name}</td>
-                        <td className="py-2 text-right text-gray-700">{formatCLP(cat.total)}</td>
-                        <td className="py-2 text-right text-gray-500">{cat.percentage}%</td>
+                      <tr key={cat.name} className="border-b border-line">
+                        <td className="py-2 text-fg">{cat.name}</td>
+                        <td className="py-2 text-right text-fg">{formatCLP(cat.total)}</td>
+                        <td className="py-2 text-right text-fg-secondary">{cat.percentage}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -251,7 +251,7 @@ export default function ReportesPage() {
             )}
 
             {/* Footer */}
-            <div className="text-xs text-gray-400 pt-4 border-t border-gray-100">
+            <div className="text-xs text-fg-muted pt-4 border-t border-line">
               Generado el {new Date(summary.generatedAt).toLocaleString('es-CL')} · Excelsia ERP
             </div>
           </div>

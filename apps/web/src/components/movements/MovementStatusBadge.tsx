@@ -1,5 +1,5 @@
 const STATUS_CONFIG: Record<string, { label: string; classes: string }> = {
-  DRAFT: { label: 'Borrador', classes: 'bg-gray-100 text-gray-700' },
+  DRAFT: { label: 'Borrador', classes: 'bg-subtle text-fg' },
   CONFIRMED: { label: 'Confirmado', classes: 'bg-green-100 text-green-700' },
   RECONCILED: { label: 'Conciliado', classes: 'bg-blue-100 text-blue-700' },
   CANCELLED: { label: 'Cancelado', classes: 'bg-red-100 text-red-700' },

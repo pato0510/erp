@@ -20,7 +20,7 @@ role-based access control (RBAC) prepared for ABAC.
 ## Tech stack
 
 - Monorepo: Nx (with module boundary enforcement)
-- Frontend: Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui
+- Frontend: Next.js `~16.1.6` (declarado en `package.json`) + TypeScript + Tailwind CSS + shadcn/ui
 - Backend: NestJS + TypeScript (domain module architecture)
 - Database: PostgreSQL with Row Level Security (RLS) for multi-tenancy
 - ORM: Prisma with prismaSchemaFolder (schema split by module)
@@ -242,6 +242,26 @@ apps/web/src/app/(dashboard)/operaciones/
 
 - page.tsx, equipos/, vehiculos/, documentos/, permisos/,
   procedimientos/, alertas/, calendario/, reportes/, configuracion/
+
+### Tokens de tema (UI-001, 2026-09-15)
+
+- Alcance: todo `apps/web/src`; Tailwind usa `darkMode: 'class'` y `html.dark`.
+- Utilidades: `surface`, `surface-2`, `subtle`, `subtle-hover`, `card`,
+  `card-solid`, `fg`, `fg-secondary`, `fg-muted`, `line`, `input` y `accent*`
+  (`accent`, `accent-light`, `accent-muted`, `accent-dim`, `accent-surface`).
+  Referencian variables CSS completas: no admiten modificadores de opacidad (`/50`).
+- Prohibidos en `apps/web/src`: grises crudos (`gray`, `slate`, `zinc`, `neutral`),
+  `bg-white`, `text-black` y hex neutros hardcodeados. Lo controla
+  `nx run web:lint:theme` y el paso CI `Check web theme tokens`.
+- Excepciones solo en `apps/web/scripts/theme-allowlist.json`, con motivo (`reason`)
+  y literales exactos en `matches`. Las entradas de archivo completo se reservan
+  para las superficies protegidas: DarkGradientBackground, Starfield, modulos,
+  auth y sidebars.
+- `dark:` se permite en colores semánticos (rojo, verde, ámbar, azul), nunca en neutros.
+- Los diálogos sobre overlays usan `bg-card-solid` para conservar un fondo opaco.
+- Los gráficos leen colores con `useThemeTokens()`, que se actualiza al cambiar `html.dark`.
+- La paleta clara cambió levemente por diseño: `gray-50` → `subtle` (`#f3f4f6`),
+  bordes `gray-200/300` → `line` (`#e8eaed`); se conservan el acento y la identidad visual.
 
 ## Plan de sprints del módulo
 
@@ -1434,6 +1454,10 @@ correcciones de sesión)
 
 # Próximos pasos
 
+- UI-001 — Tokens de tema (2026-09-15): migración mecánica a utilidades semánticas,
+  gráficos reactivos al tema y guard en CI; `dark:` semántico permitido y allowlist
+  acotada a superficies protegidas o expresiones exactas. Verificación web:
+  `lint` + `lint:theme` + `tsc --noEmit` + `build`; no existe un target `web:test`.
 - Módulos V1 completos: Finanzas, Operaciones, RRHH, Comercial, Marketing,
   Calendario de Actividades.
 - Vista Gestión de actividades — LISTA (CAL-008…CAL-010, live 2026-07-22):

@@ -1,5 +1,6 @@
 'use client';
 
+import { useThemeTokens } from '../../../hooks/useThemeTokens';
 import { useRouter } from 'next/navigation';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { DashboardAssetDistribution } from './types';
@@ -14,10 +15,11 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   IN_MAINTENANCE: { label: 'En mantenimiento', color: '#1d4ed8' },
   BLOCKED_DOCUMENTAL: { label: 'Bloqueado', color: '#b91c1c' },
   OUT_OF_SERVICE: { label: 'Fuera de servicio', color: '#475569' },
-  DECOMMISSIONED: { label: 'Dado de baja', color: '#1f2937' },
+  DECOMMISSIONED: { label: 'Dado de baja', color: '#64748b' },
 };
 
 export function StatusDistributionDonut({ data }: StatusDistributionDonutProps) {
+  const themeTokens = useThemeTokens();
   const router = useRouter();
   const segments = data.segments.filter((s) => s.count > 0);
   const total = data.total;
@@ -36,6 +38,7 @@ export function StatusDistributionDonut({ data }: StatusDistributionDonutProps) 
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
+              stroke={themeTokens.cardSolid}
               data={segments}
               dataKey="count"
               nameKey="status"
@@ -58,12 +61,21 @@ export function StatusDistributionDonut({ data }: StatusDistributionDonutProps) 
               ))}
             </Pie>
             <Tooltip
+              cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
               formatter={(v: unknown, _name, payload) => [
                 `${v} (${(payload?.payload as { percentage?: number })?.percentage ?? 0}%)`,
                 STATUS_META[(payload?.payload as { status?: string })?.status ?? '']?.label ??
                   'Estado',
               ]}
-              contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              contentStyle={{
+                borderRadius: 8,
+                fontSize: 12,
+                backgroundColor: themeTokens.cardSolid,
+                borderColor: themeTokens.border,
+                color: themeTokens.textPrimary,
+              }}
+              labelStyle={{ color: themeTokens.textPrimary }}
+              itemStyle={{ color: themeTokens.textPrimary }}
             />
           </PieChart>
         </ResponsiveContainer>

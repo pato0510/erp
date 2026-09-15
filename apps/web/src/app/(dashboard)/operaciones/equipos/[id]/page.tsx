@@ -620,7 +620,7 @@ export default function AssetDetailPage({ params }: PageProps) {
             textAlign: 'center',
           }}
         >
-          <Wrench size={36} style={{ margin: '0 auto 12px', color: '#cbd5e1' }} />
+          <Wrench size={36} style={{ margin: '0 auto 12px', color: 'var(--text-muted)' }} />
           <p
             className="text-[var(--text-primary)]"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 600 }}
@@ -634,7 +634,7 @@ export default function AssetDetailPage({ params }: PageProps) {
             href="/operaciones/equipos"
             className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-sm rounded-full text-white"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -806,7 +806,7 @@ export default function AssetDetailPage({ params }: PageProps) {
                 onClick={() => setUploadDoc({})}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white"
                 style={{
-                  background: '#1C1C1E',
+                  background: 'var(--color-dark)',
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                 }}
@@ -815,7 +815,7 @@ export default function AssetDetailPage({ params }: PageProps) {
               </button>
               <button
                 onClick={() => setRequestExceptionOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-line rounded-full hover:bg-subtle-hover"
                 style={{
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
@@ -881,7 +881,7 @@ export default function AssetDetailPage({ params }: PageProps) {
             <AssetStatusBadge status={asset.status} />
             <Link
               href={`/operaciones/equipos/${asset.id}/carpeta`}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-line rounded-lg hover:bg-subtle-hover"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -893,7 +893,7 @@ export default function AssetDetailPage({ params }: PageProps) {
             </Link>
             <button
               onClick={() => setEditModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-line rounded-lg hover:bg-subtle-hover"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -1031,7 +1031,7 @@ export default function AssetDetailPage({ params }: PageProps) {
               <AssetStatusBadge status={asset.status} />
               <button
                 onClick={() => setStatusModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-line rounded-lg hover:bg-subtle-hover"
                 style={{
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
@@ -1109,7 +1109,7 @@ export default function AssetDetailPage({ params }: PageProps) {
               <SectionTitle inline>Jerarquía</SectionTitle>
               <button
                 onClick={() => setChildModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-line rounded-lg hover:bg-subtle-hover"
                 style={{
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
@@ -1221,7 +1221,7 @@ export default function AssetDetailPage({ params }: PageProps) {
                 color: 'var(--text-muted)',
               }}
             >
-              <FileText size={28} style={{ margin: '0 auto 8px', color: '#cbd5e1' }} />
+              <FileText size={28} style={{ margin: '0 auto 8px', color: 'var(--text-muted)' }} />
               <p className="text-sm">
                 Aún no hay requerimientos documentales para este tipo de activo. Configúralos desde{' '}
                 <Link
@@ -1337,7 +1337,7 @@ export default function AssetDetailPage({ params }: PageProps) {
                             onClick={() => setUploadDoc({ documentTypeId: r.documentTypeId })}
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full text-white"
                             style={{
-                              background: '#2563eb',
+                              background: 'var(--color-accent)',
                               fontFamily: 'var(--font-outfit), sans-serif',
                               fontWeight: 500,
                             }}
@@ -1557,7 +1557,7 @@ export default function AssetDetailPage({ params }: PageProps) {
       )}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+          <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
             <div className="px-5 py-4 border-b border-[var(--border-color)]">
               <h3
                 className="text-[var(--text-primary)]"
@@ -1578,7 +1578,7 @@ export default function AssetDetailPage({ params }: PageProps) {
             <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
               <button
                 onClick={() => setConfirmDelete(false)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
               >
                 Cancelar
@@ -2071,7 +2071,7 @@ function DocActionButton({
       ? 'text-red-600 hover:bg-red-50'
       : tone === 'success'
         ? 'text-green-700 hover:bg-green-50'
-        : 'text-[var(--text-secondary)] hover:bg-gray-100';
+        : 'text-[var(--text-secondary)] hover:bg-subtle-hover';
   return (
     <button
       onClick={onClick}
@@ -2101,7 +2101,7 @@ function DocConfirmModal({
   const bg = tone === 'danger' ? '#DC2626' : '#D97706';
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="px-5 py-4 border-b border-[var(--border-color)]">
           <h3
             className="text-[var(--text-primary)]"
@@ -2118,7 +2118,7 @@ function DocConfirmModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar

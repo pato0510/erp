@@ -82,7 +82,7 @@ export default function AccountContactsTab({
               setModalOpen(true);
             }}
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             <Plus size={15} /> Nuevo contacto
           </button>

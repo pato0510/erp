@@ -109,10 +109,10 @@ export default function ImportarPage() {
   return (
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Importar Movimientos</h1>
+        <h1 className="text-2xl font-bold text-fg">Importar Movimientos</h1>
         <button
           onClick={downloadTemplate}
-          className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+          className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
         >
           <Download size={16} /> Descargar Plantilla
         </button>
@@ -123,7 +123,7 @@ export default function ImportarPage() {
         <div
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
-          className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-blue-400 transition cursor-pointer"
+          className="bg-card border-2 border-dashed border-line rounded-xl p-12 text-center hover:border-blue-400 transition cursor-pointer"
           onClick={() => fileRef.current?.click()}
         >
           <input
@@ -134,12 +134,12 @@ export default function ImportarPage() {
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           />
           {isLoading ? (
-            <div className="text-gray-500">Procesando archivo...</div>
+            <div className="text-fg-secondary">Procesando archivo...</div>
           ) : (
             <>
-              <Upload size={40} className="mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-700 font-medium">Arrastra un archivo CSV o Excel aquí</p>
-              <p className="text-gray-400 text-sm mt-1">
+              <Upload size={40} className="mx-auto text-fg-muted mb-4" />
+              <p className="text-fg font-medium">Arrastra un archivo CSV o Excel aquí</p>
+              <p className="text-fg-muted text-sm mt-1">
                 o haz clic para seleccionar (.csv, .xlsx, .xls)
               </p>
             </>
@@ -171,14 +171,14 @@ export default function ImportarPage() {
           </div>
 
           {/* Period selector */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="bg-card border border-line rounded-xl p-4">
+            <label className="block text-sm font-medium text-fg mb-2">
               Período fiscal de destino
             </label>
             <select
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full max-w-xs"
+              className="border border-line rounded-lg px-3 py-2 text-sm w-full max-w-xs"
             >
               <option value="">Seleccionar período...</option>
               {periods.map((p) => (
@@ -191,23 +191,23 @@ export default function ImportarPage() {
 
           {/* Preview table */}
           {preview.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-                <FileSpreadsheet size={16} className="text-gray-400" />
-                <span className="text-sm font-medium text-gray-700">
+            <div className="bg-card border border-line rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-line flex items-center gap-2">
+                <FileSpreadsheet size={16} className="text-fg-muted" />
+                <span className="text-sm font-medium text-fg">
                   Vista previa (primeras {preview.length} filas)
                 </span>
               </div>
               <table className="w-full text-sm">
-                <thead className="bg-gray-50">
+                <thead className="bg-subtle">
                   <tr>
-                    <th className="text-left px-4 py-2 text-gray-500">Tipo</th>
-                    <th className="text-left px-4 py-2 text-gray-500">Descripción</th>
-                    <th className="text-left px-4 py-2 text-gray-500">Categoría</th>
-                    <th className="text-right px-4 py-2 text-gray-500">Monto</th>
+                    <th className="text-left px-4 py-2 text-fg-secondary">Tipo</th>
+                    <th className="text-left px-4 py-2 text-fg-secondary">Descripción</th>
+                    <th className="text-left px-4 py-2 text-fg-secondary">Categoría</th>
+                    <th className="text-right px-4 py-2 text-fg-secondary">Monto</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-line">
                   {preview.map((row, i) => (
                     <tr key={i}>
                       <td className="px-4 py-2">
@@ -215,8 +215,8 @@ export default function ImportarPage() {
                           {row.type === 'INCOME' ? '↑ Ingreso' : '↓ Egreso'}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-gray-900">{row.description}</td>
-                      <td className="px-4 py-2 text-gray-600">{row.categoryName || '-'}</td>
+                      <td className="px-4 py-2 text-fg">{row.description}</td>
+                      <td className="px-4 py-2 text-fg-secondary">{row.categoryName || '-'}</td>
                       <td className="px-4 py-2 text-right font-medium">{formatCLP(row.amount)}</td>
                     </tr>
                   ))}
@@ -227,7 +227,7 @@ export default function ImportarPage() {
 
           {/* Errors */}
           {errors.length > 0 && (
-            <div className="bg-white border border-red-200 rounded-xl p-4">
+            <div className="bg-card border border-red-200 rounded-xl p-4">
               <h3 className="text-sm font-medium text-red-800 mb-2">Errores encontrados</h3>
               <div className="space-y-1 max-h-40 overflow-auto">
                 {errors.map((e, i) => (
@@ -255,7 +255,7 @@ export default function ImportarPage() {
                 setPreview([]);
                 setErrors([]);
               }}
-              className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+              className="px-6 py-2.5 border border-line text-fg rounded-lg text-sm font-medium hover:bg-subtle-hover transition"
             >
               Elegir otro archivo
             </button>
@@ -265,10 +265,10 @@ export default function ImportarPage() {
 
       {/* Step 3: Result */}
       {step === 'result' && result && (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+        <div className="bg-card border border-line rounded-xl p-8 text-center">
           <CheckCircle size={48} className="mx-auto text-green-500 mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Importación completada</h2>
-          <p className="text-gray-600 mb-6">
+          <h2 className="text-xl font-bold text-fg mb-2">Importación completada</h2>
+          <p className="text-fg-secondary mb-6">
             Se crearon <span className="font-bold text-green-600">{result.created}</span>{' '}
             movimientos como borrador.
             {result.skipped > 0 && (
@@ -289,7 +289,7 @@ export default function ImportarPage() {
                 setResult(null);
                 setErrors([]);
               }}
-              className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+              className="px-6 py-2.5 border border-line text-fg rounded-lg text-sm font-medium hover:bg-subtle-hover transition"
             >
               Importar otro archivo
             </button>

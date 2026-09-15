@@ -128,7 +128,7 @@ export function CommitmentTemplateFormModal({
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSave}
-        className="bg-[var(--bg-card)] w-full max-w-lg rounded-xl border border-[var(--border-color)] shadow-2xl"
+        className="bg-card-solid w-full max-w-lg rounded-xl border border-[var(--border-color)] shadow-2xl"
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--border-color)] px-5 py-4">
           <div>
@@ -157,7 +157,7 @@ export function CommitmentTemplateFormModal({
               value={typeId}
               onChange={(e) => setTypeId(e.target.value)}
               disabled={editing}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)] disabled:opacity-60"
+              className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)] disabled:opacity-60"
             >
               <option value="">Selecciona…</option>
               {typeOptions.map((opt) => (
@@ -171,7 +171,7 @@ export function CommitmentTemplateFormModal({
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+              className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
             >
               <option value="">Selecciona…</option>
               {categoryOptions.map((opt) => (
@@ -190,7 +190,7 @@ export function CommitmentTemplateFormModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ej: Renovación anual SOAP"
-              className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+              className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
             />
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -201,7 +201,7 @@ export function CommitmentTemplateFormModal({
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="50000"
                 min={0}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
               />
             </Field>
             <Field label="Días antes de vencer">
@@ -210,7 +210,7 @@ export function CommitmentTemplateFormModal({
                 value={days}
                 onChange={(e) => setDays(Number(e.target.value))}
                 min={0}
-                className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
               />
             </Field>
           </div>
@@ -236,7 +236,7 @@ export function CommitmentTemplateFormModal({
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))] disabled:opacity-50"
+            className="rounded-md border border-[var(--border-color)] bg-card-solid px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))] disabled:opacity-50"
           >
             Cancelar
           </button>

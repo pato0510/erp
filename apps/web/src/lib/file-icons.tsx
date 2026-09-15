@@ -16,13 +16,13 @@ export function getFileIcon(mimeType: string, props: IconProps = {}) {
     return <FileText size={size} className={className} style={{ color: '#dc2626' }} />;
   }
   if (mimeType.startsWith('image/')) {
-    return <ImageIcon size={size} className={className} style={{ color: '#2563eb' }} />;
+    return <ImageIcon size={size} className={className} style={{ color: 'var(--color-accent)' }} />;
   }
   if (
     mimeType === 'application/msword' ||
     mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ) {
-    return <FileText size={size} className={className} style={{ color: '#2563eb' }} />;
+    return <FileText size={size} className={className} style={{ color: 'var(--color-accent)' }} />;
   }
   if (
     mimeType === 'application/vnd.ms-excel' ||

@@ -91,7 +91,7 @@ const CATEGORY_META: Record<
   ProcedureCategory,
   { label: string; color: string; icon: typeof BookOpen }
 > = {
-  OPERATION: { label: 'Operación', color: '#2563EB', icon: HardHat },
+  OPERATION: { label: 'Operación', color: 'var(--color-accent)', icon: HardHat },
   MAINTENANCE: { label: 'Mantenimiento', color: '#64748B', icon: BookOpen },
   EMERGENCY: { label: 'Emergencia', color: '#EF4444', icon: AlertTriangle },
   SAFETY: { label: 'Seguridad', color: '#EAB308', icon: ShieldCheck },
@@ -241,7 +241,7 @@ export default function ProcedimientosPage() {
             onClick={() => setCreateOpen(true)}
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
             style={{
-              background: '#2563EB',
+              background: 'var(--color-accent)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 600,
             }}
@@ -373,7 +373,7 @@ export default function ProcedimientosPage() {
           {filtersDirty && (
             <button
               onClick={clearFilters}
-              className="px-3 py-2 text-xs rounded-full border border-gray-300 hover:bg-gray-50 inline-flex items-center gap-1"
+              className="px-3 py-2 text-xs rounded-full border border-line text-fg hover:bg-subtle-hover inline-flex items-center gap-1"
             >
               <X size={12} /> Limpiar
             </button>
@@ -386,7 +386,7 @@ export default function ProcedimientosPage() {
               onClick={() => setView('table')}
               className="p-1.5 rounded-full"
               style={{
-                background: view === 'table' ? '#2563EB' : 'transparent',
+                background: view === 'table' ? 'var(--color-accent)' : 'transparent',
                 color: view === 'table' ? '#fff' : 'var(--text-secondary)',
               }}
               title="Vista tabla"
@@ -397,7 +397,7 @@ export default function ProcedimientosPage() {
               onClick={() => setView('cards')}
               className="p-1.5 rounded-full"
               style={{
-                background: view === 'cards' ? '#2563EB' : 'transparent',
+                background: view === 'cards' ? 'var(--color-accent)' : 'transparent',
                 color: view === 'cards' ? '#fff' : 'var(--text-secondary)',
               }}
               title="Vista tarjetas"
@@ -421,7 +421,7 @@ export default function ProcedimientosPage() {
           className="p-10 text-center text-[var(--text-secondary)] rounded-xl"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}
         >
-          <BookOpen size={32} className="mx-auto mb-2 text-gray-300" />
+          <BookOpen size={32} className="mx-auto mb-2 text-fg-muted" />
           <p>No hay procedimientos que coincidan con los filtros.</p>
         </div>
       ) : view === 'table' ? (
@@ -440,14 +440,14 @@ export default function ProcedimientosPage() {
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="px-3 py-1.5 text-xs border border-gray-300 rounded-full disabled:opacity-50"
+              className="px-3 py-1.5 text-xs border border-line text-fg rounded-full disabled:opacity-50"
             >
               Anterior
             </button>
             <button
               disabled={page >= list.totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 text-xs border border-gray-300 rounded-full disabled:opacity-50"
+              className="px-3 py-1.5 text-xs border border-line text-fg rounded-full disabled:opacity-50"
             >
               Siguiente
             </button>

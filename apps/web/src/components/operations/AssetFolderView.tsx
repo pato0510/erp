@@ -243,7 +243,7 @@ export function AssetFolderView({ assetId, assetKind, backHref }: Props) {
           Operaciones / {assetKind === 'equipo' ? 'Equipos' : 'Vehículos'} / Carpeta documental
         </div>
         <div className="card" style={{ padding: 32, textAlign: 'center' }}>
-          <FileText size={36} style={{ margin: '0 auto 12px', color: '#cbd5e1' }} />
+          <FileText size={36} style={{ margin: '0 auto 12px', color: 'var(--text-muted)' }} />
           <p
             className="text-[var(--text-primary)]"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 600 }}
@@ -257,7 +257,7 @@ export function AssetFolderView({ assetId, assetKind, backHref }: Props) {
             href={`/operaciones/${assetKind === 'equipo' ? 'equipos' : 'vehiculos'}`}
             className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-sm rounded-full text-white"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -346,7 +346,7 @@ export function AssetFolderView({ assetId, assetKind, backHref }: Props) {
             <button
               onClick={() => exportFile('pdf')}
               disabled={exporting !== null}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-line rounded-lg hover:bg-subtle-hover disabled:opacity-50"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -361,7 +361,7 @@ export function AssetFolderView({ assetId, assetKind, backHref }: Props) {
               disabled={exporting !== null}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white disabled:opacity-50"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -499,7 +499,7 @@ export function AssetFolderView({ assetId, assetKind, backHref }: Props) {
               color: 'var(--text-muted)',
             }}
           >
-            <FileText size={28} style={{ margin: '0 auto 8px', color: '#cbd5e1' }} />
+            <FileText size={28} style={{ margin: '0 auto 8px', color: 'var(--text-muted)' }} />
             <p className="text-sm">
               No hay requerimientos documentales para este activo. Configúralos desde{' '}
               <Link
@@ -625,7 +625,7 @@ export function AssetFolderView({ assetId, assetKind, backHref }: Props) {
                       <button
                         onClick={() => setPreviewDoc(d)}
                         title="Ver"
-                        className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                        className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                       >
                         <Eye size={13} />
                       </button>
@@ -794,7 +794,7 @@ function RequirementsTable({
                   {r.latestRecord ? (
                     <button
                       onClick={() => onPreview(r.latestRecord!)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border border-gray-300 hover:bg-gray-50"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border border-line hover:bg-subtle-hover"
                       style={{
                         fontFamily: 'var(--font-outfit), sans-serif',
                         fontWeight: 500,
@@ -808,7 +808,7 @@ function RequirementsTable({
                       onClick={() => onUpload(r.documentType.id)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full text-white"
                       style={{
-                        background: '#2563eb',
+                        background: 'var(--color-accent)',
                         fontFamily: 'var(--font-outfit), sans-serif',
                         fontWeight: 500,
                       }}

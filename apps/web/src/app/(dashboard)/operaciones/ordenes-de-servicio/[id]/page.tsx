@@ -349,7 +349,7 @@ function Back() {
     <Link
       href="/operaciones/ordenes-de-servicio"
       className="mt-2 inline-block text-sm"
-      style={{ color: '#2563eb' }}
+      style={{ color: 'var(--color-accent)' }}
     >
       ← Volver a Órdenes de Servicio
     </Link>

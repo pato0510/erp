@@ -8,7 +8,7 @@ const VARIANT_STYLES: Record<ColorVariant, { text: string; bg: string }> = {
   red: { text: 'text-red-700', bg: 'bg-red-50 border-red-200' },
   orange: { text: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
   blue: { text: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
-  gray: { text: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' },
+  gray: { text: 'text-fg', bg: 'bg-subtle border-line' },
 };
 
 interface CashPositionCardProps {
@@ -22,9 +22,17 @@ export function CashPositionCard({ title, amount, color, subtitle }: CashPositio
   const style = VARIANT_STYLES[color];
   return (
     <div className={`rounded-xl border p-5 ${style.bg}`}>
-      <p className="label text-[11px] text-gray-500 uppercase tracking-wider">{title}</p>
+      <p
+        className={`label text-[11px] ${color === 'gray' ? 'text-fg-secondary' : style.text} uppercase tracking-wider`}
+      >
+        {title}
+      </p>
       <p className={`amount text-2xl mt-1 ${style.text}`}>{formatCLP(amount)}</p>
-      {subtitle && <p className="mt-1 text-xs font-light text-gray-400">{subtitle}</p>}
+      {subtitle && (
+        <p className={`mt-1 text-xs font-light ${color === 'gray' ? 'text-fg-muted' : style.text}`}>
+          {subtitle}
+        </p>
+      )}
     </div>
   );
 }

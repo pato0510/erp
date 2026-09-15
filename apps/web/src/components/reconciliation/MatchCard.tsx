@@ -53,15 +53,15 @@ interface MatchCardProps {
 function BankPanel({ bank }: { bank: ExternalMovementRef }) {
   const amount = Math.abs(Number(bank.amount));
   return (
-    <div className="flex-1 border border-gray-200 rounded-lg p-3 bg-gray-50">
-      <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium mb-1">
+    <div className="flex-1 border border-line rounded-lg p-3 bg-subtle">
+      <div className="flex items-center gap-1.5 text-xs text-fg-secondary font-medium mb-1">
         <Landmark size={12} /> Movimiento bancario
       </div>
-      <div className="text-sm text-gray-900 truncate" title={bank.description}>
+      <div className="text-sm text-fg truncate" title={bank.description}>
         {bank.description}
       </div>
       <div className="flex items-center justify-between mt-1">
-        <span className="text-xs text-gray-500">{formatDate(bank.date)}</span>
+        <span className="text-xs text-fg-secondary">{formatDate(bank.date)}</span>
         <span
           className={`text-sm font-semibold ${bank.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}
         >
@@ -76,16 +76,16 @@ function BankPanel({ bank }: { bank: ExternalMovementRef }) {
 function TaxPanel({ doc }: { doc: TaxDocumentRef }) {
   const counterparty = doc.direction === 'EMITIDO' ? doc.receiverName : doc.issuerName;
   return (
-    <div className="flex-1 border border-gray-200 rounded-lg p-3 bg-gray-50">
-      <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium mb-1">
+    <div className="flex-1 border border-line rounded-lg p-3 bg-subtle">
+      <div className="flex items-center gap-1.5 text-xs text-fg-secondary font-medium mb-1">
         <Receipt size={12} /> Documento tributario · Folio {doc.folio}
       </div>
-      <div className="text-sm text-gray-900 truncate" title={counterparty}>
+      <div className="text-sm text-fg truncate" title={counterparty}>
         {counterparty}
       </div>
       <div className="flex items-center justify-between mt-1">
-        <span className="text-xs text-gray-500">{formatDate(doc.issueDate)}</span>
-        <span className="text-sm font-semibold text-gray-900">{formatCLP(doc.totalAmount)}</span>
+        <span className="text-xs text-fg-secondary">{formatDate(doc.issueDate)}</span>
+        <span className="text-sm font-semibold text-fg">{formatCLP(doc.totalAmount)}</span>
       </div>
     </div>
   );
@@ -93,15 +93,15 @@ function TaxPanel({ doc }: { doc: TaxDocumentRef }) {
 
 function MovementPanel({ mov }: { mov: MovementRef }) {
   return (
-    <div className="flex-1 border border-gray-200 rounded-lg p-3 bg-gray-50">
-      <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium mb-1">
+    <div className="flex-1 border border-line rounded-lg p-3 bg-subtle">
+      <div className="flex items-center gap-1.5 text-xs text-fg-secondary font-medium mb-1">
         <ArrowLeftRight size={12} /> Movimiento interno
       </div>
-      <div className="text-sm text-gray-900 truncate" title={mov.description}>
+      <div className="text-sm text-fg truncate" title={mov.description}>
         {mov.description}
       </div>
       <div className="flex items-center justify-between mt-1">
-        <span className="text-xs text-gray-500">{formatDate(mov.date)}</span>
+        <span className="text-xs text-fg-secondary">{formatDate(mov.date)}</span>
         <span
           className={`text-sm font-semibold ${mov.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
         >
@@ -122,11 +122,11 @@ export function MatchCard({ match, onConfirm, onReject, isBusy }: MatchCardProps
   const diff = Number(match.amountDifference ?? 0);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+    <div className="bg-card border border-line rounded-xl p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <ConfidenceBadge score={Number(match.confidenceScore)} />
-          <span className="text-xs text-gray-400">{match.matchType}</span>
+          <span className="text-xs text-fg-muted">{match.matchType}</span>
         </div>
         {diff > 0 && (
           <span className="text-xs font-medium text-red-500">Diferencia: {formatCLP(diff)}</span>
@@ -138,7 +138,7 @@ export function MatchCard({ match, onConfirm, onReject, isBusy }: MatchCardProps
           <div key={idx} className="flex items-center gap-3 flex-1">
             {panel}
             {idx < panels.length - 1 && (
-              <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
+              <ArrowRight size={16} className="text-fg-muted flex-shrink-0" />
             )}
           </div>
         ))}

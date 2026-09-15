@@ -86,15 +86,15 @@ function KpiCard({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-line p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-500" style={{ fontWeight: 500 }}>
+          <p className="text-sm text-fg-secondary" style={{ fontWeight: 500 }}>
             {title}
           </p>
           <p className={`amount text-[28px] mt-1 leading-tight ${color}`}>{value}</p>
           {subtitle && (
-            <p className="text-xs text-gray-400 mt-1" style={{ fontWeight: 300 }}>
+            <p className="text-xs text-fg-muted mt-1" style={{ fontWeight: 300 }}>
               {subtitle}
             </p>
           )}
@@ -229,10 +229,10 @@ export default function ConciliacionPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl text-gray-900 flex items-center gap-2">
-            <GitMerge size={24} className="text-gray-500" /> Conciliación
+          <h1 className="text-2xl text-fg flex items-center gap-2">
+            <GitMerge size={24} className="text-fg-secondary" /> Conciliación
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-fg-secondary text-sm mt-1">
             Cruza movimientos bancarios, documentos tributarios y movimientos internos
           </p>
         </div>
@@ -256,10 +256,10 @@ export default function ConciliacionPage() {
             {[1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm animate-pulse"
+                className="bg-card rounded-xl border border-line p-5 shadow-sm animate-pulse"
               >
-                <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
-                <div className="h-8 bg-gray-200 rounded w-20" />
+                <div className="h-4 bg-subtle-hover rounded w-24 mb-3" />
+                <div className="h-8 bg-subtle-hover rounded w-20" />
               </div>
             ))}
           </>
@@ -272,7 +272,7 @@ export default function ConciliacionPage() {
               color={pctColor}
               subtitle={`${kpis.reconciledBankMovements} de ${kpis.totalBankMovements} movimientos bancarios`}
             >
-              <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="mt-2 h-1.5 bg-subtle rounded-full overflow-hidden">
                 <div
                   className={`h-full ${kpis.reconciledPercentage >= 80 ? 'bg-green-500' : kpis.reconciledPercentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
                   style={{ width: `${kpis.reconciledPercentage}%` }}
@@ -312,21 +312,21 @@ export default function ConciliacionPage() {
       </div>
 
       {/* SECTION 2 — Suggestions panel */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+      <div className="bg-card rounded-xl border border-line shadow-sm mb-6">
+        <div className="px-5 py-3 border-b border-line flex items-center gap-2">
           <AlertTriangle size={16} className="text-yellow-500" />
-          <h2 className="text-sm font-semibold text-gray-900">Sugerencias pendientes</h2>
-          <span className="text-xs text-gray-400">
+          <h2 className="text-sm font-semibold text-fg">Sugerencias pendientes</h2>
+          <span className="text-xs text-fg-muted">
             {workbench?.suggestions.length ?? 0} para revisar
           </span>
         </div>
         <div className="p-5 space-y-3">
           {isLoading ? (
-            <div className="text-sm text-gray-400 text-center py-6">Cargando...</div>
+            <div className="text-sm text-fg-muted text-center py-6">Cargando...</div>
           ) : !workbench || workbench.suggestions.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircle size={32} className="mx-auto text-gray-300 mb-2" />
-              <p className="text-sm text-gray-400">No hay sugerencias pendientes</p>
+              <CheckCircle size={32} className="mx-auto text-fg-muted mb-2" />
+              <p className="text-sm text-fg-muted">No hay sugerencias pendientes</p>
             </div>
           ) : (
             workbench.suggestions.map((m) => (
@@ -343,12 +343,14 @@ export default function ConciliacionPage() {
       </div>
 
       {/* SECTION 3 — Pending items tabs */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="border-b border-gray-200 px-4 py-3 flex items-center gap-2">
+      <div className="bg-card rounded-xl border border-line shadow-sm">
+        <div className="border-b border-line px-4 py-3 flex items-center gap-2">
           <button
             onClick={() => setPendingTab('BANK')}
             className={`px-4 py-2 text-sm rounded-lg transition ${
-              pendingTab === 'BANK' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+              pendingTab === 'BANK'
+                ? 'bg-blue-600 text-white'
+                : 'text-fg-secondary hover:bg-subtle-hover'
             }`}
           >
             <span className="inline-flex items-center gap-1.5">
@@ -362,7 +364,9 @@ export default function ConciliacionPage() {
           <button
             onClick={() => setPendingTab('TAX')}
             className={`px-4 py-2 text-sm rounded-lg transition ${
-              pendingTab === 'TAX' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+              pendingTab === 'TAX'
+                ? 'bg-blue-600 text-white'
+                : 'text-fg-secondary hover:bg-subtle-hover'
             }`}
           >
             <span className="inline-flex items-center gap-1.5">
@@ -378,19 +382,21 @@ export default function ConciliacionPage() {
         <div className="overflow-x-auto">
           {pendingTab === 'BANK' ? (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-subtle border-b border-line">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Fecha</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Descripción</th>
-                  <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Monto</th>
-                  <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Días</th>
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Fecha</th>
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">
+                    Descripción
+                  </th>
+                  <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Monto</th>
+                  <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Días</th>
                   <th className="px-4 py-2.5" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line">
                 {!workbench || workbench.pendingBankMovements.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-fg-muted">
                       Todos los movimientos bancarios están conciliados ✓
                     </td>
                   </tr>
@@ -398,16 +404,16 @@ export default function ConciliacionPage() {
                   workbench.pendingBankMovements.map((m) => {
                     const amount = Math.abs(Number(m.amount));
                     return (
-                      <tr key={m.id} className="hover:bg-gray-50">
-                        <td className="mono px-4 py-2 text-gray-600">{formatDate(m.date)}</td>
-                        <td className="px-4 py-2 text-gray-900">{m.description}</td>
+                      <tr key={m.id} className="hover:bg-subtle-hover">
+                        <td className="mono px-4 py-2 text-fg-secondary">{formatDate(m.date)}</td>
+                        <td className="px-4 py-2 text-fg">{m.description}</td>
                         <td
                           className={`amount px-4 py-2 text-right ${m.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}
                         >
                           {m.type === 'CREDIT' ? '+' : '-'}
                           {formatCLP(amount)}
                         </td>
-                        <td className="px-4 py-2 text-right text-xs text-gray-400">
+                        <td className="px-4 py-2 text-right text-xs text-fg-muted">
                           {daysPending(m.date)}d
                         </td>
                         <td className="px-4 py-2 text-right">
@@ -426,35 +432,35 @@ export default function ConciliacionPage() {
             </table>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-subtle border-b border-line">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Folio</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Tipo</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Emisor</th>
-                  <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Total</th>
-                  <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Días</th>
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Folio</th>
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Tipo</th>
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Emisor</th>
+                  <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Total</th>
+                  <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Días</th>
                   <th className="px-4 py-2.5" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line">
                 {!workbench || workbench.pendingTaxDocuments.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-fg-muted">
                       Todos los documentos tributarios están conciliados ✓
                     </td>
                   </tr>
                 ) : (
                   workbench.pendingTaxDocuments.map((d) => (
-                    <tr key={d.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-gray-900 font-medium">{d.folio}</td>
+                    <tr key={d.id} className="hover:bg-subtle-hover">
+                      <td className="px-4 py-2 text-fg font-medium">{d.folio}</td>
                       <td className="px-4 py-2">
                         <TaxDocumentTypeBadge type={d.type} />
                       </td>
-                      <td className="px-4 py-2 text-gray-900">{d.issuerName}</td>
-                      <td className="amount px-4 py-2 text-right text-gray-900">
+                      <td className="px-4 py-2 text-fg">{d.issuerName}</td>
+                      <td className="amount px-4 py-2 text-right text-fg">
                         {formatCLP(d.totalAmount)}
                       </td>
-                      <td className="px-4 py-2 text-right text-xs text-gray-400">
+                      <td className="px-4 py-2 text-right text-xs text-fg-muted">
                         {daysPending(d.issueDate)}d
                       </td>
                       <td className="px-4 py-2 text-right">
@@ -628,22 +634,24 @@ function ManualMatchModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-900">Conciliar manualmente</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 transition">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-xl">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-fg">Conciliar manualmente</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover transition">
             <X size={16} />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <div className="text-xs text-gray-500 font-medium mb-1">Origen seleccionado</div>
-            <div className="text-sm text-gray-900">{sourceLabel}</div>
+          <div className="bg-subtle border border-line rounded-lg p-3">
+            <div className="text-xs text-fg-secondary font-medium mb-1">Origen seleccionado</div>
+            <div className="text-sm text-fg">{sourceLabel}</div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Conciliar con</label>
+            <label className="block text-xs font-medium text-fg-secondary mb-1">
+              Conciliar con
+            </label>
             <div className="flex gap-2">
               {source.side === 'BANK' ? (
                 <>
@@ -676,7 +684,7 @@ function ManualMatchModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-medium text-fg-secondary mb-1">
               Buscar por descripción o monto
             </label>
             <input
@@ -684,29 +692,37 @@ function ManualMatchModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 text-sm border border-line rounded-lg"
             />
           </div>
 
-          <div className="border border-gray-200 rounded-lg max-h-60 overflow-auto">
+          <div className="border border-line rounded-lg max-h-60 overflow-auto">
             {isLoading ? (
-              <div className="p-4 text-center text-sm text-gray-400">Buscando...</div>
+              <div className="p-4 text-center text-sm text-fg-muted">Buscando...</div>
             ) : candidates.length === 0 ? (
-              <div className="p-4 text-center text-sm text-gray-400">Sin resultados</div>
+              <div className="p-4 text-center text-sm text-fg-muted">Sin resultados</div>
             ) : (
               candidates.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setSelectedId(c.id)}
-                  className={`w-full text-left px-3 py-2 flex items-center justify-between border-b border-gray-100 last:border-0 hover:bg-gray-50 transition ${
-                    selectedId === c.id ? 'bg-blue-50' : ''
+                  className={`w-full text-left px-3 py-2 flex items-center justify-between border-b border-line last:border-0 transition ${
+                    selectedId === c.id
+                      ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                      : 'text-fg hover:bg-subtle-hover'
                   }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm text-gray-900 truncate">{c.label}</div>
-                    {c.sublabel && <div className="text-xs text-gray-400">{c.sublabel}</div>}
+                    <div className="text-sm text-inherit truncate">{c.label}</div>
+                    {c.sublabel && (
+                      <div
+                        className={`text-xs ${selectedId === c.id ? 'text-blue-700' : 'text-fg-muted'}`}
+                      >
+                        {c.sublabel}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-sm font-semibold text-gray-900 flex-shrink-0 ml-3">
+                  <div className="text-sm font-semibold text-inherit flex-shrink-0 ml-3">
                     {formatCLP(Math.abs(Number(c.amount)))}
                   </div>
                 </button>
@@ -715,10 +731,10 @@ function ManualMatchModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-line">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
           >
             Cancelar
           </button>
@@ -751,7 +767,7 @@ function TargetButton({
       className={`px-3 py-1.5 text-xs rounded-lg border transition ${
         active
           ? 'bg-blue-600 text-white border-blue-600'
-          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          : 'bg-card text-fg border-line hover:bg-subtle-hover'
       }`}
     >
       {label}

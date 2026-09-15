@@ -149,7 +149,7 @@ export default function HsecEppDeliveryDetailPage() {
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+          <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
           <h1
             className="text-2xl font-semibold text-[var(--text-primary)]"
             style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
@@ -274,7 +274,7 @@ export default function HsecEppDeliveryDetailPage() {
                 onClick={() => pickFile(false)}
                 disabled={busy}
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                style={{ background: '#2563eb' }}
+                style={{ background: 'var(--color-accent)' }}
               >
                 <Upload size={13} /> Subir acuse
               </button>

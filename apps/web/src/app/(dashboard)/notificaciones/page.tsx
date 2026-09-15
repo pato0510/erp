@@ -271,7 +271,7 @@ export default function NotificacionesPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={markAllRead}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-line rounded-lg hover:bg-subtle-hover"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -318,7 +318,7 @@ export default function NotificacionesPage() {
                 style={{
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
-                  background: tab === t ? '#2563eb' : 'transparent',
+                  background: tab === t ? 'var(--color-accent)' : 'transparent',
                   color: tab === t ? '#fff' : 'var(--text-secondary)',
                 }}
               >
@@ -378,7 +378,7 @@ export default function NotificacionesPage() {
         )}
         {data && data.data.length === 0 && (
           <div className="p-12 text-center">
-            <Bell size={28} className="mx-auto text-gray-300 mb-2" />
+            <Bell size={28} className="mx-auto text-fg-muted mb-2" />
             <p
               className="text-[var(--text-secondary)]"
               style={{ fontFamily: 'var(--font-outfit), sans-serif', fontSize: 14 }}
@@ -397,7 +397,7 @@ export default function NotificacionesPage() {
                 type="checkbox"
                 checked={allSelectedOnPage}
                 onChange={toggleSelectAll}
-                style={{ accentColor: '#2563eb' }}
+                style={{ accentColor: 'var(--color-accent)' }}
                 aria-label="Seleccionar todas"
               />
               <span
@@ -427,7 +427,7 @@ export default function NotificacionesPage() {
                       type="checkbox"
                       checked={selected.has(n.id)}
                       onChange={() => toggleSelect(n.id)}
-                      style={{ accentColor: '#2563eb', marginTop: 4 }}
+                      style={{ accentColor: 'var(--color-accent)', marginTop: 4 }}
                       aria-label="Seleccionar"
                     />
                     <span
@@ -468,7 +468,7 @@ export default function NotificacionesPage() {
                               width: 8,
                               height: 8,
                               borderRadius: 999,
-                              background: '#2563eb',
+                              background: 'var(--color-accent)',
                             }}
                           />
                         )}
@@ -511,7 +511,7 @@ export default function NotificacionesPage() {
                         <button
                           onClick={() => markRead(n.id)}
                           title="Marcar como leída"
-                          className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                          className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                         >
                           <CheckCheck size={13} />
                         </button>
@@ -519,7 +519,7 @@ export default function NotificacionesPage() {
                       <button
                         onClick={() => dismiss(n.id)}
                         title="Descartar"
-                        className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                        className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                       >
                         <X size={13} />
                       </button>
@@ -540,14 +540,14 @@ export default function NotificacionesPage() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((p) => p - 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--input-bg)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--input-bg)] transition"
                   >
                     <ChevronLeft size={16} />
                   </button>
                   <button
                     disabled={page >= data.totalPages}
                     onClick={() => setPage((p) => p + 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--input-bg)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--input-bg)] transition"
                   >
                     <ChevronRight size={16} />
                   </button>

@@ -110,7 +110,7 @@ export default function TrabajadoresPage() {
     <div className="pt-2">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+          <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
           <h1
             className="text-2xl font-semibold text-[var(--text-primary)]"
             style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
@@ -124,7 +124,7 @@ export default function TrabajadoresPage() {
             setModalOpen(true);
           }}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ background: '#2563eb' }}
+          style={{ background: 'var(--color-accent)' }}
         >
           <Plus size={16} /> Nuevo trabajador
         </button>
@@ -171,7 +171,7 @@ export default function TrabajadoresPage() {
 
       <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-color)] bg-gray-50">
+          <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
               {['Nombre', 'RUT', 'Área', 'Cargo', 'Estado'].map((h) => (
                 <th
@@ -192,7 +192,7 @@ export default function TrabajadoresPage() {
                 <tr key={i} className="animate-pulse">
                   {Array.from({ length: 6 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 w-24 rounded bg-gray-200" />
+                      <div className="h-4 w-24 rounded bg-subtle-hover" />
                     </td>
                   ))}
                 </tr>
@@ -411,7 +411,7 @@ function EmployeeModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"
@@ -565,7 +565,7 @@ function EmployeeModal({
             onClick={save}
             disabled={saving}
             className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>

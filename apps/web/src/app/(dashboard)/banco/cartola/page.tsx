@@ -186,12 +186,12 @@ export default function CartolaImportPage() {
     <div className="max-w-3xl">
       <Link
         href="/banco"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-4 transition"
+        className="inline-flex items-center gap-1.5 text-sm text-fg-secondary hover:text-fg mb-4 transition"
       >
         <ArrowLeft size={14} /> Volver a conexiones
       </Link>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Importar Cartola Manual</h1>
+      <h1 className="text-2xl font-bold text-fg mb-6">Importar Cartola Manual</h1>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-900">
         <p className="font-medium mb-1">Importación manual como respaldo</p>
@@ -212,15 +212,13 @@ export default function CartolaImportPage() {
       {/* STEP 1 — Upload */}
       {step === 'upload' && (
         <div className="space-y-5">
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          <div className="bg-card border border-line rounded-xl p-5 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Conexión bancaria
-              </label>
+              <label className="block text-sm font-medium text-fg mb-1">Conexión bancaria</label>
               <select
                 value={connectionId}
                 onChange={(e) => setConnectionId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-line rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">Seleccionar...</option>
                 {connections.map((c) => (
@@ -230,21 +228,19 @@ export default function CartolaImportPage() {
                 ))}
               </select>
               {connections.length === 0 && (
-                <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                <p className="text-xs text-fg-secondary mt-2 flex items-center gap-1">
                   <Landmark size={12} /> No hay conexiones activas. Crea una desde Banco.
                 </p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Formato de cartola
-              </label>
+              <label className="block text-sm font-medium text-fg mb-1">Formato de cartola</label>
               <div className="flex gap-2 items-center">
                 <select
                   value={format}
                   onChange={(e) => setFormat(e.target.value as FormatKey)}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="flex-1 border border-line rounded-lg px-3 py-2 text-sm"
                 >
                   {FORMAT_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -254,12 +250,12 @@ export default function CartolaImportPage() {
                 </select>
                 <button
                   onClick={downloadTemplate}
-                  className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  className="flex items-center gap-2 px-3 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
                 >
                   <Download size={14} /> Plantilla
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-fg-muted mt-1">
                 {FORMAT_OPTIONS.find((o) => o.value === format)?.hint}
               </p>
             </div>
@@ -268,10 +264,10 @@ export default function CartolaImportPage() {
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className={`bg-white border-2 border-dashed rounded-xl p-12 text-center transition ${
+            className={`bg-card border-2 border-dashed rounded-xl p-12 text-center transition ${
               connectionId
-                ? 'border-gray-300 hover:border-blue-400 cursor-pointer'
-                : 'border-gray-200 opacity-50 cursor-not-allowed'
+                ? 'border-line hover:border-blue-400 cursor-pointer'
+                : 'border-line opacity-50 cursor-not-allowed'
             }`}
             onClick={() => connectionId && fileRef.current?.click()}
           >
@@ -283,12 +279,12 @@ export default function CartolaImportPage() {
               onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
             />
             {isLoading ? (
-              <div className="text-gray-500">Procesando archivo...</div>
+              <div className="text-fg-secondary">Procesando archivo...</div>
             ) : (
               <>
-                <Upload size={40} className="mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-700 font-medium">Arrastra la cartola aquí</p>
-                <p className="text-gray-400 text-sm mt-1">
+                <Upload size={40} className="mx-auto text-fg-muted mb-4" />
+                <p className="text-fg font-medium">Arrastra la cartola aquí</p>
+                <p className="text-fg-muted text-sm mt-1">
                   o haz clic para seleccionar (.csv, .xlsx, .xls — máx 10MB)
                 </p>
               </>
@@ -300,16 +296,14 @@ export default function CartolaImportPage() {
       {/* STEP 2 — Preview */}
       {step === 'preview' && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-600 flex items-center gap-2">
-            <FileSpreadsheet size={16} className="text-gray-400" />
+          <div className="bg-card border border-line rounded-xl p-4 text-sm text-fg-secondary flex items-center gap-2">
+            <FileSpreadsheet size={16} className="text-fg-muted" />
             <span>
               Conexión:{' '}
-              <span className="font-medium text-gray-900">
-                {selectedConnection?.bankAccount.name}
-              </span>
-              <span className="mx-2 text-gray-300">·</span>
+              <span className="font-medium text-fg">{selectedConnection?.bankAccount.name}</span>
+              <span className="mx-2 text-fg-muted">·</span>
               Formato detectado:{' '}
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-fg">
                 {FORMAT_LABELS[detectedFormat] ?? detectedFormat}
               </span>
             </span>
@@ -337,28 +331,28 @@ export default function CartolaImportPage() {
           </div>
 
           {preview.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-                <FileSpreadsheet size={16} className="text-gray-400" />
-                <span className="text-sm font-medium text-gray-700">
+            <div className="bg-card border border-line rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-line flex items-center gap-2">
+                <FileSpreadsheet size={16} className="text-fg-muted" />
+                <span className="text-sm font-medium text-fg">
                   Vista previa (primeras {preview.length} filas)
                 </span>
               </div>
               <table className="w-full text-sm">
-                <thead className="bg-gray-50">
+                <thead className="bg-subtle">
                   <tr>
-                    <th className="text-left px-4 py-2 text-gray-500">Fecha</th>
-                    <th className="text-left px-4 py-2 text-gray-500">Descripción</th>
-                    <th className="text-left px-4 py-2 text-gray-500">Tipo</th>
-                    <th className="text-right px-4 py-2 text-gray-500">Monto</th>
-                    <th className="text-center px-4 py-2 text-gray-500">Estado</th>
+                    <th className="text-left px-4 py-2 text-fg-secondary">Fecha</th>
+                    <th className="text-left px-4 py-2 text-fg-secondary">Descripción</th>
+                    <th className="text-left px-4 py-2 text-fg-secondary">Tipo</th>
+                    <th className="text-right px-4 py-2 text-fg-secondary">Monto</th>
+                    <th className="text-center px-4 py-2 text-fg-secondary">Estado</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-line">
                   {preview.map((row) => (
                     <tr key={row.idempotencyKey}>
-                      <td className="px-4 py-2 text-gray-700">{formatDate(row.date)}</td>
-                      <td className="px-4 py-2 text-gray-900">{row.description}</td>
+                      <td className="px-4 py-2 text-fg">{formatDate(row.date)}</td>
+                      <td className="px-4 py-2 text-fg">{row.description}</td>
                       <td className="px-4 py-2">
                         <span
                           className={`text-xs font-medium ${row.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}
@@ -383,7 +377,7 @@ export default function CartolaImportPage() {
           )}
 
           {errors.length > 0 && (
-            <div className="bg-white border border-red-200 rounded-xl p-4">
+            <div className="bg-card border border-red-200 rounded-xl p-4">
               <h3 className="text-sm font-medium text-red-800 mb-2">Errores encontrados</h3>
               <div className="space-y-1 max-h-40 overflow-auto">
                 {errors.slice(0, 50).map((e, i) => (
@@ -403,7 +397,7 @@ export default function CartolaImportPage() {
           <div className="flex gap-3">
             <button
               onClick={reset}
-              className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+              className="px-6 py-2.5 border border-line text-fg rounded-lg text-sm font-medium hover:bg-subtle-hover transition"
             >
               Volver
             </button>
@@ -420,16 +414,16 @@ export default function CartolaImportPage() {
 
       {/* STEP 3 — Result */}
       {step === 'result' && result && (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+        <div className="bg-card border border-line rounded-xl p-8 text-center">
           <CheckCircle size={48} className="mx-auto text-green-500 mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Cartola importada</h2>
-          <div className="text-gray-600 mb-6 space-y-1">
+          <h2 className="text-xl font-bold text-fg mb-2">Cartola importada</h2>
+          <div className="text-fg-secondary mb-6 space-y-1">
             <p>
               ✓ <span className="font-bold text-green-600">{result.imported}</span> movimientos
               importados
             </p>
             {result.skipped > 0 && (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-fg-secondary">
                 ⚠ {result.skipped} movimientos omitidos (ya existían)
               </p>
             )}
@@ -446,7 +440,7 @@ export default function CartolaImportPage() {
             </Link>
             <button
               onClick={reset}
-              className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+              className="px-6 py-2.5 border border-line text-fg rounded-lg text-sm font-medium hover:bg-subtle-hover transition"
             >
               Importar otra cartola
             </button>

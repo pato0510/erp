@@ -109,7 +109,7 @@ export default function AlertasPage() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-gray-900">Alertas</h1>
+        <h1 className="text-2xl text-fg">Alertas</h1>
         <button
           onClick={handleGenerate}
           disabled={isGenerating}
@@ -153,17 +153,17 @@ export default function AlertasPage() {
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-48 mb-2" />
-              <div className="h-3 bg-gray-200 rounded w-72" />
+            <div key={i} className="bg-card border border-line rounded-xl p-4 animate-pulse">
+              <div className="h-4 bg-subtle-hover rounded w-48 mb-2" />
+              <div className="h-3 bg-subtle-hover rounded w-72" />
             </div>
           ))}
         </div>
       ) : alerts.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+        <div className="bg-card border border-line rounded-xl p-12 text-center">
           <CheckCircle size={40} className="mx-auto text-green-400 mb-3" />
-          <p className="text-gray-500 font-medium">No hay alertas activas</p>
-          <p className="text-gray-400 text-sm mt-1">
+          <p className="text-fg-secondary font-medium">No hay alertas activas</p>
+          <p className="text-fg-muted text-sm mt-1">
             Presiona &ldquo;Generar Alertas&rdquo; para verificar el estado
           </p>
         </div>
@@ -179,16 +179,16 @@ export default function AlertasPage() {
       <div className="mt-8">
         <button
           onClick={() => setShowConfig(!showConfig)}
-          className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition"
+          className="flex items-center gap-2 text-sm font-medium text-fg-secondary hover:text-fg transition"
         >
           <ChevronDown size={16} className={`transition ${showConfig ? 'rotate-180' : ''}`} />
           Configurar umbrales de alerta
         </button>
 
         {showConfig && thresholds && (
-          <div className="mt-4 bg-white border border-gray-200 rounded-xl p-6 max-w-lg space-y-4">
+          <div className="mt-4 bg-card border border-line rounded-xl p-6 max-w-lg space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-fg mb-1">
                 Saldo mínimo de alerta
               </label>
               <div className="flex items-center gap-2">
@@ -196,41 +196,41 @@ export default function AlertasPage() {
                   type="number"
                   value={cashThreshold}
                   onChange={(e) => setCashThreshold(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1"
+                  className="border border-line rounded-lg px-3 py-2 text-sm flex-1"
                 />
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-fg-muted">
                   Actual: {formatCLP(thresholds.lowCashThreshold)}
                 </span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-fg mb-1">
                   Días advertencia (vencimiento)
                 </label>
                 <input
                   type="number"
                   value={daysWarning}
                   onChange={(e) => setDaysWarning(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+                  className="border border-line rounded-lg px-3 py-2 text-sm w-full"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-fg mb-1">
                   Días críticos (vencimiento)
                 </label>
                 <input
                   type="number"
                   value={daysCritical}
                   onChange={(e) => setDaysCritical(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+                  className="border border-line rounded-lg px-3 py-2 text-sm w-full"
                 />
               </div>
             </div>
             <button
               onClick={handleSaveConfig}
               disabled={isSavingConfig}
-              className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 transition"
+              className="px-4 py-2 text-sm bg-[var(--color-dark)] text-white rounded-lg hover:bg-[var(--color-dark)] disabled:opacity-50 transition"
             >
               {isSavingConfig ? 'Guardando...' : 'Guardar umbrales'}
             </button>

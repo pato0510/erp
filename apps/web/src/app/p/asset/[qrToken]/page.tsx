@@ -143,8 +143,9 @@ export default async function PublicAssetPage({ params }: PageProps) {
     <main
       className="min-h-screen w-full"
       style={{
-        background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 60%, #f8fafc 100%)',
-        color: '#0f172a',
+        background:
+          'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 60%, var(--bg-secondary) 100%)',
+        color: 'var(--text-primary)',
         fontFamily: 'var(--font-outfit), sans-serif',
       }}
     >
@@ -171,7 +172,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
               fontSize: 10,
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
-              color: '#64748b',
+              color: 'var(--text-secondary)',
             }}
           >
             Verificación de activo
@@ -182,8 +183,8 @@ export default async function PublicAssetPage({ params }: PageProps) {
         <section
           aria-label="Identificación del activo"
           style={{
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
             borderRadius: 16,
             padding: 18,
             boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
@@ -195,7 +196,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
               fontFamily: 'var(--font-jetbrains-mono), monospace',
               fontSize: 12,
               letterSpacing: '0.12em',
-              color: '#64748b',
+              color: 'var(--text-secondary)',
               marginBottom: 4,
             }}
           >
@@ -208,7 +209,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
               fontWeight: 700,
               fontSize: 28,
               letterSpacing: '0.02em',
-              color: '#0f172a',
+              color: 'var(--text-primary)',
               margin: '0 0 4px',
             }}
           >
@@ -218,7 +219,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
             style={{
               fontSize: 16,
               fontWeight: 500,
-              color: '#0f172a',
+              color: 'var(--text-primary)',
               margin: 0,
               lineHeight: 1.3,
             }}
@@ -230,7 +231,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
               style={{
                 marginTop: 10,
                 fontSize: 13,
-                color: '#475569',
+                color: 'var(--text-primary)',
               }}
             >
               📍 {data.location.name}
@@ -279,8 +280,8 @@ export default async function PublicAssetPage({ params }: PageProps) {
         <section
           aria-label="Cumplimiento documental"
           style={{
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
             borderRadius: 16,
             padding: 20,
             display: 'flex',
@@ -334,8 +335,8 @@ export default async function PublicAssetPage({ params }: PageProps) {
         <section
           aria-label="Documentos requeridos"
           style={{
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
             borderRadius: 16,
             padding: 4,
             marginBottom: 16,
@@ -347,7 +348,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
               style={{
                 padding: 20,
                 textAlign: 'center',
-                color: '#64748b',
+                color: 'var(--text-secondary)',
                 fontSize: 13,
               }}
             >
@@ -366,7 +367,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
                     borderBottom:
                       idx === data.documentCompliance.documents.length - 1
                         ? 'none'
-                        : '1px solid #f1f5f9',
+                        : '1px solid var(--border-color)',
                     gap: 12,
                   }}
                 >
@@ -376,7 +377,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
                         fontFamily: 'var(--font-outfit), sans-serif',
                         fontWeight: 500,
                         fontSize: 14,
-                        color: '#0f172a',
+                        color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -388,7 +389,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
                       style={{
                         fontFamily: 'var(--font-jetbrains-mono), monospace',
                         fontSize: 11,
-                        color: '#64748b',
+                        color: 'var(--text-secondary)',
                         marginTop: 2,
                       }}
                     >
@@ -455,7 +456,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
               gap: 8,
               padding: '12px 18px',
               borderRadius: 999,
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               color: '#ffffff',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
@@ -471,7 +472,7 @@ export default async function PublicAssetPage({ params }: PageProps) {
         <footer
           style={{
             textAlign: 'center',
-            color: '#94a3b8',
+            color: 'var(--text-muted)',
             fontSize: 11,
             fontFamily: 'var(--font-jetbrains-mono), monospace',
             lineHeight: 1.6,
@@ -497,7 +498,7 @@ function ComplianceMiniStat({ label, value, fg }: { label: string; value: number
   return (
     <div
       style={{
-        background: '#f8fafc',
+        background: 'var(--bg-secondary)',
         borderRadius: 8,
         padding: '8px 4px',
       }}
@@ -505,7 +506,7 @@ function ComplianceMiniStat({ label, value, fg }: { label: string; value: number
       <div style={{ color: fg, fontWeight: 700, fontSize: 16 }}>{value}</div>
       <div
         style={{
-          color: '#64748b',
+          color: 'var(--text-secondary)',
           fontSize: 9,
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
@@ -577,8 +578,9 @@ function NotFoundScreen() {
     <main
       className="min-h-screen w-full flex flex-col items-center justify-center"
       style={{
-        background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 60%, #f8fafc 100%)',
-        color: '#0f172a',
+        background:
+          'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 60%, var(--bg-secondary) 100%)',
+        color: 'var(--text-primary)',
         fontFamily: 'var(--font-outfit), sans-serif',
         padding: 24,
         textAlign: 'center',
@@ -591,7 +593,7 @@ function NotFoundScreen() {
           fontFamily: 'var(--font-outfit), sans-serif',
           fontSize: 22,
           fontWeight: 600,
-          color: '#0f172a',
+          color: 'var(--text-primary)',
         }}
       >
         Código QR no válido
@@ -601,7 +603,7 @@ function NotFoundScreen() {
           marginTop: 8,
           maxWidth: 360,
           fontSize: 14,
-          color: '#475569',
+          color: 'var(--text-primary)',
           lineHeight: 1.5,
         }}
       >
@@ -617,7 +619,7 @@ function NotFoundScreen() {
           gap: 8,
           padding: '10px 18px',
           borderRadius: 999,
-          background: '#1C1C1E',
+          background: 'var(--color-dark)',
           color: '#ffffff',
           fontWeight: 500,
           fontSize: 14,

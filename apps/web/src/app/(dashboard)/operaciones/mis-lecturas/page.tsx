@@ -53,7 +53,7 @@ const CATEGORY_META: Record<
   ProcedureCategory,
   { label: string; color: string; icon: typeof BookOpen }
 > = {
-  OPERATION: { label: 'Operación', color: '#2563EB', icon: HardHat },
+  OPERATION: { label: 'Operación', color: 'var(--color-accent)', icon: HardHat },
   MAINTENANCE: { label: 'Mantenimiento', color: '#64748B', icon: BookOpen },
   EMERGENCY: { label: 'Emergencia', color: '#EF4444', icon: AlertTriangle },
   SAFETY: { label: 'Seguridad', color: '#EAB308', icon: ShieldCheck },
@@ -206,7 +206,7 @@ export default function MisLecturasPage() {
           className="p-10 text-center text-[var(--text-secondary)] rounded-xl"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}
         >
-          <BookMarked size={32} className="mx-auto mb-2 text-gray-300" />
+          <BookMarked size={32} className="mx-auto mb-2 text-fg-muted" />
           <p className="font-medium text-[var(--text-primary)]">¡Estás al día! 🎉</p>
           <p className="text-sm mt-1">No tienes lecturas pendientes por acusar.</p>
         </div>
@@ -350,7 +350,7 @@ function PendingCard({ row, onAcknowledge }: { row: PendingRow; onAcknowledge: (
           href={`/operaciones/procedimientos/${row.procedure.id}`}
           className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full text-white"
           style={{
-            background: '#2563EB',
+            background: 'var(--color-accent)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: 600,
           }}

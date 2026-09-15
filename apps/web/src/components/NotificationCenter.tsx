@@ -214,7 +214,7 @@ export function NotificationCenter() {
             <button
               onClick={() => setOpen(false)}
               aria-label="Cerrar"
-              className="p-1 rounded hover:bg-gray-100"
+              className="p-1 rounded hover:bg-subtle-hover"
             >
               <X size={14} />
             </button>
@@ -235,7 +235,7 @@ export function NotificationCenter() {
 
             {items && items.length === 0 && (
               <div className="p-6 text-center">
-                <Bell size={20} className="mx-auto text-gray-300 mb-2" />
+                <Bell size={20} className="mx-auto text-fg-muted mb-2" />
                 <p
                   className="text-[var(--text-secondary)]"
                   style={{
@@ -309,7 +309,7 @@ export function NotificationCenter() {
                             width: 8,
                             height: 8,
                             borderRadius: 999,
-                            background: '#2563eb',
+                            background: 'var(--color-accent)',
                             flexShrink: 0,
                           }}
                         />

@@ -43,7 +43,7 @@ interface Props {
   onSave: (dto: AssetTypeSubmit) => Promise<void> | void;
 }
 
-const DEFAULT_COLOR = '#2563EB';
+const DEFAULT_COLOR = 'var(--color-accent)';
 
 export function AssetTypeFormModal({ mode, assetType, onClose, onSave }: Props) {
   const [name, setName] = useState(assetType?.name ?? '');

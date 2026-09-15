@@ -87,7 +87,7 @@ export default function CuentasPage() {
   const Header = (
     <div className="mb-5 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+        <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
         <h1
           className="text-2xl font-semibold text-[var(--text-primary)]"
           style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
@@ -102,7 +102,7 @@ export default function CuentasPage() {
             setModalOpen(true);
           }}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ background: '#2563eb' }}
+          style={{ background: 'var(--color-accent)' }}
         >
           <Plus size={16} /> Nueva cuenta
         </button>
@@ -172,7 +172,7 @@ export default function CuentasPage() {
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-color)] bg-gray-50">
+          <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
               {['Nombre', 'Estado', 'Prioridad', 'Industria', 'Ejecutivo', 'Actualizado'].map(
                 (h) => (
@@ -197,7 +197,7 @@ export default function CuentasPage() {
                 <tr key={i} className="animate-pulse">
                   {Array.from({ length: cols }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 w-24 rounded bg-gray-200" />
+                      <div className="h-4 w-24 rounded bg-subtle-hover" />
                     </td>
                   ))}
                 </tr>
@@ -223,7 +223,7 @@ export default function CuentasPage() {
                     {a.counterpartyId && (
                       <span
                         className="ml-2 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]"
-                        style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}
+                        style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--color-accent)' }}
                         title="Vinculada a un tercero de Finanzas (facturable)"
                       >
                         <Link2 size={10} />

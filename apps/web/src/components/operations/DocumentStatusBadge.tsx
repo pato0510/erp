@@ -52,7 +52,7 @@ const STATUS_META: Record<DerivedDocumentStatus, Meta> = {
     label: 'Pendiente revisión',
     bg: 'rgba(37, 99, 235, 0.12)',
     fg: '#1d4ed8',
-    dot: '#2563eb',
+    dot: 'var(--color-accent)',
   },
   APROBADO: {
     label: 'Aprobado',

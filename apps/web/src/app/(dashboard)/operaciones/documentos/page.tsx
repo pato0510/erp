@@ -539,7 +539,7 @@ export default function DocumentosPage() {
             disabled={isUnconfigured}
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -587,7 +587,7 @@ export default function DocumentosPage() {
               href="/operaciones/configuracion?tab=tipos"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-full text-white"
               style={{
-                background: '#2563eb',
+                background: 'var(--color-accent)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -598,7 +598,7 @@ export default function DocumentosPage() {
               href="/operaciones/configuracion?tab=documentos"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-full text-white"
               style={{
-                background: '#2563eb',
+                background: 'var(--color-accent)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -609,7 +609,7 @@ export default function DocumentosPage() {
               href="/operaciones/equipos"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-full text-white"
               style={{
-                background: '#2563eb',
+                background: 'var(--color-accent)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -645,7 +645,7 @@ export default function DocumentosPage() {
             href="/operaciones/documentos/pendientes"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full text-white"
             style={{
-              background: '#2563eb',
+              background: 'var(--color-accent)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -913,14 +913,14 @@ export default function DocumentosPage() {
             type="checkbox"
             checked={includeReplaced}
             onChange={(e) => setIncludeReplaced(e.target.checked)}
-            style={{ accentColor: '#2563eb' }}
+            style={{ accentColor: 'var(--color-accent)' }}
           />
           Mostrar documentos reemplazados
         </label>
         {hasFilters && (
           <button
             onClick={resetFilters}
-            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100 rounded-lg"
+            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-subtle-hover rounded-lg"
             title="Limpiar filtros"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
@@ -978,8 +978,8 @@ export default function DocumentosPage() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="px-5 py-3 animate-pulse flex items-center gap-3">
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-48" />
-                  <div className="h-3 bg-gray-200 rounded w-32" />
+                  <div className="h-4 bg-subtle-hover rounded w-48" />
+                  <div className="h-3 bg-subtle-hover rounded w-32" />
                 </div>
               </div>
             ))}
@@ -1040,14 +1040,14 @@ export default function DocumentosPage() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((p) => p - 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                   >
                     <ChevronLeft size={16} />
                   </button>
                   <button
                     disabled={page >= data.totalPages}
                     onClick={() => setPage((p) => p + 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -1628,7 +1628,7 @@ function ActionButton({
       ? 'text-red-600 hover:bg-red-50'
       : tone === 'success'
         ? 'text-green-700 hover:bg-green-50'
-        : 'text-[var(--text-secondary)] hover:bg-gray-100';
+        : 'text-[var(--text-secondary)] hover:bg-subtle-hover';
   return (
     <button
       onClick={onClick}
@@ -1643,7 +1643,7 @@ function ActionButton({
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
   return (
     <div className="p-12 text-center">
-      <FileText size={36} className="mx-auto text-gray-300 mb-3" />
+      <FileText size={36} className="mx-auto text-fg-muted mb-3" />
       <p
         className="text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
@@ -1685,7 +1685,7 @@ function ConfirmModal({
   const confirmBg = confirmTone === 'danger' ? '#DC2626' : '#D97706';
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="px-5 py-4 border-b border-[var(--border-color)]">
           <h3
             className="text-[var(--text-primary)]"
@@ -1702,7 +1702,7 @@ function ConfirmModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar

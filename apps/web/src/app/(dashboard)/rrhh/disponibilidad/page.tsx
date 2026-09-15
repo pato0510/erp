@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { AlertTriangle, CalendarClock, ChevronRight } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 
-const ACCENT = '#2563eb';
+const ACCENT = 'var(--color-accent)';
 
 const AREA_LABELS: Record<string, string> = {
   OPERACIONES: 'Operaciones',

@@ -56,7 +56,11 @@ function OriginRow({ label, href, value }: { label: string; href: string; value:
       <span className="w-24 shrink-0 text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
         {label}
       </span>
-      <Link href={href} className="text-sm hover:underline" style={{ color: '#2563eb' }}>
+      <Link
+        href={href}
+        className="text-sm hover:underline"
+        style={{ color: 'var(--color-accent)' }}
+      >
         {value}
       </Link>
     </div>

@@ -60,7 +60,7 @@ export default function VehiculoCarpetaPage({ params }: PageProps) {
             textAlign: 'center',
           }}
         >
-          <FileText size={36} style={{ margin: '0 auto 12px', color: '#cbd5e1' }} />
+          <FileText size={36} style={{ margin: '0 auto 12px', color: 'var(--text-muted)' }} />
           <p
             className="text-[var(--text-primary)]"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 600 }}
@@ -72,7 +72,7 @@ export default function VehiculoCarpetaPage({ params }: PageProps) {
             href="/operaciones/vehiculos"
             className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-sm rounded-full text-white"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}

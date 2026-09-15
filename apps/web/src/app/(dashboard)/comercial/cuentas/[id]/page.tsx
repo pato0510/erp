@@ -110,7 +110,10 @@ export default function AccountFichaPage() {
       <div className="mb-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="h-7 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+            <span
+              className="h-7 w-1.5 rounded-full"
+              style={{ background: 'var(--color-accent)' }}
+            />
             <div>
               <h1
                 className="text-xl font-semibold text-[var(--text-primary)]"
@@ -143,7 +146,7 @@ export default function AccountFichaPage() {
             onClick={() => setTab(t.key)}
             className="relative px-3 py-2 text-sm"
             style={{
-              color: tab === t.key ? '#2563eb' : 'var(--text-secondary)',
+              color: tab === t.key ? 'var(--color-accent)' : 'var(--text-secondary)',
               fontWeight: tab === t.key ? 600 : 400,
               borderBottom: tab === t.key ? '2px solid #2563eb' : '2px solid transparent',
             }}
@@ -243,7 +246,7 @@ function AccountDatosTab({
               <Link
                 href={`/marketing/campanas/${account.sourceCampaign.id}`}
                 className="text-sm"
-                style={{ color: '#2563eb' }}
+                style={{ color: 'var(--color-accent)' }}
               >
                 {account.sourceCampaign.name}
               </Link>
@@ -267,7 +270,7 @@ function AccountDatosTab({
       {/* Counterparty link (facturación) */}
       <Card>
         <div className="flex items-center gap-2">
-          <Link2 size={15} style={{ color: '#2563eb' }} />
+          <Link2 size={15} style={{ color: 'var(--color-accent)' }} />
           <p className="text-sm font-medium text-[var(--text-primary)]">
             Contraparte (facturación)
           </p>
@@ -319,7 +322,7 @@ function AccountDatosTab({
                 onClick={link}
                 disabled={busy || !pick}
                 className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-                style={{ background: '#2563eb' }}
+                style={{ background: 'var(--color-accent)' }}
               >
                 <Link2 size={14} /> Vincular
               </button>
@@ -383,7 +386,7 @@ function BackLink() {
     <Link
       href="/comercial/cuentas"
       className="mt-2 inline-block text-sm"
-      style={{ color: '#2563eb' }}
+      style={{ color: 'var(--color-accent)' }}
     >
       ← Volver a cuentas
     </Link>

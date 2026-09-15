@@ -83,7 +83,7 @@ export function DocumentPreviewModal({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div
-        className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full flex flex-col"
+        className="bg-card-solid rounded-xl shadow-xl w-full flex flex-col"
         style={{ maxWidth: 960, height: 'min(92vh, 800px)' }}
       >
         {/* Header */}
@@ -132,7 +132,7 @@ export function DocumentPreviewModal({
           </div>
           <button
             onClick={triggerDownload}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-line rounded-lg hover:bg-subtle-hover"
             style={{
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
@@ -141,7 +141,11 @@ export function DocumentPreviewModal({
           >
             <Download size={12} /> Descargar
           </button>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-subtle-hover"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
@@ -155,7 +159,7 @@ export function DocumentPreviewModal({
           )}
           {!loading && error && (
             <div className="h-full flex flex-col items-center justify-center gap-2 px-6 text-center">
-              <FileText size={32} className="text-gray-300" />
+              <FileText size={32} className="text-fg-muted" />
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
@@ -195,7 +199,7 @@ export function DocumentPreviewModal({
                 onClick={triggerDownload}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-full text-white"
                 style={{
-                  background: '#1C1C1E',
+                  background: 'var(--color-dark)',
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                 }}

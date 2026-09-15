@@ -640,7 +640,7 @@ function TabButton({
       onClick={onClick}
       className="px-4 py-1.5 text-sm rounded-md transition"
       style={{
-        background: active ? '#2563EB' : 'transparent',
+        background: active ? 'var(--color-accent)' : 'transparent',
         color: active ? '#fff' : 'var(--text-secondary)',
         fontFamily: 'var(--font-outfit), sans-serif',
         fontWeight: active ? 600 : 500,
@@ -769,13 +769,13 @@ function DrillModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
           <div>
             <h3 className="text-base font-semibold">{title}</h3>
             {subtitle && <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>

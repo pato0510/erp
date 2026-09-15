@@ -7,6 +7,7 @@
  * recharts LineChart with connectNulls={false} (same as the Finanzas dashboard) so months
  * without data render as GAPS — never an interpolated line. Tokens: accent #2563eb,
  * Outfit, glassmorphism; Spanish with accents. */
+import { useThemeTokens } from '../../../../hooks/useThemeTokens';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Plus } from 'lucide-react';
 import {
@@ -67,6 +68,7 @@ function longMonthLabel(iso: string): string {
 }
 
 export default function PresenciaPage() {
+  const themeTokens = useThemeTokens();
   const perms = useMarketingPermissions();
   const canWrite = useCanWriteMarketing('presenceSnapshot');
   const [snapshots, setSnapshots] = useState<PresenceSnapshot[]>([]);
@@ -145,7 +147,7 @@ export default function PresenciaPage() {
           <button
             onClick={() => setModalOpen(true)}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             <Plus size={16} /> Registrar datos del mes
           </button>
@@ -200,7 +202,11 @@ export default function PresenciaPage() {
                     className="rounded-lg border px-3 py-1.5 text-sm"
                     style={
                       metric === m.key
-                        ? { borderColor: '#2563eb', color: '#2563eb', fontWeight: 600 }
+                        ? {
+                            borderColor: 'var(--color-accent)',
+                            color: 'var(--color-accent)',
+                            fontWeight: 600,
+                          }
                         : { borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }
                     }
                   >
@@ -212,24 +218,38 @@ export default function PresenciaPage() {
 
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={series}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={themeTokens.border} />
+                <XAxis
+                  stroke={themeTokens.border}
+                  dataKey="name"
+                  tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
+                />
                 <YAxis
-                  tick={{ fontSize: 11 }}
+                  stroke={themeTokens.border}
+                  tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
                   tickFormatter={(v) => (v ? Number(v).toLocaleString('es-CL') : '')}
                   width={48}
                 />
                 <Tooltip
+                  cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
                   formatter={(v: unknown) =>
                     v == null ? 'Sin datos' : Number(v).toLocaleString('es-CL')
                   }
-                  contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                  contentStyle={{
+                    borderRadius: 8,
+                    fontSize: 12,
+                    backgroundColor: themeTokens.cardSolid,
+                    borderColor: themeTokens.border,
+                    color: themeTokens.textPrimary,
+                  }}
+                  labelStyle={{ color: themeTokens.textPrimary }}
+                  itemStyle={{ color: themeTokens.textPrimary }}
                 />
                 <Line
                   type="monotone"
                   dataKey="value"
                   name={METRICS.find((m) => m.key === metric)?.short}
-                  stroke="#2563eb"
+                  stroke="var(--color-accent)"
                   strokeWidth={2}
                   dot={{ r: 3 }}
                   connectNulls={false}
@@ -266,7 +286,7 @@ function Header(action: React.ReactNode) {
   return (
     <div className="mb-5 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+        <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
         <h1
           className="text-2xl font-semibold text-[var(--text-primary)]"
           style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}

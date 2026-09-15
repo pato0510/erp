@@ -329,7 +329,7 @@ export default function PipelinePage() {
   const Header = (
     <div className="mb-5 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+        <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
         <h1
           className="text-2xl font-semibold text-[var(--text-primary)]"
           style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
@@ -341,7 +341,7 @@ export default function PipelinePage() {
         <button
           onClick={() => setNewModal(true)}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ background: '#2563eb' }}
+          style={{ background: 'var(--color-accent)' }}
         >
           <Plus size={16} /> Nueva oportunidad
         </button>
@@ -428,7 +428,7 @@ export default function PipelinePage() {
               onDrop={() => handleDrop(stage as OpportunityStage)}
               className="flex w-[286px] shrink-0 flex-col rounded-xl border bg-[var(--bg-card)]"
               style={{
-                borderColor: over ? '#2563eb' : 'var(--border-color)',
+                borderColor: over ? 'var(--color-accent)' : 'var(--border-color)',
                 boxShadow: over ? '0 0 0 1px #2563eb inset' : undefined,
                 transition: 'border-color 120ms ease',
               }}
@@ -460,8 +460,8 @@ export default function PipelinePage() {
                       key={i}
                       className="animate-pulse rounded-lg border border-[var(--border-color)] p-3"
                     >
-                      <div className="mb-2 h-4 w-3/4 rounded bg-gray-200" />
-                      <div className="h-3 w-1/2 rounded bg-gray-200" />
+                      <div className="mb-2 h-4 w-3/4 rounded bg-subtle-hover" />
+                      <div className="h-3 w-1/2 rounded bg-subtle-hover" />
                     </div>
                   ))
                 ) : cards.length === 0 ? (

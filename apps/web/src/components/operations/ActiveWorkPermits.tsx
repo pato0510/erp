@@ -105,7 +105,7 @@ export function ActiveWorkPermits({ assetId }: { assetId: string }) {
               </div>
               <Link
                 href={`/operaciones/permisos/trabajo/${p.id}`}
-                className="p-1 rounded-md hover:bg-gray-100 text-[var(--text-secondary)] flex-shrink-0"
+                className="p-1 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)] flex-shrink-0"
                 title="Ver detalle"
               >
                 <ChevronRight size={14} />

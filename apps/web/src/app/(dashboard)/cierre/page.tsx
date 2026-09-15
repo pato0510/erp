@@ -54,7 +54,7 @@ interface ClosingSummary {
 const STATUS_BADGE: Record<PeriodStatus, { label: string; cls: string }> = {
   OPEN: { label: 'Abierto', cls: 'bg-green-100 text-green-700' },
   IN_REVIEW: { label: 'En revisión', cls: 'bg-yellow-100 text-yellow-700' },
-  CLOSED: { label: 'Cerrado', cls: 'bg-gray-200 text-gray-700' },
+  CLOSED: { label: 'Cerrado', cls: 'bg-subtle-hover text-fg' },
 };
 
 export default function CierrePage() {
@@ -222,23 +222,23 @@ export default function CierrePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl text-gray-900 flex items-center gap-2">
-            <CheckSquare size={24} className="text-gray-500" /> Cierre mensual
+          <h1 className="text-2xl text-fg flex items-center gap-2">
+            <CheckSquare size={24} className="text-fg-secondary" /> Cierre mensual
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-fg-secondary text-sm mt-1">
             Valida los requisitos y formaliza el cierre del período fiscal
           </p>
         </div>
       </div>
 
       {/* SECTION 1 — Period selector + status */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 flex flex-col md:flex-row md:items-center gap-4">
+      <div className="bg-card rounded-xl border border-line p-5 mb-6 flex flex-col md:flex-row md:items-center gap-4">
         <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Período fiscal</label>
+          <label className="block text-xs font-medium text-fg-secondary mb-1">Período fiscal</label>
           <select
             value={periodId}
             onChange={(e) => setPeriodId(e.target.value)}
-            className="w-full max-w-xs border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+            className="w-full max-w-xs border border-line rounded-lg px-3 py-2 text-sm bg-card"
           >
             {periods.map((p) => (
               <option key={p.id} value={p.id}>
@@ -255,7 +255,7 @@ export default function CierrePage() {
               {STATUS_BADGE[period.status].label}
             </span>
             {period.status === 'CLOSED' && period.closedAt && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-fg-secondary">
                 Cerrado el {formatDate(period.closedAt)}
                 {summary?.closedBy ? ` por ${summary.closedBy}` : ''}
               </span>
@@ -265,15 +265,15 @@ export default function CierrePage() {
       </div>
 
       {/* SECTION 2 — Checklist */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900">Checklist de cierre</h2>
+      <div className="bg-card rounded-xl border border-line shadow-sm mb-6">
+        <div className="px-5 py-3 border-b border-line flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-fg">Checklist de cierre</h2>
           {checklist && (
-            <div className="flex items-center gap-3 text-xs text-gray-500">
+            <div className="flex items-center gap-3 text-xs text-fg-secondary">
               <span>
                 {okCount} de {totalCount} ítems OK
               </span>
-              <div className="w-40 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="w-40 h-1.5 bg-subtle rounded-full overflow-hidden">
                 <div
                   className={`h-full ${progressPct === 100 ? 'bg-green-500' : progressPct >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
                   style={{ width: `${progressPct}%` }}
@@ -284,9 +284,9 @@ export default function CierrePage() {
         </div>
         <div className="p-5 space-y-3">
           {isLoading ? (
-            <div className="text-sm text-gray-400 text-center py-6">Cargando checklist...</div>
+            <div className="text-sm text-fg-muted text-center py-6">Cargando checklist...</div>
           ) : !checklist ? (
-            <div className="text-sm text-gray-400 text-center py-6">Sin datos</div>
+            <div className="text-sm text-fg-muted text-center py-6">Sin datos</div>
           ) : (
             checklist.items.map((item) => <ChecklistItem key={item.key} item={item} />)
           )}
@@ -295,12 +295,12 @@ export default function CierrePage() {
 
       {/* SECTION 3 — Closing actions */}
       {period && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 p-5">
+        <div className="bg-card rounded-xl border border-line shadow-sm mb-6 p-5">
           {period.status === 'OPEN' && (
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Iniciar revisión</h3>
-                <p className="text-xs text-gray-500 mt-1">
+                <h3 className="text-sm font-semibold text-fg">Iniciar revisión</h3>
+                <p className="text-xs text-fg-secondary mt-1">
                   Mueve el período a "En revisión" para bloquear la creación de nuevos movimientos
                   mientras revisas y concilias.
                 </p>
@@ -319,14 +319,14 @@ export default function CierrePage() {
           {period.status === 'IN_REVIEW' && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Cerrar período</h3>
-                <p className="text-xs text-gray-500 mt-1">
+                <h3 className="text-sm font-semibold text-fg">Cerrar período</h3>
+                <p className="text-xs text-fg-secondary mt-1">
                   Una vez cerrado, los movimientos quedan bloqueados y solo un ADMIN puede
                   reabrirlo.
                 </p>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
+                <label className="block text-xs font-medium text-fg-secondary mb-1">
                   Notas de cierre (opcional)
                 </label>
                 <textarea
@@ -335,7 +335,7 @@ export default function CierrePage() {
                   rows={3}
                   maxLength={2000}
                   placeholder="Observaciones del cierre..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 text-sm border border-line rounded-lg"
                 />
               </div>
               <div className="flex items-center gap-3">
@@ -366,15 +366,15 @@ export default function CierrePage() {
           {period.status === 'CLOSED' && (
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Período cerrado</h3>
-                <p className="text-xs text-gray-500 mt-1">
+                <h3 className="text-sm font-semibold text-fg">Período cerrado</h3>
+                <p className="text-xs text-fg-secondary mt-1">
                   Los movimientos de este período están bloqueados. Solo un ADMIN puede reabrirlo.
                 </p>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleViewSummary}
-                  className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
                 >
                   Ver resumen de cierre
                 </button>
@@ -427,7 +427,7 @@ export default function CierrePage() {
                 Vas a reabrir el período <strong>{period?.name}</strong>. Los movimientos volverán a
                 ser editables.
               </p>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
+              <label className="block text-xs font-medium text-fg-secondary mb-1">
                 Razón (mínimo 5 caracteres, se registra en auditoría)
               </label>
               <textarea
@@ -436,7 +436,7 @@ export default function CierrePage() {
                 rows={3}
                 maxLength={1000}
                 placeholder="Ej: Ajuste contable por error de categorización..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 text-sm border border-line rounded-lg"
               />
             </>
           }
@@ -477,18 +477,18 @@ function ConfirmModal({
     confirmVariant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700';
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-          <button onClick={onCancel} className="p-1 rounded hover:bg-gray-100 transition">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-fg">{title}</h3>
+          <button onClick={onCancel} className="p-1 rounded hover:bg-subtle-hover transition">
             <X size={16} />
           </button>
         </div>
-        <div className="p-5 text-sm text-gray-700">{description}</div>
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
+        <div className="p-5 text-sm text-fg">{description}</div>
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-line">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
           >
             Cancelar
           </button>
@@ -513,14 +513,12 @@ function ClosingSummaryCard({
   onExport: () => void;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 print:shadow-none print:border-0">
-      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between print:hidden">
-        <h2 className="text-sm font-semibold text-gray-900">
-          Resumen de cierre — {summary.period.name}
-        </h2>
+    <div className="bg-card rounded-xl border border-line shadow-sm mb-6 print:shadow-none print:border-0">
+      <div className="px-5 py-3 border-b border-line flex items-center justify-between print:hidden">
+        <h2 className="text-sm font-semibold text-fg">Resumen de cierre — {summary.period.name}</h2>
         <button
           onClick={onExport}
-          className="flex items-center gap-2 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+          className="flex items-center gap-2 px-3 py-1.5 text-xs border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
         >
           <Printer size={12} /> Exportar / Imprimir
         </button>
@@ -528,14 +526,14 @@ function ClosingSummaryCard({
 
       <div className="p-6 space-y-6">
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          <h3 className="text-xs font-semibold text-fg-secondary uppercase tracking-wide mb-2">
             Empresa
           </h3>
-          <p className="text-sm text-gray-900">
+          <p className="text-sm text-fg">
             {summary.company?.legalName ?? summary.company?.name ?? '—'}
           </p>
           {summary.company?.taxId && (
-            <p className="text-xs text-gray-500">RUT {summary.company.taxId}</p>
+            <p className="text-xs text-fg-secondary">RUT {summary.company.taxId}</p>
           )}
         </div>
 
@@ -561,12 +559,12 @@ function ClosingSummaryCard({
           <SummaryStat
             label="Caja apertura"
             value={formatCLP(summary.cash.opening)}
-            color="text-gray-900"
+            color="text-fg"
           />
           <SummaryStat
             label="Caja cierre"
             value={formatCLP(summary.cash.closing)}
-            color="text-gray-900"
+            color="text-fg"
           />
           <SummaryStat label="Libre" value={formatCLP(summary.cash.free)} color="text-blue-600" />
           <SummaryStat
@@ -577,33 +575,33 @@ function ClosingSummaryCard({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          <div className="border border-line rounded-lg p-4">
+            <h3 className="text-xs font-semibold text-fg-secondary uppercase tracking-wide mb-2">
               Conciliación bancaria
             </h3>
-            <p className="amount text-[28px] leading-tight text-gray-900">
+            <p className="amount text-[28px] leading-tight text-fg">
               {summary.reconciliation.reconciledPercentage}%
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-fg-secondary mt-1">
               {summary.reconciliation.reconciledBankMovements} de{' '}
               {summary.reconciliation.totalBankMovements} movimientos ·{' '}
               {summary.reconciliation.pendingCount} pendientes
             </p>
           </div>
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          <div className="border border-line rounded-lg p-4">
+            <h3 className="text-xs font-semibold text-fg-secondary uppercase tracking-wide mb-2">
               SII / Tributario
             </h3>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Emitidos</span>
-              <span className="amount text-gray-900">{formatCLP(summary.tax.emitidosTotal)}</span>
+              <span className="text-fg-secondary">Emitidos</span>
+              <span className="amount text-fg">{formatCLP(summary.tax.emitidosTotal)}</span>
             </div>
             <div className="flex justify-between text-sm mt-1">
-              <span className="text-gray-500">Recibidos</span>
-              <span className="amount text-gray-900">{formatCLP(summary.tax.recibidosTotal)}</span>
+              <span className="text-fg-secondary">Recibidos</span>
+              <span className="amount text-fg">{formatCLP(summary.tax.recibidosTotal)}</span>
             </div>
-            <div className="flex justify-between text-sm mt-2 pt-2 border-t border-gray-100">
-              <span className="text-gray-600" style={{ fontWeight: 500 }}>
+            <div className="flex justify-between text-sm mt-2 pt-2 border-t border-line">
+              <span className="text-fg-secondary" style={{ fontWeight: 500 }}>
                 Balance
               </span>
               <span
@@ -617,7 +615,7 @@ function ClosingSummaryCard({
 
         {summary.topCategories.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="text-xs font-semibold text-fg-secondary uppercase tracking-wide mb-2">
               Top categorías
             </h3>
             <div className="space-y-2">
@@ -627,9 +625,9 @@ function ClosingSummaryCard({
                     className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                     style={{ backgroundColor: c.color }}
                   />
-                  <span className="text-sm text-gray-900 flex-1 truncate">{c.name}</span>
-                  <span className="text-xs text-gray-500">{c.percentage}%</span>
-                  <span className="amount text-sm text-gray-900 w-28 text-right">
+                  <span className="text-sm text-fg flex-1 truncate">{c.name}</span>
+                  <span className="text-xs text-fg-secondary">{c.percentage}%</span>
+                  <span className="amount text-sm text-fg w-28 text-right">
                     {formatCLP(c.total)}
                   </span>
                 </div>
@@ -652,13 +650,13 @@ function ClosingSummaryCard({
           <SummaryStat
             label="Cancelados"
             value={String(summary.commitments.cancelled)}
-            color="text-gray-500"
+            color="text-fg-secondary"
           />
         </div>
 
         {summary.closedBy && summary.closedAt && (
-          <div className="text-xs text-gray-500 border-t border-gray-100 pt-3">
-            Cerrado por <span className="font-medium text-gray-700">{summary.closedBy}</span> el{' '}
+          <div className="text-xs text-fg-secondary border-t border-line pt-3">
+            Cerrado por <span className="font-medium text-fg">{summary.closedBy}</span> el{' '}
             {formatDate(summary.closedAt)}
           </div>
         )}
@@ -670,7 +668,7 @@ function ClosingSummaryCard({
 function SummaryStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <p className="label text-gray-500 text-[11px]">{label}</p>
+      <p className="label text-fg-secondary text-[11px]">{label}</p>
       <p className={`amount text-[22px] mt-1 leading-tight ${color}`}>{value}</p>
     </div>
   );

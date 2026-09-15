@@ -82,7 +82,7 @@ export function CampaignFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"
@@ -177,7 +177,7 @@ export function CampaignFormModal({
             onClick={save}
             disabled={saving}
             className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>

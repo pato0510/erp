@@ -153,7 +153,7 @@ export function AssetSubtypeFormModal({
               <button
                 type="button"
                 onClick={() => removeSpecRow(idx)}
-                className="p-2 rounded hover:bg-gray-100 text-[var(--text-secondary)] flex-shrink-0"
+                className="p-2 rounded hover:bg-subtle-hover text-[var(--text-secondary)] flex-shrink-0"
                 aria-label="Quitar"
               >
                 <Trash2 size={14} />

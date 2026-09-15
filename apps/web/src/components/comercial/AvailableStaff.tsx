@@ -68,7 +68,7 @@ export function AvailableStaff() {
             onClick={consultar}
             disabled={state === 'loading'}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             <Users size={15} /> {state === 'loading' ? 'Consultando…' : 'Consultar'}
           </button>

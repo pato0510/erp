@@ -80,7 +80,7 @@ export default function CampanasPage() {
   const Header = (
     <div className="mb-5 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+        <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
         <h1
           className="text-2xl font-semibold text-[var(--text-primary)]"
           style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
@@ -95,7 +95,7 @@ export default function CampanasPage() {
             setModalOpen(true);
           }}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ background: '#2563eb' }}
+          style={{ background: 'var(--color-accent)' }}
         >
           <Plus size={16} /> Nueva campaña
         </button>
@@ -159,7 +159,7 @@ export default function CampanasPage() {
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-color)] bg-gray-50">
+          <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
               {['Nombre', 'Canal', 'Estado', 'Inicio', 'Término', 'Presupuesto'].map((h) => (
                 <th
@@ -182,7 +182,7 @@ export default function CampanasPage() {
                 <tr key={i} className="animate-pulse">
                   {Array.from({ length: cols }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 w-24 rounded bg-gray-200" />
+                      <div className="h-4 w-24 rounded bg-subtle-hover" />
                     </td>
                   ))}
                 </tr>

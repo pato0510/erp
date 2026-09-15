@@ -325,7 +325,7 @@ export default function AprobacionesPage() {
           <button
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-3 py-2 text-xs rounded-full border border-line text-fg hover:bg-subtle-hover disabled:opacity-50"
           >
             <RefreshCw size={12} /> Actualizar
           </button>
@@ -351,7 +351,7 @@ export default function AprobacionesPage() {
           <div className="p-10 text-center text-[var(--text-secondary)]">Cargando...</div>
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center text-[var(--text-secondary)]">
-            <ClipboardCheck size={32} className="mx-auto mb-2 text-gray-300" />
+            <ClipboardCheck size={32} className="mx-auto mb-2 text-fg-muted" />
             <p className="font-medium">Nada por aprobar 🎉</p>
             <p className="text-sm mt-1">
               Cuando alguien envíe un permiso para tu autorización, aparecerá aquí.
@@ -487,7 +487,7 @@ export default function AprobacionesPage() {
                         </button>
                         <Link
                           href={linkHref}
-                          className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                          className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                           title="Ver detalle"
                         >
                           <ChevronRight size={14} />
@@ -505,7 +505,7 @@ export default function AprobacionesPage() {
       {/* Bulk confirmation */}
       {bulkConfirmOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md p-5">
+          <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md p-5">
             <h3
               className="text-base text-[var(--text-primary)]"
               style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 600 }}
@@ -519,7 +519,7 @@ export default function AprobacionesPage() {
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => setBulkConfirmOpen(false)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-full"
+                className="px-4 py-2 text-sm border border-line text-fg rounded-full"
               >
                 Cancelar
               </button>

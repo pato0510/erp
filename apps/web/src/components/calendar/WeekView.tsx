@@ -79,11 +79,7 @@ export function WeekView<T extends CalendarWeekEvent>({
             <div
               key={i}
               className={`flex min-h-[160px] flex-col px-2 py-2 ${
-                today
-                  ? 'bg-blue-50/60 dark:bg-blue-950/20'
-                  : weekend
-                    ? 'bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)]'
-                    : ''
+                today ? 'bg-blue-50/60 dark:bg-blue-950/20' : weekend ? 'bg-subtle' : ''
               }`}
             >
               <div className="mb-2 flex items-center justify-between">

@@ -209,10 +209,14 @@ export function DocumentUploadModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
           <h3 className="text-base font-semibold text-[var(--text-primary)]">Cargar documento</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-subtle-hover"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
@@ -283,7 +287,7 @@ export function DocumentUploadModal({
               className="cursor-pointer"
               style={{
                 border: '2px dashed',
-                borderColor: dragOver ? '#2563eb' : 'var(--border-color)',
+                borderColor: dragOver ? 'var(--color-accent)' : 'var(--border-color)',
                 borderRadius: 12,
                 padding: 20,
                 textAlign: 'center',
@@ -335,7 +339,7 @@ export function DocumentUploadModal({
                       e.stopPropagation();
                       handleFile(null);
                     }}
-                    className="ml-3 p-1 rounded hover:bg-gray-100 text-[var(--text-secondary)]"
+                    className="ml-3 p-1 rounded hover:bg-subtle-hover text-[var(--text-secondary)]"
                     aria-label="Quitar archivo"
                   >
                     <X size={14} />
@@ -343,7 +347,7 @@ export function DocumentUploadModal({
                 </div>
               ) : (
                 <>
-                  <Upload size={28} style={{ margin: '0 auto 8px', color: '#94a3b8' }} />
+                  <Upload size={28} style={{ margin: '0 auto 8px', color: 'var(--text-muted)' }} />
                   <p
                     style={{
                       fontFamily: 'var(--font-outfit), sans-serif',
@@ -449,7 +453,7 @@ export function DocumentUploadModal({
                     disabled={submitting !== false}
                     className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white disabled:opacity-50"
                     style={{
-                      background: '#1C1C1E',
+                      background: 'var(--color-dark)',
                       fontFamily: 'var(--font-outfit), sans-serif',
                       fontWeight: 500,
                     }}
@@ -461,7 +465,7 @@ export function DocumentUploadModal({
                   type="button"
                   onClick={() => submit(conflict.target, true)}
                   disabled={submitting !== false}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full border border-line hover:bg-subtle-hover disabled:opacity-50"
                   style={{
                     fontFamily: 'var(--font-outfit), sans-serif',
                     fontWeight: 500,
@@ -491,10 +495,10 @@ export function DocumentUploadModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar
@@ -502,7 +506,7 @@ export function DocumentUploadModal({
           <button
             onClick={() => submit('draft')}
             disabled={submitting !== false}
-            className="px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            className="px-4 py-2 text-sm rounded-full border border-line hover:bg-subtle-hover disabled:opacity-50"
             style={{
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
@@ -516,7 +520,7 @@ export function DocumentUploadModal({
             disabled={submitting !== false}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}

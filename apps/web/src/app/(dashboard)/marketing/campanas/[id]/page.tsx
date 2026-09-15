@@ -157,7 +157,10 @@ export default function CampaignDetailPage() {
       <div className="mb-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="h-7 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+            <span
+              className="h-7 w-1.5 rounded-full"
+              style={{ background: 'var(--color-accent)' }}
+            />
             <div>
               <h1
                 className="text-xl font-semibold text-[var(--text-primary)]"
@@ -339,7 +342,7 @@ function BackLink() {
     <Link
       href="/marketing/campanas"
       className="mt-2 inline-block text-sm"
-      style={{ color: '#2563eb' }}
+      style={{ color: 'var(--color-accent)' }}
     >
       ← Volver a campañas
     </Link>

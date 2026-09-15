@@ -268,7 +268,7 @@ export function OpportunityQuotes({
               onClick={create}
               disabled={createDisabled}
               className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: '#2563eb' }}
+              style={{ background: 'var(--color-accent)' }}
             >
               <Plus size={15} /> Nueva cotización
             </button>
@@ -580,7 +580,7 @@ function QuoteDetailPanel({
                 onClick={onSend}
                 disabled={busy}
                 className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-                style={{ background: '#2563eb' }}
+                style={{ background: 'var(--color-accent)' }}
               >
                 <Send size={14} /> Enviar
               </button>

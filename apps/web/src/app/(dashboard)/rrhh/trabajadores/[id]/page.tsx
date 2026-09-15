@@ -115,7 +115,7 @@ export default function EmployeeFichaPage() {
         <Link
           href="/rrhh/trabajadores"
           className="mt-2 inline-block text-sm"
-          style={{ color: '#2563eb' }}
+          style={{ color: 'var(--color-accent)' }}
         >
           ← Volver a trabajadores
         </Link>
@@ -135,7 +135,7 @@ export default function EmployeeFichaPage() {
       {/* Header */}
       <div className="mb-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
         <div className="flex items-center gap-3">
-          <span className="h-7 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+          <span className="h-7 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
           <div>
             <h1
               className="text-xl font-semibold text-[var(--text-primary)]"
@@ -159,7 +159,7 @@ export default function EmployeeFichaPage() {
             onClick={() => setTab(t.key)}
             className="relative px-3 py-2 text-sm"
             style={{
-              color: tab === t.key ? '#2563eb' : 'var(--text-secondary)',
+              color: tab === t.key ? 'var(--color-accent)' : 'var(--text-secondary)',
               fontWeight: tab === t.key ? 600 : 400,
               borderBottom: tab === t.key ? '2px solid #2563eb' : '2px solid transparent',
             }}
@@ -324,7 +324,7 @@ function RemuneracionesTab({ employeeId }: { employeeId: string }) {
           <button
             onClick={() => setEditOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             <Pencil size={14} />
             {comp ? 'Editar' : 'Ingresar remuneración'}
@@ -424,7 +424,7 @@ function CompensationModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"
@@ -504,7 +504,7 @@ function CompensationModal({
             onClick={save}
             disabled={saving}
             className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>

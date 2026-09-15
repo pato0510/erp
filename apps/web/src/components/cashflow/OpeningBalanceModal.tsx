@@ -81,13 +81,13 @@ export function OpeningBalanceModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)]">
           <div>
             <h3 className="text-base font-semibold text-[var(--text-primary)]">Editar saldo</h3>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">{accountName}</p>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>
@@ -131,7 +131,7 @@ export function OpeningBalanceModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar
@@ -141,7 +141,7 @@ export function OpeningBalanceModal({
             disabled={!canSubmit}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}

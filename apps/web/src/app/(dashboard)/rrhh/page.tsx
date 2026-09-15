@@ -16,7 +16,7 @@ import { apiClient, ApiError } from '../../../lib/api';
 import { formatCLP } from '../../../lib/formatters';
 import { KpiCard } from '../../../components/operations/dashboard/KpiCard';
 
-const ACCENT = '#2563eb';
+const ACCENT = 'var(--color-accent)';
 
 const AREA_LABELS: Record<string, string> = {
   OPERACIONES: 'Operaciones',

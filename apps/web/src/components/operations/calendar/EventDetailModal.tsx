@@ -74,7 +74,7 @@ export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--bg-card)] w-full max-w-lg rounded-xl border border-[var(--border-color)] shadow-2xl"
+        className="bg-card-solid w-full max-w-lg rounded-xl border border-[var(--border-color)] shadow-2xl"
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--border-color)] px-5 py-4">
           <div className="flex items-start gap-3">
@@ -134,7 +134,7 @@ export function EventDetailModal({ event, onClose }: EventDetailModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]"
+            className="rounded-md border border-[var(--border-color)] bg-card-solid px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]"
           >
             Cerrar
           </button>

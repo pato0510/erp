@@ -219,7 +219,7 @@ export function AlertsConfigTab({ toaster }: { toaster: Toaster }) {
             disabled={recalculating}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-full text-white disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -263,7 +263,7 @@ export function AlertsConfigTab({ toaster }: { toaster: Toaster }) {
             <button
               onClick={applyPreset}
               disabled={applyingPreset}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-line rounded-lg hover:bg-subtle-hover disabled:opacity-50"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -278,7 +278,7 @@ export function AlertsConfigTab({ toaster }: { toaster: Toaster }) {
               onClick={() => setRuleModal({ mode: 'create' })}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -289,7 +289,7 @@ export function AlertsConfigTab({ toaster }: { toaster: Toaster }) {
         </div>
         {rules.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-            <Bell size={28} style={{ margin: '0 auto 8px', color: '#cbd5e1' }} />
+            <Bell size={28} style={{ margin: '0 auto 8px', color: 'var(--text-muted)' }} />
             <p className="text-sm">
               Aún no hay reglas personalizadas. Las alertas funcionan con la configuración global.
             </p>
@@ -405,7 +405,7 @@ export function AlertsConfigTab({ toaster }: { toaster: Toaster }) {
                     <td style={{ textAlign: 'right' }}>
                       <button
                         onClick={() => setRuleModal({ mode: 'edit', rule: r })}
-                        className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)] mr-1"
+                        className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)] mr-1"
                         title="Editar"
                       >
                         <Pencil size={13} />
@@ -595,7 +595,7 @@ function SettingsSection({
             disabled={!dirty || saving}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-full text-white disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -669,7 +669,7 @@ function ToggleField({
         checked={value}
         onChange={(e) => !disabled && onChange(e.target.checked)}
         disabled={disabled}
-        style={{ accentColor: '#2563eb', marginTop: 3 }}
+        style={{ accentColor: 'var(--color-accent)', marginTop: 3 }}
       />
       <div>
         <div className="flex items-center gap-2">
@@ -784,12 +784,16 @@ function AlertRuleModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
           <h3 className="text-base font-semibold text-[var(--text-primary)] flex items-center gap-2">
             <Bell size={16} /> {mode === 'edit' ? 'Editar regla' : 'Nueva regla de alerta'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-subtle-hover"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
@@ -931,10 +935,10 @@ function AlertRuleModal({
           />
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar
@@ -944,7 +948,7 @@ function AlertRuleModal({
             disabled={submitting}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50 inline-flex items-center gap-1.5"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -979,7 +983,7 @@ function RoleMultiSelect({
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
               background: active ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
-              borderColor: active ? '#2563eb' : 'var(--border-color)',
+              borderColor: active ? 'var(--color-accent)' : 'var(--border-color)',
               color: active ? '#1d4ed8' : 'var(--text-secondary)',
             }}
           >
@@ -1055,7 +1059,7 @@ function ConfirmModal({
   const bg = tone === 'danger' ? '#DC2626' : '#D97706';
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="px-5 py-4 border-b border-[var(--border-color)]">
           <h3
             className="text-[var(--text-primary)] flex items-center gap-2"
@@ -1072,7 +1076,7 @@ function ConfirmModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar

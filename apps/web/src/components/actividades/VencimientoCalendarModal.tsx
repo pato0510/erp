@@ -27,7 +27,7 @@ export function VencimientoCalendarModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-sm overflow-hidden rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="w-full max-w-sm overflow-hidden rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-start justify-between border-b border-[var(--border-color)] px-5 py-4">
           <div className="flex items-center gap-2.5">
             <span

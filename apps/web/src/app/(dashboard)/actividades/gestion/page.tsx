@@ -375,7 +375,7 @@ export default function ActividadesGestionPage() {
                 type="button"
                 onClick={enterEdit}
                 className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white"
-                style={{ background: '#2563eb' }}
+                style={{ background: 'var(--color-accent)' }}
               >
                 <Pencil size={14} /> Editar
               </button>
@@ -524,7 +524,7 @@ export default function ActividadesGestionPage() {
 
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
         <table className="w-full min-w-[860px] text-sm">
-          <thead className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-white/5">
+          <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
               {['Tarea', 'Área', 'Responsable', 'Fecha cierre', 'Estado', '', 'Observaciones'].map(
                 (h, i) => (
@@ -1203,7 +1203,7 @@ function Chip({
       disabled={disabled}
       className="rounded-full border px-3 py-1 text-xs font-medium transition disabled:opacity-50"
       style={{
-        borderColor: active ? '#2563eb' : 'var(--border-color)',
+        borderColor: active ? 'var(--color-accent)' : 'var(--border-color)',
         background: active ? 'rgba(37,99,235,0.12)' : 'transparent',
         color: active ? '#1d4ed8' : 'var(--text-secondary)',
       }}

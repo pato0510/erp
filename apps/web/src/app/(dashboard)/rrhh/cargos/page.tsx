@@ -113,7 +113,7 @@ export default function CargosPage() {
     <div className="pt-2">
       <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
-          <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+          <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
           <h1
             className="text-2xl font-semibold text-[var(--text-primary)]"
             style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
@@ -124,7 +124,7 @@ export default function CargosPage() {
         <button
           onClick={openCreate}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ background: '#2563eb' }}
+          style={{ background: 'var(--color-accent)' }}
         >
           <Plus size={16} /> Nuevo cargo
         </button>
@@ -164,7 +164,7 @@ export default function CargosPage() {
       {/* Table */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-[var(--border-color)]">
+          <thead className="bg-subtle border-b border-[var(--border-color)]">
             <tr>
               {['Nombre', 'Área', 'Certs', 'Docs', 'Servicios', 'Estado'].map((h) => (
                 <th
@@ -185,7 +185,7 @@ export default function CargosPage() {
                 <tr key={i} className="animate-pulse">
                   {Array.from({ length: 7 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 w-20 rounded bg-gray-200" />
+                      <div className="h-4 w-20 rounded bg-subtle-hover" />
                     </td>
                   ))}
                 </tr>
@@ -322,7 +322,7 @@ function CargoModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-[var(--bg-card)] shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-card-solid shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
           <h2
             className="text-lg font-semibold text-[var(--text-primary)]"
@@ -406,7 +406,7 @@ function CargoModal({
             onClick={save}
             disabled={saving}
             className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
@@ -451,7 +451,7 @@ function TagField({
           <span
             key={v}
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
-            style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}
+            style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--color-accent)' }}
           >
             {v}
             <button

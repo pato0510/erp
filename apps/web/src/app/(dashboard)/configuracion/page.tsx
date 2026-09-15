@@ -52,7 +52,7 @@ interface Thresholds {
 const STATUS_BADGE: Record<FiscalPeriod['status'], { label: string; cls: string }> = {
   OPEN: { label: 'Abierto', cls: 'bg-green-100 text-green-700' },
   IN_REVIEW: { label: 'En revisión', cls: 'bg-yellow-100 text-yellow-700' },
-  CLOSED: { label: 'Cerrado', cls: 'bg-gray-100 text-[var(--text-secondary)]' },
+  CLOSED: { label: 'Cerrado', cls: 'bg-subtle text-[var(--text-secondary)]' },
 };
 
 const MONTH_NAMES = [
@@ -95,7 +95,7 @@ export default function ConfiguracionPage() {
           <a
             key={a.id}
             href={`#${a.id}`}
-            className="px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-gray-300 transition"
+            className="px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-line transition"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             {a.label}
@@ -106,7 +106,7 @@ export default function ConfiguracionPage() {
       <div className="space-y-6">
         <Link
           href="/configuracion/usuarios"
-          className="block bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm hover:border-gray-300 transition"
+          className="block bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm hover:border-line text-fg transition"
         >
           <div className="px-6 py-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-50">
@@ -264,9 +264,9 @@ function CompanySection({
 
       {loading || !company || !settings ? (
         <div className="p-6 space-y-3">
-          <div className="h-4 bg-gray-100 rounded w-48 animate-pulse" />
-          <div className="h-10 bg-gray-100 rounded animate-pulse" />
-          <div className="h-10 bg-gray-100 rounded animate-pulse" />
+          <div className="h-4 bg-subtle rounded w-48 animate-pulse" />
+          <div className="h-10 bg-subtle rounded animate-pulse" />
+          <div className="h-10 bg-subtle rounded animate-pulse" />
         </div>
       ) : (
         <>
@@ -334,13 +334,13 @@ function CompanySection({
               </CfgField>
             </div>
           </div>
-          <footer className="px-6 py-3 border-t border-[var(--border-color)] flex justify-end bg-gray-50 rounded-b-xl">
+          <footer className="px-6 py-3 border-t border-[var(--border-color)] flex justify-end bg-subtle rounded-b-xl">
             <button
               onClick={save}
               disabled={saving}
               className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -487,11 +487,11 @@ function PeriodsSection({
                 key={y}
                 onClick={() => setSelectedYear(y)}
                 className={`relative shrink-0 px-3 py-1.5 text-sm rounded-md transition border ${
-                  active ? 'text-white' : 'text-[var(--text-primary)] hover:bg-gray-50'
+                  active ? 'text-white' : 'text-[var(--text-primary)] hover:bg-subtle-hover'
                 }`}
                 style={{
-                  background: active ? '#2563EB' : '#FFFFFF',
-                  borderColor: active ? '#2563EB' : 'var(--border-color)',
+                  background: active ? 'var(--color-accent)' : 'var(--bg-card)',
+                  borderColor: active ? 'var(--color-accent)' : 'var(--border-color)',
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                 }}
@@ -513,7 +513,7 @@ function PeriodsSection({
             disabled={generating}
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -529,7 +529,7 @@ function PeriodsSection({
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+              <div key={i} className="h-20 bg-subtle rounded-lg animate-pulse" />
             ))}
           </div>
         ) : periods.length === 0 ? (
@@ -676,8 +676,8 @@ function ThresholdsSection({
 
       {loading || !thresholds ? (
         <div className="p-6 space-y-3">
-          <div className="h-4 bg-gray-100 rounded w-48 animate-pulse" />
-          <div className="h-10 bg-gray-100 rounded animate-pulse" />
+          <div className="h-4 bg-subtle rounded w-48 animate-pulse" />
+          <div className="h-10 bg-subtle rounded animate-pulse" />
         </div>
       ) : (
         <>
@@ -724,13 +724,13 @@ function ThresholdsSection({
               </CfgField>
             </div>
           </div>
-          <footer className="px-6 py-3 border-t border-[var(--border-color)] flex justify-end bg-gray-50 rounded-b-xl">
+          <footer className="px-6 py-3 border-t border-[var(--border-color)] flex justify-end bg-subtle rounded-b-xl">
             <button
               onClick={save}
               disabled={saving}
               className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}

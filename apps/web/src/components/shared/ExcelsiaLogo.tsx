@@ -9,9 +9,9 @@ interface ExcelsiaLogoProps {
 }
 
 export function ExcelsiaLogo({ size = 28, variant = 'light', className }: ExcelsiaLogoProps) {
-  const accent = '#2563EB';
-  const triangleStroke = variant === 'light' ? accent : '#1C1C1E';
-  const wordmarkColor = variant === 'light' ? '#ffffff' : '#1C1C1E';
+  const accent = 'var(--color-accent)';
+  const triangleStroke = variant === 'light' ? accent : 'var(--color-dark)';
+  const wordmarkColor = variant === 'light' ? '#ffffff' : 'var(--color-dark)';
 
   return (
     <div className={className} style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>

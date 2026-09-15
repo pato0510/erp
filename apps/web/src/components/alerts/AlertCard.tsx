@@ -49,15 +49,15 @@ export function AlertCard({ alert, onDismiss }: AlertCardProps) {
       <Icon size={20} className={`${config.iconColor} mt-0.5 flex-shrink-0`} />
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-semibold ${config.text}`}>{alert.title}</p>
-        <p className="text-sm text-gray-600 mt-0.5">{alert.message}</p>
-        <p className="text-xs text-gray-400 mt-1">{formatRelativeDate(alert.createdAt)}</p>
+        <p className="text-sm text-fg-secondary mt-0.5">{alert.message}</p>
+        <p className="text-xs text-fg-muted mt-1">{formatRelativeDate(alert.createdAt)}</p>
       </div>
       <button
         onClick={() => onDismiss(alert.id)}
-        className="p-1 rounded hover:bg-white/50 transition flex-shrink-0"
+        className="p-1 rounded hover:bg-subtle-hover transition flex-shrink-0"
         title="Descartar"
       >
-        <X size={16} className="text-gray-400" />
+        <X size={16} className="text-fg-muted" />
       </button>
     </div>
   );

@@ -128,7 +128,7 @@ export default function MarketingCalendarioPage() {
   const Header = (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+        <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
         <h1
           className="text-2xl font-semibold text-[var(--text-primary)]"
           style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}

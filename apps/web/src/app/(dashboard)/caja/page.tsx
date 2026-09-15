@@ -66,7 +66,7 @@ const ACCOUNT_TYPE_BADGE: Record<string, string> = {
   SAVINGS: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   CASH: 'bg-amber-50 text-amber-700 border-amber-200',
   CREDIT_LINE: 'bg-purple-50 text-purple-700 border-purple-200',
-  OTHER: 'bg-gray-50 text-[var(--text-secondary)] border-gray-200',
+  OTHER: 'bg-subtle text-[var(--text-secondary)] border-line',
 };
 
 const ACCOUNT_ICONS: Record<string, React.ElementType> = {
@@ -193,7 +193,7 @@ export default function CajaPage() {
                   `caja-${date}.xlsx`,
                 );
               }}
-              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              className="flex items-center gap-2 px-3 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
             >
               <Download size={16} /> Exportar
             </button>
@@ -216,7 +216,7 @@ export default function CajaPage() {
               onClick={() => setModal({ kind: 'create-account' })}
               className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full transition"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -230,18 +230,18 @@ export default function CajaPage() {
           <div className="divide-y divide-[var(--border-color)]">
             {Array.from({ length: 2 }).map((_, i) => (
               <div key={i} className="px-5 py-4 animate-pulse flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-200" />
+                <div className="w-10 h-10 rounded-lg bg-subtle-hover" />
                 <div className="flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-48 mb-2" />
-                  <div className="h-3 bg-gray-200 rounded w-32" />
+                  <div className="h-4 bg-subtle-hover rounded w-48 mb-2" />
+                  <div className="h-3 bg-subtle-hover rounded w-32" />
                 </div>
-                <div className="h-6 bg-gray-200 rounded w-24" />
+                <div className="h-6 bg-subtle-hover rounded w-24" />
               </div>
             ))}
           </div>
         ) : accounts.length === 0 ? (
           <div className="p-12 text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-subtle flex items-center justify-center mb-4">
               <Wallet size={28} className="text-[var(--text-secondary)]" />
             </div>
             <h3
@@ -262,7 +262,7 @@ export default function CajaPage() {
               onClick={() => setModal({ kind: 'create-account' })}
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm text-white rounded-full transition"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -278,7 +278,7 @@ export default function CajaPage() {
               const masked = maskAccountNumber(acc.accountNumber);
               return (
                 <div key={acc.id} className="px-5 py-4 flex items-center gap-4">
-                  <div className="p-2.5 bg-gray-100 rounded-lg flex-shrink-0">
+                  <div className="p-2.5 bg-subtle rounded-lg flex-shrink-0">
                     <Icon size={20} className="text-[var(--text-secondary)]" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -309,7 +309,7 @@ export default function CajaPage() {
                   </div>
                   <button
                     onClick={() => setModal({ kind: 'set-balance', account: acc })}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition text-[var(--text-secondary)]"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-line rounded-lg hover:bg-subtle-hover transition text-[var(--text-secondary)]"
                     style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
                   >
                     <Pencil size={12} /> Editar saldo
@@ -337,8 +337,8 @@ export default function CajaPage() {
               key={i}
               className="rounded-xl border border-[var(--border-color)] p-5 animate-pulse"
             >
-              <div className="h-3 bg-gray-200 rounded w-20 mb-3" />
-              <div className="h-7 bg-gray-200 rounded w-32" />
+              <div className="h-3 bg-subtle-hover rounded w-20 mb-3" />
+              <div className="h-7 bg-subtle-hover rounded w-32" />
             </div>
           ))}
         </div>
@@ -373,7 +373,7 @@ export default function CajaPage() {
       {/* SECTION — Commitments */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm">
         <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+          <div className="flex gap-1 bg-subtle rounded-lg p-0.5">
             <button
               onClick={() => setCommitTab('upcoming')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
@@ -404,7 +404,7 @@ export default function CajaPage() {
         </div>
 
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-[var(--border-color)]">
+          <thead className="bg-subtle border-b border-[var(--border-color)]">
             <tr>
               <th className="label text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Vencimiento
@@ -432,7 +432,7 @@ export default function CajaPage() {
                 <tr key={i} className="animate-pulse">
                   {Array.from({ length: 6 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 bg-gray-200 rounded w-16" />
+                      <div className="h-4 bg-subtle-hover rounded w-16" />
                     </td>
                   ))}
                 </tr>
@@ -445,7 +445,7 @@ export default function CajaPage() {
               </tr>
             ) : (
               commitments.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50">
+                <tr key={c.id} className="hover:bg-subtle-hover">
                   <td className="px-4 py-2.5">
                     <span className={`mono ${dueDateUrgency(c.dueDate)}`}>
                       {formatDate(c.dueDate)}
@@ -486,7 +486,7 @@ export default function CajaPage() {
                         </button>
                         <button
                           onClick={() => handleCancelCommitment(c.id)}
-                          className="text-xs px-2 py-1 rounded bg-gray-100 text-[var(--text-secondary)] hover:bg-gray-200 transition"
+                          className="text-xs px-2 py-1 rounded bg-subtle text-[var(--text-secondary)] hover:bg-subtle-hover transition"
                         >
                           Cancelar
                         </button>

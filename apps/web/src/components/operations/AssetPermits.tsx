@@ -111,7 +111,7 @@ export function AssetPermits({ assetId }: Props) {
             onClick={() => setUploadOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white rounded-full"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -204,7 +204,7 @@ export function AssetPermits({ assetId }: Props) {
                       {p.fileName && (
                         <button
                           onClick={() => triggerDownload(p)}
-                          className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                          className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                           title="Descargar"
                         >
                           <Download size={13} />

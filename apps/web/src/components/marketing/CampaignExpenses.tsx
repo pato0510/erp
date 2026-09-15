@@ -78,7 +78,7 @@ export function CampaignExpenses({
   const budgetNum = budgetAmount != null ? Number(budgetAmount) : null;
   const over = budgetNum != null && spentNum > budgetNum;
   const pct = budgetNum != null && budgetNum > 0 ? (spentNum / budgetNum) * 100 : 0;
-  const barColor = over ? '#ef4444' : '#2563eb';
+  const barColor = over ? '#ef4444' : 'var(--color-accent)';
 
   return (
     <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5">
@@ -91,7 +91,7 @@ export function CampaignExpenses({
               setModalOpen(true);
             }}
             className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
-            style={{ background: '#2563eb' }}
+            style={{ background: 'var(--color-accent)' }}
           >
             <Plus size={14} /> Nuevo gasto
           </button>
@@ -144,7 +144,7 @@ export function CampaignExpenses({
       {/* Table */}
       <div className="overflow-hidden rounded-lg border border-[var(--border-color)]">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-color)] bg-gray-50">
+          <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
               {['Fecha', 'Descripción', 'Proveedor', 'Monto'].map((h) => (
                 <th

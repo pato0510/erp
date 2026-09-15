@@ -139,7 +139,11 @@ function KV({ label, value }: { label: string; value: string }) {
 
 function Back() {
   return (
-    <Link href="/caja" className="mt-2 inline-block text-sm" style={{ color: '#2563eb' }}>
+    <Link
+      href="/caja"
+      className="mt-2 inline-block text-sm"
+      style={{ color: 'var(--color-accent)' }}
+    >
       ← Volver a Caja
     </Link>
   );

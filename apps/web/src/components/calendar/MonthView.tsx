@@ -92,7 +92,7 @@ export function MonthView<T extends CalendarMonthEvent>({
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-      <div className="grid grid-cols-7 border-b border-[var(--border-color)] bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)]">
+      <div className="grid grid-cols-7 border-b border-[var(--border-color)] bg-subtle">
         {DAY_NAMES_SHORT.map((name) => (
           <div
             key={name}
@@ -117,7 +117,7 @@ export function MonthView<T extends CalendarMonthEvent>({
               key={idx}
               onClick={() => onSelectDay?.(day)}
               className={`group relative flex flex-col gap-1 border-b border-r border-[var(--border-color)] px-1.5 py-1.5 text-left transition-colors hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))] ${
-                weekend && inMonth ? 'bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)]' : ''
+                weekend && inMonth ? 'bg-subtle' : ''
               }`}
               style={{
                 opacity: inMonth ? 1 : 0.45,

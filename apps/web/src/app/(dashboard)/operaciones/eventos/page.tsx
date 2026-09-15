@@ -311,7 +311,7 @@ export default function EventosPage() {
       <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] text-[var(--text-secondary)]">
+            <thead className="bg-subtle text-[var(--text-secondary)]">
               <tr>
                 <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide">
                   Timestamp
@@ -527,7 +527,7 @@ function DetailModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--bg-card)] w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border border-[var(--border-color)] shadow-2xl"
+        className="bg-card-solid w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border border-[var(--border-color)] shadow-2xl"
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--border-color)] px-5 py-4">
           <div>
@@ -574,14 +574,14 @@ function DetailModal({
           )}
 
           <Section title="Payload">
-            <pre className="overflow-x-auto rounded-md border border-[var(--border-color)] bg-[rgba(0,0,0,0.03)] dark:bg-[rgba(255,255,255,0.03)] p-3 text-[11px] font-mono text-[var(--text-primary)]">
+            <pre className="overflow-x-auto rounded-md border border-[var(--border-color)] bg-subtle p-3 text-[11px] font-mono text-[var(--text-primary)]">
               {JSON.stringify(row.payload, null, 2)}
             </pre>
           </Section>
 
           {row.handlerResults != null && (
             <Section title="Resultados de handlers">
-              <pre className="overflow-x-auto rounded-md border border-[var(--border-color)] bg-[rgba(0,0,0,0.03)] dark:bg-[rgba(255,255,255,0.03)] p-3 text-[11px] font-mono text-[var(--text-primary)]">
+              <pre className="overflow-x-auto rounded-md border border-[var(--border-color)] bg-subtle p-3 text-[11px] font-mono text-[var(--text-primary)]">
                 {JSON.stringify(row.handlerResults, null, 2)}
               </pre>
             </Section>
@@ -634,7 +634,7 @@ function DetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]"
+            className="rounded-md border border-[var(--border-color)] bg-card-solid px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]"
           >
             Cerrar
           </button>

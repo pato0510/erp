@@ -25,7 +25,7 @@ interface Meta {
   dot: string;
 }
 const STATUS_META: Record<string, Meta> = {
-  RECIBIDA: { bg: 'rgba(37, 99, 235, 0.12)', fg: '#1d4ed8', dot: '#2563eb' }, // blue — new
+  RECIBIDA: { bg: 'rgba(37, 99, 235, 0.12)', fg: '#1d4ed8', dot: 'var(--color-accent)' }, // blue — new
   EN_EJECUCION: { bg: 'rgba(234, 179, 8, 0.14)', fg: '#a16207', dot: '#ca8a04' }, // amber — in progress
   COMPLETADA: { bg: 'rgba(34, 197, 94, 0.12)', fg: '#15803d', dot: '#16a34a' }, // green — done
   CANCELADA: { bg: 'rgba(100, 116, 139, 0.14)', fg: '#475569', dot: '#64748b' }, // slate — aborted

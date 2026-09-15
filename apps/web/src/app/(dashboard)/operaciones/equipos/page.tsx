@@ -240,7 +240,7 @@ export default function EquiposPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setImportWizardOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm border border-line rounded-full hover:bg-subtle-hover"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -253,7 +253,7 @@ export default function EquiposPage() {
               onClick={() => setModal({ mode: 'create' })}
               className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -293,7 +293,7 @@ export default function EquiposPage() {
             href="/operaciones/configuracion?tab=tipos"
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-full text-white flex-shrink-0"
             style={{
-              background: '#2563eb',
+              background: 'var(--color-accent)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -360,7 +360,7 @@ export default function EquiposPage() {
         {hasFilters && (
           <button
             onClick={resetFilters}
-            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100 rounded-lg"
+            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-subtle-hover rounded-lg"
             title="Limpiar filtros"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
@@ -375,10 +375,10 @@ export default function EquiposPage() {
           <div className="divide-y divide-[var(--border-color)]">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="px-5 py-3 animate-pulse flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-200" />
+                <div className="w-10 h-10 rounded-lg bg-subtle-hover" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-48" />
-                  <div className="h-3 bg-gray-200 rounded w-32" />
+                  <div className="h-4 bg-subtle-hover rounded w-48" />
+                  <div className="h-3 bg-subtle-hover rounded w-32" />
                 </div>
               </div>
             ))}
@@ -425,14 +425,14 @@ export default function EquiposPage() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((p) => p - 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                   >
                     <ChevronLeft size={16} />
                   </button>
                   <button
                     disabled={page >= data.totalPages}
                     onClick={() => setPage((p) => p + 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -694,7 +694,7 @@ function AssetRowView({
             e.stopPropagation();
             onEdit();
           }}
-          className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+          className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
           title="Editar"
         >
           <Pencil size={14} />
@@ -717,7 +717,7 @@ function AssetRowView({
 function EmptyState({ hasFilters, onCreate }: { hasFilters: boolean; onCreate: () => void }) {
   return (
     <div className="p-12 text-center">
-      <Wrench size={36} className="mx-auto text-gray-300 mb-3" />
+      <Wrench size={36} className="mx-auto text-fg-muted mb-3" />
       <p
         className="text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
@@ -734,7 +734,7 @@ function EmptyState({ hasFilters, onCreate }: { hasFilters: boolean; onCreate: (
           onClick={onCreate}
           className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
           style={{
-            background: '#1C1C1E',
+            background: 'var(--color-dark)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: 500,
           }}
@@ -761,7 +761,7 @@ function ConfirmDialog({
 }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="px-5 py-4 border-b border-[var(--border-color)]">
           <h3
             className="text-[var(--text-primary)]"
@@ -778,7 +778,7 @@ function ConfirmDialog({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar

@@ -38,7 +38,7 @@ const CATEGORY_META: Record<
   ProcedureCategory,
   { label: string; color: string; icon: typeof BookOpen }
 > = {
-  OPERATION: { label: 'Operación', color: '#2563EB', icon: HardHat },
+  OPERATION: { label: 'Operación', color: 'var(--color-accent)', icon: HardHat },
   MAINTENANCE: { label: 'Mantenimiento', color: '#64748B', icon: BookOpen },
   EMERGENCY: { label: 'Emergencia', color: '#EF4444', icon: AlertTriangle },
   SAFETY: { label: 'Seguridad', color: '#EAB308', icon: ShieldCheck },
@@ -138,7 +138,7 @@ export function ApplicableProcedures({ assetId }: { assetId: string }) {
                   )}
                   <Link
                     href={`/operaciones/procedimientos/${p.id}`}
-                    className="p-1 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                    className="p-1 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                     title="Ver procedimiento"
                   >
                     <ChevronRight size={14} />

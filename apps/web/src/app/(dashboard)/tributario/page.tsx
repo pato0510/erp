@@ -125,7 +125,7 @@ const STATUS_BADGES: Record<string, { label: string; cls: string }> = {
   PENDING: { label: 'Pendiente', cls: 'bg-yellow-100 text-yellow-700' },
   ACCEPTED: { label: 'Aceptado', cls: 'bg-green-100 text-green-700' },
   REJECTED: { label: 'Rechazado', cls: 'bg-red-100 text-red-700' },
-  CANCELLED: { label: 'Anulado', cls: 'bg-gray-100 text-gray-500' },
+  CANCELLED: { label: 'Anulado', cls: 'bg-subtle text-fg-secondary' },
 };
 
 const PAGE_SIZE = 20;
@@ -144,15 +144,15 @@ function SummaryCard({
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+    <div className="bg-card rounded-xl border border-line p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500" style={{ fontWeight: 500 }}>
+          <p className="text-sm text-fg-secondary" style={{ fontWeight: 500 }}>
             {title}
           </p>
           <p className={`amount text-[26px] mt-1 leading-tight ${color}`}>{value}</p>
           {subtitle && (
-            <p className="text-xs text-gray-400 mt-1" style={{ fontWeight: 300 }}>
+            <p className="text-xs text-fg-muted mt-1" style={{ fontWeight: 300 }}>
               {subtitle}
             </p>
           )}
@@ -443,19 +443,19 @@ export default function TributarioPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl text-gray-900 flex items-center gap-2">
-            <Receipt size={24} className="text-gray-500" /> Tributario
+          <h1 className="text-2xl text-fg flex items-center gap-2">
+            <Receipt size={24} className="text-fg-secondary" /> Tributario
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-fg-secondary text-sm mt-1">
             Facturación electrónica y documentos tributarios sincronizados desde SII
           </p>
         </div>
       </div>
 
       {/* Period picker — year row then month row */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 space-y-3">
+      <div className="bg-card rounded-xl border border-line p-4 mb-4 space-y-3">
         <div>
-          <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Año</p>
+          <p className="text-xs text-fg-secondary mb-2 font-medium uppercase tracking-wider">Año</p>
           <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">
             {Array.from({ length: now.getFullYear() - 2019 + 1 }, (_, i) => 2019 + i).map((y) => {
               const active = selectedYear === y;
@@ -464,11 +464,11 @@ export default function TributarioPage() {
                   key={y}
                   onClick={() => setSelectedYear(y)}
                   className={`shrink-0 px-3 py-1.5 text-sm rounded-md border transition ${
-                    active ? 'text-white' : 'text-gray-700 hover:bg-gray-50'
+                    active ? 'text-white' : 'text-fg hover:bg-subtle-hover'
                   }`}
                   style={{
-                    background: active ? '#2563EB' : '#FFFFFF',
-                    borderColor: active ? '#2563EB' : '#E5E7EB',
+                    background: active ? 'var(--color-accent)' : 'var(--bg-card)',
+                    borderColor: active ? 'var(--color-accent)' : 'var(--border-color)',
                   }}
                 >
                   {y}
@@ -478,7 +478,7 @@ export default function TributarioPage() {
           </div>
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Mes</p>
+          <p className="text-xs text-fg-secondary mb-2 font-medium uppercase tracking-wider">Mes</p>
           <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">
             {MONTH_SHORT.map((m, i) => {
               const monthNum = i + 1;
@@ -489,17 +489,17 @@ export default function TributarioPage() {
                   key={monthNum}
                   onClick={() => setSelectedMonth(monthNum)}
                   className={`shrink-0 px-3 py-1.5 text-sm rounded-md border transition relative ${
-                    active ? 'text-white' : 'text-gray-700 hover:bg-gray-50'
+                    active ? 'text-white' : 'text-fg hover:bg-subtle-hover'
                   }`}
                   style={{
-                    background: active ? '#2563EB' : '#FFFFFF',
-                    borderColor: active ? '#2563EB' : '#E5E7EB',
+                    background: active ? 'var(--color-accent)' : 'var(--bg-card)',
+                    borderColor: active ? 'var(--color-accent)' : 'var(--border-color)',
                   }}
                   title={exists ? '' : 'Sin período fiscal'}
                 >
                   {m}
                   {!exists && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-gray-300 border border-white" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-subtle-hover border border-white" />
                   )}
                 </button>
               );
@@ -525,25 +525,25 @@ export default function TributarioPage() {
       )}
 
       {/* SECTION 0 — SII Connection (BaseAPI) */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="bg-card rounded-xl border border-line p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="p-2.5 rounded-lg bg-green-50">
           <ShieldCheck size={20} className="text-green-600" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-gray-900">Conectado al SII vía BaseAPI</p>
+            <p className="text-sm font-semibold text-fg">Conectado al SII vía BaseAPI</p>
             <span className="label text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200">
               Activo
             </span>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-fg-secondary mt-0.5">
             {SII_COMPANY_NAME} · RUT {SII_COMPANY_RUT}
           </p>
         </div>
         <button
           onClick={handleTestConnection}
           disabled={isTestingConnection}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition"
+          className="flex items-center gap-2 px-3 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 transition"
         >
           <RefreshCw size={14} className={isTestingConnection ? 'animate-spin' : ''} />
           Probar conexión
@@ -551,12 +551,12 @@ export default function TributarioPage() {
       </div>
 
       {/* SECTION 1 — Summary cards */}
-      <h2 className="text-sm font-semibold text-gray-900 mb-3">
+      <h2 className="text-sm font-semibold text-fg mb-3">
         Resumen tributario — {MONTH_LONG[selectedMonth - 1]} {selectedYear}
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {!periodId ? (
-          <div className="md:col-span-2 lg:col-span-4 text-center py-8 text-sm text-gray-400">
+          <div className="md:col-span-2 lg:col-span-4 text-center py-8 text-sm text-fg-muted">
             Selecciona o crea un período fiscal para ver el resumen tributario.
           </div>
         ) : isSummaryLoading || !summary ? (
@@ -564,10 +564,10 @@ export default function TributarioPage() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm animate-pulse"
+                className="bg-card rounded-xl border border-line p-5 shadow-sm animate-pulse"
               >
-                <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
-                <div className="h-6 bg-gray-200 rounded w-32" />
+                <div className="h-4 bg-subtle-hover rounded w-24 mb-3" />
+                <div className="h-6 bg-subtle-hover rounded w-32" />
               </div>
             ))}
           </>
@@ -606,10 +606,10 @@ export default function TributarioPage() {
       </div>
 
       {/* SECTION 2 — Sync controls */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="bg-card rounded-xl border border-line p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-700">Sincronización con SII (mock)</p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-sm font-medium text-fg">Sincronización con SII (mock)</p>
+          <p className="text-xs text-fg-muted mt-0.5">
             {lastSyncLabel
               ? `Última sincronización: ${lastSyncLabel}`
               : 'Aún no se ha sincronizado este período'}
@@ -619,7 +619,7 @@ export default function TributarioPage() {
           <button
             onClick={() => handleSync('EMITIDO')}
             disabled={!!syncingAction}
-            className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition"
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 transition"
           >
             <RefreshCw size={14} className={syncingAction === 'EMITIDO' ? 'animate-spin' : ''} />
             Sincronizar Emitidos
@@ -627,7 +627,7 @@ export default function TributarioPage() {
           <button
             onClick={() => handleSync('RECIBIDO')}
             disabled={!!syncingAction}
-            className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition"
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 transition"
           >
             <RefreshCw size={14} className={syncingAction === 'RECIBIDO' ? 'animate-spin' : ''} />
             Sincronizar Recibidos
@@ -673,59 +673,59 @@ export default function TributarioPage() {
       )}
 
       {/* Pending categorization */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-3">
+      <div className="bg-card rounded-xl border border-line shadow-sm mb-6">
+        <div className="px-5 py-4 border-b border-line flex items-center gap-3">
           <div className="p-2 rounded-lg bg-yellow-50">
             <Tag size={18} className="text-yellow-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900">
-              Movimientos pendientes de categorizar
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-sm font-semibold text-fg">Movimientos pendientes de categorizar</p>
+            <p className="text-xs text-fg-secondary mt-0.5">
               Documentos importados con la categoría &quot;Productos no categorizados&quot;
             </p>
           </div>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-subtle text-fg font-medium">
             {pending.length}
           </span>
         </div>
         <div className="overflow-x-auto">
           {isPendingLoading ? (
-            <div className="px-5 py-8 text-center text-sm text-gray-400">
+            <div className="px-5 py-8 text-center text-sm text-fg-muted">
               Cargando pendientes...
             </div>
           ) : pending.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-gray-400">
-              <CheckCircle size={28} className="mx-auto text-gray-300 mb-2" />
+            <div className="px-5 py-8 text-center text-sm text-fg-muted">
+              <CheckCircle size={28} className="mx-auto text-fg-muted mb-2" />
               No hay movimientos pendientes de categorizar.
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-subtle border-b border-line">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Tipo</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Folio</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Contraparte</th>
-                  <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Monto</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Tipo</th>
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Folio</th>
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">
+                    Contraparte
+                  </th>
+                  <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Monto</th>
+                  <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">
                     Categoría actual
                   </th>
-                  <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Acción</th>
+                  <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line">
                 {pending.map((p) => {
                   const counterpartyName =
                     p.direction === 'EMITIDO' ? p.receiverName : p.issuerName;
                   return (
-                    <tr key={p.id} className="hover:bg-gray-50">
+                    <tr key={p.id} className="hover:bg-subtle-hover">
                       <td className="px-4 py-2.5">
                         <TaxDocumentTypeBadge type={p.type} />
                       </td>
-                      <td className="px-4 py-2.5 font-medium text-gray-900">{p.folio}</td>
-                      <td className="px-4 py-2.5 text-gray-700">{counterpartyName}</td>
-                      <td className="amount px-4 py-2.5 text-right text-gray-900">
+                      <td className="px-4 py-2.5 font-medium text-fg">{p.folio}</td>
+                      <td className="px-4 py-2.5 text-fg">{counterpartyName}</td>
+                      <td className="amount px-4 py-2.5 text-right text-fg">
                         {formatCLP(p.totalAmount)}
                       </td>
                       <td className="px-4 py-2.5">
@@ -736,7 +736,7 @@ export default function TributarioPage() {
                       <td className="px-4 py-2.5 text-right">
                         <button
                           onClick={() => setCategorizingDoc(p)}
-                          className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                          className="px-3 py-1.5 text-xs border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
                         >
                           Categorizar
                         </button>
@@ -764,9 +764,9 @@ export default function TributarioPage() {
       )}
 
       {/* SECTION 3 — Documents */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <div className="bg-card rounded-xl border border-line shadow-sm">
         {/* Tabs + search */}
-        <div className="border-b border-gray-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="border-b border-line px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex gap-1">
             {(
               [
@@ -779,7 +779,9 @@ export default function TributarioPage() {
                 key={t.value}
                 onClick={() => setTab(t.value)}
                 className={`px-4 py-2 text-sm rounded-lg transition ${
-                  tab === t.value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  tab === t.value
+                    ? 'bg-blue-600 text-white'
+                    : 'text-fg-secondary hover:bg-subtle-hover'
                 }`}
               >
                 {t.label}
@@ -790,14 +792,14 @@ export default function TributarioPage() {
             <div className="relative w-full sm:w-72">
               <Search
                 size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted"
               />
               <input
                 type="text"
                 placeholder="Buscar por RUT o nombre..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-line rounded-lg"
               />
             </div>
           </div>
@@ -806,32 +808,32 @@ export default function TributarioPage() {
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-subtle border-b border-line">
               <tr>
-                <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Folio</th>
-                <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Tipo</th>
-                <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Fecha</th>
-                <th className="text-left px-4 py-2.5 text-gray-500 font-medium">
+                <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Folio</th>
+                <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Tipo</th>
+                <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Fecha</th>
+                <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">
                   {tab === 'EMITIDO' ? 'Receptor' : tab === 'RECIBIDO' ? 'Emisor' : 'Contraparte'}
                 </th>
-                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Neto</th>
-                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">IVA</th>
-                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Total</th>
-                <th className="text-center px-4 py-2.5 text-gray-500 font-medium">Estado</th>
-                <th className="text-center px-4 py-2.5 text-gray-500 font-medium">Concilia.</th>
+                <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Neto</th>
+                <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">IVA</th>
+                <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Total</th>
+                <th className="text-center px-4 py-2.5 text-fg-secondary font-medium">Estado</th>
+                <th className="text-center px-4 py-2.5 text-fg-secondary font-medium">Concilia.</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line">
               {isDocsLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm">
+                  <td colSpan={9} className="px-4 py-10 text-center text-fg-muted text-sm">
                     Cargando documentos...
                   </td>
                 </tr>
               ) : !documents || documents.data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400 text-sm">
-                    <Receipt size={32} className="mx-auto text-gray-300 mb-2" />
+                  <td colSpan={9} className="px-4 py-10 text-center text-fg-muted text-sm">
+                    <Receipt size={32} className="mx-auto text-fg-muted mb-2" />
                     Sin documentos. Sincroniza para ver datos.
                   </td>
                 </tr>
@@ -843,25 +845,25 @@ export default function TributarioPage() {
                   const counterpartyRut =
                     doc.direction === 'EMITIDO' ? doc.receiverRut : doc.issuerRut;
                   return (
-                    <tr key={doc.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 font-medium text-gray-900">{doc.folio}</td>
+                    <tr key={doc.id} className="hover:bg-subtle-hover">
+                      <td className="px-4 py-2.5 font-medium text-fg">{doc.folio}</td>
                       <td className="px-4 py-2.5">
                         <TaxDocumentTypeBadge type={doc.type} />
                       </td>
-                      <td className="mono px-4 py-2.5 text-gray-600">
+                      <td className="mono px-4 py-2.5 text-fg-secondary">
                         {formatDate(doc.issueDate)}
                       </td>
                       <td className="px-4 py-2.5">
-                        <div className="text-gray-900">{counterpartyName}</div>
-                        <div className="text-xs text-gray-400">{counterpartyRut}</div>
+                        <div className="text-fg">{counterpartyName}</div>
+                        <div className="text-xs text-fg-muted">{counterpartyRut}</div>
                       </td>
-                      <td className="amount px-4 py-2.5 text-right text-gray-700">
+                      <td className="amount px-4 py-2.5 text-right text-fg">
                         {formatCLP(doc.netAmount)}
                       </td>
-                      <td className="amount px-4 py-2.5 text-right text-gray-500">
+                      <td className="amount px-4 py-2.5 text-right text-fg-secondary">
                         {formatCLP(doc.taxAmount)}
                       </td>
-                      <td className="amount px-4 py-2.5 text-right text-gray-900">
+                      <td className="amount px-4 py-2.5 text-right text-fg">
                         {formatCLP(doc.totalAmount)}
                       </td>
                       <td className="px-4 py-2.5 text-center">
@@ -875,7 +877,7 @@ export default function TributarioPage() {
                             <CheckCircle size={12} /> Conciliado
                           </span>
                         ) : (
-                          <span className="text-gray-400 text-xs">Pendiente</span>
+                          <span className="text-fg-muted text-xs">Pendiente</span>
                         )}
                       </td>
                     </tr>
@@ -888,22 +890,22 @@ export default function TributarioPage() {
 
         {/* Pagination */}
         {documents && documents.totalPages > 1 && (
-          <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between text-sm">
-            <span className="text-gray-500">
+          <div className="border-t border-line px-4 py-3 flex items-center justify-between text-sm">
+            <span className="text-fg-secondary">
               Página {documents.page} de {documents.totalPages} · {documents.total} documentos
             </span>
             <div className="flex gap-1">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
+                className="px-3 py-1.5 border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-40 transition"
               >
                 Anterior
               </button>
               <button
                 disabled={page >= documents.totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
+                className="px-3 py-1.5 border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-40 transition"
               >
                 Siguiente
               </button>
@@ -972,14 +974,14 @@ function CategorizeModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-lg max-w-md w-full p-5"
+        className="bg-card-solid rounded-xl shadow-lg max-w-md w-full p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-gray-900">Categorizar movimiento</h3>
+          <h3 className="text-base font-semibold text-fg">Categorizar movimiento</h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-md hover:bg-gray-100 text-gray-500 transition"
+            className="p-1 rounded-md hover:bg-subtle-hover text-fg-secondary transition"
             aria-label="Cerrar"
           >
             <X size={16} />
@@ -988,32 +990,32 @@ function CategorizeModal({
 
         <div className="space-y-2 mb-4 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-500">Documento</span>
-            <span className="text-gray-900 font-medium">
+            <span className="text-fg-secondary">Documento</span>
+            <span className="text-fg font-medium">
               {doc.type.replace('_', ' ')} #{doc.folio}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Contraparte</span>
-            <span className="text-gray-900 font-medium text-right">
+            <span className="text-fg-secondary">Contraparte</span>
+            <span className="text-fg font-medium text-right">
               {counterpartyName}
-              <span className="block text-xs text-gray-400">{counterpartyRut}</span>
+              <span className="block text-xs text-fg-muted">{counterpartyRut}</span>
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Monto</span>
-            <span className="text-gray-900 font-medium amount">{formatCLP(doc.totalAmount)}</span>
+            <span className="text-fg-secondary">Monto</span>
+            <span className="text-fg font-medium amount">{formatCLP(doc.totalAmount)}</span>
           </div>
         </div>
 
-        <label className="block text-xs text-gray-600 mb-1.5 font-medium">
+        <label className="block text-xs text-fg-secondary mb-1.5 font-medium">
           Nueva categoría ({movementType === 'INCOME' ? 'Ingreso' : 'Egreso'})
         </label>
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
           disabled={isLoading || isSaving}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg mb-4 disabled:bg-gray-50"
+          className="w-full px-3 py-2 text-sm border border-line rounded-lg mb-4 disabled:bg-subtle"
         >
           <option value="">{isLoading ? 'Cargando...' : 'Selecciona una categoría'}</option>
           {categories
@@ -1029,7 +1031,7 @@ function CategorizeModal({
           <button
             onClick={onClose}
             disabled={isSaving}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 transition"
           >
             Cancelar
           </button>

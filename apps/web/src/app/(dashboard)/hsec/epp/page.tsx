@@ -99,7 +99,7 @@ function HsecEppContent() {
     <div className="pt-2">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+          <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
           <h1
             className="text-2xl font-semibold text-[var(--text-primary)]"
             style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
@@ -110,7 +110,7 @@ function HsecEppContent() {
         <button
           onClick={() => setModalOpen(true)}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ background: '#2563eb' }}
+          style={{ background: 'var(--color-accent)' }}
         >
           <Plus size={16} /> Nueva entrega
         </button>
@@ -151,7 +151,7 @@ function HsecEppContent() {
 
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-white/5">
+          <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
               {['Fecha', 'Empleado', 'Elementos', 'Acuse', 'Notas'].map((h, i) => (
                 <th
@@ -187,7 +187,7 @@ function HsecEppContent() {
                 <tr
                   key={r.id}
                   onClick={() => router.push(`/hsec/epp/${r.id}`)}
-                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5"
+                  className="cursor-pointer hover:bg-subtle-hover"
                 >
                   <td className="px-3 py-2.5 text-[var(--text-primary)]">{formatDbDate(r.date)}</td>
                   <td className="px-3 py-2.5 font-medium text-[var(--text-primary)]">

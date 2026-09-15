@@ -21,7 +21,7 @@ interface Category {
 }
 
 const COLOR_PRESETS = [
-  '#2563EB',
+  'var(--color-accent)',
   '#1E3A5F',
   '#64748B',
   '#16A34A',
@@ -152,7 +152,7 @@ export default function CategoriasPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <Link
             href="/categorias/reglas"
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--text-primary)] border border-[var(--border-color)] rounded-full hover:bg-gray-50 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--text-primary)] border border-[var(--border-color)] rounded-full hover:bg-subtle-hover transition"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Reglas de categorización <ArrowRight size={14} />
@@ -161,7 +161,7 @@ export default function CategoriasPage() {
             onClick={() => setModal({ mode: 'create', type: tab })}
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full transition"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -178,7 +178,9 @@ export default function CategoriasPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm rounded-md transition ${
-              tab === t ? 'bg-gray-900 text-white' : 'text-[var(--text-secondary)] hover:bg-gray-50'
+              tab === t
+                ? 'bg-[var(--color-dark)] text-white'
+                : 'text-[var(--text-secondary)] hover:bg-subtle-hover'
             }`}
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
@@ -193,16 +195,16 @@ export default function CategoriasPage() {
           <div className="divide-y divide-[var(--border-color)]">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="px-5 py-4 animate-pulse flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-gray-200" />
-                <div className="h-4 bg-gray-200 rounded w-48" />
+                <div className="w-3 h-3 rounded-full bg-subtle-hover" />
+                <div className="h-4 bg-subtle-hover rounded w-48" />
                 <div className="flex-1" />
-                <div className="h-4 bg-gray-200 rounded w-20" />
+                <div className="h-4 bg-subtle-hover rounded w-20" />
               </div>
             ))}
           </div>
         ) : categories.length === 0 ? (
           <div className="p-12 text-center">
-            <Tag size={36} className="mx-auto text-gray-300 mb-3" />
+            <Tag size={36} className="mx-auto text-fg-muted mb-3" />
             <p className="text-[var(--text-secondary)] font-medium">
               Aún no tienes categorías. Crea tu primera categoría.
             </p>
@@ -210,7 +212,7 @@ export default function CategoriasPage() {
               onClick={() => setModal({ mode: 'create', type: tab })}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -256,20 +258,20 @@ export default function CategoriasPage() {
                     )}
                   </div>
                   {subCount > 0 && (
-                    <span className="label text-[10px] text-[var(--text-secondary)] bg-gray-100 rounded-full px-2 py-0.5">
+                    <span className="label text-[10px] text-[var(--text-secondary)] bg-subtle rounded-full px-2 py-0.5">
                       {subCount} sub
                     </span>
                   )}
                   <button
                     onClick={() => setModal({ mode: 'edit', category: c })}
-                    className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                    className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                     title="Editar"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => handleToggle(c)}
-                    className="p-2 rounded-md hover:bg-gray-100"
+                    className="p-2 rounded-md hover:bg-subtle-hover"
                     title={c.isActive ? 'Desactivar' : 'Activar'}
                     style={{ color: c.isActive ? '#64748B' : '#16A34A' }}
                   >
@@ -350,12 +352,12 @@ function CategoryModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)]">
           <h3 className="text-base font-semibold text-[var(--text-primary)]">
             {modal.mode === 'create' ? 'Nueva categoría' : 'Editar categoría'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>
@@ -368,7 +370,7 @@ function CategoryModal({
           {modal.mode === 'create' && (
             <FormField label="Tipo">
               <div
-                className="text-sm text-[var(--text-secondary)] px-3 py-2 rounded-lg bg-gray-50 border border-[var(--border-color)]"
+                className="text-sm text-[var(--text-secondary)] px-3 py-2 rounded-lg bg-subtle border border-[var(--border-color)]"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
               >
                 {initialType === 'INCOME' ? 'Ingreso' : 'Egreso'}
@@ -386,7 +388,7 @@ function CategoryModal({
                   className="w-7 h-7 rounded-full border-2 transition"
                   style={{
                     backgroundColor: c,
-                    borderColor: color === c ? '#1C1C1E' : 'transparent',
+                    borderColor: color === c ? 'var(--text-primary)' : 'transparent',
                   }}
                   aria-label={c}
                 />
@@ -425,7 +427,7 @@ function CategoryModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar
@@ -435,7 +437,7 @@ function CategoryModal({
             disabled={!name.trim() || submitting}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}

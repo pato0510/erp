@@ -209,7 +209,7 @@ export function AssetActiveAlerts({ assetId, assetTypeCategory }: Props) {
                   <button
                     onClick={() => setDetailId(a.id)}
                     title="Ver detalle"
-                    className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                    className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                   >
                     <Eye size={13} />
                   </button>
@@ -217,7 +217,7 @@ export function AssetActiveAlerts({ assetId, assetTypeCategory }: Props) {
                     <button
                       onClick={() => performAck(a.id)}
                       title="Atender"
-                      className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                      className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                     >
                       <CheckCircle2 size={13} />
                     </button>
@@ -238,7 +238,7 @@ export function AssetActiveAlerts({ assetId, assetTypeCategory }: Props) {
                       setDismissId(a.id);
                     }}
                     title="Descartar"
-                    className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                    className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                   >
                     <XCircle size={13} />
                   </button>
@@ -352,7 +352,7 @@ function SimpleReasonModal({
   const bg = confirmTone === 'success' ? '#15803d' : '#D97706';
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="px-5 py-4 border-b border-[var(--border-color)]">
           <h3
             className="text-[var(--text-primary)]"
@@ -384,7 +384,7 @@ function SimpleReasonModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar

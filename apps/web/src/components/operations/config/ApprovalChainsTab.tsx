@@ -140,7 +140,7 @@ export function ApprovalChainsTab({ toaster }: { toaster: Toaster }) {
             <button
               onClick={() => handleSeedDefaults('both')}
               disabled={seeding}
-              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-line hover:bg-subtle-hover disabled:opacity-50"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -328,7 +328,7 @@ function ChainGroup({
                     <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                       <button
                         onClick={() => onEdit(t)}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-gray-100 text-[var(--text-secondary)] text-xs"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)] text-xs"
                         title={chain.length > 0 ? 'Editar cadena' : 'Crear cadena'}
                       >
                         {chain.length > 0 ? <Pencil size={12} /> : <Plus size={12} />}

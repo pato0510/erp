@@ -3,7 +3,7 @@
 export function ConfidenceBadge({ score }: { score: number | null | undefined }) {
   if (score === null || score === undefined) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-subtle text-fg-secondary">
         —
       </span>
     );

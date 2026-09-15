@@ -81,15 +81,15 @@ export default function NuevoCompromisoPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Nuevo Compromiso</h1>
+      <h1 className="text-2xl font-bold text-fg mb-6">Nuevo Compromiso</h1>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="bg-white border border-gray-200 rounded-xl p-6 space-y-5"
+        className="bg-card border border-line rounded-xl p-6 space-y-5"
       >
         {/* Type toggle */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
+          <label className="block text-sm font-medium text-fg mb-2">Tipo</label>
           <div className="flex gap-2">
             {(['EXPENSE', 'INCOME'] as const).map((t) => (
               <label
@@ -99,7 +99,7 @@ export default function NuevoCompromisoPage() {
                     ? t === 'INCOME'
                       ? 'border-green-500 bg-green-50 text-green-700'
                       : 'border-red-500 bg-red-50 text-red-700'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    : 'border-line text-fg-secondary hover:border-line'
                 }`}
               >
                 <input type="radio" value={t} {...register('type')} className="sr-only" />
@@ -112,24 +112,22 @@ export default function NuevoCompromisoPage() {
         {/* Amount + Due Date */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Monto (CLP)</label>
+            <label className="block text-sm font-medium text-fg mb-1">Monto (CLP)</label>
             <input
               type="number"
               step="1"
               {...register('amount', { valueAsNumber: true })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="1000000"
             />
             {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount.message}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha de vencimiento
-            </label>
+            <label className="block text-sm font-medium text-fg mb-1">Fecha de vencimiento</label>
             <input
               type="date"
               {...register('dueDate')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
             {errors.dueDate && (
               <p className="text-red-500 text-xs mt-1">{errors.dueDate.message}</p>
@@ -139,11 +137,11 @@ export default function NuevoCompromisoPage() {
 
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+          <label className="block text-sm font-medium text-fg mb-1">Descripción</label>
           <input
             type="text"
             {...register('description')}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             placeholder="Descripción del compromiso"
           />
           {errors.description && (
@@ -154,12 +152,12 @@ export default function NuevoCompromisoPage() {
         {/* Category + Period */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría <span className="text-gray-400">(opcional)</span>
+            <label className="block text-sm font-medium text-fg mb-1">
+              Categoría <span className="text-fg-muted">(opcional)</span>
             </label>
             <select
               {...register('categoryId')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             >
               <option value="">Sin categoría</option>
               {categories.map((c) => (
@@ -170,10 +168,10 @@ export default function NuevoCompromisoPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Período Fiscal</label>
+            <label className="block text-sm font-medium text-fg mb-1">Período Fiscal</label>
             <select
               {...register('fiscalPeriodId')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             >
               <option value="">Seleccionar...</option>
               {periods.map((p) => (
@@ -191,12 +189,12 @@ export default function NuevoCompromisoPage() {
         {/* Counterparty + Notes */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contraparte <span className="text-gray-400">(opcional)</span>
+            <label className="block text-sm font-medium text-fg mb-1">
+              Contraparte <span className="text-fg-muted">(opcional)</span>
             </label>
             <select
               {...register('counterpartyId')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             >
               <option value="">Sin contraparte</option>
               {counterparties.map((c) => (
@@ -207,13 +205,13 @@ export default function NuevoCompromisoPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notas <span className="text-gray-400">(opcional)</span>
+            <label className="block text-sm font-medium text-fg mb-1">
+              Notas <span className="text-fg-muted">(opcional)</span>
             </label>
             <input
               type="text"
               {...register('notes')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
           </div>
         </div>
@@ -234,7 +232,7 @@ export default function NuevoCompromisoPage() {
           <button
             type="button"
             onClick={() => router.push('/caja')}
-            className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+            className="px-6 py-2.5 border border-line text-fg rounded-lg text-sm font-medium hover:bg-subtle-hover transition"
           >
             Cancelar
           </button>

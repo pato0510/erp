@@ -1,7 +1,7 @@
 const STATUS_CONFIG: Record<string, { label: string; classes: string }> = {
   PENDING: { label: 'Pendiente', classes: 'bg-yellow-100 text-yellow-700' },
   PAID: { label: 'Pagado', classes: 'bg-green-100 text-green-700' },
-  CANCELLED: { label: 'Cancelado', classes: 'bg-gray-100 text-gray-500' },
+  CANCELLED: { label: 'Cancelado', classes: 'bg-subtle text-fg-secondary' },
 };
 
 export function CommitmentStatusBadge({ status }: { status: string }) {

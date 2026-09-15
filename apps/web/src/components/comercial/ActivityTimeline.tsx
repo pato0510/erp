@@ -137,7 +137,7 @@ export function ActivityTimeline({
           setModalOpen(true);
         }}
         className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white"
-        style={{ background: '#2563eb' }}
+        style={{ background: 'var(--color-accent)' }}
       >
         <Plus size={15} /> Registrar actividad
       </button>
@@ -247,7 +247,7 @@ export function ActivityTimeline({
                         <button
                           onClick={() => toggle(a.id)}
                           className="mt-0.5 text-xs font-medium"
-                          style={{ color: '#2563eb' }}
+                          style={{ color: 'var(--color-accent)' }}
                         >
                           {isOpen ? 'Ver menos' : 'Ver más'}
                         </button>
@@ -266,7 +266,7 @@ export function ActivityTimeline({
                         <Link
                           href={`/comercial/pipeline/${a.opportunityId}`}
                           className="hover:underline"
-                          style={{ color: '#2563eb' }}
+                          style={{ color: 'var(--color-accent)' }}
                         >
                           {linkedName ?? 'Oportunidad'}
                         </Link>

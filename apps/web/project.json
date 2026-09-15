@@ -6,6 +6,12 @@
   "tags": ["type:app", "scope:frontend"],
   "// targets": "to see all targets run: nx show project web --web",
   "targets": {
+    "lint:theme": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node apps/web/scripts/check-theme-tokens.mjs"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "options": {

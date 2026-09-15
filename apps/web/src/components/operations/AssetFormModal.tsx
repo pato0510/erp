@@ -285,12 +285,16 @@ export function AssetFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
           <h3 className="text-base font-semibold text-[var(--text-primary)]">
             {mode === 'create' ? 'Nuevo equipo' : 'Editar equipo'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-subtle-hover"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
@@ -499,7 +503,7 @@ export function AssetFormModal({
                   <button
                     type="button"
                     onClick={() => removeAttrRow(idx)}
-                    className="p-2 rounded hover:bg-gray-100 text-[var(--text-secondary)] flex-shrink-0"
+                    className="p-2 rounded hover:bg-subtle-hover text-[var(--text-secondary)] flex-shrink-0"
                     aria-label="Quitar atributo"
                   >
                     <Trash2 size={14} />
@@ -576,7 +580,7 @@ export function AssetFormModal({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
                     style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
                   >
                     <Upload size={14} /> Subir foto
@@ -615,10 +619,10 @@ export function AssetFormModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar
@@ -628,7 +632,7 @@ export function AssetFormModal({
             disabled={submitting}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}

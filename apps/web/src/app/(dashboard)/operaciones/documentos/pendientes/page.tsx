@@ -333,7 +333,7 @@ export default function PendientesPage() {
         {hasFilters && (
           <button
             onClick={resetFilters}
-            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100 rounded-lg"
+            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-subtle-hover rounded-lg"
             title="Limpiar filtros"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
@@ -386,14 +386,14 @@ export default function PendientesPage() {
                 <button
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                  className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                 >
                   <ChevronLeft size={16} />
                 </button>
                 <button
                   disabled={page >= data.totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                  className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -622,7 +622,7 @@ function PendingCard({
       <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-color)]">
         <button
           onClick={onPreview}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-line rounded-lg hover:bg-subtle-hover"
           style={{
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: 500,
@@ -702,7 +702,7 @@ function EmptyState() {
       </p>
       <Link
         href="/operaciones/documentos"
-        className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
+        className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-sm border border-line rounded-full hover:bg-subtle-hover"
         style={{
           fontFamily: 'var(--font-outfit), sans-serif',
           fontWeight: 500,
@@ -733,7 +733,7 @@ function ConfirmModal({
   const bg = tone === 'success' ? '#16a34a' : '#DC2626';
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="px-5 py-4 border-b border-[var(--border-color)]">
           <h3
             className="text-[var(--text-primary)]"
@@ -750,7 +750,7 @@ function ConfirmModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar

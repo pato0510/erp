@@ -170,9 +170,9 @@ export function VehicleImportWizard({ onClose, onImported }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
           <div>
             <h3
               className="text-[var(--text-primary)]"
@@ -186,7 +186,11 @@ export function VehicleImportWizard({ onClose, onImported }: Props) {
             </h3>
             <StepDots step={step} />
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-subtle-hover"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
@@ -225,12 +229,12 @@ export function VehicleImportWizard({ onClose, onImported }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
           {step === 'upload' && (
             <>
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
               >
                 Cancelar
@@ -240,7 +244,7 @@ export function VehicleImportWizard({ onClose, onImported }: Props) {
                 disabled={!file || previewLoading}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
                 style={{
-                  background: '#1C1C1E',
+                  background: 'var(--color-dark)',
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                 }}
@@ -255,7 +259,7 @@ export function VehicleImportWizard({ onClose, onImported }: Props) {
             <>
               <button
                 onClick={() => setStep('upload')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
               >
                 <ArrowLeft size={14} /> Atrás
@@ -265,7 +269,7 @@ export function VehicleImportWizard({ onClose, onImported }: Props) {
                 disabled={importing || preview.validRows === 0}
                 className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
                 style={{
-                  background: '#1C1C1E',
+                  background: 'var(--color-dark)',
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                 }}
@@ -283,7 +287,7 @@ export function VehicleImportWizard({ onClose, onImported }: Props) {
             <>
               <button
                 onClick={reset}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
               >
                 Importar más
@@ -292,7 +296,7 @@ export function VehicleImportWizard({ onClose, onImported }: Props) {
                 onClick={finishAndClose}
                 className="px-4 py-2 text-sm text-white rounded-full"
                 style={{
-                  background: '#1C1C1E',
+                  background: 'var(--color-dark)',
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                 }}
@@ -379,7 +383,7 @@ function StepDots({ step }: { step: Step }) {
             width: i === idx ? 18 : 6,
             height: 6,
             borderRadius: 999,
-            background: i <= idx ? '#2563eb' : 'var(--border-color)',
+            background: i <= idx ? 'var(--color-accent)' : 'var(--border-color)',
             transition: 'all 200ms ease',
           }}
         />
@@ -447,7 +451,7 @@ function UploadStep({
         className="cursor-pointer"
         style={{
           border: '2px dashed',
-          borderColor: dragOver ? '#2563eb' : 'var(--border-color)',
+          borderColor: dragOver ? 'var(--color-accent)' : 'var(--border-color)',
           borderRadius: 12,
           padding: 32,
           textAlign: 'center',
@@ -457,7 +461,7 @@ function UploadStep({
       >
         {file ? (
           <div className="flex items-center justify-center gap-3">
-            <FileSpreadsheet size={28} style={{ color: '#2563eb' }} />
+            <FileSpreadsheet size={28} style={{ color: 'var(--color-accent)' }} />
             <div>
               <div
                 style={{
@@ -485,7 +489,7 @@ function UploadStep({
                 e.stopPropagation();
                 onFile(null);
               }}
-              className="ml-3 p-1 rounded hover:bg-gray-100 text-[var(--text-secondary)]"
+              className="ml-3 p-1 rounded hover:bg-subtle-hover text-[var(--text-secondary)]"
               aria-label="Quitar archivo"
             >
               <X size={14} />
@@ -493,7 +497,7 @@ function UploadStep({
           </div>
         ) : (
           <>
-            <Upload size={28} style={{ margin: '0 auto 8px', color: '#94a3b8' }} />
+            <Upload size={28} style={{ margin: '0 auto 8px', color: 'var(--text-muted)' }} />
             <p
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',

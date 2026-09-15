@@ -1,0 +1,662 @@
+[
+  {
+    "path": "apps/web/src/components/DarkGradientBackground.tsx",
+    "reason": "UI-001: intentional fixed dashboard gradient; do not modify."
+  },
+  {
+    "path": "apps/web/src/components/Starfield.tsx",
+    "reason": "UI-001: starfield canvas has its own intentional palette."
+  },
+  {
+    "path": "apps/web/src/app/modulos/**",
+    "reason": "UI-001: portal/starfield surface owns its light and dark palette."
+  },
+  {
+    "path": "apps/web/src/app/(auth)/**",
+    "reason": "UI-001: login/auth branding and starfield are protected."
+  },
+  {
+    "path": "apps/web/src/components/sidebars/**",
+    "reason": "UI-001: sidebar owns --sidebar-* colors and fixed white labels."
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/actividades/areas/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/categorias/reglas/page.tsx",
+    "reason": "UI-001: white toggle thumbs sit on the colored status track in both themes.",
+    "matches": ["w-3 h-3 rounded-full bg-white"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/comercial/pipeline/[id]/page.tsx",
+    "reason": "UI-001 + COM-016: existing accent/status inline colors preserved; this shared page permits class migration only.",
+    "matches": [
+      "background: '#2563eb'",
+      "background: '#b91c1c'",
+      "color: '#15803d'",
+      "color: '#2563eb'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/comercial/pipeline/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#ef4444'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/configuracion/usuarios/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#1E3A5F'",
+      "color: '#3B82F6'",
+      "color: '#64748B'",
+      "color: '#94A3B8'",
+      "color: '#CBD5E1'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/contrapartes/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#1E3A5F'", "color: '#475569'", "color: '#64748B'", "color: '#94A3B8'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/dashboard/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded. UI-001 explicitly permits lifting near-black chart colors to a mid-tone of the same hue (#1E3A5F to #527cab, #334155 to #7c8da5).",
+    "matches": [
+      "backgroundColor: '#16a34a'",
+      "backgroundColor: '#94A3B8'",
+      "color: '#527cab'",
+      "color: '#64748B'",
+      "color: '#94A3B8'",
+      "fill=\"#94A3B8\"",
+      "stroke=\"#16a34a\"",
+      "stroke=\"#94A3B8\""
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/hsec/configuracion/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/marketing/campanas/[id]/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["borderColor: '#fecaca'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/movimientos/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["fill=\"#94A3B8\""]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/notificaciones/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["'#fff'", "background: '#475569'", "color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/alertas/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "'#fff'",
+      "background: '#0f172a'",
+      "background: '#15803d'",
+      "color: '#475569'",
+      "color: '#fff'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/aprobaciones/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#22C55E'", "color: '#15803d'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/auditoria/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#a16207'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/cobertura-acuses/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["'#fff'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/configuracion/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "'#fff'",
+      "background: '#60A5FA'",
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#6d28d9'",
+      "color: '#a16207'",
+      "color: '#b91c1c'",
+      "color: '#fff'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/documentos/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#1d4ed8'", "color: '#475569'", "color: '#a16207'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/documentos/pendientes/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#16a34a'", "color: '#16a34a'", "color: '#1d4ed8'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/equipos/[id]/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "'#fff'",
+      "background: '#D97706'",
+      "background: '#DC2626'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#a16207'",
+      "color: '#b91c1c'",
+      "color: '#fff'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/equipos/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#DC2626'", "color: '#1d4ed8'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/excepciones/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#15803d'", "background: '#D97706'", "background: '#DC2626'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/mis-lecturas/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#15803d'",
+      "color: '#22C55E'",
+      "color: '#475569'",
+      "color: '#64748B'",
+      "color: '#A855F7'",
+      "color: '#EAB308'",
+      "color: '#EF4444'",
+      "color: '#b91c1c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/permisos/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["'#fff'", "color: '#1d4ed8'", "color: '#fff'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/permisos/trabajo/[id]/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "background: '#22C55E'",
+      "background: '#7C3AED'",
+      "color: '#15803D'",
+      "color: '#1d4ed8'",
+      "color: '#22C55E'",
+      "color: '#94A3B8'",
+      "color: '#EAB308'",
+      "color: '#F97316'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/procedimientos/[id]/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "background: '#EF4444'",
+      "color: '#1d4ed8'",
+      "color: '#22C55E'",
+      "color: '#475569'",
+      "color: '#64748B'",
+      "color: '#A855F7'",
+      "color: '#EAB308'",
+      "color: '#EF4444'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/procedimientos/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "'#fff'",
+      "color: '#22C55E'",
+      "color: '#475569'",
+      "color: '#64748B'",
+      "color: '#A855F7'",
+      "color: '#EAB308'",
+      "color: '#EF4444'",
+      "color: '#c2410c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/vehiculos/[id]/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "'#fff'",
+      "background: '#D97706'",
+      "background: '#DC2626'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#a16207'",
+      "color: '#b91c1c'",
+      "color: '#fff'"
+    ]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/operaciones/vehiculos/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#DC2626'", "color: '#1d4ed8'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/rrhh/cargos/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/rrhh/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#a16207'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/rrhh/parametros/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#a16207'"]
+  },
+  {
+    "path": "apps/web/src/app/(dashboard)/rrhh/trabajadores/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#475569'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/app/p/asset/[qrToken]/page.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "'#ffffff'",
+      "color: '#7f1d1d'",
+      "color: '#854d0e'",
+      "color: '#a16207'",
+      "color: '#b91c1c'",
+      "color: '#ffffff'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/actividades/AreaFormModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["\"#fff\""]
+  },
+  {
+    "path": "apps/web/src/components/actividades/AusenciaCalendarModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/components/actividades/BirthdayModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#db2777'"]
+  },
+  {
+    "path": "apps/web/src/components/actividades/CampaignCalendarModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#7c3aed'"]
+  },
+  {
+    "path": "apps/web/src/components/actividades/CierreCalendarModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#e11d48'"]
+  },
+  {
+    "path": "apps/web/src/components/actividades/ServicioCalendarModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#0d9488'"]
+  },
+  {
+    "path": "apps/web/src/components/actividades/VencimientoCalendarModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#d97706'"]
+  },
+  {
+    "path": "apps/web/src/components/actividades/calendarAdapter.ts",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#0d9488'",
+      "color: '#475569'",
+      "color: '#7c3aed'",
+      "color: '#d97706'",
+      "color: '#db2777'",
+      "color: '#e11d48'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/actividades/statusMachine.ts",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#1d4ed8'", "color: '#475569'", "color: '#b45309'"]
+  },
+  {
+    "path": "apps/web/src/components/comercial/AccountContactsTab.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#1d4ed8'"]
+  },
+  {
+    "path": "apps/web/src/components/comercial/ActivityTimeline.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/components/comercial/AvailableStaff.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'"]
+  },
+  {
+    "path": "apps/web/src/components/comercial/DeleteOpportunityModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#b91c1c'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/components/comercial/LostReasonModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/components/comercial/OpportunityQuotes.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#15803d'"]
+  },
+  {
+    "path": "apps/web/src/components/comercial/accountLabels.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#a16207'",
+      "color: '#b91c1c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/comercial/activityLabels.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#0e7490'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#6d28d9'",
+      "color: '#a16207'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/comercial/quoteLabels.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#a16207'",
+      "color: '#b91c1c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/comercial/stageLabels.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#0e7490'",
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#4f46e5'",
+      "color: '#6d28d9'",
+      "color: '#a16207'",
+      "color: '#b91c1c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/hsec/incidentTypes.ts",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#b45309'",
+      "color: '#b91c1c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/hsec/trainingTypes.ts",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#0f766e'", "color: '#1d4ed8'", "color: '#6d28d9'"]
+  },
+  {
+    "path": "apps/web/src/components/marketing/CampaignRetorno.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#1d4ed8'"]
+  },
+  {
+    "path": "apps/web/src/components/marketing/campaignLabels.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#a16207'",
+      "color: '#b91c1c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/operations/AcknowledgmentModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#22C55E'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/AlertDetailModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#15803d'", "background: '#64748b'", "color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/ApplicableProcedures.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#22C55E'",
+      "color: '#475569'",
+      "color: '#64748B'",
+      "color: '#A855F7'",
+      "color: '#EAB308'",
+      "color: '#EF4444'",
+      "color: '#c2410c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/operations/AssetActiveAlerts.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/AssetFolderView.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["'#fff'", "color: '#475569'", "color: '#b91c1c'", "color: '#fff'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/AssetImportWizard.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#16a34a'", "color: '#a16207'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/AssetPermits.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/AssetQrSection.tsx",
+    "reason": "UI-001: QR preview retains its white quiet zone for scanning; white action label stays on the red destructive button.",
+    "matches": ["'#ffffff'", "background: '#b91c1c'", "background: '#ffffff'", "color: '#ffffff'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/AssetStatusHistoryModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "'#fff'",
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#a16207'",
+      "color: '#b91c1c'",
+      "color: '#fff'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/operations/DocumentHistoryModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/DocumentPreviewModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/DocumentSupersessionModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#a16207'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/DocumentUploadModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#a16207'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/ExceptionModals.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/PermitApprovalTimeline.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#475569'", "color: '#a16207'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/ProcedureAcknowledgmentSection.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#22C55E'", "color: '#15803d'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/ProcedureFormModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#1d4ed8'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/ProcedureRevisionsTimeline.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#a16207'",
+      "color: '#b91c1c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/operations/VehicleImportWizard.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#16a34a'", "color: '#a16207'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/WorkPermitsTab.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["'#fff'", "color: '#22C55E'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/calendar/types.ts",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#0f766e'",
+      "color: '#15803d'",
+      "color: '#1d4ed8'",
+      "color: '#a16207'",
+      "color: '#b91c1c'",
+      "color: '#c2410c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/operations/config/AlertsConfigTab.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#15803d'", "color: '#1d4ed8'", "color: '#475569'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/config/ApprovalChainsTab.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#1d4ed8'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/config/AssetTypeFormModal.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#1d4ed8'"]
+  },
+  {
+    "path": "apps/web/src/components/operations/dashboard/ActivityStreamItem.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#0d9488'",
+      "color: '#1d4ed8'",
+      "color: '#4338ca'",
+      "color: '#475569'",
+      "color: '#7c3aed'",
+      "color: '#a16207'",
+      "color: '#b91c1c'",
+      "color: '#c2410c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/operations/dashboard/AssetRiskCard.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "'#ffffff'",
+      "color: '#1d4ed8'",
+      "color: '#a16207'",
+      "color: '#b91c1c'",
+      "color: '#c2410c'",
+      "color: '#ffffff'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/operations/dashboard/StatusDistributionDonut.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": [
+      "color: '#16a34a'",
+      "color: '#1d4ed8'",
+      "color: '#475569'",
+      "color: '#64748b'",
+      "color: '#a16207'",
+      "color: '#b91c1c'"
+    ]
+  },
+  {
+    "path": "apps/web/src/components/rrhh/EmployeeAbsencesTab.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["'#fff'", "background: '#16a34a'", "color: '#15803d'", "color: '#b91c1c'"]
+  },
+  {
+    "path": "apps/web/src/components/rrhh/EmployeeDocumentsTab.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#16a34a'"]
+  },
+  {
+    "path": "apps/web/src/components/rrhh/EmployeeFiniquitoSection.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#15803d'"]
+  },
+  {
+    "path": "apps/web/src/components/rrhh/EmployeeVacationsTab.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["background: '#16a34a'"]
+  },
+  {
+    "path": "apps/web/src/components/shared/ExcelsiaLogo.tsx",
+    "reason": "UI-001: explicit brand logo variants retain the white wordmark on the dark/colored variant.",
+    "matches": ["'#ffffff'"]
+  },
+  {
+    "path": "apps/web/src/lib/file-icons.tsx",
+    "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
+    "matches": ["color: '#16a34a'", "color: '#64748b'", "color: '#dc2626'"]
+  }
+]

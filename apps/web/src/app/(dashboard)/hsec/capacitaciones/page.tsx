@@ -104,7 +104,7 @@ function HsecCapacitacionesContent() {
     <div className="pt-2">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="h-6 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
+          <span className="h-6 w-1.5 rounded-full" style={{ background: 'var(--color-accent)' }} />
           <h1
             className="text-2xl font-semibold text-[var(--text-primary)]"
             style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
@@ -115,7 +115,7 @@ function HsecCapacitacionesContent() {
         <button
           onClick={() => setModalOpen(true)}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ background: '#2563eb' }}
+          style={{ background: 'var(--color-accent)' }}
         >
           <Plus size={16} /> Nueva capacitación
         </button>
@@ -169,7 +169,7 @@ function HsecCapacitacionesContent() {
 
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
         <table className="w-full min-w-[820px] text-sm">
-          <thead className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-white/5">
+          <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
               {['Tipo', 'Tema', 'Fecha', 'Relator', 'Asistentes', 'Planilla'].map((h, i) => (
                 <th
@@ -205,7 +205,7 @@ function HsecCapacitacionesContent() {
                 <tr
                   key={r.id}
                   onClick={() => router.push(`/hsec/capacitaciones/${r.id}`)}
-                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5"
+                  className="cursor-pointer hover:bg-subtle-hover"
                 >
                   <td className="px-3 py-2.5">
                     <span
@@ -222,7 +222,7 @@ function HsecCapacitacionesContent() {
                   <td className="px-3 py-2.5 text-[var(--text-primary)]">
                     {formatDbDate(r.date)}
                     {r.time && (
-                      <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-[var(--text-secondary)] dark:bg-white/10">
+                      <span className="ml-2 rounded bg-subtle px-1.5 py-0.5 text-xs text-[var(--text-secondary)]">
                         {r.time}
                       </span>
                     )}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useThemeTokens } from '../../../hooks/useThemeTokens';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Upload, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
@@ -44,6 +45,7 @@ interface FiscalPeriodOption {
 }
 
 export default function MovimientosPage() {
+  const themeTokens = useThemeTokens();
   const [movements, setMovements] = useState<Movement[]>([]);
   // Separate dataset used only by the category chart. It reflects the current
   // filters but NOT the current page, so the chart stays stable while the
@@ -267,13 +269,13 @@ export default function MovimientosPage() {
                 `movimientos-${date}.xlsx`,
               );
             }}
-            className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
           >
             <Download size={16} /> Exportar Excel
           </button>
           <Link
             href="/movimientos/importar"
-            className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
           >
             <Upload size={16} /> Importar CSV
           </Link>
@@ -304,17 +306,43 @@ export default function MovimientosPage() {
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={categoryChartData} layout="vertical" barSize={12}>
               <XAxis
+                stroke={themeTokens.border}
                 type="number"
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
                 tickFormatter={(v) => `$${(Number(v) / 1000000).toFixed(1)}M`}
               />
-              <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 11 }} />
-              <Tooltip
-                formatter={(v: unknown) => formatCLP(v as number)}
-                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              <YAxis
+                stroke={themeTokens.border}
+                type="category"
+                dataKey="name"
+                width={160}
+                tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
               />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="income" name="Ingresos" fill="#2563EB" radius={[0, 3, 3, 0]} />
+              <Tooltip
+                cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
+                formatter={(v: unknown) => formatCLP(v as number)}
+                contentStyle={{
+                  borderRadius: 8,
+                  fontSize: 12,
+                  backgroundColor: themeTokens.cardSolid,
+                  borderColor: themeTokens.border,
+                  color: themeTokens.textPrimary,
+                }}
+                labelStyle={{ color: themeTokens.textPrimary }}
+                itemStyle={{ color: themeTokens.textPrimary }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: 11 }}
+                formatter={(value) => (
+                  <span style={{ color: themeTokens.textSecondary }}>{value}</span>
+                )}
+              />
+              <Bar
+                dataKey="income"
+                name="Ingresos"
+                fill="var(--color-accent)"
+                radius={[0, 3, 3, 0]}
+              />
               <Bar dataKey="expense" name="Egresos" fill="#94A3B8" radius={[0, 3, 3, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -329,7 +357,7 @@ export default function MovimientosPage() {
             <select
               value={filterType}
               onChange={(e) => updateFilter(setFilterType, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Todos</option>
               <option value="INCOME">Ingresos</option>
@@ -341,7 +369,7 @@ export default function MovimientosPage() {
             <select
               value={filterStatus}
               onChange={(e) => updateFilter(setFilterStatus, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Todos</option>
               <option value="DRAFT">Borrador</option>
@@ -357,7 +385,7 @@ export default function MovimientosPage() {
             <select
               value={filterFiscalPeriodId}
               onChange={(e) => updateFilter(setFilterFiscalPeriodId, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Todos</option>
               {fiscalPeriods.map((p) => (
@@ -372,7 +400,7 @@ export default function MovimientosPage() {
             <select
               value={filterCategoryId}
               onChange={(e) => updateFilter(setFilterCategoryId, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Todas</option>
               {categories.map((c) => (
@@ -387,7 +415,7 @@ export default function MovimientosPage() {
             <select
               value={filterCounterpartyId}
               onChange={(e) => updateFilter(setFilterCounterpartyId, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Todas</option>
               {counterparties.map((c) => (
@@ -404,7 +432,7 @@ export default function MovimientosPage() {
             <select
               value={filterCostCenterId}
               onChange={(e) => updateFilter(setFilterCostCenterId, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Todos</option>
               {costCenters.map((c) => (
@@ -420,7 +448,7 @@ export default function MovimientosPage() {
               type="date"
               value={filterDateFrom}
               onChange={(e) => updateFilter(setFilterDateFrom, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
@@ -429,7 +457,7 @@ export default function MovimientosPage() {
               type="date"
               value={filterDateTo}
               onChange={(e) => updateFilter(setFilterDateTo, e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div className="flex-1 min-w-[200px]">
@@ -441,7 +469,7 @@ export default function MovimientosPage() {
                 placeholder="Descripción o referencia..."
                 value={filterSearch}
                 onChange={(e) => updateFilter(setFilterSearch, e.target.value)}
-                className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+                className="w-full border border-line rounded-lg pl-9 pr-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -459,7 +487,7 @@ export default function MovimientosPage() {
       {/* Table */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-[var(--border-color)]">
+          <thead className="bg-subtle border-b border-[var(--border-color)]">
             <tr>
               <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Fecha
@@ -496,7 +524,7 @@ export default function MovimientosPage() {
                 <tr key={i} className="animate-pulse">
                   {Array.from({ length: 9 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 bg-gray-200 rounded w-20" />
+                      <div className="h-4 bg-subtle-hover rounded w-20" />
                     </td>
                   ))}
                 </tr>
@@ -509,7 +537,7 @@ export default function MovimientosPage() {
               </tr>
             ) : (
               movements.map((m) => (
-                <tr key={m.id} className="hover:bg-gray-50">
+                <tr key={m.id} className="hover:bg-subtle-hover">
                   <td className="mono px-4 py-3 text-[var(--text-secondary)]">
                     {formatDate(m.date)}
                   </td>
@@ -565,7 +593,7 @@ export default function MovimientosPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)] bg-gray-50">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)] bg-subtle">
             <p className="text-sm text-[var(--text-secondary)]">
               {total} movimientos &middot; Página {page} de {totalPages}
             </p>
@@ -573,14 +601,14 @@ export default function MovimientosPage() {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
               >
                 <ChevronRight size={16} />
               </button>

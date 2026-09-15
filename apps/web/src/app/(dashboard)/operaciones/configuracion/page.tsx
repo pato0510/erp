@@ -210,7 +210,7 @@ function ConfiguracionContent() {
               className={`relative flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-subtle-hover'
               }`}
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
@@ -507,7 +507,7 @@ function TiposTab({ toaster }: { toaster: Toaster }) {
             onClick={() => setTypeModal({ mode: 'create' })}
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -598,7 +598,7 @@ function TiposTab({ toaster }: { toaster: Toaster }) {
                     <td style={{ textAlign: 'right' }}>
                       <button
                         onClick={() => setTypeModal({ mode: 'edit', type: t })}
-                        className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                        className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                         title="Editar"
                       >
                         <Pencil size={14} />
@@ -648,7 +648,7 @@ function TiposTab({ toaster }: { toaster: Toaster }) {
               disabled={typeOptionsForSubtypes.length === 0}
               className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -709,7 +709,7 @@ function TiposTab({ toaster }: { toaster: Toaster }) {
                     <td style={{ textAlign: 'right' }}>
                       <button
                         onClick={() => setSubtypeModal({ mode: 'edit', subtype: s })}
-                        className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                        className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                         title="Editar"
                       >
                         <Pencil size={14} />
@@ -864,7 +864,7 @@ function UbicacionesTab({ toaster }: { toaster: Toaster }) {
             onClick={() => setModal({ mode: 'create' })}
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -955,7 +955,7 @@ function UbicacionesTab({ toaster }: { toaster: Toaster }) {
                       <td style={{ textAlign: 'right' }}>
                         <button
                           onClick={() => setModal({ mode: 'edit', location: l })}
-                          className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                          className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                           title="Editar"
                         >
                           <Pencil size={14} />
@@ -1083,7 +1083,7 @@ function TiposDocumentoTab({ toaster }: { toaster: Toaster }) {
             <button
               onClick={handleSeedDefaults}
               disabled={seeding}
-              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-line hover:bg-subtle-hover disabled:opacity-50"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -1097,7 +1097,7 @@ function TiposDocumentoTab({ toaster }: { toaster: Toaster }) {
               onClick={() => setModal({ mode: 'create' })}
               className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -1213,7 +1213,7 @@ function TiposDocumentoTab({ toaster }: { toaster: Toaster }) {
                       <td style={{ textAlign: 'right' }}>
                         <button
                           onClick={() => setModal({ mode: 'edit', type: dt })}
-                          className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                          className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                           title="Editar"
                         >
                           <Pencil size={14} />
@@ -1292,7 +1292,7 @@ function SubTabButton({
       onClick={onClick}
       className="px-4 py-1.5 text-sm rounded-md transition"
       style={{
-        background: active ? '#2563EB' : 'transparent',
+        background: active ? 'var(--color-accent)' : 'transparent',
         color: active ? '#fff' : 'var(--text-secondary)',
         fontFamily: 'var(--font-outfit), sans-serif',
         fontWeight: active ? 600 : 500,
@@ -1392,7 +1392,7 @@ function TiposPermisoTab({ toaster }: { toaster: Toaster }) {
             <button
               onClick={handleSeedDefaults}
               disabled={seeding}
-              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-line hover:bg-subtle-hover disabled:opacity-50"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -1406,7 +1406,7 @@ function TiposPermisoTab({ toaster }: { toaster: Toaster }) {
               onClick={() => setModal({ mode: 'create' })}
               className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -1530,7 +1530,7 @@ function TiposPermisoTab({ toaster }: { toaster: Toaster }) {
                       <td style={{ textAlign: 'right' }}>
                         <button
                           onClick={() => setModal({ mode: 'edit', type: pt })}
-                          className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                          className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                           title="Editar"
                         >
                           <Pencil size={14} />
@@ -1654,7 +1654,7 @@ function TiposPermisoDeTrabajoTab({ toaster }: { toaster: Toaster }) {
             <button
               onClick={handleSeedDefaults}
               disabled={seeding}
-              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-full border border-line hover:bg-subtle-hover disabled:opacity-50"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -1668,7 +1668,7 @@ function TiposPermisoDeTrabajoTab({ toaster }: { toaster: Toaster }) {
               onClick={() => setModal({ mode: 'create' })}
               className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -1826,7 +1826,7 @@ function TiposPermisoDeTrabajoTab({ toaster }: { toaster: Toaster }) {
                     <td style={{ textAlign: 'right' }}>
                       <button
                         onClick={() => setModal({ mode: 'edit', type: wt })}
-                        className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                        className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                         title="Editar"
                       >
                         <Pencil size={14} />
@@ -1990,7 +1990,7 @@ function AvanzadoTab({ toaster }: { toaster: Toaster }) {
             disabled={refreshing}
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}
@@ -2167,7 +2167,7 @@ function BulkQrSection({ toaster }: { toaster: Toaster }) {
           disabled={generating || loading || (stats?.withoutQr ?? 0) === 0}
           className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
           style={{
-            background: '#1C1C1E',
+            background: 'var(--color-dark)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: 500,
           }}
@@ -2332,7 +2332,7 @@ function EmptyState({
 }) {
   return (
     <div className="config-empty">
-      <Icon size={36} style={{ margin: '0 auto 12px', color: '#cbd5e1' }} />
+      <Icon size={36} style={{ margin: '0 auto 12px', color: 'var(--text-muted)' }} />
       <p
         className="text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}

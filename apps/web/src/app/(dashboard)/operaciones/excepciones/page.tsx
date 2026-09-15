@@ -335,7 +335,7 @@ function ExcepcionesContent() {
               setSearchInput('');
               setSearch('');
             }}
-            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100 rounded-lg"
+            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-subtle-hover rounded-lg"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             <X size={14} /> Limpiar
@@ -358,7 +358,7 @@ function ExcepcionesContent() {
         )}
         {data && filteredRows.length === 0 && !loading && (
           <div className="p-12 text-center">
-            <ShieldOff size={36} className="mx-auto text-gray-300 mb-3" />
+            <ShieldOff size={36} className="mx-auto text-fg-muted mb-3" />
             <p
               className="text-[var(--text-secondary)]"
               style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
@@ -541,14 +541,14 @@ function ExcepcionesContent() {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 disabled={page >= data.totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
               >
                 <ChevronRight size={16} />
               </button>
@@ -694,7 +694,7 @@ function RowAction({
     <button
       onClick={onClick}
       title={title}
-      className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+      className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
     >
       {children}
     </button>

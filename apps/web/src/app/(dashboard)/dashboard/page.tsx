@@ -1,5 +1,6 @@
 'use client';
 
+import { useThemeTokens } from '../../../hooks/useThemeTokens';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiClient } from '../../../lib/api';
@@ -247,8 +248,8 @@ function KpiCard({
 function SkeletonCard() {
   return (
     <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm animate-pulse">
-      <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
-      <div className="h-8 bg-gray-200 rounded w-36" />
+      <div className="h-4 bg-subtle-hover rounded w-24 mb-3" />
+      <div className="h-8 bg-subtle-hover rounded w-36" />
     </div>
   );
 }
@@ -256,21 +257,22 @@ function SkeletonCard() {
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   OPEN: { label: 'Abierto', cls: 'bg-green-100 text-green-700' },
   IN_REVIEW: { label: 'En Revisión', cls: 'bg-yellow-100 text-yellow-700' },
-  CLOSED: { label: 'Cerrado', cls: 'bg-gray-100 text-[var(--text-secondary)]' },
+  CLOSED: { label: 'Cerrado', cls: 'bg-subtle text-[var(--text-secondary)]' },
 };
 
 const PIE_COLORS = [
-  '#1E3A5F',
-  '#2563EB',
+  '#527cab',
+  'var(--color-accent)',
   '#3B82F6',
   '#60A5FA',
   '#93C5FD',
   '#64748B',
   '#475569',
-  '#334155',
+  '#7c8da5',
 ];
 
 export default function DashboardPage() {
+  const themeTokens = useThemeTokens();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -452,7 +454,7 @@ export default function DashboardPage() {
             <p className="text-[var(--text-secondary)] mt-1">
               {data.period.name} &middot;{' '}
               <span
-                className={`badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[data.period.status]?.cls || 'bg-gray-100 text-[var(--text-secondary)]'}`}
+                className={`badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_LABELS[data.period.status]?.cls || 'bg-subtle text-[var(--text-secondary)]'}`}
               >
                 {STATUS_LABELS[data.period.status]?.label || data.period.status}
               </span>
@@ -460,7 +462,7 @@ export default function DashboardPage() {
           )}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="inline-flex gap-1 bg-gray-100 rounded-lg p-0.5">
+          <div className="inline-flex gap-1 bg-subtle rounded-lg p-0.5">
             {[
               { mode: 'month' as const, label: 'Mes' },
               { mode: 'year' as const, label: 'Año' },
@@ -484,7 +486,7 @@ export default function DashboardPage() {
             <PeriodSelector value={periodId} onChange={setPeriodId} />
           ) : viewMode === 'year' ? (
             <div
-              className="flex gap-2 overflow-x-auto max-w-full pb-1 -mb-1 bg-gray-100 rounded-lg p-0.5"
+              className="flex gap-2 overflow-x-auto max-w-full pb-1 -mb-1 bg-subtle rounded-lg p-0.5"
               style={{ maxWidth: 'min(100%, 520px)' }}
             >
               {yearOptions.map((y) => (
@@ -635,7 +637,7 @@ export default function DashboardPage() {
                     </h3>
                     <button
                       onClick={() => setGoalsModalOpen(true)}
-                      className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-muted)]"
+                      className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-muted)]"
                       title="Editar metas"
                       aria-label="Editar metas"
                     >
@@ -645,7 +647,7 @@ export default function DashboardPage() {
                   <div className="flex justify-center">
                     <Gauge
                       percentage={incomeVsGoal}
-                      fillColor={incomeVsGoal >= 100 ? '#16a34a' : '#2563EB'}
+                      fillColor={incomeVsGoal >= 100 ? '#16a34a' : 'var(--color-accent)'}
                       centerText={`${Math.round(incomeVsGoal)}%`}
                       ariaLabel="Ingresos vs meta anual"
                     />
@@ -675,7 +677,7 @@ export default function DashboardPage() {
                     </h3>
                     <button
                       onClick={() => setGoalsModalOpen(true)}
-                      className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-muted)]"
+                      className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-muted)]"
                       title="Editar metas"
                       aria-label="Editar metas"
                     >
@@ -738,19 +740,19 @@ export default function DashboardPage() {
               <div className="flex gap-2">
                 <Link
                   href="/movimientos/nuevo"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
                 >
                   <Plus size={12} /> Nuevo Movimiento
                 </Link>
                 <Link
                   href="/caja/nuevo-compromiso"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
                 >
                   <Clock size={12} /> Nuevo Compromiso
                 </Link>
                 <Link
                   href="/movimientos/importar"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
                 >
                   <Upload size={12} /> Importar CSV
                 </Link>
@@ -771,23 +773,37 @@ export default function DashboardPage() {
                   <>
                     <ResponsiveContainer width="100%" height={220}>
                       <LineChart data={months12}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={themeTokens.border} />
+                        <XAxis
+                          stroke={themeTokens.border}
+                          dataKey="name"
+                          tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
+                        />
                         <YAxis
-                          tick={{ fontSize: 11 }}
+                          stroke={themeTokens.border}
+                          tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
                           tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
                         />
                         <Tooltip
+                          cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
                           formatter={(v: unknown) =>
                             v == null ? 'Sin datos' : formatCLP(v as number)
                           }
-                          contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                          contentStyle={{
+                            borderRadius: 8,
+                            fontSize: 12,
+                            backgroundColor: themeTokens.cardSolid,
+                            borderColor: themeTokens.border,
+                            color: themeTokens.textPrimary,
+                          }}
+                          labelStyle={{ color: themeTokens.textPrimary }}
+                          itemStyle={{ color: themeTokens.textPrimary }}
                         />
                         <Line
                           type="monotone"
                           dataKey="income"
                           name="Ingresos"
-                          stroke="#2563EB"
+                          stroke="var(--color-accent)"
                           strokeWidth={2}
                           dot={{ r: 3 }}
                           connectNulls={false}
@@ -818,7 +834,7 @@ export default function DashboardPage() {
                       <span className="flex items-center gap-1.5">
                         <span
                           className="inline-block w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: '#2563EB' }}
+                          style={{ backgroundColor: 'var(--color-accent)' }}
                         />
                         Ingresos
                       </span>
@@ -844,14 +860,29 @@ export default function DashboardPage() {
                   <>
                     <ResponsiveContainer width="100%" height={180}>
                       <BarChart data={incomeExpenseData} layout="vertical" barSize={28}>
-                        <XAxis type="number" hide />
-                        <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
+                        <XAxis stroke={themeTokens.border} type="number" hide />
+                        <YAxis
+                          stroke={themeTokens.border}
+                          type="category"
+                          dataKey="name"
+                          width={70}
+                          tick={{ fontSize: 12, fill: themeTokens.textSecondary }}
+                        />
                         <Tooltip
+                          cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
                           formatter={(v: unknown) => formatCLP(v as number)}
-                          contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                          contentStyle={{
+                            borderRadius: 8,
+                            fontSize: 12,
+                            backgroundColor: themeTokens.cardSolid,
+                            borderColor: themeTokens.border,
+                            color: themeTokens.textPrimary,
+                          }}
+                          labelStyle={{ color: themeTokens.textPrimary }}
+                          itemStyle={{ color: themeTokens.textPrimary }}
                         />
                         <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                          <Cell fill="#2563EB" />
+                          <Cell fill="var(--color-accent)" />
                           <Cell fill="#94A3B8" />
                         </Bar>
                       </BarChart>
@@ -860,7 +891,7 @@ export default function DashboardPage() {
                       <span className="flex items-center gap-1.5">
                         <span
                           className="inline-block w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: '#2563EB' }}
+                          style={{ backgroundColor: 'var(--color-accent)' }}
                         />
                         Ingresos
                       </span>
@@ -887,6 +918,7 @@ export default function DashboardPage() {
                   <ResponsiveContainer width="100%" height={180}>
                     <PieChart>
                       <Pie
+                        stroke={themeTokens.cardSolid}
                         data={pieData}
                         dataKey="value"
                         nameKey="name"
@@ -901,8 +933,17 @@ export default function DashboardPage() {
                         ))}
                       </Pie>
                       <Tooltip
+                        cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
                         formatter={(v: unknown) => formatCLP(v as number)}
-                        contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                        contentStyle={{
+                          borderRadius: 8,
+                          fontSize: 12,
+                          backgroundColor: themeTokens.cardSolid,
+                          borderColor: themeTokens.border,
+                          color: themeTokens.textPrimary,
+                        }}
+                        labelStyle={{ color: themeTokens.textPrimary }}
+                        itemStyle={{ color: themeTokens.textPrimary }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -942,7 +983,7 @@ export default function DashboardPage() {
                     {
                       label: 'Ingresos',
                       value: Number(data.movements.totalIncome),
-                      color: '#2563EB',
+                      color: 'var(--color-accent)',
                     },
                     {
                       label: 'Egresos',
@@ -952,7 +993,7 @@ export default function DashboardPage() {
                     {
                       label: 'Caja Libre',
                       value: Number(data.cash.freeCash),
-                      color: '#1E3A5F',
+                      color: '#527cab',
                     },
                   ].map((item) => {
                     const maxVal = Math.max(
@@ -971,7 +1012,7 @@ export default function DashboardPage() {
                             {formatCLP(item.value)}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div className="w-full bg-subtle rounded-full h-2">
                           <div
                             className="h-2 rounded-full"
                             style={{ width: `${pct}%`, backgroundColor: item.color }}
@@ -1055,7 +1096,7 @@ export default function DashboardPage() {
                       <Link
                         key={m.id}
                         href="/movimientos"
-                        className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition block"
+                        className="px-6 py-3 flex items-center justify-between hover:bg-subtle-hover transition block"
                       >
                         <div className="flex items-center gap-3">
                           <div
@@ -1124,12 +1165,12 @@ function RealtimeCashSection({ cash }: { cash: RealtimeCash | null }) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-32 mb-3" />
-          <div className="h-10 bg-gray-200 rounded w-48" />
+          <div className="h-4 bg-subtle-hover rounded w-32 mb-3" />
+          <div className="h-10 bg-subtle-hover rounded w-48" />
         </div>
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-6 shadow-sm animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-32 mb-3" />
-          <div className="h-10 bg-gray-200 rounded w-48" />
+          <div className="h-4 bg-subtle-hover rounded w-32 mb-3" />
+          <div className="h-10 bg-subtle-hover rounded w-48" />
         </div>
       </div>
     );
@@ -1181,7 +1222,7 @@ function RealtimeCashSection({ cash }: { cash: RealtimeCash | null }) {
           <p className="text-xs text-[var(--text-muted)] mt-1" style={{ fontWeight: 300 }}>
             Disponible tras compromisos · Comprometido {formatCLP(cash.committedAmount)}
           </p>
-          <div className="mt-3 w-full bg-gray-100 rounded-full h-1.5">
+          <div className="mt-3 w-full bg-subtle rounded-full h-1.5">
             <div
               className="h-1.5 rounded-full"
               style={{ width: `${freePct}%`, backgroundColor: freeBarColor }}
@@ -1254,6 +1295,7 @@ function MultiYearContent({
   chartMode: 'year' | 'month';
   onChartModeChange: (mode: 'year' | 'month') => void;
 }) {
+  const themeTokens = useThemeTokens();
   if (!data) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
@@ -1334,17 +1376,36 @@ function MultiYearContent({
               if (clickedYear) onYearClick(Number(clickedYear));
             }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
-            <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={themeTokens.border} />
+            <XAxis
+              stroke={themeTokens.border}
+              dataKey="year"
+              tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
+            />
             <YAxis
-              tick={{ fontSize: 11 }}
+              stroke={themeTokens.border}
+              tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
               tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
             />
             <Tooltip
+              cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
               formatter={(v: unknown) => formatCLP(v as number)}
-              contentStyle={{ borderRadius: 8, fontSize: 12 }}
+              contentStyle={{
+                borderRadius: 8,
+                fontSize: 12,
+                backgroundColor: themeTokens.cardSolid,
+                borderColor: themeTokens.border,
+                color: themeTokens.textPrimary,
+              }}
+              labelStyle={{ color: themeTokens.textPrimary }}
+              itemStyle={{ color: themeTokens.textPrimary }}
             />
-            <Bar dataKey="income" name="Ingresos" fill="#2563EB" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="income"
+              name="Ingresos"
+              fill="var(--color-accent)"
+              radius={[4, 4, 0, 0]}
+            />
             <Bar dataKey="expense" name="Egresos" fill="#94A3B8" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -1359,7 +1420,7 @@ function MultiYearContent({
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">
             {chartMode === 'year' ? 'Evolución por año' : 'Evolución por mes'}
           </h3>
-          <div className="inline-flex gap-1 bg-gray-100 rounded-lg p-0.5">
+          <div className="inline-flex gap-1 bg-subtle rounded-lg p-0.5">
             {[
               { mode: 'month' as const, label: 'Por mes' },
               { mode: 'year' as const, label: 'Por año' },
@@ -1387,42 +1448,72 @@ function MultiYearContent({
                 if (clickedYear) onYearClick(Number(clickedYear));
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
-              <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={themeTokens.border} />
+              <XAxis
+                stroke={themeTokens.border}
+                dataKey="year"
+                tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
+              />
               <YAxis
-                tick={{ fontSize: 11 }}
+                stroke={themeTokens.border}
+                tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
                 tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
               />
               <Tooltip
+                cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
                 formatter={(v: unknown) => formatCLP(v as number)}
-                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                contentStyle={{
+                  borderRadius: 8,
+                  fontSize: 12,
+                  backgroundColor: themeTokens.cardSolid,
+                  borderColor: themeTokens.border,
+                  color: themeTokens.textPrimary,
+                }}
+                labelStyle={{ color: themeTokens.textPrimary }}
+                itemStyle={{ color: themeTokens.textPrimary }}
               />
-              <Bar dataKey="income" name="Ingresos" fill="#2563EB" radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="income"
+                name="Ingresos"
+                fill="var(--color-accent)"
+                radius={[4, 4, 0, 0]}
+              />
               <Bar dataKey="expense" name="Egresos" fill="#94A3B8" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={monthChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" />
+              <CartesianGrid strokeDasharray="3 3" stroke={themeTokens.border} />
               <XAxis
+                stroke={themeTokens.border}
                 dataKey="label"
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 10, fill: themeTokens.textSecondary }}
                 interval={Math.max(0, Math.floor(monthChartData.length / 12) - 1)}
               />
               <YAxis
-                tick={{ fontSize: 11 }}
+                stroke={themeTokens.border}
+                tick={{ fontSize: 11, fill: themeTokens.textSecondary }}
                 tickFormatter={(v) => (v ? `$${(Number(v) / 1000000).toFixed(1)}M` : '')}
               />
               <Tooltip
+                cursor={{ fill: themeTokens.border, stroke: themeTokens.border }}
                 formatter={(v: unknown) => (v == null ? 'Sin datos' : formatCLP(v as number))}
-                contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                contentStyle={{
+                  borderRadius: 8,
+                  fontSize: 12,
+                  backgroundColor: themeTokens.cardSolid,
+                  borderColor: themeTokens.border,
+                  color: themeTokens.textPrimary,
+                }}
+                labelStyle={{ color: themeTokens.textPrimary }}
+                itemStyle={{ color: themeTokens.textPrimary }}
               />
               <Line
                 type="monotone"
                 dataKey="income"
                 name="Ingresos"
-                stroke="#2563EB"
+                stroke="var(--color-accent)"
                 strokeWidth={2}
                 dot={false}
                 connectNulls={false}
@@ -1443,7 +1534,7 @@ function MultiYearContent({
           <span className="flex items-center gap-1.5">
             <span
               className="inline-block w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: '#2563EB' }}
+              style={{ backgroundColor: 'var(--color-accent)' }}
             />
             Ingresos
           </span>
@@ -1464,13 +1555,13 @@ function MultiYearContent({
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-[var(--border-color)]">
+            <thead className="bg-subtle border-b border-[var(--border-color)]">
               <tr>
-                <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Año</th>
-                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Ingresos</th>
-                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Egresos</th>
-                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Margen</th>
-                <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Resultado</th>
+                <th className="text-left px-4 py-2.5 text-fg-secondary font-medium">Año</th>
+                <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Ingresos</th>
+                <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Egresos</th>
+                <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Margen</th>
+                <th className="text-right px-4 py-2.5 text-fg-secondary font-medium">Resultado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-color)]">
@@ -1481,7 +1572,7 @@ function MultiYearContent({
                     key={y.year}
                     onClick={() => y.hasData && onYearClick(y.year)}
                     className={`transition ${
-                      y.hasData ? 'cursor-pointer hover:bg-gray-50' : 'opacity-50'
+                      y.hasData ? 'cursor-pointer hover:bg-subtle-hover' : 'opacity-50'
                     } ${isBest ? 'bg-green-50' : ''}`}
                   >
                     <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">

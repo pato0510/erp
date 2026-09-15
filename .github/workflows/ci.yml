@@ -39,6 +39,9 @@ jobs:
       - name: Run lint on affected projects
         run: npx nx affected --target=lint
 
+      - name: Check web theme tokens
+        run: node apps/web/scripts/check-theme-tokens.mjs
+
   build:
     name: Build
     runs-on: ubuntu-latest

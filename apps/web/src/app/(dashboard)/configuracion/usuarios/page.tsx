@@ -23,18 +23,22 @@ interface CompanyUser {
 
 const ROLE_META: Record<UserRole, { label: string; color: string; badgeCls: string }> = {
   SUPER_ADMIN: { label: 'Super Admin', color: '#1E3A5F', badgeCls: 'bg-indigo-50 text-indigo-800' },
-  ADMIN: { label: 'Administrador', color: '#2563EB', badgeCls: 'bg-blue-50 text-blue-700' },
+  ADMIN: {
+    label: 'Administrador',
+    color: 'var(--color-accent)',
+    badgeCls: 'bg-blue-50 text-blue-700',
+  },
   MANAGER: { label: 'Gerente', color: '#3B82F6', badgeCls: 'bg-blue-50 text-blue-600' },
-  ACCOUNTANT: { label: 'Contador', color: '#64748B', badgeCls: 'bg-slate-100 text-slate-700' },
+  ACCOUNTANT: { label: 'Contador', color: '#64748B', badgeCls: 'bg-subtle text-fg' },
   ANALYST: {
     label: 'Analista',
     color: '#94A3B8',
-    badgeCls: 'bg-gray-100 text-[var(--text-secondary)]',
+    badgeCls: 'bg-subtle text-[var(--text-secondary)]',
   },
   VIEWER: {
     label: 'Visualizador',
     color: '#CBD5E1',
-    badgeCls: 'bg-gray-50 text-[var(--text-secondary)]',
+    badgeCls: 'bg-subtle text-[var(--text-secondary)]',
   },
 };
 
@@ -158,7 +162,7 @@ export default function UsuariosPage() {
           onClick={() => setModal({ mode: 'create' })}
           className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full transition"
           style={{
-            background: '#1C1C1E',
+            background: 'var(--color-dark)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: 500,
           }}
@@ -173,17 +177,17 @@ export default function UsuariosPage() {
           <div className="divide-y divide-[var(--border-color)]">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="px-5 py-4 animate-pulse flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gray-200" />
+                <div className="w-10 h-10 rounded-full bg-subtle-hover" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-48" />
-                  <div className="h-3 bg-gray-200 rounded w-64" />
+                  <div className="h-4 bg-subtle-hover rounded w-48" />
+                  <div className="h-3 bg-subtle-hover rounded w-64" />
                 </div>
               </div>
             ))}
           </div>
         ) : users.length === 0 ? (
           <div className="p-12 text-center">
-            <Users size={36} className="mx-auto text-gray-300 mb-3" />
+            <Users size={36} className="mx-auto text-fg-muted mb-3" />
             <p className="text-[var(--text-secondary)] font-medium">
               No hay usuarios en esta empresa
             </p>
@@ -191,7 +195,7 @@ export default function UsuariosPage() {
               onClick={() => setModal({ mode: 'create' })}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -254,14 +258,14 @@ export default function UsuariosPage() {
                   </div>
                   <button
                     onClick={() => setModal({ mode: 'edit', user: u })}
-                    className="p-2 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+                    className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
                     title="Editar"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => handleToggle(u)}
-                    className="p-2 rounded-md hover:bg-gray-100"
+                    className="p-2 rounded-md hover:bg-subtle-hover"
                     title={u.isActive ? 'Desactivar' : 'Activar'}
                     style={{ color: u.isActive ? '#64748B' : '#16A34A' }}
                   >
@@ -369,12 +373,12 @@ function UserModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)]">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid">
           <h3 className="text-base font-semibold text-[var(--text-primary)]">
             {isCreate ? 'Nuevo usuario' : 'Editar usuario'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
             <X size={16} />
           </button>
         </div>
@@ -482,10 +486,10 @@ function UserModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar
@@ -495,7 +499,7 @@ function UserModal({
             disabled={submitting}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#1C1C1E',
+              background: 'var(--color-dark)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
             }}

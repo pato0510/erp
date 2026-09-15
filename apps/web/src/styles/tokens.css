@@ -18,7 +18,10 @@
   /* Theme-aware semantic tokens — LIGHT mode */
   --bg-primary: #ffffff;
   --bg-secondary: #f8f9fa;
+  --bg-subtle: #f3f4f6;
+  --bg-subtle-hover: #e5e7eb;
   --bg-card: #ffffff;
+  --bg-card-solid: #ffffff;
   --text-primary: #0c0f1a;
   --text-secondary: #6b7280;
   --text-muted: #9aa0ad;
@@ -51,6 +54,8 @@ html.dark {
      with backdrop-filter blur on cards to give a glassmorphism look. */
   --bg-primary: #0f0f0f;
   --bg-secondary: transparent;
+  --bg-subtle: #242424;
+  --bg-subtle-hover: #2a2a2a;
   --bg-card: rgba(28, 28, 30, 0.5);
   --bg-card-solid: #1c1c1e;
   --text-primary: #f5f5f5;

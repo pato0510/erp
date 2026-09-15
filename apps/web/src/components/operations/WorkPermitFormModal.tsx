@@ -248,12 +248,16 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-card)] z-10">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid z-10">
           <h3 className="text-base font-semibold text-[var(--text-primary)]">
             Nuevo permiso de trabajo
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100" aria-label="Cerrar">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-subtle-hover"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
@@ -487,7 +491,7 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
                     { rowId: newRowId(), name: '', role: '', isInternal: false },
                   ])
                 }
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border border-gray-300 hover:bg-gray-50"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border border-line text-fg hover:bg-subtle-hover"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
               >
                 <Plus size={12} /> Agregar persona
@@ -554,10 +558,10 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-[var(--bg-card)]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)] sticky bottom-0 bg-card-solid">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-full hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
             disabled={submitting !== false}
           >
@@ -565,7 +569,7 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
           </button>
           <button
             onClick={() => submit('draft')}
-            className="px-4 py-2 text-sm rounded-full border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+            className="px-4 py-2 text-sm rounded-full border border-line text-fg hover:bg-subtle-hover disabled:opacity-50"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
             disabled={submitting !== false}
           >
@@ -575,7 +579,7 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
             onClick={() => submit('review')}
             className="px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
-              background: '#2563EB',
+              background: 'var(--color-accent)',
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 600,
             }}
@@ -705,7 +709,7 @@ function EditableList({
       ))}
       <button
         onClick={() => onChange([...items, ''])}
-        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border border-gray-300 hover:bg-gray-50"
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border border-line text-fg hover:bg-subtle-hover"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
       >
         <Plus size={12} /> {addLabel}

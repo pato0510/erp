@@ -377,7 +377,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--bg-card)] w-full sm:max-w-2xl max-h-[95vh] overflow-y-auto rounded-t-xl sm:rounded-xl border border-[var(--border-color)] shadow-2xl"
+        className="bg-card-solid w-full sm:max-w-2xl max-h-[95vh] overflow-y-auto rounded-t-xl sm:rounded-xl border border-[var(--border-color)] shadow-2xl"
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--border-color)] px-5 py-4">
           <div>
@@ -402,7 +402,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => update('startDate', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 />
               </Field>
               <Field label="Hasta">
@@ -410,7 +410,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => update('endDate', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 />
               </Field>
             </div>
@@ -422,7 +422,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                 <select
                   value={filters.status}
                   onChange={(e) => update('status', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 >
                   <option value="">Todos</option>
                   {ASSET_STATUSES.map((s) => (
@@ -438,7 +438,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   placeholder="Opcional — UUID del tipo"
                   value={filters.assetTypeId}
                   onChange={(e) => update('assetTypeId', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 />
               </Field>
               <Field label="Ubicación (UUID)">
@@ -447,7 +447,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   placeholder="Opcional — UUID de la ubicación"
                   value={filters.locationId}
                   onChange={(e) => update('locationId', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 />
               </Field>
               <CheckboxField
@@ -477,7 +477,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                       style={{
                         backgroundColor: active ? 'rgba(37,99,235,0.12)' : 'transparent',
                         color: active ? '#1d4ed8' : 'var(--text-secondary)',
-                        borderColor: active ? '#2563eb' : 'var(--border-color)',
+                        borderColor: active ? 'var(--color-accent)' : 'var(--border-color)',
                       }}
                     >
                       {opt.label}
@@ -499,14 +499,14 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   placeholder="Opcional — UUID del procedimiento"
                   value={filters.procedureId}
                   onChange={(e) => update('procedureId', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 />
               </Field>
               <Field label="Categoría">
                 <select
                   value={filters.category}
                   onChange={(e) => update('category', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 >
                   <option value="">Todas</option>
                   {PROCEDURE_CATEGORIES.map((c) => (
@@ -531,7 +531,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   <select
                     value={filters.severity}
                     onChange={(e) => update('severity', e.target.value)}
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                    className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                   >
                     <option value="">Todas</option>
                     {ALERT_SEVERITIES.map((s) => (
@@ -545,7 +545,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   <select
                     value={filters.status}
                     onChange={(e) => update('status', e.target.value)}
-                    className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                    className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                   >
                     <option value="">Todos</option>
                     {ALERT_STATUSES.map((s) => (
@@ -562,7 +562,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   placeholder="Opcional — UUID del activo"
                   value={filters.assetId}
                   onChange={(e) => update('assetId', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 />
               </Field>
             </>
@@ -574,7 +574,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                 <select
                   value={filters.status}
                   onChange={(e) => update('status', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 >
                   <option value="">Todos</option>
                   {WORK_PERMIT_STATUSES.map((s) => (
@@ -590,7 +590,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   placeholder="Opcional — UUID del supervisor"
                   value={filters.supervisorId}
                   onChange={(e) => update('supervisorId', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 />
               </Field>
               <Field label="Tipo de permiso (UUID)">
@@ -599,7 +599,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   placeholder="Opcional — UUID del tipo"
                   value={filters.permitTypeId}
                   onChange={(e) => update('permitTypeId', e.target.value)}
-                  className="w-full rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+                  className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
                 />
               </Field>
             </>
@@ -607,7 +607,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
 
           {/* Preview section */}
           {preview && (
-            <div className="rounded-lg border border-[var(--border-color)] bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] p-3">
+            <div className="rounded-lg border border-[var(--border-color)] bg-subtle p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                   Vista previa
@@ -666,7 +666,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]"
+            className="rounded-md border border-[var(--border-color)] bg-card-solid px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))]"
           >
             Cancelar
           </button>
@@ -674,7 +674,7 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
             type="button"
             onClick={loadPreview}
             disabled={loadingPreview || generating}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-card-solid px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--hover-bg,rgba(0,0,0,0.03))] disabled:opacity-50"
           >
             {loadingPreview ? <RefreshCw size={12} className="animate-spin" /> : <Eye size={12} />}
             Vista previa

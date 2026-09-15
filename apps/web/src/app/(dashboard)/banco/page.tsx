@@ -52,11 +52,11 @@ const STATUS_BADGES: Record<string, { label: string; cls: string }> = {
   ACTIVE: { label: 'Activo', cls: 'bg-green-100 text-green-700' },
   ERROR: { label: 'Error', cls: 'bg-red-100 text-red-700' },
   PENDING: { label: 'Pendiente', cls: 'bg-yellow-100 text-yellow-700' },
-  INACTIVE: { label: 'Inactivo', cls: 'bg-gray-100 text-gray-500' },
+  INACTIVE: { label: 'Inactivo', cls: 'bg-subtle text-fg-secondary' },
 };
 
 const SYNC_STATUS: Record<string, { label: string; cls: string }> = {
-  PENDING: { label: 'Pendiente', cls: 'bg-gray-100 text-gray-600' },
+  PENDING: { label: 'Pendiente', cls: 'bg-subtle text-fg-secondary' },
   RUNNING: { label: 'Ejecutando', cls: 'bg-blue-100 text-blue-700' },
   SUCCESS: { label: 'Exitoso', cls: 'bg-green-100 text-green-700' },
   FAILED: { label: 'Fallido', cls: 'bg-red-100 text-red-700' },
@@ -222,12 +222,12 @@ export default function BancoPage() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl text-gray-900">Conexiones Bancarias</h1>
+        <h1 className="text-2xl text-fg">Conexiones Bancarias</h1>
         <div className="flex items-center gap-2">
           {connections.length > 0 && (
             <Link
               href="/banco/cartola"
-              className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-700"
+              className="flex items-center gap-2 px-4 py-2 text-sm border border-line rounded-lg hover:bg-subtle-hover transition text-fg"
             >
               <FileUp size={16} /> Importar Cartola
             </Link>
@@ -242,14 +242,14 @@ export default function BancoPage() {
       </div>
 
       {showForm && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6 max-w-lg space-y-4">
-          <h3 className="font-semibold text-gray-900">Conectar cuenta bancaria</h3>
+        <div className="bg-card border border-line rounded-xl p-6 mb-6 max-w-lg space-y-4">
+          <h3 className="font-semibold text-fg">Conectar cuenta bancaria</h3>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta bancaria</label>
+            <label className="block text-sm font-medium text-fg mb-1">Cuenta bancaria</label>
             <select
               value={formAccountId}
               onChange={(e) => setFormAccountId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm"
             >
               <option value="">Seleccionar...</option>
               {accounts.map((a) => (
@@ -260,21 +260,19 @@ export default function BancoPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor</label>
-            <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" disabled>
+            <label className="block text-sm font-medium text-fg mb-1">Proveedor</label>
+            <select className="w-full border border-line rounded-lg px-3 py-2 text-sm" disabled>
               <option>Mock (Simulación)</option>
             </select>
-            <p className="text-xs text-gray-400 mt-1">Fintoc y Unnax disponibles próximamente</p>
+            <p className="text-xs text-fg-muted mt-1">Fintoc y Unnax disponibles próximamente</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              ID cuenta proveedor
-            </label>
+            <label className="block text-sm font-medium text-fg mb-1">ID cuenta proveedor</label>
             <input
               type="text"
               value={formProviderId}
               onChange={(e) => setFormProviderId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm"
               placeholder="MOCK-001"
             />
           </div>
@@ -288,7 +286,7 @@ export default function BancoPage() {
             </button>
             <button
               onClick={() => setShowForm(false)}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover transition"
             >
               Cancelar
             </button>
@@ -299,17 +297,17 @@ export default function BancoPage() {
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2].map((i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
-              <div className="h-5 bg-gray-200 rounded w-48 mb-2" />
-              <div className="h-4 bg-gray-200 rounded w-32" />
+            <div key={i} className="bg-card border border-line rounded-xl p-5 animate-pulse">
+              <div className="h-5 bg-subtle-hover rounded w-48 mb-2" />
+              <div className="h-4 bg-subtle-hover rounded w-32" />
             </div>
           ))}
         </div>
       ) : connections.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-          <Landmark size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500 font-medium">Sin conexiones bancarias</p>
-          <p className="text-gray-400 text-sm mt-1">
+        <div className="bg-card border border-line rounded-xl p-12 text-center">
+          <Landmark size={40} className="mx-auto text-fg-muted mb-3" />
+          <p className="text-fg-secondary font-medium">Sin conexiones bancarias</p>
+          <p className="text-fg-muted text-sm mt-1">
             Conecta una cuenta para sincronizar movimientos
           </p>
         </div>
@@ -322,7 +320,7 @@ export default function BancoPage() {
             const isSyncingBal = syncingIds.has(`${conn.id}-balance`);
             const isSyncingMov = syncingIds.has(`${conn.id}-movements`);
             return (
-              <div key={conn.id} className="bg-white border border-gray-200 rounded-xl shadow-sm">
+              <div key={conn.id} className="bg-card border border-line rounded-xl shadow-sm">
                 <div className="p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -330,10 +328,8 @@ export default function BancoPage() {
                         <Landmark size={18} className="text-blue-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {conn.bankAccount.name}
-                        </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-sm font-semibold text-fg">{conn.bankAccount.name}</p>
+                        <p className="text-xs text-fg-muted">
                           {conn.provider.toUpperCase()} · {conn.providerAccountId}
                           {conn.lastSyncAt &&
                             ` · Últ. sync: ${formatRelativeDate(conn.lastSyncAt)}`}
@@ -349,7 +345,7 @@ export default function BancoPage() {
                       <button
                         onClick={() => handleSync(conn.id, 'balance')}
                         disabled={isSyncingBal}
-                        className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition flex items-center gap-1"
+                        className="px-3 py-1.5 text-xs border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 transition flex items-center gap-1"
                       >
                         <RefreshCw size={12} className={isSyncingBal ? 'animate-spin' : ''} />{' '}
                         Saldos
@@ -364,17 +360,17 @@ export default function BancoPage() {
                       </button>
                       <button
                         onClick={() => toggleHistory(conn.id)}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 transition"
+                        className="p-1.5 rounded-lg hover:bg-subtle-hover transition"
                         title="Historial"
                       >
                         <History
                           size={16}
-                          className={isHistoryOpen ? 'text-blue-600' : 'text-gray-400'}
+                          className={isHistoryOpen ? 'text-blue-600' : 'text-fg-muted'}
                         />
                       </button>
                       <button
                         onClick={() => toggleMovements(conn.id)}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 transition"
+                        className="p-1.5 rounded-lg hover:bg-subtle-hover transition"
                       >
                         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </button>
@@ -389,27 +385,29 @@ export default function BancoPage() {
 
                 {/* Sync History */}
                 {isHistoryOpen && (
-                  <div className="border-t border-gray-200 bg-gray-50">
+                  <div className="border-t border-line bg-subtle">
                     <div className="px-5 py-3 flex items-center gap-2">
-                      <History size={14} className="text-gray-400" />
-                      <span className="text-xs font-medium text-gray-500">
+                      <History size={14} className="text-fg-muted" />
+                      <span className="text-xs font-medium text-fg-secondary">
                         Historial de sincronización
                       </span>
                     </div>
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-100">
+                      <thead className="bg-subtle">
                         <tr>
-                          <th className="text-left px-4 py-2 text-gray-500">Inicio</th>
-                          <th className="text-center px-4 py-2 text-gray-500">Estado</th>
-                          <th className="text-right px-4 py-2 text-gray-500">Mov. sincronizados</th>
-                          <th className="text-right px-4 py-2 text-gray-500">Duración</th>
-                          <th className="text-left px-4 py-2 text-gray-500">Error</th>
+                          <th className="text-left px-4 py-2 text-fg-secondary">Inicio</th>
+                          <th className="text-center px-4 py-2 text-fg-secondary">Estado</th>
+                          <th className="text-right px-4 py-2 text-fg-secondary">
+                            Mov. sincronizados
+                          </th>
+                          <th className="text-right px-4 py-2 text-fg-secondary">Duración</th>
+                          <th className="text-left px-4 py-2 text-fg-secondary">Error</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
+                      <tbody className="divide-y divide-line bg-card">
                         {syncHistory.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                            <td colSpan={5} className="px-4 py-6 text-center text-fg-muted">
                               Sin historial
                             </td>
                           </tr>
@@ -421,7 +419,7 @@ export default function BancoPage() {
                               : '-';
                             return (
                               <tr key={run.id}>
-                                <td className="px-4 py-2 text-gray-600">
+                                <td className="px-4 py-2 text-fg-secondary">
                                   {formatRelativeDate(run.startedAt)}
                                 </td>
                                 <td className="px-4 py-2 text-center">
@@ -431,10 +429,12 @@ export default function BancoPage() {
                                     {st.label}
                                   </span>
                                 </td>
-                                <td className="px-4 py-2 text-right text-gray-700">
+                                <td className="px-4 py-2 text-right text-fg">
                                   {run.movementsSynced + run.balancesSynced}
                                 </td>
-                                <td className="px-4 py-2 text-right text-gray-500">{duration}</td>
+                                <td className="px-4 py-2 text-right text-fg-secondary">
+                                  {duration}
+                                </td>
                                 <td className="px-4 py-2 text-red-500 truncate max-w-[200px]">
                                   {run.errorMessage || '-'}
                                 </td>
@@ -449,29 +449,29 @@ export default function BancoPage() {
 
                 {/* External movements */}
                 {isExpanded && (
-                  <div className="border-t border-gray-200">
+                  <div className="border-t border-line">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-subtle">
                         <tr>
-                          <th className="text-left px-4 py-2 text-gray-500">Fecha</th>
-                          <th className="text-left px-4 py-2 text-gray-500">Descripción</th>
-                          <th className="text-left px-4 py-2 text-gray-500">Tipo</th>
-                          <th className="text-right px-4 py-2 text-gray-500">Monto</th>
-                          <th className="text-center px-4 py-2 text-gray-500">Estado</th>
+                          <th className="text-left px-4 py-2 text-fg-secondary">Fecha</th>
+                          <th className="text-left px-4 py-2 text-fg-secondary">Descripción</th>
+                          <th className="text-left px-4 py-2 text-fg-secondary">Tipo</th>
+                          <th className="text-right px-4 py-2 text-fg-secondary">Monto</th>
+                          <th className="text-center px-4 py-2 text-fg-secondary">Estado</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-line">
                         {movements.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-4 py-8 text-center text-gray-400 text-sm">
+                            <td colSpan={5} className="px-4 py-8 text-center text-fg-muted text-sm">
                               Sin movimientos. Sincroniza para ver datos.
                             </td>
                           </tr>
                         ) : (
                           movements.map((m) => (
-                            <tr key={m.id} className="hover:bg-gray-50">
-                              <td className="mono px-4 py-2 text-gray-700">{formatDate(m.date)}</td>
-                              <td className="px-4 py-2 text-gray-900">{m.description}</td>
+                            <tr key={m.id} className="hover:bg-subtle-hover">
+                              <td className="mono px-4 py-2 text-fg">{formatDate(m.date)}</td>
+                              <td className="px-4 py-2 text-fg">{m.description}</td>
                               <td className="px-4 py-2">
                                 <span
                                   className={`text-xs font-medium ${m.type === 'CREDIT' ? 'text-green-600' : 'text-red-500'}`}

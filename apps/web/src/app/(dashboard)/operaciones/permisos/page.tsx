@@ -299,7 +299,7 @@ export default function PermisosPage() {
               disabled={isUnconfigured}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white disabled:opacity-50"
               style={{
-                background: '#1C1C1E',
+                background: 'var(--color-dark)',
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
               }}
@@ -319,7 +319,7 @@ export default function PermisosPage() {
           onClick={() => setTab('externos')}
           className="px-4 py-2 text-sm rounded-lg transition"
           style={{
-            background: tab === 'externos' ? '#2563eb' : 'transparent',
+            background: tab === 'externos' ? 'var(--color-accent)' : 'transparent',
             color: tab === 'externos' ? '#fff' : 'var(--text-secondary)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: tab === 'externos' ? 600 : 500,
@@ -331,7 +331,7 @@ export default function PermisosPage() {
           onClick={() => setTab('trabajo')}
           className="px-4 py-2 text-sm rounded-lg transition"
           style={{
-            background: tab === 'trabajo' ? '#2563eb' : 'transparent',
+            background: tab === 'trabajo' ? 'var(--color-accent)' : 'transparent',
             color: tab === 'trabajo' ? '#fff' : 'var(--text-secondary)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: tab === 'trabajo' ? 600 : 500,
@@ -379,7 +379,7 @@ export default function PermisosPage() {
                   disabled={seeding}
                   className="inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-full text-white disabled:opacity-50"
                   style={{
-                    background: '#2563eb',
+                    background: 'var(--color-accent)',
                     fontFamily: 'var(--font-outfit), sans-serif',
                     fontWeight: 500,
                   }}
@@ -389,7 +389,7 @@ export default function PermisosPage() {
                 </button>
                 <Link
                   href="/operaciones/configuracion?tab=permisos"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-full border border-gray-300 hover:bg-gray-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-full border border-line hover:bg-subtle-hover"
                   style={{
                     fontFamily: 'var(--font-outfit), sans-serif',
                     fontWeight: 500,
@@ -506,7 +506,7 @@ export default function PermisosPage() {
                   setStatusFilter('');
                   setTargetTypeFilter('');
                 }}
-                className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100 rounded-lg"
+                className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-subtle-hover rounded-lg"
                 style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
               >
                 <X size={14} /> Limpiar
@@ -528,7 +528,7 @@ export default function PermisosPage() {
               </div>
             ) : data && filteredRows.length === 0 ? (
               <div className="p-12 text-center">
-                <FileText size={36} className="mx-auto text-gray-300 mb-3" />
+                <FileText size={36} className="mx-auto text-fg-muted mb-3" />
                 <p
                   className="text-[var(--text-secondary)]"
                   style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
@@ -580,14 +580,14 @@ export default function PermisosPage() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage((p) => p - 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--input-bg)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--input-bg)] transition"
                   >
                     <ChevronLeft size={16} />
                   </button>
                   <button
                     disabled={page >= data.totalPages}
                     onClick={() => setPage((p) => p + 1)}
-                    className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--input-bg)] transition"
+                    className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--input-bg)] transition"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -798,7 +798,7 @@ function PermitRowView({ row, onDownload }: { row: PermitRow; onDownload: () => 
         <button
           onClick={onDownload}
           title="Descargar"
-          className="p-1.5 rounded-md hover:bg-gray-100 text-[var(--text-secondary)]"
+          className="p-1.5 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
         >
           <Download size={13} />
         </button>

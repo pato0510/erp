@@ -106,7 +106,7 @@ export default function ServiciosActivosPage() {
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
           <table className="w-full min-w-[760px] text-sm">
-            <thead className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-white/5">
+            <thead className="border-b border-[var(--border-color)] bg-subtle">
               <tr>
                 {['Orden', 'Estado', 'Inicio de ejecución', 'Fin de ejecución'].map((h) => (
                   <th

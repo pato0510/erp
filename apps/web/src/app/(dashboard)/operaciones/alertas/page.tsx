@@ -556,7 +556,7 @@ function AlertasContent() {
           <div className="flex items-center gap-2 flex-wrap">
             <Link
               href="/operaciones/configuracion?tab=alertas"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-line rounded-lg hover:bg-subtle-hover"
               style={{
                 fontFamily: 'var(--font-outfit), sans-serif',
                 fontWeight: 500,
@@ -572,7 +572,7 @@ function AlertasContent() {
                 disabled={recalculating}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-full text-white disabled:opacity-50"
                 style={{
-                  background: '#1C1C1E',
+                  background: 'var(--color-dark)',
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                 }}
@@ -696,7 +696,7 @@ function AlertasContent() {
           {hasFilters && (
             <button
               onClick={resetFilters}
-              className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-gray-100 rounded-lg"
+              className="inline-flex items-center gap-1 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-subtle-hover rounded-lg"
               style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
             >
               <X size={14} /> Limpiar filtros
@@ -769,7 +769,7 @@ function AlertasContent() {
                 style={{
                   background: active ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
                   color: active ? '#1d4ed8' : 'var(--text-secondary)',
-                  border: `1px solid ${active ? '#2563eb' : 'var(--border-color)'}`,
+                  border: `1px solid ${active ? 'var(--color-accent)' : 'var(--border-color)'}`,
                   fontFamily: 'var(--font-outfit), sans-serif',
                   fontWeight: 500,
                   fontSize: 12,
@@ -817,7 +817,7 @@ function AlertasContent() {
             style={{
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
-              background: view === 'list' ? '#2563eb' : 'transparent',
+              background: view === 'list' ? 'var(--color-accent)' : 'transparent',
               color: view === 'list' ? '#fff' : 'var(--text-secondary)',
             }}
           >
@@ -829,7 +829,7 @@ function AlertasContent() {
             style={{
               fontFamily: 'var(--font-outfit), sans-serif',
               fontWeight: 500,
-              background: view === 'cards' ? '#2563eb' : 'transparent',
+              background: view === 'cards' ? 'var(--color-accent)' : 'transparent',
               color: view === 'cards' ? '#fff' : 'var(--text-secondary)',
             }}
           >
@@ -844,8 +844,8 @@ function AlertasContent() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="px-5 py-3 animate-pulse flex items-center gap-3">
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-64" />
-                <div className="h-3 bg-gray-200 rounded w-40" />
+                <div className="h-4 bg-subtle-hover rounded w-64" />
+                <div className="h-3 bg-subtle-hover rounded w-40" />
               </div>
             </div>
           ))}
@@ -907,7 +907,7 @@ function AlertasContent() {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -923,7 +923,7 @@ function AlertasContent() {
               <button
                 disabled={page >= data.totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="p-2 rounded border border-gray-300 disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+                className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
               >
                 <ChevronRight size={16} />
               </button>
@@ -1063,7 +1063,7 @@ function KpiCard({
       className="text-left rounded-xl p-4 transition"
       style={{
         background: 'var(--bg-card)',
-        border: `1px solid ${active ? '#2563eb' : 'var(--border-color)'}`,
+        border: `1px solid ${active ? 'var(--color-accent)' : 'var(--border-color)'}`,
         boxShadow: active ? '0 0 0 3px rgba(37,99,235,0.08)' : 'none',
       }}
     >
@@ -1155,7 +1155,7 @@ function EmptyState({
   if (hasFilters) {
     return (
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-12 text-center">
-        <SearchX size={36} className="mx-auto text-gray-300 mb-3" />
+        <SearchX size={36} className="mx-auto text-fg-muted mb-3" />
         <p
           className="text-[var(--text-secondary)]"
           style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
@@ -1164,7 +1164,7 @@ function EmptyState({
         </p>
         <button
           onClick={onReset}
-          className="mt-3 inline-flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 rounded-full hover:bg-gray-50"
+          className="mt-3 inline-flex items-center gap-1 px-3 py-2 text-sm border border-line text-fg rounded-full hover:bg-subtle-hover"
           style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
         >
           <X size={13} /> Limpiar filtros
@@ -1194,7 +1194,7 @@ function EmptyState({
           href="/operaciones/configuracion?tab=alertas"
           className="inline-flex items-center gap-1.5 mt-3 px-3 py-2 text-sm rounded-full text-white"
           style={{
-            background: '#1C1C1E',
+            background: 'var(--color-dark)',
             fontFamily: 'var(--font-outfit), sans-serif',
             fontWeight: 500,
           }}
@@ -1230,7 +1230,7 @@ function ListView(props: ListProps) {
                   type="checkbox"
                   checked={props.allSelected}
                   onChange={props.onToggleAll}
-                  style={{ accentColor: '#2563eb' }}
+                  style={{ accentColor: 'var(--color-accent)' }}
                   aria-label="Seleccionar todas"
                 />
               </th>
@@ -1295,7 +1295,7 @@ function ListRow({
           type="checkbox"
           checked={selected}
           onChange={onToggleSelect}
-          style={{ accentColor: '#2563eb' }}
+          style={{ accentColor: 'var(--color-accent)' }}
           aria-label="Seleccionar"
         />
       </td>
@@ -1554,8 +1554,8 @@ function Action({
     tone === 'success'
       ? 'text-green-700 hover:bg-green-50'
       : tone === 'muted'
-        ? 'text-[var(--text-secondary)] hover:bg-gray-100'
-        : 'text-[var(--text-secondary)] hover:bg-gray-100';
+        ? 'text-[var(--text-secondary)] hover:bg-subtle-hover'
+        : 'text-[var(--text-secondary)] hover:bg-subtle-hover';
   return (
     <button
       onClick={onClick}
@@ -1627,7 +1627,7 @@ function ReasonModal({
   };
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-card)] rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-md">
         <div className="px-5 py-4 border-b border-[var(--border-color)]">
           <h3
             className="text-[var(--text-primary)]"
@@ -1659,7 +1659,7 @@ function ReasonModal({
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
             style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
           >
             Cancelar
