@@ -1,8 +1,12 @@
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { MovementStatus, MovementType } from '@prisma/client';
 import { Transform } from 'class-transformer';
 
 export class FilterMovementDto {
+  @IsOptional()
+  @IsIn(['all', 'exclude', 'only'])
+  uncategorized?: 'all' | 'exclude' | 'only' = 'all';
+
   @IsOptional()
   @IsEnum(MovementType)
   type?: MovementType;

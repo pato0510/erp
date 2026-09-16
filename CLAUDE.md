@@ -156,7 +156,40 @@ Aplicado en sync SII y disponible para uso manual
   **FIN-B:** las reglas `GIRO` solo coinciden con contrapartes que tengan giro,
   obtenido de SII o ingresado manualmente.
 
-Última actualización: 2026-09-16 (FIN-A)
+## FIN-B — Recategorización y movimientos no categorizados (2026-09-16)
+
+- «No categorizado» = `categoryId` entre los IDs de `Productos no categorizados`
+  de la empresa, tipos `INCOME` y `EXPENSE`, resueltos por
+  `resolveDefaultCategoryIds`. Comparte constantes e identidad
+  `companyId` + `name` + `type` con los upserts SII; no crea categorías al leer.
+  `Ingresos por Ventas` es una categoría final y queda fuera. Las categorías
+  ajenas a ese conjunto nunca se modifican.
+- `POST /api/movements/recategorize`: `dryRun` por defecto `true`,
+  `fiscalPeriodId` opcional; gate `update` sobre `Movement`, igual que editar.
+  Preview sin escrituras; aplicación manual que cambia solo `categoryId`.
+  Compare-and-set por empresa, categoría original y período evita sobrescribir
+  una categoría manual cambiada desde la lectura. Preview y aplicación recalculan
+  las reglas vigentes; cambios concurrentes pueden alterar el resultado.
+- Paginación keyset de 200 por `id`, una transacción `executeWithRls` por página:
+  una página posterior puede fallar después de aplicar páginas anteriores.
+  Auditoría mediante `audit_movements`, con contexto del usuario y empresa.
+- Omite y cuenta `sinContraparte`, `sinRegla` y `periodoCerrado`.
+  Este último corresponde a `MovementStatus.DRAFT` con `PeriodStatus.CLOSED`,
+  igual que `assertPeriodOpen`: `IN_REVIEW` no bloquea y los no borradores
+  admiten cambios de categoría aun en período cerrado. Los omitidos por cierre
+  no cuentan como cambios ni pasan al matcher; requieren confirmación o reapertura.
+- Listado `GET /api/movements`: `uncategorized=all|exclude|only`, por defecto
+  `all`. `/movimientos` excluye pendientes de la tabla principal y los reúne
+  al pie en «No categorizados (N)», plegado inicialmente, con los mismos filtros,
+  columnas y paginación independiente. `/categorias/reglas` tiene panel de
+  preview por regla, confirmación, aplicación y nueva previsualización.
+- Rendimiento conocido: consultas de reglas por candidato y categoría por
+  coincidencia, unas 200–400 lecturas por página, además de las escrituras.
+  Mejora prevista: precargar reglas y categorías por página manteniendo el
+  matcher único; latencia con PostgreSQL real todavía no medida.
+- `UX-001`, diferido en sprint 16, queda entregado por este ticket.
+
+Última actualización: 2026-09-16 (FIN-B)
 
 ═══════════════════════════════════════════════════════════════════
 

@@ -7,6 +7,7 @@ import { CreateMovementDto } from './dto/create-movement.dto';
 import { UpdateMovementDto } from './dto/update-movement.dto';
 import { FilterMovementDto } from './dto/filter-movement.dto';
 import { resolveCounterpartyFacts } from '../common/counterparty-facts';
+import { resolveDefaultCategoryIds } from '../common/default-categories';
 
 const MOVEMENT_INCLUDES = {
   category: { select: { id: true, name: true, type: true, color: true } },
@@ -35,6 +36,12 @@ export class MovementsService {
     if (filters.counterpartyId) where.counterpartyId = filters.counterpartyId;
     if (filters.costCenterId) where.costCenterId = filters.costCenterId;
     if (filters.fiscalPeriodId) where.fiscalPeriodId = filters.fiscalPeriodId;
+
+    if (filters.uncategorized === 'only' || filters.uncategorized === 'exclude') {
+      const ids = await resolveDefaultCategoryIds(companyId, this.prisma);
+      // AND preserves an explicit category filter instead of overwriting it.
+      where.AND = [{ categoryId: filters.uncategorized === 'only' ? { in: ids } : { notIn: ids } }];
+    }
 
     if (filters.dateFrom || filters.dateTo) {
       where.date = {};

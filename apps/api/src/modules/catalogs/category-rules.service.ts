@@ -132,7 +132,7 @@ export class CategoryRulesService {
     return rule?.categoryId ?? null;
   }
 
-  private async findMatchingRule(
+  async findMatchingRule(
     companyId: string,
     counterparty: CounterpartyFactSource | null,
     movementType: MovementType,

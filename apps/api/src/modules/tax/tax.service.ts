@@ -18,11 +18,12 @@ import { CategoryRulesService } from '../catalogs/category-rules.service';
 import { cleanRut, paginate } from '@erp/utils';
 import { CounterpartyFactSource } from '../common/counterparty-facts';
 import { readCounterpartyGiro } from './counterparty-giro';
+import {
+  SALES_INCOME_CATEGORY_NAME,
+  UNCATEGORIZED_CATEGORY_NAME,
+} from '../common/default-categories';
 
 const DEFAULT_PROVIDER = DEFAULT_SII_PROVIDER;
-
-const SALES_INCOME_CATEGORY_NAME = 'Ingresos por Ventas';
-const UNCATEGORIZED_CATEGORY_NAME = 'Productos no categorizados';
 
 const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   FACTURA_ELECTRONICA: 'Factura',

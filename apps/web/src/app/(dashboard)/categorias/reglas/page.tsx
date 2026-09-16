@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { Toast } from '../../../../components/shared/Toast';
+import { RecategorizePanel } from '../../../../components/movements/RecategorizePanel';
 
 type RuleType = 'RUT' | 'GIRO' | 'KEYWORD' | 'DEFAULT';
 type MovementTypeFilter = 'INCOME' | 'EXPENSE' | 'BOTH';
@@ -79,6 +80,7 @@ const DEFAULT_DRAFT: RuleDraft = {
 
 export default function CategoryRulesPage() {
   const [rules, setRules] = useState<CategoryRule[]>([]);
+  const [rulesRevision, setRulesRevision] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [modal, setModal] = useState<ModalState>(null);
@@ -102,6 +104,7 @@ export default function CategoryRulesPage() {
         apiClient.get<Category[]>('/api/categories?type=EXPENSE'),
       ]);
       setRules(rulesRes);
+      setRulesRevision((revision) => revision + 1);
       setCategories([...incomeCats, ...expenseCats]);
     } catch (err) {
       setToast({
@@ -185,6 +188,12 @@ export default function CategoryRulesPage() {
 
       {/* Test panel */}
       <TestPanel onError={(m) => setToast({ message: m, type: 'error' })} />
+      <RecategorizePanel
+        key={rulesRevision}
+        onApplied={(count) =>
+          setToast({ message: `Movimientos recategorizados: ${count}`, type: 'success' })
+        }
+      />
 
       {/* Rules list */}
       <section className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm">

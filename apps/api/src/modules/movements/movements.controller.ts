@@ -9,11 +9,16 @@ import { CheckPolicies } from '../common/decorators/check-policies.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentCompany } from '../common/decorators/current-company.decorator';
 import { MovementSubject } from '../common/casl/casl-ability.factory';
+import { RecategorizeMovementsDto } from './dto/recategorize-movements.dto';
+import { MovementRecategorizationService } from './movement-recategorization.service';
 
 @Controller('movements')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class MovementsController {
-  constructor(private readonly movementsService: MovementsService) {}
+  constructor(
+    private readonly movementsService: MovementsService,
+    private readonly recategorizationService: MovementRecategorizationService,
+  ) {}
 
   @Get()
   @CheckPolicies((ability) => ability.can('read', MovementSubject))
@@ -52,6 +57,16 @@ export class MovementsController {
     @Body() dto: UpdateMovementDto,
   ) {
     return this.movementsService.update(id, companyId, user.id, dto);
+  }
+
+  @Post('recategorize')
+  @CheckPolicies((ability) => ability.can('update', MovementSubject))
+  recategorize(
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: RecategorizeMovementsDto,
+  ) {
+    return this.recategorizationService.recategorize(companyId, user.id, dto);
   }
 
   @Post(':id/confirm')

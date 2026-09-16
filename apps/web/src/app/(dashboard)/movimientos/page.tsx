@@ -3,7 +3,15 @@
 import { useThemeTokens } from '../../../hooks/useThemeTokens';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Upload, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import {
+  Plus,
+  Upload,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Download,
+} from 'lucide-react';
 import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiClient } from '../../../lib/api';
 import { downloadFile } from '../../../lib/download';
@@ -67,6 +75,31 @@ export default function MovimientosPage() {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [uncategorizedOpen, setUncategorizedOpen] = useState(false);
+  const [uncategorizedTotal, setUncategorizedTotal] = useState(0);
+  const [uncategorizedPage, setUncategorizedPage] = useState(1);
+  const [uncategorizedPages, setUncategorizedPages] = useState(1);
+  const [uncategorizedMovements, setUncategorizedMovements] = useState<Movement[]>([]);
+  const [uncategorizedLoading, setUncategorizedLoading] = useState(false);
+  const [uncategorizedError, setUncategorizedError] = useState<string | null>(null);
+  const mainRequest = useRef(0);
+  const countRequest = useRef(0);
+  const uncategorizedRequest = useRef(0);
+
+  const filters = new URLSearchParams();
+  for (const [key, value] of Object.entries({
+    type: filterType,
+    status: filterStatus,
+    categoryId: filterCategoryId,
+    counterpartyId: filterCounterpartyId,
+    costCenterId: filterCostCenterId,
+    fiscalPeriodId: filterFiscalPeriodId,
+    dateFrom: filterDateFrom,
+    dateTo: filterDateTo,
+    search: filterSearch,
+  }))
+    if (value) filters.set(key, value);
+  const filterQuery = filters.toString();
 
   // Filter option lists
   const [categories, setCategories] = useState<SelectOption[]>([]);
@@ -78,42 +111,25 @@ export default function MovimientosPage() {
   const reloadRef = useRef<(() => void) | null>(null);
 
   const load = useCallback(async () => {
+    const request = ++mainRequest.current;
     setIsLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filterType) params.set('type', filterType);
-      if (filterStatus) params.set('status', filterStatus);
-      if (filterCategoryId) params.set('categoryId', filterCategoryId);
-      if (filterCounterpartyId) params.set('counterpartyId', filterCounterpartyId);
-      if (filterCostCenterId) params.set('costCenterId', filterCostCenterId);
-      if (filterFiscalPeriodId) params.set('fiscalPeriodId', filterFiscalPeriodId);
-      if (filterDateFrom) params.set('dateFrom', filterDateFrom);
-      if (filterDateTo) params.set('dateTo', filterDateTo);
-      if (filterSearch) params.set('search', filterSearch);
+      const params = new URLSearchParams(filterQuery);
+      params.set('uncategorized', 'exclude');
       params.set('page', String(page));
       params.set('limit', '15');
 
       const res = await apiClient.get<PaginatedResult>(`/api/movements?${params}`);
+      if (request !== mainRequest.current) return;
       setMovements(res.data);
       setTotal(res.total);
       setTotalPages(res.totalPages);
     } catch {
       // handled by apiClient
     } finally {
-      setIsLoading(false);
+      if (request === mainRequest.current) setIsLoading(false);
     }
-  }, [
-    filterType,
-    filterStatus,
-    filterCategoryId,
-    filterCounterpartyId,
-    filterCostCenterId,
-    filterFiscalPeriodId,
-    filterDateFrom,
-    filterDateTo,
-    filterSearch,
-    page,
-  ]);
+  }, [filterQuery, page]);
 
   useEffect(() => {
     load();
@@ -125,16 +141,7 @@ export default function MovimientosPage() {
   // of movements in this app. If a company ever exceeds that, we'll page here.
   const loadChartData = useCallback(async () => {
     try {
-      const params = new URLSearchParams();
-      if (filterType) params.set('type', filterType);
-      if (filterStatus) params.set('status', filterStatus);
-      if (filterCategoryId) params.set('categoryId', filterCategoryId);
-      if (filterCounterpartyId) params.set('counterpartyId', filterCounterpartyId);
-      if (filterCostCenterId) params.set('costCenterId', filterCostCenterId);
-      if (filterFiscalPeriodId) params.set('fiscalPeriodId', filterFiscalPeriodId);
-      if (filterDateFrom) params.set('dateFrom', filterDateFrom);
-      if (filterDateTo) params.set('dateTo', filterDateTo);
-      if (filterSearch) params.set('search', filterSearch);
+      const params = new URLSearchParams(filterQuery);
       params.set('page', '1');
       params.set('limit', '1000');
 
@@ -144,21 +151,55 @@ export default function MovimientosPage() {
       // handled by apiClient; leave previous chart data in place on failure.
     }
     // Deliberately omits `page` so changing pages doesn't refire this fetch.
-  }, [
-    filterType,
-    filterStatus,
-    filterCategoryId,
-    filterCounterpartyId,
-    filterCostCenterId,
-    filterFiscalPeriodId,
-    filterDateFrom,
-    filterDateTo,
-    filterSearch,
-  ]);
+  }, [filterQuery]);
 
   useEffect(() => {
     loadChartData();
   }, [loadChartData]);
+
+  const loadUncategorizedCount = useCallback(async () => {
+    const request = ++countRequest.current;
+    setUncategorizedError(null);
+    try {
+      const res = await apiClient.get<PaginatedResult>(
+        `/api/movements?${filterQuery}&uncategorized=only&limit=1`,
+      );
+      if (request === countRequest.current) setUncategorizedTotal(res.total);
+    } catch (err) {
+      if (request === countRequest.current)
+        setUncategorizedError(
+          err instanceof Error ? err.message : 'Error cargando el conteo de no categorizados.',
+        );
+    }
+  }, [filterQuery]);
+
+  const loadUncategorized = useCallback(async () => {
+    const request = ++uncategorizedRequest.current;
+    setUncategorizedLoading(true);
+    setUncategorizedError(null);
+    try {
+      const res = await apiClient.get<PaginatedResult>(
+        `/api/movements?${filterQuery}&uncategorized=only&page=${uncategorizedPage}&limit=15`,
+      );
+      if (request !== uncategorizedRequest.current) return;
+      setUncategorizedMovements(res.data);
+      setUncategorizedPages(res.totalPages);
+    } catch (err) {
+      if (request === uncategorizedRequest.current)
+        setUncategorizedError(
+          err instanceof Error ? err.message : 'Error cargando movimientos no categorizados.',
+        );
+    } finally {
+      if (request === uncategorizedRequest.current) setUncategorizedLoading(false);
+    }
+  }, [filterQuery, uncategorizedPage]);
+
+  useEffect(() => {
+    loadUncategorizedCount();
+  }, [loadUncategorizedCount]);
+  useEffect(() => {
+    if (uncategorizedOpen) loadUncategorized();
+  }, [uncategorizedOpen, loadUncategorized]);
 
   // Load filter options once on mount — these don't change often enough to
   // warrant refetching on every filter tweak.
@@ -186,6 +227,8 @@ export default function MovimientosPage() {
   reloadRef.current = () => {
     load();
     loadChartData();
+    loadUncategorizedCount();
+    if (uncategorizedOpen) loadUncategorized();
   };
 
   const handleConfirm = async (id: string) => {
@@ -204,6 +247,7 @@ export default function MovimientosPage() {
   const updateFilter = (setter: (v: string) => void, value: string) => {
     setter(value);
     setPage(1);
+    setUncategorizedPage(1);
   };
 
   const clearFilters = () => {
@@ -217,6 +261,7 @@ export default function MovimientosPage() {
     setFilterDateTo('');
     setFilterSearch('');
     setPage(1);
+    setUncategorizedPage(1);
   };
 
   // Category distribution derived from the filter-wide chart dataset (not the
@@ -486,155 +531,230 @@ export default function MovimientosPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-subtle border-b border-[var(--border-color)]">
+      <MovementsTable
+        label="Movimientos categorizados"
+        movements={movements}
+        isLoading={isLoading}
+        total={total}
+        totalPages={totalPages}
+        page={page}
+        onPageChange={setPage}
+        handleConfirm={handleConfirm}
+        handleCancel={handleCancel}
+      />
+      {uncategorizedError && (
+        <p role="alert" className="mt-4 text-sm text-fg">
+          {uncategorizedError}
+        </p>
+      )}
+      {uncategorizedTotal > 0 && (
+        <section className="mt-6" aria-labelledby="uncategorized-toggle">
+          <button
+            id="uncategorized-toggle"
+            type="button"
+            aria-expanded={uncategorizedOpen}
+            aria-controls="uncategorized-movements"
+            onClick={() => setUncategorizedOpen((open) => !open)}
+            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-fg bg-card border border-line rounded-lg hover:bg-subtle-hover focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {uncategorizedOpen ? (
+              <ChevronDown size={16} aria-hidden="true" />
+            ) : (
+              <ChevronRight size={16} aria-hidden="true" />
+            )}
+            No categorizados ({uncategorizedTotal})
+          </button>
+          <div id="uncategorized-movements" hidden={!uncategorizedOpen} className="mt-3">
+            {uncategorizedOpen && (
+              <MovementsTable
+                label="Movimientos no categorizados"
+                movements={uncategorizedMovements}
+                isLoading={uncategorizedLoading}
+                total={uncategorizedTotal}
+                totalPages={uncategorizedPages}
+                page={uncategorizedPage}
+                onPageChange={setUncategorizedPage}
+                handleConfirm={handleConfirm}
+                handleCancel={handleCancel}
+              />
+            )}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function MovementsTable({
+  label,
+  movements,
+  isLoading,
+  total,
+  totalPages,
+  page,
+  onPageChange,
+  handleConfirm,
+  handleCancel,
+}: {
+  label: string;
+  movements: Movement[];
+  isLoading: boolean;
+  total: number;
+  totalPages: number;
+  page: number;
+  onPageChange: (page: number) => void;
+  handleConfirm: (id: string) => Promise<void>;
+  handleCancel: (id: string) => Promise<void>;
+}) {
+  return (
+    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-x-auto">
+      <table aria-label={label} className="w-full text-sm">
+        <thead className="bg-subtle border-b border-[var(--border-color)]">
+          <tr>
+            <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Fecha
+            </th>
+            <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Período Fiscal
+            </th>
+            <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Tipo
+            </th>
+            <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Descripción
+            </th>
+            <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Categoría
+            </th>
+            <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Contraparte
+            </th>
+            <th
+              scope="col"
+              className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-fg-secondary"
+            >
+              RUT
+            </th>
+            <th
+              scope="col"
+              className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-fg-secondary"
+            >
+              Giro
+            </th>
+            <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Monto
+            </th>
+            <th className="label text-center px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Estado
+            </th>
+            <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
+              Acciones
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--border-color)]">
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <tr key={i} className="animate-pulse">
+                {Array.from({ length: 11 }).map((_, j) => (
+                  <td key={j} className="px-4 py-3">
+                    <div className="h-4 bg-subtle-hover rounded w-20" />
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : movements.length === 0 ? (
             <tr>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Fecha
-              </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Período Fiscal
-              </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Tipo
-              </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Descripción
-              </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Categoría
-              </th>
-              <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Contraparte
-              </th>
-              <th
-                scope="col"
-                className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-fg-secondary"
-              >
-                RUT
-              </th>
-              <th
-                scope="col"
-                className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-fg-secondary"
-              >
-                Giro
-              </th>
-              <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Monto
-              </th>
-              <th className="label text-center px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Estado
-              </th>
-              <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Acciones
-              </th>
+              <td colSpan={11} className="px-4 py-12 text-center text-[var(--text-muted)]">
+                No se encontraron movimientos
+              </td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border-color)]">
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="animate-pulse">
-                  {Array.from({ length: 11 }).map((_, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="h-4 bg-subtle-hover rounded w-20" />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : movements.length === 0 ? (
-              <tr>
-                <td colSpan={11} className="px-4 py-12 text-center text-[var(--text-muted)]">
-                  No se encontraron movimientos
+          ) : (
+            movements.map((m) => (
+              <tr key={m.id} className="hover:bg-subtle-hover">
+                <td className="mono px-4 py-3 text-[var(--text-secondary)]">
+                  {formatDate(m.date)}
+                </td>
+                <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">
+                  {m.fiscalPeriod?.name || '-'}
+                </td>
+                <td className="px-4 py-3">
+                  <MovementTypeBadge type={m.type} />
+                </td>
+                <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-[200px] truncate">
+                  {m.description}
+                </td>
+                <td className="px-4 py-3 text-[var(--text-secondary)]">
+                  {m.category?.name || '-'}
+                </td>
+                <td className="px-4 py-3 text-[var(--text-secondary)]">
+                  {m.counterparty?.name || '-'}
+                </td>
+                <td className="px-4 py-3 text-fg-secondary whitespace-nowrap">
+                  {m.counterpartyFacts?.rut ? formatRUT(m.counterpartyFacts.rut) : '-'}
+                </td>
+                <td className="px-4 py-3 text-fg-secondary">{m.counterpartyFacts?.giro || '-'}</td>
+                <td
+                  className={`amount px-4 py-3 text-right ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
+                >
+                  {m.type === 'INCOME' ? '+' : '-'}
+                  {formatCLP(Number(m.amount))}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <MovementStatusBadge status={m.status} />
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex gap-1 justify-end">
+                    {m.status === 'DRAFT' && (
+                      <button
+                        onClick={() => handleConfirm(m.id)}
+                        className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 transition"
+                      >
+                        Confirmar
+                      </button>
+                    )}
+                    {(m.status === 'DRAFT' || m.status === 'CONFIRMED') && (
+                      <button
+                        onClick={() => handleCancel(m.id)}
+                        className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
-            ) : (
-              movements.map((m) => (
-                <tr key={m.id} className="hover:bg-subtle-hover">
-                  <td className="mono px-4 py-3 text-[var(--text-secondary)]">
-                    {formatDate(m.date)}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)] whitespace-nowrap">
-                    {m.fiscalPeriod?.name || '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <MovementTypeBadge type={m.type} />
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-[200px] truncate">
-                    {m.description}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)]">
-                    {m.category?.name || '-'}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)]">
-                    {m.counterparty?.name || '-'}
-                  </td>
-                  <td className="px-4 py-3 text-fg-secondary whitespace-nowrap">
-                    {m.counterpartyFacts?.rut ? formatRUT(m.counterpartyFacts.rut) : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-fg-secondary">
-                    {m.counterpartyFacts?.giro || '-'}
-                  </td>
-                  <td
-                    className={`amount px-4 py-3 text-right ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}
-                  >
-                    {m.type === 'INCOME' ? '+' : '-'}
-                    {formatCLP(Number(m.amount))}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <MovementStatusBadge status={m.status} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex gap-1 justify-end">
-                      {m.status === 'DRAFT' && (
-                        <button
-                          onClick={() => handleConfirm(m.id)}
-                          className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 transition"
-                        >
-                          Confirmar
-                        </button>
-                      )}
-                      {(m.status === 'DRAFT' || m.status === 'CONFIRMED') && (
-                        <button
-                          onClick={() => handleCancel(m.id)}
-                          className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition"
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+            ))
+          )}
+        </tbody>
+      </table>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)] bg-subtle">
-            <p className="text-sm text-[var(--text-secondary)]">
-              {total} movimientos &middot; Página {page} de {totalPages}
-            </p>
-            <div className="flex gap-2">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-                className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-                className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-color)] bg-subtle">
+          <p className="text-sm text-[var(--text-secondary)]">
+            {total} movimientos &middot; Página {page} de {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <button
+              disabled={isLoading || page <= 1}
+              onClick={() => onPageChange(page - 1)}
+              aria-label="Página anterior"
+              className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              disabled={isLoading || page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+              aria-label="Página siguiente"
+              className="p-2 rounded border border-line text-fg disabled:opacity-30 hover:bg-[var(--bg-card)] transition"
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
