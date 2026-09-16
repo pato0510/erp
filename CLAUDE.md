@@ -580,8 +580,8 @@ QA doc: docs/EXCELSIA-RRHH-QA-PRE-DESBLOQUEO.md
 Status: V1 completo (COM-001…COM-015), desplegado y visible en /modulos.
 Post-V1: COM-016 (notas internas de oportunidad), COM-017 (documentos adjuntos
 de oportunidad), COM-018 (Cuentas v2: Enterprise + columnas + acordeón) y
-COM-021 (gestión de empresas + asignación masiva), 2026-09-15/16 — ver
-bloques abajo.
+COM-021 (gestión de empresas + asignación masiva) y COM-019 (dashboard
+comercial), 2026-09-15/16 — ver bloques abajo.
 Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
@@ -771,8 +771,40 @@ enterpriseId: null }`; responde `{ assigned, skipped }`. Web: el modal inline
   (carga `?noEnterprise=true`, lista de checkboxes con búsqueda, "Seleccionar
   todos (filtrados)", contador, "Asignar N cuentas", toast con asignadas y
   omitidas; Escape cierra y Tab cicla dentro del diálogo). Mutate→refetch.
+- COM-019 — DASHBOARD COMERCIAL (2026-09-16; CRM-4): entrada "Dashboard"
+  PRIMERA en el sidebar Comercial y página `/comercial/dashboard` (solo
+  lectura; se renderiza con `opportunity.read`, la API manda). UN endpoint GET
+  `/comercial/dashboard?from&to` (YYYY-MM-DD, `to` INCLUSIVO en bordes UTC —
+  convención HR-004b; default últimos 90 días hasta hoy; 400 si from > to o
+  rango > 3 años), gateado en UNA lambda `@CheckPolicies` con `read
+Opportunity && read Account` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT).
+  TODO DERIVADO EN VIVO: cero agregados almacenados, cero cache, cero cron;
+  una sola ronda de queries (`Promise.all`, count + findMany con select +
+  groupBy), cada una con el `companyId` explícito; sin SQL crudo. Campos
+  decididos: VALOR DEL NEGOCIO = `estimatedValue` (lo que suma el tablero; el
+  netAmount de la cotización ACEPTADA solo alimenta el Commitment del
+  handoff); FECHA DE CIERRE = `closedAt` (se setea en GANADA/PERDIDA y se
+  limpia al reabrir — una reabierta sale de ganadas/perdidas); MOTIVO =
+  enum `lostReason` (se conserva como historia al reabrir). Definiciones:
+  created = createdAt en rango · won/lost = stage GANADA/PERDIDA con closedAt
+  en rango · winRate = won/(won+lost), null con denominador 0 · wonAmount = Σ
+  estimatedValue ganadas en rango · avgCycleDays = media de (closedAt −
+  createdAt) en días, ganadas en rango, null sin ganadas · openCount/openAmount
+  = FOTO ACTUAL de abiertas (toda etapa salvo GANADA/PERDIDA; EN_PAUSA cuenta
+  como abierta), no acotada al rango · pipelineByStage = foto abierta en orden
+  de pipeline (PROSPECTO…NEGOCIACION, EN_PAUSA), ceros incluidos ·
+  lostReasons = top 5 en rango · lostAccounts = cuentas con ≥1 perdida en
+  rango, 0 ganadas en rango y 0 abiertas HOY, top 10 por monto perdido (última
+  pérdida = closedAt más reciente, con su motivo) · topAccounts = top 5 por
+  monto ganado en rango · activitiesByType = actividades creadas en rango
+  (groupBy). FE: presets 30/90/365/Año actual + dos inputs de fecha, 7 KPI
+  cards, barra "Pipeline por etapa" (recharts + `useThemeTokens`, tabla sr-only
+  con los mismos valores), lista de motivos, tablas Cuentas perdidas (link a la
+  ficha) y Cuentas top, lista de actividades; "Sin datos en el rango." por
+  sección. SIN tocar la fábrica CASL (GO-001 de Codex): puertas sobre subjects
+  existentes.
 
-Última actualización: 2026-09-16 (COM-021)
+Última actualización: 2026-09-16 (COM-019)
 
 ═══════════════════════════════════════════════════════════════════
 

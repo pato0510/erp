@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, KanbanSquare, LogOut, Moon, Sun, Users } from 'lucide-react';
+import { Building2, KanbanSquare, LayoutDashboard, LogOut, Moon, Sun, Users } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -12,8 +12,9 @@ import { SidebarBrand } from './SidebarBrand';
  * SidebarBrand component (zero new CSS). Config-driven: append entries to
  * navItems as later COM tickets ship (Cotizaciones, …). COM-007 adds Pipeline
  * (the flagship board), placed first. COM-021 adds Empresas (the clients' parent
- * companies) right after Cuentas. */
+ * companies) right after Cuentas. COM-019 adds Dashboard, placed FIRST. */
 const navItems = [
+  { href: '/comercial/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: false },
   { href: '/comercial/pipeline', label: 'Pipeline', icon: KanbanSquare, exact: false },
   { href: '/comercial/cuentas', label: 'Cuentas', icon: Users, exact: false },
   { href: '/comercial/empresas', label: 'Empresas', icon: Building2, exact: false },

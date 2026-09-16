@@ -4,6 +4,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { ComercialController } from './comercial.controller';
 import { ContactsModule } from './contacts/contacts.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { EnterprisesModule } from './enterprises/enterprises.module';
 import { OpportunitiesModule } from './opportunities/opportunities.module';
 import { OpportunityDocumentsModule } from './opportunity-documents/opportunity-documents.module';
@@ -17,7 +18,8 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
  * OpportunitiesModule (the pipeline); COM-008 adds ActivitiesModule (the interaction
  * timeline); COM-016 adds OpportunityNotesModule (the internal note thread on a deal);
  * COM-017 adds OpportunityDocumentsModule (files attached to a deal); COM-018 adds
- * EnterprisesModule (the client's parent company, one Enterprise → many Accounts).
+ * EnterprisesModule (the client's parent company, one Enterprise → many Accounts); COM-019
+ * adds DashboardModule (the live-derived Comercial dashboard).
  * Remaining feature submodules are imported here as their tickets land, mirroring how RrhhModule / OperationsModule aggregate their feature
  * submodules. PoliciesGuard / CaslAbilityFactory / PrismaService are provided by the
  * global Casl/Prisma modules.
@@ -37,6 +39,7 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
     OpportunityDocumentsModule,
     QuotesModule,
     DisponibilidadModule,
+    DashboardModule,
   ],
   controllers: [ComercialController],
 })
