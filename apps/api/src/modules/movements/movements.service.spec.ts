@@ -83,6 +83,30 @@ describe('MovementsService', () => {
     service = moduleRef.get(MovementsService);
   });
 
+  it('resolves RUT/giro for table rows through the counterparty link, including nulls', async () => {
+    prisma.movement.findMany.mockResolvedValue([
+      {
+        ...baseMovement,
+        counterparty: { name: 'Horizonte', taxId: '12.345.678-5', giro: 'Construcción' },
+      },
+      { ...baseMovement, id: 'm2', counterparty: null },
+    ]);
+    prisma.movement.count.mockResolvedValue(2);
+    const result = await service.findAll(companyId, {});
+    expect(result.data.map((m) => m.counterpartyFacts)).toEqual([
+      { name: 'Horizonte', rut: '12.345.678-5', giro: 'Construcción' },
+      { name: null, rut: null, giro: null },
+    ]);
+    expect(prisma.movement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId },
+        include: expect.objectContaining({
+          counterparty: { select: { id: true, name: true, type: true, taxId: true, giro: true } },
+        }),
+      }),
+    );
+  });
+
   // ───────────────────────── create ─────────────────────────
 
   describe('create', () => {

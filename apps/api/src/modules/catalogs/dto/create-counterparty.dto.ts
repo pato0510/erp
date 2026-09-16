@@ -1,5 +1,6 @@
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { CounterpartyType } from '@prisma/client';
+import { Transform } from 'class-transformer';
 
 export class CreateCounterpartyDto {
   @IsString()
@@ -14,6 +15,12 @@ export class CreateCounterpartyDto {
   @IsString()
   @MaxLength(20)
   taxId?: string;
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() || null : value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  giro?: string | null;
 
   @IsOptional()
   @IsEmail()

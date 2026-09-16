@@ -82,6 +82,16 @@ export class TaxController {
     return this.taxService.syncAll(companyId, user.id, fiscalPeriodId);
   }
 
+  @Post('counterparty-giro/backfill')
+  @CheckPolicies((ability) => ability.can('update', MovementSubject))
+  async backfillCounterpartyGiro(
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+  ): Promise<{ updated: number }> {
+    const updated = await this.taxService.backfillCounterpartyGiro(companyId, user.id);
+    return { updated };
+  }
+
   @Post('test-connection')
   @CheckPolicies((ability) => ability.can('read', MovementSubject))
   async testConnection() {

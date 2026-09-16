@@ -59,7 +59,7 @@ export class CounterpartiesService {
   async create(companyId: string, userId: string, dto: CreateCounterpartyDto) {
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.counterparty.create({
-        data: { ...dto, companyId },
+        data: { ...dto, companyId, giro: dto.giro?.trim() || null },
       });
     });
   }
@@ -70,7 +70,10 @@ export class CounterpartiesService {
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.counterparty.update({
         where: { id },
-        data: dto,
+        data: {
+          ...dto,
+          giro: dto.giro === undefined ? undefined : dto.giro?.trim() || null,
+        },
       });
     });
   }

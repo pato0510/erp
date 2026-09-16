@@ -1,5 +1,16 @@
 import { CategoryRuleMovementType, CategoryRuleType } from '@prisma/client';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateCategoryRuleDto {
   @IsString()
@@ -13,8 +24,10 @@ export class CreateCategoryRuleDto {
   @IsEnum(CategoryRuleType)
   ruleType!: CategoryRuleType;
 
-  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @ValidateIf((dto) => dto.ruleType !== CategoryRuleType.DEFAULT || dto.matchValue != null)
   @IsString()
+  @MinLength(1, { message: 'Ingresa un valor de coincidencia para la regla.' })
   @MaxLength(200)
   matchValue?: string | null;
 

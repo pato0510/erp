@@ -9,7 +9,7 @@ import { apiClient } from '../../../lib/api';
 import { downloadFile } from '../../../lib/download';
 import { MovementStatusBadge } from '../../../components/movements/MovementStatusBadge';
 import { MovementTypeBadge } from '../../../components/movements/MovementTypeBadge';
-import { formatCLP, formatDate } from '../../../lib/formatters';
+import { formatCLP, formatDate, formatRUT } from '../../../lib/formatters';
 
 interface Movement {
   id: string;
@@ -21,6 +21,7 @@ interface Movement {
   reference?: string;
   category: { id: string; name: string };
   counterparty?: { id: string; name: string };
+  counterpartyFacts: { rut: string | null; giro: string | null };
   costCenter?: { id: string; name: string; code: string | null };
   fiscalPeriod?: { id: string; name: string; year: number; month: number };
 }
@@ -485,7 +486,7 @@ export default function MovimientosPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-subtle border-b border-[var(--border-color)]">
             <tr>
@@ -507,6 +508,18 @@ export default function MovimientosPage() {
               <th className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Contraparte
               </th>
+              <th
+                scope="col"
+                className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-fg-secondary"
+              >
+                RUT
+              </th>
+              <th
+                scope="col"
+                className="label text-left px-4 py-3 text-[11px] uppercase tracking-wider text-fg-secondary"
+              >
+                Giro
+              </th>
               <th className="label text-right px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                 Monto
               </th>
@@ -522,7 +535,7 @@ export default function MovimientosPage() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="animate-pulse">
-                  {Array.from({ length: 9 }).map((_, j) => (
+                  {Array.from({ length: 11 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 bg-subtle-hover rounded w-20" />
                     </td>
@@ -531,7 +544,7 @@ export default function MovimientosPage() {
               ))
             ) : movements.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-[var(--text-muted)]">
+                <td colSpan={11} className="px-4 py-12 text-center text-[var(--text-muted)]">
                   No se encontraron movimientos
                 </td>
               </tr>
@@ -555,6 +568,12 @@ export default function MovimientosPage() {
                   </td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">
                     {m.counterparty?.name || '-'}
+                  </td>
+                  <td className="px-4 py-3 text-fg-secondary whitespace-nowrap">
+                    {m.counterpartyFacts?.rut ? formatRUT(m.counterpartyFacts.rut) : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-fg-secondary">
+                    {m.counterpartyFacts?.giro || '-'}
                   </td>
                   <td
                     className={`amount px-4 py-3 text-right ${m.type === 'INCOME' ? 'text-green-600' : 'text-red-500'}`}

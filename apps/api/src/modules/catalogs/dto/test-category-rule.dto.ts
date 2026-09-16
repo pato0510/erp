@@ -1,4 +1,4 @@
-import { IsEnum, IsString } from 'class-validator';
+import { IsEnum, IsString, IsOptional, MaxLength } from 'class-validator';
 import { MovementType } from '@prisma/client';
 
 export class TestCategoryRuleDto {
@@ -7,6 +7,11 @@ export class TestCategoryRuleDto {
 
   @IsString()
   razonSocial!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  giro?: string;
 
   @IsEnum(MovementType)
   movementType!: MovementType;

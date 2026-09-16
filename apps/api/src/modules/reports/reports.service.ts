@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { MovementStatus, Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { resolveCounterpartyFacts } from '../common/counterparty-facts';
 
 const HEADER_FILL: ExcelJS.Fill = {
   type: 'pattern',
@@ -55,7 +56,7 @@ export class ReportsService {
       where,
       include: {
         category: { select: { name: true } },
-        counterparty: { select: { name: true } },
+        counterparty: { select: { name: true, taxId: true, giro: true } },
         costCenter: { select: { name: true } },
         fiscalPeriod: { select: { name: true } },
       },
@@ -75,6 +76,8 @@ export class ReportsService {
       { header: 'Descripción', key: 'description', width: 35 },
       { header: 'Categoría', key: 'category', width: 18 },
       { header: 'Contraparte', key: 'counterparty', width: 20 },
+      { header: 'RUT', key: 'rut', width: 18 },
+      { header: 'Giro', key: 'giro', width: 35 },
       { header: 'Centro de Costo', key: 'costCenter', width: 16 },
       { header: 'Referencia', key: 'reference', width: 14 },
       { header: 'Monto', key: 'amount', width: 16 },
@@ -87,6 +90,7 @@ export class ReportsService {
     });
 
     for (const m of movements) {
+      const facts = resolveCounterpartyFacts(m.counterparty);
       const row = ws.addRow({
         date: new Date(m.date).toLocaleDateString('es-CL'),
         type: m.type === 'INCOME' ? 'Ingreso' : 'Egreso',
@@ -94,6 +98,8 @@ export class ReportsService {
         description: m.description,
         category: m.category?.name || '',
         counterparty: m.counterparty?.name || '',
+        rut: facts.rut ?? '',
+        giro: facts.giro ?? '',
         costCenter: m.costCenter?.name || '',
         reference: m.reference || '',
         amount: Number(m.amount),

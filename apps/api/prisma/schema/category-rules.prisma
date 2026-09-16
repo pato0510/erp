@@ -1,5 +1,6 @@
 enum CategoryRuleType {
   RUT
+  GIRO
   KEYWORD
   DEFAULT
 }

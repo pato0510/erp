@@ -61,6 +61,7 @@ export class CategoryRulesController {
       dto.rut,
       dto.razonSocial,
       dto.movementType,
+      dto.giro,
     );
   }
 }

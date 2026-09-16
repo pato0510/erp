@@ -6,10 +6,11 @@ import { paginate } from '@erp/utils';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { UpdateMovementDto } from './dto/update-movement.dto';
 import { FilterMovementDto } from './dto/filter-movement.dto';
+import { resolveCounterpartyFacts } from '../common/counterparty-facts';
 
 const MOVEMENT_INCLUDES = {
   category: { select: { id: true, name: true, type: true, color: true } },
-  counterparty: { select: { id: true, name: true, type: true } },
+  counterparty: { select: { id: true, name: true, type: true, taxId: true, giro: true } },
   costCenter: { select: { id: true, name: true, code: true } },
   fiscalPeriod: { select: { id: true, name: true, year: true, month: true } },
 };
@@ -59,7 +60,15 @@ export class MovementsService {
       this.prisma.movement.count({ where }),
     ]);
 
-    return paginate(data, total, page, limit);
+    return paginate(
+      data.map((movement) => ({
+        ...movement,
+        counterpartyFacts: resolveCounterpartyFacts(movement.counterparty),
+      })),
+      total,
+      page,
+      limit,
+    );
   }
 
   async findOne(id: string, companyId: string) {
@@ -68,7 +77,7 @@ export class MovementsService {
       include: MOVEMENT_INCLUDES,
     });
     if (!movement) throw new NotFoundException('Movement not found');
-    return movement;
+    return { ...movement, counterpartyFacts: resolveCounterpartyFacts(movement.counterparty) };
   }
 
   async create(companyId: string, userId: string, dto: CreateMovementDto) {

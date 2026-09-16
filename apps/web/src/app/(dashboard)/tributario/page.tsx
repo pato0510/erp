@@ -185,6 +185,7 @@ export default function TributarioPage() {
   const [isSummaryLoading, setIsSummaryLoading] = useState(true);
   const [isDocsLoading, setIsDocsLoading] = useState(true);
   const [syncingAction, setSyncingAction] = useState<'EMITIDO' | 'RECIBIDO' | 'ALL' | null>(null);
+  const [isBackfillingGiro, setIsBackfillingGiro] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -352,6 +353,24 @@ export default function TributarioPage() {
     loadSummary();
     loadDocuments();
     loadPending();
+  };
+
+  const handleBackfillGiro = async () => {
+    setIsBackfillingGiro(true);
+    try {
+      const { updated } = await apiClient.post<{ updated: number }>(
+        '/api/tax/counterparty-giro/backfill',
+        {},
+      );
+      setToast({ message: `Giros completados: ${updated}`, type: 'success' });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Error al recuperar giros desde SII',
+        type: 'error',
+      });
+    } finally {
+      setIsBackfillingGiro(false);
+    }
   };
 
   const handleSync = async (action: 'EMITIDO' | 'RECIBIDO' | 'ALL') => {
@@ -618,7 +637,7 @@ export default function TributarioPage() {
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => handleSync('EMITIDO')}
-            disabled={!!syncingAction}
+            disabled={!!syncingAction || isBackfillingGiro}
             className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 transition"
           >
             <RefreshCw size={14} className={syncingAction === 'EMITIDO' ? 'animate-spin' : ''} />
@@ -626,7 +645,7 @@ export default function TributarioPage() {
           </button>
           <button
             onClick={() => handleSync('RECIBIDO')}
-            disabled={!!syncingAction}
+            disabled={!!syncingAction || isBackfillingGiro}
             className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 transition"
           >
             <RefreshCw size={14} className={syncingAction === 'RECIBIDO' ? 'animate-spin' : ''} />
@@ -634,11 +653,20 @@ export default function TributarioPage() {
           </button>
           <button
             onClick={() => handleSync('ALL')}
-            disabled={!!syncingAction}
+            disabled={!!syncingAction || isBackfillingGiro}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
           >
             <RefreshCw size={14} className={syncingAction === 'ALL' ? 'animate-spin' : ''} />
             Sincronizar Todo
+          </button>
+          <button
+            onClick={handleBackfillGiro}
+            disabled={isBackfillingGiro || !!syncingAction}
+            aria-busy={isBackfillingGiro}
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 transition"
+          >
+            <RefreshCw size={14} className={isBackfillingGiro ? 'animate-spin' : ''} />
+            Recuperar giros desde SII
           </button>
         </div>
       </div>

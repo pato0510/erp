@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   CategoryType,
   CounterpartyType,
+  Counterparty,
   DocumentDirection,
   DocumentType,
   MovementSource,
@@ -14,7 +15,9 @@ import { RlsService } from '../common/rls/rls.service';
 import { DEFAULT_SII_PROVIDER, SiiProviderFactory } from './providers/sii-provider.factory';
 import { TaxDocumentResult } from './providers/sii-provider.interface';
 import { CategoryRulesService } from '../catalogs/category-rules.service';
-import { paginate } from '@erp/utils';
+import { cleanRut, paginate } from '@erp/utils';
+import { CounterpartyFactSource } from '../common/counterparty-facts';
+import { readCounterpartyGiro } from './counterparty-giro';
 
 const DEFAULT_PROVIDER = DEFAULT_SII_PROVIDER;
 
@@ -437,10 +440,26 @@ export class TaxService {
           direction: doc.direction,
         },
       },
-      select: { id: true },
+      select: { id: true, issuerRut: true, receiverRut: true },
     });
 
     if (existing) {
+      // Enrich a repeat sync when the provider now supplies a giro. Financial
+      // fields and the movement link keep their existing idempotent behavior.
+      const incomingRut =
+        doc.direction === DocumentDirection.EMITIDO ? doc.receiverRut : doc.issuerRut;
+      const existingRut =
+        doc.direction === DocumentDirection.EMITIDO ? existing.receiverRut : existing.issuerRut;
+      if (
+        cleanRut(incomingRut) &&
+        cleanRut(incomingRut) === cleanRut(existingRut) &&
+        readCounterpartyGiro(doc.metadata, doc.direction)
+      ) {
+        await tx.taxDocument.update({
+          where: { id: existing.id },
+          data: { metadata: doc.metadata as Prisma.InputJsonValue },
+        });
+      }
       return { id: existing.id, created: false };
     }
 
@@ -526,8 +545,7 @@ export class TaxService {
     direction: DocumentDirection,
     defaults: DefaultCategoryIds,
     companyId: string,
-    rut: string,
-    razonSocial: string,
+    counterparty: CounterpartyFactSource,
   ): Promise<string> {
     const movementType =
       direction === DocumentDirection.EMITIDO ? MovementType.INCOME : MovementType.EXPENSE;
@@ -538,8 +556,7 @@ export class TaxService {
        category — miscategorisation, not an error. */
     const ruleMatch = await this.categoryRulesService.applyRules(
       companyId,
-      rut,
-      razonSocial,
+      counterparty,
       movementType,
       tx,
     );
@@ -564,23 +581,100 @@ export class TaxService {
     rut: string,
     name: string,
     direction: DocumentDirection,
-  ): Promise<string> {
+    giro: string | null = null,
+  ): Promise<Pick<Counterparty, 'id' | 'name' | 'taxId' | 'giro'>> {
+    const select = { id: true, name: true, taxId: true, giro: true };
     const existing = await tx.counterparty.findUnique({
       where: { companyId_taxId: { companyId, taxId: rut } },
-      select: { id: true },
+      select,
     });
-    if (existing) return existing.id;
+    if (existing) {
+      if (giro && existing.giro === null) {
+        await tx.counterparty.updateMany({
+          where: { id: existing.id, companyId, giro: null },
+          data: { giro },
+        });
+        return tx.counterparty.findUniqueOrThrow({ where: { id: existing.id }, select });
+      }
+      return existing;
+    }
 
     const created = await tx.counterparty.create({
       data: {
         companyId,
         name,
         taxId: rut,
+        giro,
         type: direction === 'EMITIDO' ? CounterpartyType.CLIENT : CounterpartyType.SUPPLIER,
       },
-      select: { id: true },
+      select,
     });
-    return created.id;
+    return created;
+  }
+
+  /** Recover missing source facts only. Invoke explicitly with company/user
+   * context after migration; this is NOT a category backfill or a sync hook.
+   * Latest dated evidence wins for null giro; existing values stay untouched.
+   * Each page has its own RLS/audit transaction, with no global session SET. */
+  async backfillCounterpartyGiro(companyId: string, userId: string): Promise<number> {
+    let cursor: string | undefined;
+    let updated = 0;
+    for (;;) {
+      const page = await this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+        const documents = await tx.taxDocument.findMany({
+          where: { companyId, movementId: { not: null } },
+          orderBy: [{ issueDate: 'desc' }, { id: 'desc' }],
+          take: 100,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          select: {
+            id: true,
+            direction: true,
+            movementId: true,
+            issuerRut: true,
+            receiverRut: true,
+            metadata: true,
+          },
+        });
+        let count = 0;
+        for (const doc of documents) {
+          const giro = readCounterpartyGiro(doc.metadata, doc.direction);
+          if (!giro || !doc.movementId) continue;
+          const rut = doc.direction === DocumentDirection.EMITIDO ? doc.receiverRut : doc.issuerRut;
+          count += await this.fillLinkedCounterpartyGiro(tx, companyId, doc.movementId, rut, giro);
+        }
+        return { count, lastId: documents.at(-1)?.id, length: documents.length };
+      });
+      updated += page.count;
+      if (page.length < 100) return updated;
+      cursor = page.lastId;
+    }
+  }
+
+  private async fillLinkedCounterpartyGiro(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    movementId: string,
+    rut: string,
+    giro: string,
+  ): Promise<number> {
+    const movement = await tx.movement.findFirst({
+      where: { id: movementId, companyId },
+      select: { counterparty: { select: { id: true, companyId: true, taxId: true } } },
+    });
+    const counterparty = movement?.counterparty;
+    // Never attribute issuer/receiver data to a different linked entity.
+    if (
+      !counterparty ||
+      counterparty.companyId !== companyId ||
+      !cleanRut(rut) ||
+      cleanRut(counterparty.taxId) !== cleanRut(rut)
+    )
+      return 0;
+    const result = await tx.counterparty.updateMany({
+      where: { id: counterparty.id, companyId, giro: null },
+      data: { giro },
+    });
+    return result.count;
   }
 
   /**
@@ -611,22 +705,34 @@ export class TaxService {
         totalAmount: true,
         externalId: true,
         movementId: true,
+        metadata: true,
       },
     });
     if (!taxDoc) return false;
-    if (taxDoc.movementId) return false; // idempotency: already linked
-
     const isIncome = taxDoc.direction === DocumentDirection.EMITIDO;
     const counterpartyRut = isIncome ? taxDoc.receiverRut : taxDoc.issuerRut;
     const counterpartyName = isIncome ? taxDoc.receiverName : taxDoc.issuerName;
+    const giro = readCounterpartyGiro(taxDoc.metadata, taxDoc.direction);
+    if (taxDoc.movementId) {
+      if (giro)
+        await this.fillLinkedCounterpartyGiro(
+          tx,
+          companyId,
+          taxDoc.movementId,
+          counterpartyRut,
+          giro,
+        );
+      return false; // no duplicate movement and no recategorization on re-sync
+    }
 
-    const counterpartyId = await this.findOrCreateCounterparty(
+    const counterparty = await this.findOrCreateCounterparty(
       tx,
       companyId,
       userId,
       counterpartyRut,
       counterpartyName,
       taxDoc.direction,
+      giro,
     );
 
     const categoryId = await this.applyCategoryRules(
@@ -634,8 +740,7 @@ export class TaxService {
       taxDoc.direction,
       defaults,
       companyId,
-      counterpartyRut,
-      counterpartyName,
+      counterparty,
     );
 
     const typeLabel = DOCUMENT_TYPE_LABELS[taxDoc.type] ?? taxDoc.type;
@@ -646,7 +751,7 @@ export class TaxService {
         companyId,
         fiscalPeriodId,
         categoryId,
-        counterpartyId,
+        counterpartyId: counterparty.id,
         type: isIncome ? MovementType.INCOME : MovementType.EXPENSE,
         status: MovementStatus.CONFIRMED,
         source: MovementSource.TAX_SYNC,

@@ -17,7 +17,7 @@ import {
 import { apiClient } from '../../../../lib/api';
 import { Toast } from '../../../../components/shared/Toast';
 
-type RuleType = 'RUT' | 'KEYWORD' | 'DEFAULT';
+type RuleType = 'RUT' | 'GIRO' | 'KEYWORD' | 'DEFAULT';
 type MovementTypeFilter = 'INCOME' | 'EXPENSE' | 'BOTH';
 type CategoryType = 'INCOME' | 'EXPENSE';
 
@@ -59,7 +59,7 @@ type ModalState = null | { mode: 'create' } | { mode: 'edit'; rule: CategoryRule
 
 interface RuleDraft {
   name: string;
-  ruleType: 'RUT' | 'KEYWORD';
+  ruleType: 'RUT' | 'GIRO' | 'KEYWORD';
   matchValue: string;
   movementType: MovementTypeFilter;
   categoryId: string;
@@ -228,9 +228,11 @@ export default function CategoryRulesPage() {
               const ruleTypeBadge =
                 r.ruleType === 'RUT'
                   ? { label: 'RUT', cls: 'bg-blue-100 text-blue-700' }
-                  : r.ruleType === 'KEYWORD'
-                    ? { label: 'Palabra clave', cls: 'bg-purple-100 text-purple-700' }
-                    : { label: 'Por defecto', cls: 'bg-subtle text-fg' };
+                  : r.ruleType === 'GIRO'
+                    ? { label: 'Giro', cls: 'bg-purple-100 text-purple-700' }
+                    : r.ruleType === 'KEYWORD'
+                      ? { label: 'Palabra clave', cls: 'bg-purple-100 text-purple-700' }
+                      : { label: 'Por defecto', cls: 'bg-subtle text-fg' };
               return (
                 <li
                   key={r.id}
@@ -324,6 +326,7 @@ export default function CategoryRulesPage() {
 function TestPanel({ onError }: { onError: (m: string) => void }) {
   const [rut, setRut] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
+  const [giro, setGiro] = useState('');
   const [movementType, setMovementType] = useState<CategoryType>('INCOME');
   const [result, setResult] = useState<TestResult | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -338,6 +341,7 @@ function TestPanel({ onError }: { onError: (m: string) => void }) {
       const res = await apiClient.post<TestResult>('/api/category-rules/test', {
         rut: rut.trim(),
         razonSocial: razonSocial.trim(),
+        giro: giro.trim() || undefined,
         movementType,
       });
       setResult(res);
@@ -395,6 +399,20 @@ function TestPanel({ onError }: { onError: (m: string) => void }) {
             <option value="INCOME">Ingreso</option>
             <option value="EXPENSE">Egreso</option>
           </select>
+        </div>
+        <div>
+          <label htmlFor="test-giro" className="block text-xs text-fg-secondary mb-1 font-medium">
+            Giro (opcional)
+          </label>
+          <input
+            id="test-giro"
+            name="giro"
+            autoComplete="off"
+            value={giro}
+            onChange={(e) => setGiro(e.target.value)}
+            maxLength={200}
+            className="w-full px-3 py-2 text-sm border border-line rounded-lg bg-input text-fg focus-visible:ring-2 focus-visible:ring-accent"
+          />
         </div>
         <button
           onClick={test}
@@ -460,7 +478,7 @@ function RuleModal({
     if (initial) {
       return {
         name: initial.name,
-        ruleType: initial.ruleType === 'KEYWORD' ? 'KEYWORD' : 'RUT',
+        ruleType: initial.ruleType === 'DEFAULT' ? 'RUT' : initial.ruleType,
         matchValue: initial.matchValue ?? '',
         movementType: initial.movementType,
         categoryId: initial.categoryId,
@@ -492,9 +510,11 @@ function RuleModal({
     }
     if (!draft.matchValue.trim()) {
       onError(
-        draft.ruleType === 'RUT'
-          ? 'Ingresa el RUT a coincidir.'
-          : 'Ingresa la palabra clave a buscar.',
+        draft.ruleType === 'GIRO'
+          ? 'Ingresa el texto del giro a buscar.'
+          : draft.ruleType === 'RUT'
+            ? 'Ingresa el RUT a buscar.'
+            : 'Ingresa la palabra clave a buscar.',
       );
       return;
     }
@@ -562,37 +582,54 @@ function RuleModal({
 
           <Field label="Tipo de regla">
             <div className="flex gap-2">
-              {(['RUT', 'KEYWORD'] as const).map((t) => (
+              {(['RUT', 'GIRO', 'KEYWORD'] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setDraft({ ...draft, ruleType: t })}
+                  aria-pressed={draft.ruleType === t}
                   className={`flex-1 px-3 py-2 text-sm rounded-lg border transition ${
                     draft.ruleType === t
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-card-solid text-fg border-line hover:bg-subtle-hover'
                   }`}
                 >
-                  {t === 'RUT' ? 'Por RUT' : 'Por palabra clave'}
+                  {t === 'RUT' ? 'Por RUT' : t === 'GIRO' ? 'Giro contiene' : 'Por palabra clave'}
                 </button>
               ))}
             </div>
           </Field>
 
           <Field
+            htmlFor="rule-match-value"
             label={
-              draft.ruleType === 'RUT' ? 'RUT de la contraparte' : 'Palabra clave en razón social'
+              draft.ruleType === 'RUT'
+                ? 'RUT de la contraparte'
+                : draft.ruleType === 'GIRO'
+                  ? 'Giro'
+                  : 'Palabra clave en razón social'
             }
             help={
               draft.ruleType === 'RUT'
-                ? 'Formato: XX.XXX.XXX-X'
-                : 'Ejemplo: ARRIENDO, SERVICIOS, etc.'
+                ? 'Coincidencia exacta. Formato: XX.XXX.XXX-X'
+                : draft.ruleType === 'GIRO'
+                  ? 'Contiene. Ignora mayúsculas y tildes.'
+                  : 'Ejemplo: ARRIENDO, SERVICIOS, etc.'
             }
           >
             <input
+              id="rule-match-value"
+              name="matchValue"
+              aria-describedby="rule-match-value-help"
               value={draft.matchValue}
               onChange={(e) => setDraft({ ...draft, matchValue: e.target.value })}
-              placeholder={draft.ruleType === 'RUT' ? '76.123.456-7' : 'ARRIENDO'}
+              placeholder={
+                draft.ruleType === 'RUT'
+                  ? '76.123.456-7'
+                  : draft.ruleType === 'GIRO'
+                    ? 'Construcción'
+                    : 'ARRIENDO'
+              }
               className="w-full px-3 py-2 text-sm border border-line rounded-lg"
               style={
                 draft.ruleType === 'RUT'
@@ -688,17 +725,28 @@ function RuleModal({
 function Field({
   label,
   help,
+  htmlFor,
   children,
 }: {
   label: string;
   help?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="block text-xs text-fg-secondary mb-1.5 font-medium">{label}</label>
+      <label htmlFor={htmlFor} className="block text-xs text-fg-secondary mb-1.5 font-medium">
+        {label}
+      </label>
       {children}
-      {help && <p className="mt-1 text-[11px] text-fg-muted">{help}</p>}
+      {help && (
+        <p
+          id={htmlFor ? `${htmlFor}-help` : undefined}
+          className={`mt-1 text-[11px] ${htmlFor ? 'text-fg-secondary' : 'text-fg-muted'}`}
+        >
+          {help}
+        </p>
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ interface Counterparty {
   name: string;
   type: CounterpartyType;
   taxId?: string | null;
+  giro?: string | null;
   email?: string | null;
   phone?: string | null;
   address?: string | null;
@@ -110,6 +111,7 @@ export default function ContrapartesPage() {
     name: string;
     type: CounterpartyType;
     taxId?: string;
+    giro?: string | null;
     email?: string;
     phone?: string;
     address?: string;
@@ -390,6 +392,7 @@ function CounterpartyModal({
     name: string;
     type: CounterpartyType;
     taxId?: string;
+    giro?: string | null;
     email?: string;
     phone?: string;
     address?: string;
@@ -401,6 +404,7 @@ function CounterpartyModal({
   const [name, setName] = useState(initial?.name ?? '');
   const [type, setType] = useState<CounterpartyType>(initial?.type ?? 'CLIENT');
   const [taxId, setTaxId] = useState(initial?.taxId ?? '');
+  const [giro, setGiro] = useState(initial?.giro ?? '');
   const [email, setEmail] = useState(initial?.email ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
@@ -416,6 +420,7 @@ function CounterpartyModal({
         name: name.trim(),
         type,
         taxId: taxId.trim() || undefined,
+        giro: giro.trim() || null,
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
@@ -468,6 +473,16 @@ function CounterpartyModal({
                 placeholder="76.123.456-7"
                 className="cp-input mono"
                 style={{ fontFamily: 'var(--font-jetbrains-mono), monospace' }}
+              />
+            </Field>
+            <Field label="Giro" htmlFor="counterparty-giro">
+              <input
+                id="counterparty-giro"
+                name="giro"
+                value={giro}
+                onChange={(e) => setGiro(e.target.value)}
+                maxLength={200}
+                className="cp-input"
               />
             </Field>
             <Field label="Email">
@@ -537,15 +552,18 @@ function CounterpartyModal({
 function Field({
   label,
   required,
+  htmlFor,
   children,
 }: {
   label: string;
   required?: boolean;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
       <label
+        htmlFor={htmlFor}
         className="block mb-1.5 text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500, fontSize: 13 }}
       >

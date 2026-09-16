@@ -121,14 +121,42 @@ Endpoints:
 
 EMITIDO → INCOME categoría "Ingresos por Ventas"
 RECIBIDO → EXPENSE categoría "Productos no categorizados"
-Aplica reglas de categorización (RUT primero, keyword después)
+Aplica reglas de categorización (`RUT` → `GIRO` → `KEYWORD`)
 Estado CONFIRMED, idempotente vía taxDoc.movementId
 
 ## Categorización por reglas
 
-Tabla CategoryRule con tipos RUT | KEYWORD | DEFAULT
+Tabla `CategoryRule` con tipos `RUT` | `GIRO` | `KEYWORD` | `DEFAULT`
 Pantalla /categorias/reglas con CRUD + panel de prueba
 Aplicado en sync SII y disponible para uso manual
+
+## FIN-A — RUT y giro de la contraparte (2026-09-16)
+
+- `Counterparty.giro` es un dato fuente nullable: sync lee `giroemis` (recibido)
+  o `girorecep` (emitido) desde `metadata.raw`, según la dirección del documento.
+  El RUT se resuelve desde `Counterparty.taxId`; `resolveCounterpartyFacts()`
+  comparte esa resolución entre reglas, movimientos y exportación.
+- Giro editable manualmente en `/contrapartes` (máximo 200 caracteres, recortado;
+  vacío → `null`). Sync y backfill completan solo `giro: null`, sin sobrescribir
+  un valor manual ni cambiar categorías de movimientos existentes.
+- `POST /api/tax/counterparty-giro/backfill` y botón «Recuperar giros desde SII»
+  en `/tributario`: recuperación idempotente desde documentos almacenados,
+  con `executeWithRls` y el mismo permiso `update` sobre `Movement` que sync.
+  Devuelve `{ updated: number }` y muestra «Giros completados: N».
+- Una condición por regla, en `ruleType` + `matchValue`: precedencia
+  `RUT` → `GIRO` → `KEYWORD`, luego prioridad descendente y fecha de creación.
+  `GIRO` busca una subcadena con normalización `NFD`, sin diacríticos y en
+  minúsculas `es-CL`; giro nulo no coincide. `DEFAULT` sigue sin evaluarse.
+  No hay columnas adicionales de criterios en `CategoryRule`.
+- RUT y Giro aparecen después de Contraparte en la tabla `/movimientos` y en
+  el XLSX; valores ausentes quedan vacíos en la exportación.
+- **Pregunta abierta:** no está confirmado que las filas RCV de BaseAPI traigan
+  giro (el dato vive en el XML DTE). El conteo del backfill después del deploy
+  permitirá comprobarlo sobre los documentos almacenados; puede devolver cero.
+  **FIN-B:** las reglas `GIRO` solo coinciden con contrapartes que tengan giro,
+  obtenido de SII o ingresado manualmente.
+
+Última actualización: 2026-09-16 (FIN-A)
 
 ═══════════════════════════════════════════════════════════════════
 
