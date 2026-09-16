@@ -7,6 +7,8 @@ import { ACCOUNT_STATUSES, PRIORITIES, PRIORITY_LABELS, STATUS_LABELS } from './
 // MKT-006 — campaign status labels for the "Campaña de origen" option text. Aliased to
 // avoid clashing with the account STATUS_LABELS above.
 import { STATUS_LABELS as CAMPAIGN_STATUS_LABELS } from '../marketing/campaignLabels';
+// COM-018 — the parent-enterprise select (with the inline "Crear empresa" affordance).
+import { EnterpriseSelect } from './EnterpriseSelect';
 
 interface CampaignOption {
   id: string;
@@ -28,6 +30,7 @@ export interface AccountForForm {
   paymentTermDays: number;
   notes: string | null;
   sourceCampaignId: string | null; // MKT-006 — attribution ("Campaña de origen")
+  enterpriseId: string | null; // COM-018 — optional parent enterprise
 }
 
 /* COM-014 — the client payment terms AGS uses. Values ARE the day counts (the API and the
@@ -54,6 +57,7 @@ export function AccountFormModal({
   const [paymentTermDays, setPaymentTermDays] = useState<number>(editing?.paymentTermDays ?? 30);
   const [notes, setNotes] = useState(editing?.notes ?? '');
   const [sourceCampaignId, setSourceCampaignId] = useState(editing?.sourceCampaignId ?? '');
+  const [enterpriseId, setEnterpriseId] = useState(editing?.enterpriseId ?? '');
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -85,6 +89,9 @@ export function AccountFormModal({
       // MKT-006 — null clears the attribution; a uuid is validated company-scoped by the
       // backend. Sent on both create and edit.
       sourceCampaignId: sourceCampaignId || null,
+      // COM-018 — null clears the parent link; a uuid is validated (company + active) by the
+      // backend. Sent on both create and edit.
+      enterpriseId: enterpriseId || null,
     };
     try {
       if (editing) await apiClient.patch(`/api/comercial/accounts/${editing.id}`, body);
@@ -151,6 +158,9 @@ export function AccountFormModal({
               </select>
             </Field>
           </div>
+          <Field label="Empresa">
+            <EnterpriseSelect mode="form" value={enterpriseId} onChange={setEnterpriseId} />
+          </Field>
           <Field label="Industria">
             <input
               value={industry}

@@ -4,6 +4,7 @@ import {
   ActivitySubject,
   AvailabilitySubject,
   ContactSubject,
+  EnterpriseSubject,
   OpportunityDocumentSubject,
   OpportunityNoteSubject,
   OpportunitySubject,
@@ -66,6 +67,7 @@ export class ComercialController {
         | typeof AccountSubject
         | typeof ActivitySubject
         | typeof ContactSubject
+        | typeof EnterpriseSubject
         | typeof OpportunityDocumentSubject
         | typeof OpportunityNoteSubject
         | typeof OpportunitySubject
@@ -79,6 +81,9 @@ export class ComercialController {
     });
     return {
       account: flagsFor(AccountSubject),
+      // COM-018 — the client's parent company; mirror of account (no manageAny —
+      // enterprises have no author rule). Gates the "Crear empresa" affordance.
+      enterprise: flagsFor(EnterpriseSubject),
       contact: flagsFor(ContactSubject),
       // COM-007 — the kanban gates drag/create/close/reopen on opportunity.update
       // (MANAGER/ADMIN/SUPER_ADMIN); ACCOUNTANT reads the board but sees no controls.

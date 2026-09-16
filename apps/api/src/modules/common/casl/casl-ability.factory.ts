@@ -51,6 +51,7 @@ type Subjects =
       | typeof EmployeeCompensationSubject
       | typeof JobPositionSubject
       | typeof AccountSubject
+      | typeof EnterpriseSubject
       | typeof ContactSubject
       | typeof OpportunitySubject
       | typeof ActivitySubject
@@ -255,6 +256,12 @@ class JobPositionSubject {
 class AccountSubject {
   static readonly modelName = 'Account' as const;
 }
+/* COM-018 — the client's parent company (Enterprise ≠ Company, the tenant). Grants MIRROR
+   AccountSubject role by role, action by action (grant-by-enumeration doctrine): VIEWER has
+   no grant on Account, so it has none here. No author rule — no `manage` semantics. */
+class EnterpriseSubject {
+  static readonly modelName = 'Enterprise' as const;
+}
 class ContactSubject {
   static readonly modelName = 'Contact' as const;
 }
@@ -369,6 +376,7 @@ const RRHH_COMPENSATION_SUBJECTS = [
    Comercial data until a later ticket grants it per-entity. */
 const COMERCIAL_SUBJECTS = [
   AccountSubject,
+  EnterpriseSubject,
   ContactSubject,
   OpportunitySubject,
   ActivitySubject,
@@ -494,6 +502,7 @@ export {
   EmployeeCompensationSubject,
   JobPositionSubject,
   AccountSubject,
+  EnterpriseSubject,
   ContactSubject,
   OpportunitySubject,
   ActivitySubject,
@@ -614,6 +623,8 @@ export class CaslAbilityFactory {
         can(['create', 'update', 'delete'], ServiceCatalogSubject);
         /* COM-003 — accounts (CRM core): MANAGER is the commercial role → full CRUD. */
         can(['read', 'create', 'update', 'delete'], AccountSubject);
+        /* COM-018 — enterprises mirror the account profile → full CRUD. */
+        can(['read', 'create', 'update', 'delete'], EnterpriseSubject);
         /* COM-004 — contacts share the account permission profile → full CRUD. */
         can(['read', 'create', 'update', 'delete'], ContactSubject);
         /* COM-005 — opportunities (pipeline core) share the same profile → full CRUD. */
@@ -689,6 +700,8 @@ export class CaslAbilityFactory {
         /* COM-003 — accounts: ACCOUNTANT gets READ-ONLY portfolio visibility (same
            rationale as its RRHH financial read). No create/update/delete. */
         can('read', AccountSubject);
+        /* COM-018 — enterprises mirror accounts: ACCOUNTANT read-only. No write. */
+        can('read', EnterpriseSubject);
         /* COM-004 — contacts share the account read profile. Read-only, no write. */
         can('read', ContactSubject);
         /* COM-005 — opportunities: ACCOUNTANT read-only (pipeline visibility). No write. */

@@ -58,6 +58,12 @@ export class CreateAccountDto {
   @IsUUID()
   sourceCampaignId?: string;
 
+  // COM-018 — optional parent Enterprise (the client's company). Validated company-scoped
+  // AND active in the service; null (on update) clears the link.
+  @IsOptional()
+  @IsUUID()
+  enterpriseId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(2000)

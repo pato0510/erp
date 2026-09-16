@@ -517,12 +517,13 @@ QA doc: docs/EXCELSIA-RRHH-QA-PRE-DESBLOQUEO.md
 ═══════════════════════════════════════════════════════════════════
 
 Status: V1 completo (COM-001…COM-015), desplegado y visible en /modulos.
-Post-V1: COM-016 (notas internas de oportunidad) y COM-017 (documentos adjuntos
-de oportunidad), 2026-09-15 — ver bloques abajo.
+Post-V1: COM-016 (notas internas de oportunidad), COM-017 (documentos adjuntos
+de oportunidad) y COM-018 (Cuentas v2: Enterprise + columnas + acordeón),
+2026-09-15 — ver bloques abajo.
 Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
-Tablas: service_catalog, accounts, contacts, opportunities,
+Tablas: service_catalog, enterprises, accounts, contacts, opportunities,
 opportunity_services, activities, opportunity_notes, opportunity_documents,
 quotes, quote_lines
 (+ service_orders en Operaciones, target del handoff COM-013a).
@@ -633,8 +634,53 @@ Puntos clave:
   dependencias; `prefers-reduced-motion` desactiva todo; la entrada se
   reproduce en cada montaje del hub. Archivos: `app/page.tsx`,
   `app/modulos/page.tsx`, `global.css`.
+- COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
+  = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
+  Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
+  Tabla `enterprises` (migración hand-authored `20260916140000_add_enterprises`
+  con los cinco bloques invariantes: tabla + índices, ENABLE RLS, política
+  `enterprise_isolation` con la MISMA expresión que
+  `opportunity_document_isolation`, GRANT `app_user`, trigger
+  `audit_enterprises`; después `ALTER TABLE accounts ADD COLUMN "enterpriseId"`
+  - FK `accounts_enterpriseId_fkey` ON DELETE SET NULL + índice). UNICIDAD EN
+    LA MIGRACIÓN, no en Prisma (no puede expresarla): índice único
+    `(companyId, lower(name))` e índice único PARCIAL `(companyId, rut) WHERE rut
+IS NOT NULL`; el service pre-chequea (409 en español, nombre
+    case-insensitive / RUT) y atrapa P2002 como respaldo de carrera (estilo
+    bicapa de `incident-persons.service`). `rut` opcional, normalizado con
+    `cleanRut` y validado Módulo-11 (400) — idioma de `employees.service`. SIN
+    DELETE: desactivar es PATCH `isActive=false` y las cuentas conservan el
+    vínculo. Vínculo en accounts OPCIONAL (`enterpriseId`, SET NULL): al crear/
+    editar se valida que la empresa exista en la company Y esté activa (400);
+    `null` limpia. NO es la pregunta del holding AGS/EMSERVI (V2). CASL:
+    `EnterpriseSubject` ESPEJA `AccountSubject` rol a rol (MANAGER CRUD,
+    ACCOUNTANT read, ANALYST/VIEWER nada); flag `enterprise` en
+    /comercial/permissions (sin manageAny — no hay regla de autor). Endpoints
+    `/comercial/enterprises` (GET ?q&includeInactive · POST · PATCH :id), todos
+    con `@CheckPolicies`. LISTA DE CUENTAS: GET gana `?enterpriseId` /
+    `?noEnterprise=true` (excluyentes → 400), incluye `enterprise { id, name }`
+    por fila y `lastMovementAt` — ÚLTIMO MOVIMIENTO DERIVADO, jamás almacenado ni
+    cacheado: UNA query raw por página (`Prisma.sql` + `$queryRaw`, sin N+1) con
+    `GREATEST` de max(`opportunities.updatedAt`), max(`activities.createdAt`),
+    max(`opportunity_notes.createdAt`) y max(`opportunity_documents.createdAt`
+    vivos) — los documentos de COM-017 se SUMAN a las tres fuentes de D3 porque
+    subir un archivo ES una acción; `WHERE a."companyId" = $1::uuid AND a.id =
+ANY($2::uuid[])` (doctrina: el SQL crudo SIEMPRE lleva el filtro explícito de
+    company, precedente HARDEN). La lista NO tiene paginación ni orden
+    server-side (name asc): ordenar por último movimiento es solo client-side en
+    V1. FE: columnas "Nombre de la cuenta · Empresa · Estado · Prioridad ·
+    Responsable · Creado (createdAt, reemplaza Actualizado) · Último movimiento"
+    (la columna Industria salió del listado; sigue en la ficha); filtro "Empresa"
+    (Todas / Sin empresa / una) vía `EnterpriseSelect` (componente reutilizable
+    con "Crear empresa" inline gateado en `enterprise.create`, también en
+    `AccountFormModal`); click en la fila (o Enter/Espacio con foco, fila
+    `role="button"` + `aria-expanded`/`aria-controls`) abre un ACORDEÓN inline con
+    `ActivityTimeline scope="account"` (que ya soportaba el scope; canWrite =
+    flags de activity; lazy al primer abrir, una fila abierta a la vez) + link
+    "Ver cuenta"; la fila ya no navega a la ficha. La ficha muestra "Empresa:
+    <nombre>" (solo lectura; se edita en el formulario).
 
-Última actualización: 2026-09-15 (COM-017 + UI-002)
+Última actualización: 2026-09-15 (COM-018)
 
 ═══════════════════════════════════════════════════════════════════
 

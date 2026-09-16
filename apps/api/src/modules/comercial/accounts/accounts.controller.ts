@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -26,7 +27,9 @@ import { UpdateAccountDto } from './dto/update-account.dto';
  * SUPER_ADMIN. DELETE is a soft-deactivate (status INACTIVA). Linking a
  * counterparty happens via update and is company-scoped (cross-company links are
  * rejected); accounts NEVER create a counterparty. Writes run through
- * executeWithRls; reads are company-scoped. */
+ * executeWithRls; reads are company-scoped.
+ * COM-018 — the list gains ?enterpriseId / ?noEnterprise=true (mutually exclusive), an
+ * `enterprise { id, name }` per row and the DERIVED `lastMovementAt` (never stored). */
 @Controller('comercial/accounts')
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 export class AccountsController {
@@ -39,11 +42,19 @@ export class AccountsController {
     @Query('status') status?: string,
     @Query('priority') priority?: string,
     @Query('search') search?: string,
+    @Query('enterpriseId') enterpriseId?: string,
+    @Query('noEnterprise') noEnterprise?: string,
   ) {
+    const withoutEnterprise = noEnterprise === 'true';
+    if (enterpriseId && withoutEnterprise) {
+      throw new BadRequestException('enterpriseId y noEnterprise son excluyentes.');
+    }
     return this.service.findAll(companyId, {
       status: status ? (status as AccountStatus) : undefined,
       priority: priority ? (priority as AccountPriority) : undefined,
       search: search || undefined,
+      enterpriseId: enterpriseId || undefined,
+      noEnterprise: withoutEnterprise || undefined,
     });
   }
 

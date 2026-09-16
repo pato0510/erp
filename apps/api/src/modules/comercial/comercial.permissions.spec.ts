@@ -22,6 +22,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
     for (const role of [UserRole.SUPER_ADMIN, UserRole.ADMIN]) {
       const p = perms(role);
       expect(p.account).toEqual(FULL);
+      expect(p.enterprise).toEqual(FULL); // COM-018 — mirror of account
       expect(p.contact).toEqual(FULL);
       expect(p.opportunity).toEqual(FULL);
       expect(p.activity).toEqual(FULL);
@@ -36,6 +37,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
   it('MANAGER: full CRUD on account/contact/opportunity/activity/quote/serviceCatalog + availability read', () => {
     const p = perms(UserRole.MANAGER);
     expect(p.account).toEqual(FULL);
+    expect(p.enterprise).toEqual(FULL); // COM-018
     expect(p.contact).toEqual(FULL);
     expect(p.opportunity).toEqual(FULL);
     expect(p.activity).toEqual(FULL);
@@ -49,6 +51,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
   it('ACCOUNTANT: read-only on account/contact/opportunity/activity/quote/serviceCatalog; NO availability (deliberate)', () => {
     const p = perms(UserRole.ACCOUNTANT);
     expect(p.account).toEqual(READ_ONLY);
+    expect(p.enterprise).toEqual(READ_ONLY); // COM-018
     expect(p.contact).toEqual(READ_ONLY);
     expect(p.opportunity).toEqual(READ_ONLY); // COM-007 — sees the board, cannot mutate
     expect(p.activity).toEqual(READ_ONLY); // COM-008 — sees timelines, cannot register/edit/delete
@@ -62,6 +65,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
   it('ANALYST: no account/contact/opportunity/activity/quote/availability; serviceCatalog read-only', () => {
     const p = perms(UserRole.ANALYST);
     expect(p.account).toEqual(NONE);
+    expect(p.enterprise).toEqual(NONE); // COM-018
     expect(p.contact).toEqual(NONE);
     expect(p.opportunity).toEqual(NONE); // floored — the board 403s (sin-permiso state)
     expect(p.activity).toEqual(NONE); // floored — never reaches the timeline
@@ -75,6 +79,7 @@ describe('COM-004b ComercialController.permissions — ability-derived flags', (
   it('VIEWER: no account/contact/opportunity/activity/quote/availability; serviceCatalog read-only', () => {
     const p = perms(UserRole.VIEWER);
     expect(p.account).toEqual(NONE);
+    expect(p.enterprise).toEqual(NONE); // COM-018
     expect(p.contact).toEqual(NONE);
     expect(p.opportunity).toEqual(NONE);
     expect(p.activity).toEqual(NONE);
@@ -132,6 +137,19 @@ describe('COM-017 ComercialController.permissions — opportunityDocument mirror
     for (const role of Object.values(UserRole)) {
       const expected = role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
       expect(perms(role).opportunityDocument.manageAny).toBe(expected);
+    }
+  });
+});
+
+/* COM-018 — enterprise MIRRORS account cell by cell for every role. */
+describe('COM-018 ComercialController.permissions — enterprise mirrors account', () => {
+  const factory = new CaslAbilityFactory();
+  const controller = new ComercialController({} as never);
+  const perms = (role: UserRole) => controller.permissions(factory.defineAbilityFor(role));
+
+  it('enterprise flags equal account flags for every role', () => {
+    for (const role of Object.values(UserRole)) {
+      expect(perms(role).enterprise).toEqual(perms(role).account);
     }
   });
 });

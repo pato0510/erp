@@ -4,10 +4,16 @@
  * edit modal + soft-deactivate. Clones the RRHH cargos table markup and the
  * standard modal overlay. Write controls are role-gated (useCanWrite); ANALYST/
  * VIEWER get a 403 from the list and see a clean "sin permiso" state. Tokens:
- * accent #2563eb, Outfit headings. */
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Ban, Link2, Pencil, Plus } from 'lucide-react';
+ * accent #2563eb, Outfit headings.
+ * COM-018 — columns: Nombre de la cuenta · Empresa · Estado · Prioridad · Responsable ·
+ * Creado · Último movimiento (DERIVED by the API, "—" when null; no server-side sort on
+ * it in V1). "Empresa" filter (all / sin empresa / one). Row click (or Enter/Space on the
+ * focused row, aria-expanded) toggles an inline accordion with the account's activities
+ * (ActivityTimeline scope="account", lazy on first open, one row open at a time) and a
+ * "Ver cuenta" link; the ficha is no longer the row's click target. */
+import { Fragment, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Ban, ChevronDown, ChevronRight, ExternalLink, Link2, Pencil, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { formatDate } from '../../../../lib/formatters';
 import { useCanWrite } from '../../../../hooks/useCanWrite';
@@ -19,6 +25,8 @@ import {
   StatusBadge,
 } from '../../../../components/comercial/accountLabels';
 import { AccountFormModal } from '../../../../components/comercial/AccountFormModal';
+import { ActivityTimeline } from '../../../../components/comercial/ActivityTimeline';
+import { EnterpriseSelect, NO_ENTERPRISE } from '../../../../components/comercial/EnterpriseSelect';
 
 interface AccountRow {
   id: string;
@@ -31,13 +39,28 @@ interface AccountRow {
   ownerId: string | null;
   counterpartyId: string | null;
   sourceCampaignId: string | null; // MKT-006 — feeds AccountFormModal's "Campaña de origen"
+  enterpriseId: string | null; // COM-018 — feeds AccountFormModal's "Empresa"
+  enterprise: { id: string; name: string } | null; // COM-018 — included by the list
+  lastMovementAt: string | null; // COM-018 — derived by the API, never stored
   notes: string | null;
+  createdAt: string;
   updatedAt: string;
 }
 
+const COLUMNS = [
+  'Nombre de la cuenta',
+  'Empresa',
+  'Estado',
+  'Prioridad',
+  'Responsable',
+  'Creado',
+  'Último movimiento',
+];
+
 export default function CuentasPage() {
-  const router = useRouter();
   const canWrite = useCanWrite();
+  // COM-018 — the accordion's timeline gates Registrar/Editar/Eliminar on the activity flags.
+  const canWriteActivity = useCanWrite('activity');
   const [rows, setRows] = useState<AccountRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +68,8 @@ export default function CuentasPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [enterpriseFilter, setEnterpriseFilter] = useState(''); // '' | NO_ENTERPRISE | id
+  const [expandedId, setExpandedId] = useState<string | null>(null); // one row open at a time
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AccountRow | null>(null);
 
@@ -54,6 +79,8 @@ export default function CuentasPage() {
     if (statusFilter) params.set('status', statusFilter);
     if (priorityFilter) params.set('priority', priorityFilter);
     if (search.trim()) params.set('search', search.trim());
+    if (enterpriseFilter === NO_ENTERPRISE) params.set('noEnterprise', 'true');
+    else if (enterpriseFilter) params.set('enterpriseId', enterpriseFilter);
     const qs = params.toString();
     apiClient
       .get<AccountRow[]>(`/api/comercial/accounts${qs ? `?${qs}` : ''}`)
@@ -67,11 +94,13 @@ export default function CuentasPage() {
         else setError('No se pudieron cargar las cuentas.');
       })
       .finally(() => setIsLoading(false));
-  }, [statusFilter, priorityFilter, search]);
+  }, [statusFilter, priorityFilter, search, enterpriseFilter]);
 
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
+
+  const toggleRow = (id: string) => setExpandedId((cur) => (cur === id ? null : id));
 
   const deactivate = async (a: AccountRow, ev: React.MouseEvent) => {
     ev.stopPropagation();
@@ -123,7 +152,7 @@ export default function CuentasPage() {
     );
   }
 
-  const cols = canWrite ? 7 : 6;
+  const cols = COLUMNS.length + (canWrite ? 1 : 0);
 
   return (
     <div className="pt-2">
@@ -161,6 +190,13 @@ export default function CuentasPage() {
             </option>
           ))}
         </select>
+        {/* COM-018 — "Empresa" filter: Todas / Sin empresa (→ noEnterprise=true) / one. */}
+        <EnterpriseSelect
+          mode="filter"
+          value={enterpriseFilter}
+          onChange={setEnterpriseFilter}
+          className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
+        />
       </div>
 
       {error && (
@@ -174,16 +210,14 @@ export default function CuentasPage() {
         <table className="w-full text-sm">
           <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
-              {['Nombre', 'Estado', 'Prioridad', 'Industria', 'Ejecutivo', 'Actualizado'].map(
-                (h) => (
-                  <th
-                    key={h}
-                    className="label px-4 py-3 text-left text-[11px] uppercase tracking-wider text-[var(--text-secondary)]"
-                  >
-                    {h}
-                  </th>
-                ),
-              )}
+              {COLUMNS.map((h) => (
+                <th
+                  key={h}
+                  className="label px-4 py-3 text-left text-[11px] uppercase tracking-wider text-[var(--text-secondary)]"
+                >
+                  {h}
+                </th>
+              ))}
               {canWrite && (
                 <th className="label px-4 py-3 text-right text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
                   Acciones
@@ -212,69 +246,125 @@ export default function CuentasPage() {
                 </td>
               </tr>
             ) : (
-              rows.map((a) => (
-                <tr
-                  key={a.id}
-                  className="cursor-pointer hover:bg-black/[0.02]"
-                  onClick={() => router.push(`/comercial/cuentas/${a.id}`)}
-                >
-                  <td className="px-4 py-3 font-medium text-[var(--text-primary)]">
-                    {a.name}
-                    {a.counterpartyId && (
-                      <span
-                        className="ml-2 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]"
-                        style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--color-accent)' }}
-                        title="Vinculada a un tercero de Finanzas (facturable)"
-                      >
-                        <Link2 size={10} />
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={a.status} />
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)]">
-                    {PRIORITY_LABELS[a.priority] ?? a.priority}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)]">{a.industry ?? '—'}</td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)]">
-                    {a.ownerId ? (
-                      <span className="font-mono text-[11px]" title={a.ownerId}>
-                        {a.ownerId.slice(0, 8)}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)]">
-                    {formatDate(a.updatedAt)}
-                  </td>
-                  {canWrite && (
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            setEditing(a);
-                            setModalOpen(true);
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                        >
-                          <Pencil size={13} /> Editar
-                        </button>
-                        {a.status !== 'INACTIVA' && (
-                          <button
-                            onClick={(ev) => deactivate(a, ev)}
-                            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-xs text-red-600 hover:bg-red-50"
-                          >
-                            <Ban size={13} /> Desactivar
-                          </button>
+              rows.map((a) => {
+                const expanded = expandedId === a.id;
+                const panelId = `account-activities-${a.id}`;
+                return (
+                  <Fragment key={a.id}>
+                    <tr
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expanded}
+                      aria-controls={panelId}
+                      className="cursor-pointer hover:bg-black/[0.02] focus:outline-none focus-visible:bg-subtle"
+                      onClick={() => toggleRow(a.id)}
+                      onKeyDown={(e) => {
+                        // Only when the ROW itself is focused — buttons inside keep their own keys.
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleRow(a.id);
+                        }
+                      }}
+                    >
+                      <td className="px-4 py-3 font-medium text-[var(--text-primary)]">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-[var(--text-secondary)]" aria-hidden="true">
+                            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          </span>
+                          {a.name}
+                          {a.counterpartyId && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]"
+                              style={{
+                                background: 'rgba(37,99,235,0.1)',
+                                color: 'var(--color-accent)',
+                              }}
+                              title="Vinculada a un tercero de Finanzas (facturable)"
+                            >
+                              <Link2 size={10} />
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">
+                        {a.enterprise?.name ?? '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={a.status} />
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">
+                        {PRIORITY_LABELS[a.priority] ?? a.priority}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">
+                        {a.ownerId ? (
+                          <span className="font-mono text-[11px]" title={a.ownerId}>
+                            {a.ownerId.slice(0, 8)}
+                          </span>
+                        ) : (
+                          '—'
                         )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">
+                        {formatDate(a.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">
+                        {a.lastMovementAt ? formatDate(a.lastMovementAt) : '—'}
+                      </td>
+                      {canWrite && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                setEditing(a);
+                                setModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                            >
+                              <Pencil size={13} /> Editar
+                            </button>
+                            {a.status !== 'INACTIVA' && (
+                              <button
+                                onClick={(ev) => deactivate(a, ev)}
+                                className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                              >
+                                <Ban size={13} /> Desactivar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                    {/* COM-018 — inline accordion: the account's activities (newest-first) +
+                        "Ver cuenta". Mounted only while open → lazy on first open. */}
+                    {expanded && (
+                      <tr id={panelId}>
+                        <td colSpan={cols} className="bg-subtle px-4 py-4">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                              Actividad de {a.name}
+                            </p>
+                            <Link
+                              href={`/comercial/cuentas/${a.id}`}
+                              onClick={(ev) => ev.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-sm font-medium hover:underline"
+                              style={{ color: 'var(--color-accent)' }}
+                            >
+                              Ver cuenta <ExternalLink size={13} />
+                            </Link>
+                          </div>
+                          <ActivityTimeline
+                            scope="account"
+                            scopeId={a.id}
+                            canWrite={canWriteActivity}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })
             )}
           </tbody>
         </table>

@@ -119,3 +119,156 @@ describe('CreateAccountDto — paymentTermDays validation (COM-014)', () => {
     expect(termError(await validateDto({ name: 'X' }))).toBeUndefined();
   });
 });
+
+/* COM-018 — enterprise link + list enrichment. A separate stateful fake (the COM-003 one
+ * above is fixed-shape) with an enterprise table, a findMany that honors the
+ * enterpriseId / noEnterprise filters, and a mocked $queryRaw for the DERIVED
+ * lastMovementAt (asserted to run ONCE per list call with the companyId and the page ids). */
+describe('AccountsService — COM-018 enterprise link + lastMovementAt', () => {
+  type Row = Record<string, unknown>;
+  function makeService2(
+    opts: { enterprises?: Row[]; accounts?: Row[]; lastMovement?: Row[] } = {},
+  ) {
+    const enterprises = opts.enterprises ?? [
+      { id: 'e-active', companyId: 'c1', isActive: true, name: 'Minera' },
+      { id: 'e-inactive', companyId: 'c1', isActive: false, name: 'Vieja' },
+      { id: 'e-foreign', companyId: 'OTHER', isActive: true, name: 'Ajena' },
+    ];
+    const accounts = opts.accounts ?? [];
+    const accountCreate = jest.fn((args: Row) =>
+      Promise.resolve({ id: 'a1', ...(args.data as Row) }),
+    );
+    const accountUpdate = jest.fn((args: Row) =>
+      Promise.resolve({ id: 'a1', ...(args.data as Row) }),
+    );
+    const accountFindMany = jest.fn((args: Row) => {
+      const w = (args.where as Row) ?? {};
+      return Promise.resolve(
+        accounts.filter(
+          (a) =>
+            a.companyId === w.companyId &&
+            (w.enterpriseId === undefined || (a.enterpriseId ?? null) === w.enterpriseId),
+        ),
+      );
+    });
+    const queryRaw = jest.fn(() => Promise.resolve(opts.lastMovement ?? []));
+    const prisma = {
+      enterprise: {
+        findFirst: (args: Row) => {
+          const w = args.where as Row;
+          return Promise.resolve(
+            enterprises.find(
+              (e) =>
+                e.id === w.id &&
+                e.companyId === w.companyId &&
+                (w.isActive === undefined || e.isActive === w.isActive),
+            ) ?? null,
+          );
+        },
+      },
+      account: {
+        findFirst: () => Promise.resolve({ id: 'a1', companyId: 'c1' }),
+        findMany: accountFindMany,
+        create: accountCreate,
+        update: accountUpdate,
+      },
+      $queryRaw: queryRaw,
+    } as unknown as ConstructorParameters<typeof AccountsService>[0];
+    const rls = {
+      executeWithRls: (_c: string, _u: string, fn: (t: unknown) => unknown) => fn(prisma),
+    } as unknown as ConstructorParameters<typeof AccountsService>[1];
+    return {
+      svc: new AccountsService(prisma, rls, {} as never),
+      accountCreate,
+      accountUpdate,
+      accountFindMany,
+      queryRaw,
+    };
+  }
+
+  it('create with a FOREIGN enterprise → 400, no write', async () => {
+    const { svc, accountCreate } = makeService2();
+    await expect(
+      svc.create('c1', 'u1', { name: 'X', enterpriseId: 'e-foreign' } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(accountCreate).not.toHaveBeenCalled();
+  });
+
+  it('create with an INACTIVE enterprise → 400, no write', async () => {
+    const { svc, accountCreate } = makeService2();
+    await expect(
+      svc.create('c1', 'u1', { name: 'X', enterpriseId: 'e-inactive' } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(accountCreate).not.toHaveBeenCalled();
+  });
+
+  it('create with an active same-company enterprise links it', async () => {
+    const { svc } = makeService2();
+    const row = (await svc.create('c1', 'u1', {
+      name: 'X',
+      enterpriseId: 'e-active',
+    } as never)) as Row;
+    expect(row.enterpriseId).toBe('e-active');
+  });
+
+  it('update with enterpriseId: null clears the link without validation', async () => {
+    const { svc, accountUpdate } = makeService2();
+    await svc.update('a1', 'c1', 'u1', { enterpriseId: null } as never);
+    expect(accountUpdate).toHaveBeenCalledWith({
+      where: { id: 'a1' },
+      data: { enterpriseId: null },
+    });
+  });
+
+  it('list filters: enterpriseId → that enterprise; noEnterprise → unlinked; both → 400', async () => {
+    const accounts = [
+      { id: 'a-linked', companyId: 'c1', enterpriseId: 'e-active' },
+      { id: 'a-free', companyId: 'c1', enterpriseId: null },
+      { id: 'a-other', companyId: 'OTHER', enterpriseId: null },
+    ];
+    const { svc, accountFindMany } = makeService2({ accounts });
+    let list = (await svc.findAll('c1', { enterpriseId: 'e-active' })) as Row[];
+    expect(list.map((a) => a.id)).toEqual(['a-linked']);
+    expect(accountFindMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { companyId: 'c1', enterpriseId: 'e-active' },
+        include: { enterprise: { select: { id: true, name: true } } },
+      }),
+    );
+    list = (await svc.findAll('c1', { noEnterprise: true })) as Row[];
+    expect(list.map((a) => a.id)).toEqual(['a-free']);
+    expect(accountFindMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { companyId: 'c1', enterpriseId: null } }),
+    );
+    await expect(
+      svc.findAll('c1', { enterpriseId: 'e-active', noEnterprise: true }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('lastMovementAt is merged from ONE raw query per list call, carrying the companyId and the page ids', async () => {
+    const accounts = [
+      { id: 'a1', companyId: 'c1', enterpriseId: null },
+      { id: 'a2', companyId: 'c1', enterpriseId: null },
+    ];
+    const when = new Date('2026-09-10T12:00:00Z');
+    const { svc, queryRaw } = makeService2({
+      accounts,
+      lastMovement: [{ id: 'a1', lastMovementAt: when }],
+    });
+    const list = (await svc.findAll('c1')) as Row[];
+    expect(list.find((a) => a.id === 'a1')?.lastMovementAt).toBe(when.toISOString());
+    expect(list.find((a) => a.id === 'a2')?.lastMovementAt).toBeNull();
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    // Prisma.sql → sql-template-tag: `.text` renders Postgres $n placeholders.
+    const sql = queryRaw.mock.calls[0][0] as unknown as { text: string; values: unknown[] };
+    expect(sql.text).toContain('GREATEST(o.last, act.last, n.last, d.last)');
+    expect(sql.text).toContain('a."companyId" = $1::uuid AND a.id = ANY($2::uuid[])');
+    expect(sql.values).toEqual(['c1', ['a1', 'a2']]);
+  });
+
+  it('an empty list skips the raw query', async () => {
+    const { svc, queryRaw } = makeService2({ accounts: [] });
+    expect(await svc.findAll('c1')).toEqual([]);
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+});

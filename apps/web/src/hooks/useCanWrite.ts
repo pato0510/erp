@@ -21,6 +21,7 @@ export interface OpportunityNoteFlags extends SubjectFlags {
 }
 export interface ComercialPermissions {
   account: SubjectFlags;
+  enterprise: SubjectFlags; // COM-018 — the client's parent company (mirror of account)
   contact: SubjectFlags;
   opportunity: SubjectFlags; // COM-007 — the pipeline board gates on this
   activity: SubjectFlags; // COM-008 — the interaction timeline gates on this
@@ -35,6 +36,7 @@ export type ComercialSubject = keyof ComercialPermissions;
 const NONE: SubjectFlags = { read: false, create: false, update: false, delete: false };
 const EMPTY: ComercialPermissions = {
   account: NONE,
+  enterprise: NONE,
   contact: NONE,
   opportunity: NONE,
   activity: NONE,

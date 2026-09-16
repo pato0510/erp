@@ -81,6 +81,7 @@ model Account {
   ownerId          String?         @db.Uuid // commercial executive — bare actor UUID (no FK), like createdBy
   counterpartyId   String?         @db.Uuid // optional link to Finance counterparties
   sourceCampaignId String?         @db.Uuid // MKT-006 — Marketing attribution hook (real FK below)
+  enterpriseId     String?         @db.Uuid // COM-018 — optional parent Enterprise (the client's company; FK below, SET NULL)
   notes            String?
   createdBy        String          @db.Uuid
   createdAt        DateTime        @default(now())
@@ -95,10 +96,45 @@ model Account {
   // exported CampaignLookupService). ON DELETE SET NULL: deleting a campaign clears the
   // attribution, never the account.
   sourceCampaign Campaign? @relation(fields: [sourceCampaignId], references: [id], onDelete: SetNull)
+  // COM-018 — the parent Enterprise (one Enterprise → many Accounts). ON DELETE SET NULL:
+  // there is no DELETE endpoint (deactivation only), but a raw delete must never take the
+  // account down — it only unlinks.
+  enterprise Enterprise? @relation(fields: [enterpriseId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([sourceCampaignId])
+  @@index([enterpriseId])
   @@map("accounts")
+}
+
+/* COM-018 — enterprises: the CLIENT's parent company (CRM-1: "una empresa puede tener
+   varias cuentas"). Named Enterprise so it NEVER collides with Company, which is the
+   TENANT (the Excelsia customer). One Enterprise → many Accounts; the link is OPTIONAL
+   (accounts.enterpriseId, SET NULL) — an account can live without a parent. `rut` is
+   optional, stored NORMALIZED (cleanRut) and Módulo-11 validated in the service.
+   Uniqueness lives in the MIGRATION, not here: a unique index on (companyId, lower(name))
+   and a PARTIAL unique index on (companyId, rut) WHERE rut IS NOT NULL — Prisma cannot
+   express either, so the service pre-checks and catches P2002 as the race backstop.
+   No DELETE: deactivation is isActive=false and linked accounts keep their link. This
+   is NOT the AGS/EMSERVI holding question (V2). createdBy is the bare actor UUID from
+   the JWT (no FK — codebase convention). Platform invariant (RLS + audit + GRANT) is in
+   migration 20260916140000_add_enterprises. */
+model Enterprise {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  name      String
+  rut       String? // normalized (rut.ts), format-validated; optional
+  industry  String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdBy String   @db.Uuid // bare actor UUID from JWT, no FK (codebase convention)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts Account[]
+
+  @@index([companyId])
+  @@map("enterprises")
 }
 
 /* COM-004 — contacts: people within a commercial account (e.g. the client's ops

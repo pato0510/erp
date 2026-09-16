@@ -34,6 +34,8 @@ interface Account {
   sourceCampaignId: string | null;
   // MKT-006 — enriched by the accounts service via the Marketing-exported lookup.
   sourceCampaign: { id: string; name: string } | null;
+  enterpriseId: string | null; // COM-018 — feeds AccountFormModal's "Empresa"
+  enterprise: { id: string; name: string } | null; // COM-018 — enriched by the accounts service
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -125,6 +127,13 @@ export default function AccountFichaPage() {
                 <StatusBadge status={account.status} />
                 <span>·</span>
                 <span>Prioridad {PRIORITY_LABELS[account.priority] ?? account.priority}</span>
+                {/* COM-018 — the parent enterprise (read-only here; edit via the form). */}
+                {account.enterprise && (
+                  <>
+                    <span>·</span>
+                    <span>Empresa: {account.enterprise.name}</span>
+                  </>
+                )}
                 {account.industry && (
                   <>
                     <span>·</span>
@@ -232,6 +241,8 @@ function AccountDatosTab({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <KV label="Estado" value={STATUS_LABELS[account.status] ?? account.status} />
           <KV label="Prioridad" value={PRIORITY_LABELS[account.priority] ?? account.priority} />
+          {/* COM-018 — parent enterprise (Enterprise ≠ Company); "Sin empresa" when unlinked. */}
+          <KV label="Empresa" value={account.enterprise?.name ?? 'Sin empresa'} />
           <KV label="Industria" value={account.industry ?? '—'} />
           <KV label="Riesgo comercial" value={account.commercialRisk ?? '—'} />
           {/* COM-014 — payment term drives the projected-income commitment at handoff */}
