@@ -77,6 +77,22 @@ describe('COM-018 EnterprisesController — every endpoint is gated (PoliciesGua
     expect(handlers.every((h) => h(accountantAbility))).toBe(action === 'read');
   });
 
+  /* COM-021 — the bulk assignment MUTATES ACCOUNTS: its gate is `update` on AccountSubject.
+   * MANAGER passes, ACCOUNTANT (read-only on accounts) and VIEWER do not. */
+  it('assignAccounts carries @CheckPolicies(update Account)', () => {
+    const handlers = handlersOf('assignAccounts');
+    expect(handlers.length).toBeGreaterThan(0);
+    expect(handlers.every((h) => h(managerAbility))).toBe(true);
+    expect(handlers.every((h) => h(accountantAbility))).toBe(false);
+    expect(handlers.every((h) => h(viewerAbility))).toBe(false);
+    // Pins the SUBJECT: an ability with update on Enterprise but not on Account must fail.
+    const enterpriseOnly = {
+      can: (action: string, subject: { modelName: string }) =>
+        action === 'update' && subject.modelName === 'Enterprise',
+    } as never;
+    expect(handlers.every((h) => h(enterpriseOnly))).toBe(false);
+  });
+
   it('exposes no delete handler (deactivation is PATCH isActive=false)', () => {
     expect('remove' in proto).toBe(false);
     expect('deactivate' in proto).toBe(false);

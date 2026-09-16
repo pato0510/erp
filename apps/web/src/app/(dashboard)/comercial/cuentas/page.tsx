@@ -11,8 +11,9 @@
  * focused row, aria-expanded) toggles an inline accordion with the account's activities
  * (ActivityTimeline scope="account", lazy on first open, one row open at a time) and a
  * "Ver cuenta" link; the ficha is no longer the row's click target. */
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Ban, ChevronDown, ChevronRight, ExternalLink, Link2, Pencil, Plus } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { formatDate } from '../../../../lib/formatters';
@@ -57,7 +58,18 @@ const COLUMNS = [
   'Último movimiento',
 ];
 
+/* COM-021 — useSearchParams needs a Suspense boundary (the operaciones/excepciones
+   precedent), so the page body lives in CuentasContent. */
 export default function CuentasPage() {
+  return (
+    <Suspense fallback={null}>
+      <CuentasContent />
+    </Suspense>
+  );
+}
+
+function CuentasContent() {
+  const searchParams = useSearchParams();
   const canWrite = useCanWrite();
   // COM-018 — the accordion's timeline gates Registrar/Editar/Eliminar on the activity flags.
   const canWriteActivity = useCanWrite('activity');
@@ -68,7 +80,11 @@ export default function CuentasPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [search, setSearch] = useState('');
-  const [enterpriseFilter, setEnterpriseFilter] = useState(''); // '' | NO_ENTERPRISE | id
+  // COM-021 — /comercial/cuentas?enterpriseId=<id> (from the Empresas page) preselects the
+  // Empresa filter on mount; the select stays free to change afterwards.
+  const [enterpriseFilter, setEnterpriseFilter] = useState(
+    () => searchParams.get('enterpriseId') ?? '',
+  ); // '' | NO_ENTERPRISE | id
   const [expandedId, setExpandedId] = useState<string | null>(null); // one row open at a time
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AccountRow | null>(null);

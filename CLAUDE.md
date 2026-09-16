@@ -546,8 +546,9 @@ QA doc: docs/EXCELSIA-RRHH-QA-PRE-DESBLOQUEO.md
 
 Status: V1 completo (COM-001…COM-015), desplegado y visible en /modulos.
 Post-V1: COM-016 (notas internas de oportunidad), COM-017 (documentos adjuntos
-de oportunidad) y COM-018 (Cuentas v2: Enterprise + columnas + acordeón),
-2026-09-15 — ver bloques abajo.
+de oportunidad), COM-018 (Cuentas v2: Enterprise + columnas + acordeón) y
+COM-021 (gestión de empresas + asignación masiva), 2026-09-15/16 — ver
+bloques abajo.
 Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
@@ -707,8 +708,38 @@ ANY($2::uuid[])` (doctrina: el SQL crudo SIEMPRE lleva el filtro explícito de
     flags de activity; lazy al primer abrir, una fila abierta a la vez) + link
     "Ver cuenta"; la fila ya no navega a la ficha. La ficha muestra "Empresa:
     <nombre>" (solo lectura; se edita en el formulario).
+- COM-021 — GESTIÓN DE EMPRESAS (2026-09-16; pedido del fundador tras el
+  chequeo en producción de COM-018: las empresas nacían vacías y las cuentas
+  existentes no tenían ninguna). Entrada "Empresas" en el sidebar Comercial
+  (justo después de Cuentas, ícono `Building2`) y página
+  `/comercial/empresas` (espejo del listado de Cuentas): búsqueda por nombre o
+  RUT (`?q=`, server-side), filtro Activas / Inactivas / Todas (UN fetch con
+  `includeInactive=true` y split client-side), columnas Nombre · RUT
+  (`formatRUT`) · Industria · Cuentas (`accountsCount`) · Estado; acciones
+  Editar y Desactivar/Reactivar (gateadas en `enterprise.update`, con confirm),
+  Asignar cuentas (gateada en `account.update`, solo empresas activas) y Ver
+  cuentas (link a `/comercial/cuentas?enterpriseId=<id>`, que preselecciona el
+  filtro Empresa vía `useSearchParams` — envuelto en `Suspense` como el
+  precedente de operaciones/excepciones). JAMÁS un DELETE. API: GET
+  `/comercial/enterprises` suma `accountsCount` por fila (Prisma `_count`
+  aplanado); NUEVO POST `/comercial/enterprises/:id/accounts` `{ accountIds:
+string[] }` (1..200 UUIDs) → asignación masiva. Su puerta es `update` sobre
+  `AccountSubject` (muta cuentas, NO Enterprise). Reglas del service: la
+  empresa debe existir en la company Y estar activa (400, mensaje COM-018);
+  todos los ids deben existir en la company (400 con el CONTEO de faltantes/
+  ajenos, jamás su contenido); solo se asignan cuentas con `enterpriseId`
+  null — una cuenta ya vinculada a CUALQUIER empresa se OMITE, nunca se
+  sobrescribe (la reasignación vive en el formulario de la cuenta, a propósito);
+  `updateMany` dentro de `executeWithRls` con `where { id in ids, companyId,
+enterpriseId: null }`; responde `{ assigned, skipped }`. Web: el modal inline
+  de COM-018 salió de `EnterpriseSelect` a `EnterpriseFormModal` (crear Y
+  editar: nombre, RUT, industria, notas; 400/409 del backend verbatim) — el
+  select lo sigue usando para crear sin cambios; nuevo `AssignAccountsModal`
+  (carga `?noEnterprise=true`, lista de checkboxes con búsqueda, "Seleccionar
+  todos (filtrados)", contador, "Asignar N cuentas", toast con asignadas y
+  omitidas; Escape cierra y Tab cicla dentro del diálogo). Mutate→refetch.
 
-Última actualización: 2026-09-15 (COM-018)
+Última actualización: 2026-09-16 (COM-021)
 
 ═══════════════════════════════════════════════════════════════════
 

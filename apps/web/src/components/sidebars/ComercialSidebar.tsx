@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { KanbanSquare, LogOut, Moon, Sun, Users } from 'lucide-react';
+import { Building2, KanbanSquare, LogOut, Moon, Sun, Users } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -11,10 +11,12 @@ import { SidebarBrand } from './SidebarBrand';
  * the shared .tn-sidebar tokens defined once in (dashboard)/layout.tsx and the
  * SidebarBrand component (zero new CSS). Config-driven: append entries to
  * navItems as later COM tickets ship (Cotizaciones, …). COM-007 adds Pipeline
- * (the flagship board), placed first. */
+ * (the flagship board), placed first. COM-021 adds Empresas (the clients' parent
+ * companies) right after Cuentas. */
 const navItems = [
   { href: '/comercial/pipeline', label: 'Pipeline', icon: KanbanSquare, exact: false },
   { href: '/comercial/cuentas', label: 'Cuentas', icon: Users, exact: false },
+  { href: '/comercial/empresas', label: 'Empresas', icon: Building2, exact: false },
 ];
 
 export function ComercialSidebar() {

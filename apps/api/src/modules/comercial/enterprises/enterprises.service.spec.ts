@@ -12,7 +12,7 @@ import { EnterprisesService } from './enterprises.service';
 type Any = Record<string, unknown>;
 
 function makeService(seed: Any[] = [], opts: { createThrowsP2002?: string } = {}) {
-  const rows: Any[] = [...seed];
+  const rows: Any[] = seed.filter((r) => r.__kind !== 'account');
   let seq = 1;
   const matches = (e: Any, w: Any) => {
     if (w.id !== undefined) {
@@ -53,7 +53,16 @@ function makeService(seed: Any[] = [], opts: { createThrowsP2002?: string } = {}
       Promise.resolve(
         rows
           .filter((e) => matches(e, (args.where as Any) ?? {}))
-          .sort((a, b) => String(a.name).localeCompare(String(b.name))),
+          .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+          // COM-021 — honour `include: { _count: { select: { accounts: true } } }`.
+          .map((e) =>
+            (args.include as Any)?._count
+              ? {
+                  ...e,
+                  _count: { accounts: accounts.filter((a) => a.enterpriseId === e.id).length },
+                }
+              : e,
+          ),
       ),
     ),
     create: jest.fn((args: Any) => {
@@ -74,14 +83,42 @@ function makeService(seed: Any[] = [], opts: { createThrowsP2002?: string } = {}
       return Promise.resolve(row);
     }),
   };
-  const account = { update: jest.fn(), updateMany: jest.fn() };
+  const accounts: Any[] = seed.filter((r) => r.__kind === 'account');
+  const account = {
+    update: jest.fn(),
+    findMany: jest.fn((args: Any) => {
+      const w = args.where as Any;
+      const ids = ((w.id as Any).in as string[]) ?? [];
+      return Promise.resolve(
+        accounts
+          .filter((a) => ids.includes(a.id as string) && a.companyId === w.companyId)
+          .map((a) => ({ id: a.id, enterpriseId: a.enterpriseId ?? null })),
+      );
+    }),
+    updateMany: jest.fn((args: Any) => {
+      const w = args.where as Any;
+      const ids = ((w.id as Any).in as string[]) ?? [];
+      let count = 0;
+      for (const a of accounts) {
+        if (
+          ids.includes(a.id as string) &&
+          a.companyId === w.companyId &&
+          (w.enterpriseId === undefined || (a.enterpriseId ?? null) === w.enterpriseId)
+        ) {
+          a.enterpriseId = (args.data as Any).enterpriseId;
+          count++;
+        }
+      }
+      return Promise.resolve({ count });
+    }),
+  };
   const prisma = { enterprise, account } as unknown as ConstructorParameters<
     typeof EnterprisesService
   >[0];
   const rls = {
     executeWithRls: (_c: string, _u: string, fn: (t: unknown) => unknown) => fn(prisma),
   } as unknown as ConstructorParameters<typeof EnterprisesService>[1];
-  return { svc: new EnterprisesService(prisma, rls), rows, enterprise, account };
+  return { svc: new EnterprisesService(prisma, rls), rows, enterprise, account, accounts };
 }
 
 const minera = {
@@ -240,5 +277,85 @@ describe('EnterprisesService — list', () => {
     expect(((await svc.findAll('c1', { q: '11.111.111' })) as Any[]).map((e) => e.id)).toEqual([
       'e-c',
     ]);
+  });
+});
+
+/* COM-021 — bulk assignment + accountsCount. */
+describe('EnterprisesService — assignAccounts (COM-021)', () => {
+  const acc = (id: string, companyId = 'c1', enterpriseId: string | null = null) => ({
+    __kind: 'account',
+    id,
+    companyId,
+    enterpriseId,
+  });
+  const seed = () => [
+    { ...minera },
+    { id: 'e-off', companyId: 'c1', name: 'Apagada', rut: null, isActive: false },
+    { ...foreign },
+    acc('a1'),
+    acc('a2'),
+    acc('a-linked', 'c1', 'e-other'),
+    acc('a-foreign', 'OTHER'),
+  ];
+
+  it('foreign enterprise → 400, no write', async () => {
+    const { svc, account } = makeService(seed());
+    await expect(
+      svc.assignAccounts('e-x', 'c1', 'u1', { accountIds: ['a1'] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(account.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('inactive enterprise → 400, no write', async () => {
+    const { svc, account } = makeService(seed());
+    await expect(
+      svc.assignAccounts('e-off', 'c1', 'u1', { accountIds: ['a1'] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(account.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('foreign / missing account ids → 400 (count only), no write', async () => {
+    const { svc, account } = makeService(seed());
+    await expect(
+      svc.assignAccounts('e-minera', 'c1', 'u1', { accountIds: ['a1', 'a-foreign', 'nope'] }),
+    ).rejects.toMatchObject({
+      message: '2 cuenta(s) no existen en esta empresa o no pertenecen a ella.',
+    });
+    expect(account.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('assigns only UNLINKED accounts; already-linked ones are skipped and counted, never overwritten', async () => {
+    const { svc, account, accounts } = makeService(seed());
+    const res = await svc.assignAccounts('e-minera', 'c1', 'u1', {
+      accountIds: ['a1', 'a2', 'a-linked'],
+    });
+    expect(res).toEqual({ assigned: 2, skipped: 1 });
+    expect(account.updateMany).toHaveBeenCalledTimes(1);
+    expect(account.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['a1', 'a2'] }, companyId: 'c1', enterpriseId: null },
+      data: { enterpriseId: 'e-minera' },
+    });
+    expect(accounts.find((a) => a.id === 'a-linked')?.enterpriseId).toBe('e-other');
+    expect(accounts.find((a) => a.id === 'a1')?.enterpriseId).toBe('e-minera');
+  });
+
+  it('all already linked → { assigned: 0, skipped: n } without a write', async () => {
+    const { svc, account } = makeService(seed());
+    const res = await svc.assignAccounts('e-minera', 'c1', 'u1', { accountIds: ['a-linked'] });
+    expect(res).toEqual({ assigned: 0, skipped: 1 });
+    expect(account.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('list rows carry accountsCount (flattened _count)', async () => {
+    const { svc } = makeService([
+      ...seed(),
+      acc('a3', 'c1', 'e-minera'),
+      acc('a4', 'c1', 'e-minera'),
+    ]);
+    const list = (await svc.findAll('c1', { includeInactive: true })) as Any[];
+    const byId = Object.fromEntries(list.map((e) => [e.id, e]));
+    expect(byId['e-minera'].accountsCount).toBe(2);
+    expect(byId['e-off'].accountsCount).toBe(0);
+    expect(byId['e-minera']._count).toBeUndefined();
   });
 });
