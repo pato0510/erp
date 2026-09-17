@@ -16,10 +16,16 @@
  * Tokens: accent #2563eb, Outfit headings.
  *
  * The minimal detail (/comercial/pipeline/[id]) shows read-only fields + stage
- * actions; the full detail (service-bundle editor, timeline) lands in COM-007b. */
+ * actions; the full detail (service-bundle editor, timeline) lands in COM-007b.
+ *
+ * COM-020 — Pipeline 2.0: a "Tabla | Kanban" toggle (React state only), default Tabla.
+ * The table (PipelineTable) reuses attemptMove for its inline stage select, so both
+ * views share ONE stage-change path; its filters (q, stages, owner, enterprise, closed
+ * window) are server-side params the page adds only in table view — the kanban's fetch
+ * and rendering are untouched. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Plus, RotateCcw, User as UserIcon } from 'lucide-react';
+import { KanbanSquare, LayoutList, Play, Plus, RotateCcw, User as UserIcon } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { formatCLP, formatDate } from '../../../../lib/formatters';
 import { useComercialPermissions } from '../../../../hooks/useCanWrite';
@@ -39,6 +45,12 @@ import {
 } from '../../../../components/comercial/NewOpportunityModal';
 import { LostReasonModal } from '../../../../components/comercial/LostReasonModal';
 import { CardMoveMenu } from '../../../../components/comercial/CardMoveMenu';
+// COM-020 — the grouped table view + the sentinel EnterpriseSelect uses for "Sin empresa".
+import {
+  PipelineTable,
+  type PipelineFilters,
+} from '../../../../components/comercial/PipelineTable';
+import { NO_ENTERPRISE } from '../../../../components/comercial/EnterpriseSelect';
 
 interface Opportunity {
   id: string;
@@ -55,6 +67,8 @@ interface Opportunity {
   closedAt: string | null;
   notes: string | null;
   updatedAt: string;
+  lastMovementAt?: string | null; // COM-020 — derived by the API
+  account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null; // COM-020
 }
 interface AccountRow {
   id: string;
@@ -78,6 +92,15 @@ export default function PipelinePage() {
 
   const [accountFilter, setAccountFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
+  // COM-020 — view toggle (React state only) + the table's server-side filters.
+  const [view, setView] = useState<'table' | 'kanban'>('table');
+  const [tableFilters, setTableFilters] = useState<PipelineFilters>({
+    q: '',
+    stages: [],
+    ownerId: '',
+    enterprise: '',
+    showClosed: false,
+  });
   const [newModal, setNewModal] = useState(false);
   const [lostModal, setLostModal] = useState<{
     id: string;
@@ -156,8 +179,19 @@ export default function PipelinePage() {
   const fetchOpps = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (accountFilter) params.set('accountId', accountFilter);
-    if (ownerFilter) params.set('ownerId', ownerFilter);
+    if (view === 'table') {
+      // COM-020 — table filters are server-side; includeClosed is explicit so the
+      // kanban (which sends nothing) keeps its legacy full set.
+      if (tableFilters.q.trim()) params.set('q', tableFilters.q.trim());
+      tableFilters.stages.forEach((st) => params.append('stage', st));
+      if (tableFilters.ownerId) params.set('ownerId', tableFilters.ownerId);
+      if (tableFilters.enterprise === NO_ENTERPRISE) params.set('noEnterprise', 'true');
+      else if (tableFilters.enterprise) params.set('enterpriseId', tableFilters.enterprise);
+      params.set('includeClosed', tableFilters.showClosed ? 'true' : 'false');
+    } else {
+      if (accountFilter) params.set('accountId', accountFilter);
+      if (ownerFilter) params.set('ownerId', ownerFilter);
+    }
     const qs = params.toString();
     apiClient
       .get<Opportunity[]>(`/api/comercial/opportunities${qs ? `?${qs}` : ''}`)
@@ -171,7 +205,7 @@ export default function PipelinePage() {
         else setError('No se pudieron cargar las oportunidades.');
       })
       .finally(() => setLoading(false));
-  }, [accountFilter, ownerFilter]);
+  }, [accountFilter, ownerFilter, view, tableFilters]);
 
   useEffect(() => {
     fetchOpps();
@@ -366,205 +400,259 @@ export default function PipelinePage() {
     <div className="pt-2">
       {Header}
 
-      {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <select
-          value={accountFilter}
-          onChange={(e) => setAccountFilter(e.target.value)}
-          className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
-        >
-          <option value="">Todas las cuentas</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={ownerFilter}
-          onChange={(e) => setOwnerFilter(e.target.value)}
-          className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
-        >
-          <option value="">Todos los responsables</option>
-          {ownerOptions.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        {(accountFilter || ownerFilter) && (
+      {/* COM-020 — view toggle (segmented control). Default Tabla; kanban unchanged. */}
+      <div
+        className="mb-4 inline-flex rounded-lg border border-[var(--border-color)] p-0.5"
+        role="group"
+        aria-label="Vista"
+      >
+        {(
+          [
+            ['table', 'Tabla', LayoutList],
+            ['kanban', 'Kanban', KanbanSquare],
+          ] as const
+        ).map(([v, label, Icon]) => (
           <button
-            onClick={() => {
-              setAccountFilter('');
-              setOwnerFilter('');
-            }}
-            className="text-sm text-[var(--text-secondary)] underline-offset-2 hover:underline"
+            key={v}
+            type="button"
+            aria-pressed={view === v}
+            onClick={() => setView(v)}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm ${
+              view === v
+                ? 'text-white'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+            style={view === v ? { background: 'var(--color-accent)' } : undefined}
           >
-            Limpiar filtros
+            <Icon size={14} /> {label}
           </button>
-        )}
+        ))}
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
           {error}
         </div>
       )}
 
-      {/* Board — horizontally scrollable. onDragOver drives the edge auto-scroll. */}
-      <div ref={boardRef} onDragOver={onBoardDragOver} className="flex gap-4 overflow-x-auto pb-4">
-        {STAGE_ORDER.map((stage) => {
-          const cards = byStage(stage);
-          const over = dragOverStage === stage;
-          return (
-            <div
-              key={stage}
-              onDragOver={(e) => {
-                if (!draggingId) return;
-                e.preventDefault();
-                if (dragOverStage !== stage) setDragOverStage(stage);
-              }}
-              onDragLeave={() => setDragOverStage((s) => (s === stage ? null : s))}
-              onDrop={() => handleDrop(stage as OpportunityStage)}
-              className="flex w-[286px] shrink-0 flex-col rounded-xl border bg-[var(--bg-card)]"
-              style={{
-                borderColor: over ? 'var(--color-accent)' : 'var(--border-color)',
-                boxShadow: over ? '0 0 0 1px #2563eb inset' : undefined,
-                transition: 'border-color 120ms ease',
-              }}
+      {view === 'table' ? (
+        <PipelineTable
+          rows={opps}
+          loading={loading}
+          canWrite={canWrite}
+          filters={tableFilters}
+          onFiltersChange={setTableFilters}
+          ownerOptions={ownerOptions}
+          ownerLabel={(id) => (id ? (usersById.get(id) ?? id.slice(0, 8)) : '—')}
+          onChangeStage={(row, stage) => {
+            const opp = opps.find((o) => o.id === row.id);
+            if (opp) attemptMove(opp, stage);
+          }}
+        />
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <select
+              value={accountFilter}
+              onChange={(e) => setAccountFilter(e.target.value)}
+              className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
-              {/* Column header */}
-              <div className="flex items-center justify-between gap-2 border-b border-[var(--border-color)] px-3 py-2.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: stageAccent(stage) }}
-                  />
-                  <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                    {STAGE_LABELS[stage]}
-                  </span>
-                  <span className="shrink-0 text-xs text-[var(--text-secondary)]">
-                    ({cards.length})
-                  </span>
-                </div>
-                <span className="shrink-0 text-[11px] font-medium text-[var(--text-secondary)]">
-                  {formatCLP(columnSum(stage))}
-                </span>
-              </div>
+              <option value="">Todas las cuentas</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={ownerFilter}
+              onChange={(e) => setOwnerFilter(e.target.value)}
+              className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
+            >
+              <option value="">Todos los responsables</option>
+              {ownerOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            {(accountFilter || ownerFilter) && (
+              <button
+                onClick={() => {
+                  setAccountFilter('');
+                  setOwnerFilter('');
+                }}
+                className="text-sm text-[var(--text-secondary)] underline-offset-2 hover:underline"
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
 
-              {/* Column body */}
-              <div className="flex min-h-[120px] flex-1 flex-col gap-2 p-2">
-                {loading ? (
-                  Array.from({ length: 2 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="animate-pulse rounded-lg border border-[var(--border-color)] p-3"
-                    >
-                      <div className="mb-2 h-4 w-3/4 rounded bg-subtle-hover" />
-                      <div className="h-3 w-1/2 rounded bg-subtle-hover" />
+          {/* Board — horizontally scrollable. onDragOver drives the edge auto-scroll. */}
+          <div
+            ref={boardRef}
+            onDragOver={onBoardDragOver}
+            className="flex gap-4 overflow-x-auto pb-4"
+          >
+            {STAGE_ORDER.map((stage) => {
+              const cards = byStage(stage);
+              const over = dragOverStage === stage;
+              return (
+                <div
+                  key={stage}
+                  onDragOver={(e) => {
+                    if (!draggingId) return;
+                    e.preventDefault();
+                    if (dragOverStage !== stage) setDragOverStage(stage);
+                  }}
+                  onDragLeave={() => setDragOverStage((s) => (s === stage ? null : s))}
+                  onDrop={() => handleDrop(stage as OpportunityStage)}
+                  className="flex w-[286px] shrink-0 flex-col rounded-xl border bg-[var(--bg-card)]"
+                  style={{
+                    borderColor: over ? 'var(--color-accent)' : 'var(--border-color)',
+                    boxShadow: over ? '0 0 0 1px #2563eb inset' : undefined,
+                    transition: 'border-color 120ms ease',
+                  }}
+                >
+                  {/* Column header */}
+                  <div className="flex items-center justify-between gap-2 border-b border-[var(--border-color)] px-3 py-2.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: stageAccent(stage) }}
+                      />
+                      <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                        {STAGE_LABELS[stage]}
+                      </span>
+                      <span className="shrink-0 text-xs text-[var(--text-secondary)]">
+                        ({cards.length})
+                      </span>
                     </div>
-                  ))
-                ) : cards.length === 0 ? (
-                  <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[var(--border-color)] py-6 text-center text-xs text-[var(--text-secondary)]">
-                    Sin oportunidades
+                    <span className="shrink-0 text-[11px] font-medium text-[var(--text-secondary)]">
+                      {formatCLP(columnSum(stage))}
+                    </span>
                   </div>
-                ) : (
-                  cards.map((o) => {
-                    const account = accountsById.get(o.accountId);
-                    const ownerName = o.ownerId
-                      ? (usersById.get(o.ownerId) ?? o.ownerId.slice(0, 8))
-                      : null;
-                    const draggable = canWrite && !isClosedStage(o.stage);
-                    return (
-                      <div
-                        key={o.id}
-                        draggable={draggable}
-                        onDragStart={() => setDraggingId(o.id)}
-                        onDragEnd={() => {
-                          setDraggingId(null);
-                          setDragOverStage(null);
-                          stopAutoScroll();
-                        }}
-                        onClick={() => router.push(`/comercial/pipeline/${o.id}`)}
-                        className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 text-left transition-shadow hover:shadow-sm"
-                        style={{
-                          cursor: draggable ? 'grab' : 'pointer',
-                          opacity: draggingId === o.id ? 0.5 : 1,
-                        }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="min-w-0 text-sm font-medium text-[var(--text-primary)]">
-                            {o.name}
-                          </p>
-                          <div className="flex shrink-0 items-center gap-1">
-                            {account?.priority === 'ALTA' && (
-                              <span
-                                title="Cuenta prioridad alta"
-                                className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                                style={{ background: '#ef4444' }}
-                              />
-                            )}
-                            {/* "Mover a…" — writers, non-closed cards. Reuses attemptMove/
-                                resume so it's the same flow as a drag-drop. */}
-                            {draggable && (
-                              <CardMoveMenu
-                                stage={o.stage}
-                                onMove={(t) => attemptMove(o, t)}
-                                onResume={() => resume(o)}
-                              />
-                            )}
-                          </div>
+
+                  {/* Column body */}
+                  <div className="flex min-h-[120px] flex-1 flex-col gap-2 p-2">
+                    {loading ? (
+                      Array.from({ length: 2 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="animate-pulse rounded-lg border border-[var(--border-color)] p-3"
+                        >
+                          <div className="mb-2 h-4 w-3/4 rounded bg-subtle-hover" />
+                          <div className="h-3 w-1/2 rounded bg-subtle-hover" />
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
-                          {account?.name ?? '—'}
-                        </p>
-
-                        <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-                          <span className="font-medium text-[var(--text-primary)]">
-                            {o.estimatedValue != null ? formatCLP(o.estimatedValue) : '—'}
-                          </span>
-                          <span className="text-[var(--text-secondary)]">
-                            {o.expectedCloseDate ? formatDate(o.expectedCloseDate) : '—'}
-                          </span>
-                        </div>
-
-                        {ownerName && (
-                          <div className="mt-2 flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
-                            <UserIcon size={11} />
-                            <span className="truncate">{ownerName}</span>
-                          </div>
-                        )}
-
-                        {/* Semi-terminal / paused quick-actions (writers only) */}
-                        {canWrite && isClosedStage(o.stage) && (
-                          <div className="mt-2 border-t border-[var(--border-color)] pt-2">
-                            <button
-                              onClick={(ev) => reopen(o, ev)}
-                              className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                            >
-                              <RotateCcw size={11} /> Reabrir
-                            </button>
-                          </div>
-                        )}
-                        {canWrite && o.stage === 'EN_PAUSA' && (
-                          <div className="mt-2 border-t border-[var(--border-color)] pt-2">
-                            <button
-                              onClick={(ev) => resume(o, ev)}
-                              className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                            >
-                              <Play size={11} /> Reanudar
-                            </button>
-                          </div>
-                        )}
+                      ))
+                    ) : cards.length === 0 ? (
+                      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[var(--border-color)] py-6 text-center text-xs text-[var(--text-secondary)]">
+                        Sin oportunidades
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                    ) : (
+                      cards.map((o) => {
+                        const account = accountsById.get(o.accountId);
+                        const ownerName = o.ownerId
+                          ? (usersById.get(o.ownerId) ?? o.ownerId.slice(0, 8))
+                          : null;
+                        const draggable = canWrite && !isClosedStage(o.stage);
+                        return (
+                          <div
+                            key={o.id}
+                            draggable={draggable}
+                            onDragStart={() => setDraggingId(o.id)}
+                            onDragEnd={() => {
+                              setDraggingId(null);
+                              setDragOverStage(null);
+                              stopAutoScroll();
+                            }}
+                            onClick={() => router.push(`/comercial/pipeline/${o.id}`)}
+                            className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 text-left transition-shadow hover:shadow-sm"
+                            style={{
+                              cursor: draggable ? 'grab' : 'pointer',
+                              opacity: draggingId === o.id ? 0.5 : 1,
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="min-w-0 text-sm font-medium text-[var(--text-primary)]">
+                                {o.name}
+                              </p>
+                              <div className="flex shrink-0 items-center gap-1">
+                                {account?.priority === 'ALTA' && (
+                                  <span
+                                    title="Cuenta prioridad alta"
+                                    className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                                    style={{ background: '#ef4444' }}
+                                  />
+                                )}
+                                {/* "Mover a…" — writers, non-closed cards. Reuses attemptMove/
+                                resume so it's the same flow as a drag-drop. */}
+                                {draggable && (
+                                  <CardMoveMenu
+                                    stage={o.stage}
+                                    onMove={(t) => attemptMove(o, t)}
+                                    onResume={() => resume(o)}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                            <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
+                              {account?.name ?? '—'}
+                            </p>
+
+                            <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                              <span className="font-medium text-[var(--text-primary)]">
+                                {o.estimatedValue != null ? formatCLP(o.estimatedValue) : '—'}
+                              </span>
+                              <span className="text-[var(--text-secondary)]">
+                                {o.expectedCloseDate ? formatDate(o.expectedCloseDate) : '—'}
+                              </span>
+                            </div>
+
+                            {ownerName && (
+                              <div className="mt-2 flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                                <UserIcon size={11} />
+                                <span className="truncate">{ownerName}</span>
+                              </div>
+                            )}
+
+                            {/* Semi-terminal / paused quick-actions (writers only) */}
+                            {canWrite && isClosedStage(o.stage) && (
+                              <div className="mt-2 border-t border-[var(--border-color)] pt-2">
+                                <button
+                                  onClick={(ev) => reopen(o, ev)}
+                                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                >
+                                  <RotateCcw size={11} /> Reabrir
+                                </button>
+                              </div>
+                            )}
+                            {canWrite && o.stage === 'EN_PAUSA' && (
+                              <div className="mt-2 border-t border-[var(--border-color)] pt-2">
+                                <button
+                                  onClick={(ev) => resume(o, ev)}
+                                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                >
+                                  <Play size={11} /> Reanudar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {newModal && (
         <NewOpportunityModal
@@ -588,6 +676,7 @@ export default function PipelinePage() {
 
       {toast && (
         <div
+          role={toast.type === 'error' ? 'alert' : 'status'}
           className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg px-4 py-3 text-sm shadow-lg"
           style={{
             background: toast.type === 'error' ? '#fef2f2' : '#f0fdf4',

@@ -305,3 +305,188 @@ describe('OpportunitiesService — COM-009 system-generated timeline entries', (
     expect(activityCreate).toHaveBeenCalledTimes(1);
   });
 });
+
+/* COM-020 — list filters + the DERIVED per-opportunity lastMovementAt. A separate stateful
+ * fake (the COM-005 one above is fixed-shape): opportunity.findMany honours the where
+ * shape the service builds, $queryRaw is mocked and asserted to run ONCE per list call
+ * with the companyId and the page ids. Existing callers (no filters) keep every stage. */
+describe('OpportunitiesService — COM-020 list filters + lastMovementAt', () => {
+  type Row = Record<string, unknown>;
+  const DAY = 24 * 60 * 60 * 1000;
+  const rows: Row[] = [
+    {
+      id: 'p1',
+      companyId: 'c1',
+      stage: 'PROSPECTO',
+      name: 'Faena Norte',
+      ownerId: 'u1',
+      account: { name: 'Minera', enterpriseId: 'e1' },
+      closedAt: null,
+    },
+    {
+      id: 'n1',
+      companyId: 'c1',
+      stage: 'NEGOCIACION',
+      name: 'Planta',
+      ownerId: 'u2',
+      account: { name: 'Constructora', enterpriseId: null },
+      closedAt: null,
+    },
+    {
+      id: 'w-recent',
+      companyId: 'c1',
+      stage: 'GANADA',
+      name: 'Ganada reciente',
+      ownerId: 'u1',
+      account: { name: 'Minera', enterpriseId: 'e1' },
+      closedAt: new Date(Date.now() - 10 * DAY),
+    },
+    {
+      id: 'l-old',
+      companyId: 'c1',
+      stage: 'PERDIDA',
+      name: 'Perdida vieja',
+      ownerId: 'u1',
+      account: { name: 'Minera', enterpriseId: 'e1' },
+      closedAt: new Date(Date.now() - 200 * DAY),
+    },
+    {
+      id: 'other',
+      companyId: 'OTHER',
+      stage: 'PROSPECTO',
+      name: 'Ajena',
+      ownerId: 'u1',
+      account: { name: 'X', enterpriseId: null },
+      closedAt: null,
+    },
+  ];
+  const matchStage = (r: Row, cond: unknown): boolean => {
+    if (cond === undefined) return true;
+    const c = cond as Row;
+    if (c.in) return (c.in as string[]).includes(r.stage as string);
+    if (c.notIn) return !(c.notIn as string[]).includes(r.stage as string);
+    return r.stage === cond;
+  };
+  const matches = (r: Row, w: Row): boolean => {
+    if (w.companyId !== undefined && r.companyId !== w.companyId) return false;
+    if (!matchStage(r, w.stage)) return false;
+    if (w.ownerId !== undefined && r.ownerId !== w.ownerId) return false;
+    if (w.account !== undefined) {
+      const a = w.account as Row;
+      if ('enterpriseId' in a && (r.account as Row).enterpriseId !== a.enterpriseId) return false;
+      if (
+        a.name &&
+        !String((r.account as Row).name)
+          .toLowerCase()
+          .includes(String((a.name as Row).contains).toLowerCase())
+      )
+        return false;
+    }
+    if (
+      w.name &&
+      !String(r.name)
+        .toLowerCase()
+        .includes(String((w.name as Row).contains).toLowerCase())
+    )
+      return false;
+    if (
+      w.closedAt &&
+      (r.closedAt === null || (r.closedAt as Date) < ((w.closedAt as Row).gte as Date))
+    )
+      return false;
+    if (w.OR && !(w.OR as Row[]).some((o) => matches(r, o))) return false;
+    if (w.AND && !(w.AND as Row[]).every((o) => matches(r, o))) return false;
+    return true;
+  };
+  function makeListService(lastMovement: Row[] = []) {
+    const findMany = jest.fn((args: Row) =>
+      Promise.resolve(rows.filter((r) => matches(r, args.where as Row))),
+    );
+    const queryRaw = jest.fn(() => Promise.resolve(lastMovement));
+    const prisma = {
+      opportunity: { findMany },
+      $queryRaw: queryRaw,
+    } as unknown as ConstructorParameters<typeof OpportunitiesService>[0];
+    const rls = {} as unknown as ConstructorParameters<typeof OpportunitiesService>[1];
+    const domainEvents = {} as unknown as ConstructorParameters<typeof OpportunitiesService>[2];
+    return { svc: new OpportunitiesService(prisma, rls, domainEvents), findMany, queryRaw };
+  }
+  const ids = (list: Row[]) => list.map((r) => r.id);
+
+  it('no filters → legacy full set (every stage, closed included), enriched with account + lastMovementAt', async () => {
+    const { svc, findMany } = makeListService();
+    const list = (await svc.findAll('c1')) as Row[];
+    expect(ids(list)).toEqual(['p1', 'n1', 'w-recent', 'l-old']);
+    expect(list[0]).toHaveProperty('lastMovementAt', null);
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { companyId: 'c1' },
+        include: {
+          account: {
+            select: { id: true, name: true, enterprise: { select: { id: true, name: true } } },
+          },
+        },
+      }),
+    );
+  });
+
+  it('stage[] filters (repeatable)', async () => {
+    const { svc } = makeListService();
+    expect(
+      ids((await svc.findAll('c1', { stage: ['PROSPECTO', 'NEGOCIACION'] as never })) as Row[]),
+    ).toEqual(['p1', 'n1']);
+  });
+
+  it('q matches the opportunity name OR the account name, case-insensitive', async () => {
+    const { svc } = makeListService();
+    expect(ids((await svc.findAll('c1', { q: 'planta' })) as Row[])).toEqual(['n1']);
+    expect(ids((await svc.findAll('c1', { q: 'MINERA' })) as Row[])).toEqual([
+      'p1',
+      'w-recent',
+      'l-old',
+    ]);
+  });
+
+  it('ownerId / enterpriseId / noEnterprise filters; both enterprise params → 400', async () => {
+    const { svc } = makeListService();
+    expect(ids((await svc.findAll('c1', { ownerId: 'u2' })) as Row[])).toEqual(['n1']);
+    expect(ids((await svc.findAll('c1', { enterpriseId: 'e1' })) as Row[])).toEqual([
+      'p1',
+      'w-recent',
+      'l-old',
+    ]);
+    expect(ids((await svc.findAll('c1', { noEnterprise: true })) as Row[])).toEqual(['n1']);
+    await expect(
+      svc.findAll('c1', { enterpriseId: 'e1', noEnterprise: true }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('includeClosed=false → open only; includeClosed=true → open + closed within 90 days', async () => {
+    const { svc } = makeListService();
+    expect(ids((await svc.findAll('c1', { includeClosed: false })) as Row[])).toEqual(['p1', 'n1']);
+    expect(ids((await svc.findAll('c1', { includeClosed: true })) as Row[])).toEqual([
+      'p1',
+      'n1',
+      'w-recent',
+    ]);
+  });
+
+  it('lastMovementAt is merged from ONE raw query per list call, carrying the companyId and the ids', async () => {
+    const when = new Date('2026-09-10T12:00:00Z');
+    const { svc, queryRaw } = makeListService([{ id: 'n1', lastMovementAt: when }]);
+    const list = (await svc.findAll('c1', { includeClosed: false })) as Row[];
+    expect(list.find((r) => r.id === 'n1')?.lastMovementAt).toBe(when.toISOString());
+    expect(list.find((r) => r.id === 'p1')?.lastMovementAt).toBeNull();
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    const sql = queryRaw.mock.calls[0][0] as unknown as { text: string; values: unknown[] };
+    expect(sql.text).toContain('GREATEST(o."updatedAt", act.last, n.last, d.last)');
+    expect(sql.text).toContain('o."companyId" = $1::uuid AND o.id = ANY($2::uuid[])');
+    expect(sql.values).toEqual(['c1', ['p1', 'n1']]);
+  });
+
+  it('an empty list skips the raw query', async () => {
+    const { svc, queryRaw } = makeListService();
+    expect(await svc.findAll('c1', { ownerId: 'nobody' })).toEqual([]);
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+});

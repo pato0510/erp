@@ -44,10 +44,26 @@ const LOST_REASON_LABELS: Record<LostReason, string> = {
 };
 
 interface ListFilters {
-  stage?: OpportunityStage;
+  stage?: OpportunityStage[]; // COM-020 — repeatable
   accountId?: string;
   ownerId?: string;
+  q?: string; // COM-020 — name / account name contains (case-insensitive)
+  enterpriseId?: string; // COM-020 — via the account's parent enterprise
+  noEnterprise?: boolean; // COM-020 — accounts without a parent enterprise
+  /* COM-020 — TRI-STATE on purpose: undefined = legacy behaviour (every stage, what the
+     kanban and ActivityTimeline expect); false = open only; true = open + closed within
+     the last 90 days by closedAt. */
+  includeClosed?: boolean;
 }
+
+/* COM-020 — the shape of the page-scoped raw "last movement" query (per opportunity). */
+interface LastMovementRow {
+  id: string;
+  lastMovementAt: Date | null;
+}
+
+// COM-020 — reuses the file's existing CLOSED_STAGES (GANADA/PERDIDA).
+const CLOSED_WINDOW_DAYS = 90;
 
 @Injectable()
 export class OpportunitiesService {
@@ -64,12 +80,81 @@ export class OpportunitiesService {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   }
 
+  /** COM-020 — the list (full set, no pagination, updatedAt DESC), extended — never
+   * forked: every existing caller keeps its params and its row fields; rows GAIN
+   * `account { id, name, enterprise { id, name } | null }` and the DERIVED
+   * `lastMovementAt`. `owner` stays `ownerId` (a bare actor UUID, no relation). */
   async findAll(companyId: string, filters: ListFilters = {}) {
     const where: Prisma.OpportunityWhereInput = { companyId };
-    if (filters.stage) where.stage = filters.stage;
+    const and: Prisma.OpportunityWhereInput[] = [];
+    if (filters.stage && filters.stage.length > 0) where.stage = { in: filters.stage };
     if (filters.accountId) where.accountId = filters.accountId;
     if (filters.ownerId) where.ownerId = filters.ownerId;
-    return this.prisma.opportunity.findMany({ where, orderBy: [{ updatedAt: 'desc' }] });
+    if (filters.enterpriseId && filters.noEnterprise) {
+      throw new BadRequestException('enterpriseId y noEnterprise son excluyentes.');
+    }
+    if (filters.enterpriseId) where.account = { enterpriseId: filters.enterpriseId };
+    if (filters.noEnterprise) where.account = { enterpriseId: null };
+    const q = filters.q?.trim();
+    if (q) {
+      and.push({
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { account: { name: { contains: q, mode: 'insensitive' } } },
+        ],
+      });
+    }
+    if (filters.includeClosed === false) {
+      and.push({ stage: { notIn: CLOSED_STAGES } });
+    } else if (filters.includeClosed === true) {
+      const since = new Date(Date.now() - CLOSED_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+      and.push({
+        OR: [{ stage: { notIn: CLOSED_STAGES } }, { closedAt: { gte: since } }],
+      });
+    }
+    if (and.length > 0) where.AND = and;
+    const rows = await this.prisma.opportunity.findMany({
+      where,
+      orderBy: [{ updatedAt: 'desc' }],
+      include: {
+        account: {
+          select: { id: true, name: true, enterprise: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    const lastMovement = await this.lastMovementByOpportunity(
+      companyId,
+      rows.map((r) => r.id),
+    );
+    return rows.map((r) => ({
+      ...r,
+      lastMovementAt: lastMovement.get(r.id)?.toISOString() ?? null,
+    }));
+  }
+
+  /** COM-020 — "Último movimiento" per opportunity, DERIVED at read time (never stored,
+   * never cached): ONE raw query for the whole list — no per-row work, no N+1. The twin
+   * of COM-018's lastMovementByAccount: GREATEST of the row's own updatedAt (stage moves,
+   * edits), its activities, its notes (COM-016) and its live documents (COM-017).
+   * Doctrine: raw SQL ALWAYS carries the explicit "companyId" filter (HARDEN arc). */
+  private async lastMovementByOpportunity(
+    companyId: string,
+    opportunityIds: string[],
+  ): Promise<Map<string, Date>> {
+    const result = new Map<string, Date>();
+    if (opportunityIds.length === 0) return result;
+    const rows = await this.prisma.$queryRaw<LastMovementRow[]>(Prisma.sql`
+      SELECT o.id, GREATEST(o."updatedAt", act.last, n.last, d.last) AS "lastMovementAt"
+      FROM opportunities o
+      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM activities WHERE "opportunityId" = o.id) act ON true
+      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM opportunity_notes WHERE "opportunityId" = o.id) n ON true
+      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM opportunity_documents WHERE "opportunityId" = o.id AND "deletedAt" IS NULL) d ON true
+      WHERE o."companyId" = ${companyId}::uuid AND o.id = ANY(${opportunityIds}::uuid[])
+    `);
+    for (const row of rows) {
+      if (row.lastMovementAt) result.set(row.id, new Date(row.lastMovementAt));
+    }
+    return result;
   }
 
   async findOne(id: string, companyId: string) {

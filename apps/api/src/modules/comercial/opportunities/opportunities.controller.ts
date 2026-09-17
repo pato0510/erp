@@ -35,16 +35,32 @@ export class OpportunitiesController {
 
   @Get()
   @CheckPolicies((ability) => ability.can('read', OpportunitySubject))
+  /* COM-020 — the list grew q / stage (repeatable) / enterpriseId / noEnterprise /
+   * includeClosed (tri-state: omitted = legacy full set; false = open only; true = open +
+   * closed in the last 90 days). Existing callers send none of them and see the same rows,
+   * enriched with account + lastMovementAt. */
   findAll(
     @CurrentCompany() companyId: string,
-    @Query('stage') stage?: string,
+    @Query('stage') stage?: string | string[],
     @Query('accountId') accountId?: string,
     @Query('ownerId') ownerId?: string,
+    @Query('q') q?: string,
+    @Query('enterpriseId') enterpriseId?: string,
+    @Query('noEnterprise') noEnterprise?: string,
+    @Query('includeClosed') includeClosed?: string,
   ) {
+    const stages = (Array.isArray(stage) ? stage : stage ? stage.split(',') : [])
+      .map((s) => s.trim())
+      .filter((s): s is OpportunityStage => s in OpportunityStage);
     return this.service.findAll(companyId, {
-      stage: stage ? (stage as OpportunityStage) : undefined,
+      stage: stages.length > 0 ? stages : undefined,
       accountId: accountId || undefined,
       ownerId: ownerId || undefined,
+      q: q || undefined,
+      enterpriseId: enterpriseId || undefined,
+      noEnterprise: noEnterprise === 'true' || undefined,
+      includeClosed:
+        includeClosed === 'true' ? true : includeClosed === 'false' ? false : undefined,
     });
   }
 

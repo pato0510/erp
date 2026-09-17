@@ -594,8 +594,9 @@ QA doc: docs/EXCELSIA-RRHH-QA-PRE-DESBLOQUEO.md
 Status: V1 completo (COM-001…COM-015), desplegado y visible en /modulos.
 Post-V1: COM-016 (notas internas de oportunidad), COM-017 (documentos adjuntos
 de oportunidad), COM-018 (Cuentas v2: Enterprise + columnas + acordeón) y
-COM-021 (gestión de empresas + asignación masiva) y COM-019 (dashboard
-comercial), 2026-09-15/16 — ver bloques abajo.
+COM-021 (gestión de empresas + asignación masiva), COM-019 (dashboard
+comercial) y COM-020 (Pipeline 2.0: vista tabla), 2026-09-15/17 — ver bloques
+abajo.
 Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
@@ -826,8 +827,39 @@ Opportunity && read Account` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT).
   ficha) y Cuentas top, lista de actividades; "Sin datos en el rango." por
   sección. SIN tocar la fábrica CASL (GO-001 de Codex): puertas sobre subjects
   existentes.
+- COM-020 — PIPELINE 2.0 (2026-09-17; CRM-5, decisión del fundador
+  2026-09-17): VISTA TABLA agrupada por etapa como vista POR DEFECTO de
+  `/comercial/pipeline`, con toggle "Tabla | Kanban" (estado React, sin
+  storage); el kanban queda intacto como vista alternativa. SIN drag-and-drop
+  (diferido: se agregaría como extensión SOBRE esta vista, nunca reemplazándola).
+  Componente `PipelineTable`: un grupo colapsable por etapa abierta en
+  `STAGE_ORDER` (botón con `aria-expanded`/`aria-controls`; abiertas
+  expandidas, vacías colapsadas con "0"), con pill de etapa, conteo y suma
+  (CLP); "Ver cerradas (90 días)" agrega GANADA/PERDIDA colapsadas. Columnas:
+  Oportunidad · Cuenta · Empresa · Etapa · Valor · Responsable · Último
+  movimiento (relativo + absoluto en hover) · Cierre esperado
+  (`expectedCloseDate` existe); NO hay "Próxima actividad" (`activityDate` es
+  cuándo OCURRIÓ la interacción; no existe concepto de actividad programada).
+  CAMBIO DE ETAPA INLINE: la pill es un `<select>` nativo para writers que
+  llama al MISMO `attemptMove` del kanban → GANADA confirm liviano, PERDIDA
+  `LostReasonModal`, resto PATCH `/:id/stage` canónico, optimista + revert +
+  toast `role="alert"`; lectores ven la pill estática. Filtros server-side
+  (q, etapas múltiples, responsable — directorio `/api/users` si el rol lo
+  lee, si no los ownerIds cargados —, empresa vía `EnterpriseSelect`,
+  "Limpiar"); orden client-side por columna (`aria-sort`) dentro de cada
+  grupo. API: GET `/comercial/opportunities` EXTENDIDO, no bifurcado — gana
+  `q`, `stage` repetible, `enterpriseId`/`noEnterprise`, `includeClosed`
+  TRI-ESTADO (omitido = set completo legado que esperan kanban y
+  ActivityTimeline; `false` = solo abiertas; `true` = abiertas + cerradas con
+  `closedAt` en los últimos 90 días); cada fila suma `account { id, name,
+enterprise }` (el responsable sigue siendo `ownerId`, UUID sin relación) y
+  `lastMovementAt` DERIVADO POR OPORTUNIDAD, jamás almacenado: UNA query raw
+  por llamada (`Prisma.sql`, gemela de la de COM-018) con `GREATEST` de
+  `updatedAt` propio, actividades, notas y documentos vivos, `WHERE
+o."companyId" = $1::uuid AND o.id = ANY($2::uuid[])`. Sin migración, sin
+  subject nuevo, sin CASL.
 
-Última actualización: 2026-09-17 (COM-019 + UI-003)
+Última actualización: 2026-09-17 (COM-020)
 
 ═══════════════════════════════════════════════════════════════════
 
