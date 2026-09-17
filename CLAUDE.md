@@ -453,6 +453,38 @@ apps/web/src/app/(dashboard)/operaciones/
   secundario de header/footer `--hub-text-secondary`. Geometría, tipografía,
   textos, orden, escenas SVG (HUB-002), línea de estado y footer (HUB-003b/004)
   intactos.
+- HUB-003a — Estado vivo por módulo (2026-09-17): `GET /api/hub/status`,
+  con `JwtAuthGuard`, membresía activa vía `PoliciesGuard` y política explícita
+  `@CheckPolicies(() => true)`; permisos por módulo desde `@CurrentAbility`.
+  Respuesta `{ lines: [{ moduleKey, kind, message }] }`.
+  Consultas nuevas con `companyId` explícito dentro de `executeWithRls`;
+  servicios reutilizados conservan sus caminos de lectura. Una ronda de
+  `Promise.allSettled`, con advertencia por fuente fallida. Todo derivado en vivo,
+  sin cron ni persistencia; la línea se omite sin permiso o si la fuente falla.
+  `kind`: `atencion` con conteos positivos y `correcto` en cero, salvo Marketing,
+  siempre `informativo`. `message` en español, singular/plural según cantidad,
+  sin prefijo `>`; se omiten las partes de conteo cero en tareas y críticas.
+  Decisión del fundador (2026-09-17): producción muestra datos reales;
+  los textos de ejemplo del equipo de diseño viven solo en la rama de demo.
+  Siete fuentes:
+  - `finanzas`: `resolveDefaultCategoryIds` de FIN-B + `movement.count`,
+    semántica `uncategorized=only`; gate `read` sobre `MovementSubject`.
+  - `operaciones`: `AlertInstancesService.getKpis`, conteos `active` y
+    `critical`; gate `read` sobre `AlertRuleSubject`. Criterio documentado:
+    alertas abiertas = `ACTIVE`; críticas = `CRITICAL` + `BLOCKING`.
+  - `hsec`: `hsecIncident.count` por `occurredDate`, hoy Santiago y los
+    29 días anteriores; gate `read` sobre `HsecIncidentSubject`.
+  - `comercial`: `AlertsService.getAlerts(companyId, true)`, `counts.total`;
+    gate `read` sobre `OpportunitySubject` Y `QuoteSubject`.
+  - `marketing`: `campaign.count` con estado `ACTIVA`;
+    gate `read` sobre `CampaignSubject`.
+  - `rrhh`: tres consultas `count` nuevas sobre `employeeContract`,
+    `employeeDocument` y `certification`, con la elegibilidad de los
+    recordatorios y fechas desde hoy hasta hoy + 30 días inclusive en Santiago;
+    gate `read` sobre `EmployeeSubject`. No se ejecutan los recordatorios:
+    no existe un resumen puro reutilizable de las tres fuentes.
+  - `gestion`: `TodosService.alerts` con `scope: 'mine'` y `summary: true`,
+    `counts.overdue` y `counts.dueSoon`; gate `read` sobre `TodoSubject`.
 
 ## Plan de sprints del módulo
 

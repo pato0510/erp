@@ -7,5 +7,6 @@ import { TodosService } from './todos.service';
   imports: [NotificationModule],
   controllers: [TodosController],
   providers: [TodosService],
+  exports: [TodosService],
 })
 export class TodosModule {}

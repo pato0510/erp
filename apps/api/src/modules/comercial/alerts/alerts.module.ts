@@ -11,5 +11,6 @@ import { AlertsService } from './alerts.service';
   imports: [OpportunitiesModule],
   controllers: [AlertsController],
   providers: [AlertsService],
+  exports: [AlertsService],
 })
 export class AlertsModule {}
