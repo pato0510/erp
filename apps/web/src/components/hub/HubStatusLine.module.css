@@ -1,0 +1,30 @@
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.dot {
+  flex: 0 0 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-color);
+}
+
+.prompt {
+  flex: 0 0 auto;
+  color: var(--status-color);
+}
+
+.message {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hub-desc);
+  text-overflow: ellipsis;
+}

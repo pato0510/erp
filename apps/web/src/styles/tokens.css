@@ -59,6 +59,9 @@
   --hub-title: #ffffff;
   --hub-desc: #e1e9f3;
   --hub-text-secondary: #aebed3;
+  --hub-status-atencion: #fcd34d;
+  --hub-status-correcto: #86efac;
+  --hub-status-informativo: #93c5fd;
   --hub-shadow: 0 5px 13px #030c1729;
   --hub-highlight: inset 0 1px 0 #ffffff0c;
   --hub-veil: linear-gradient(0deg, #06111b38, transparent 70%);

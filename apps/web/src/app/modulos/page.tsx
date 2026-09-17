@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, ClipboardList, LogOut, Moon, Sun } from 'lucide-react';
+import { ArrowRight, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 // UI-003 — the brand isotype (designer SVG) replaces the inline gradient mark.
 import { ExcelsiaLogo } from '../../components/shared/ExcelsiaLogo';
@@ -10,314 +10,25 @@ import { useTheme } from '../../lib/theme';
 import { Starfield } from '../../components/Starfield';
 // HUB-004 — the footer with the centred clock · latency · connection block.
 import { HubFooter } from '../../components/hub/HubFooter';
+import { HubScene, type HubModuleKey } from '../../components/hub/HubScene';
+import { HubStatusLine, type HubStatusKind } from '../../components/hub/HubStatusLine';
+import { apiClient } from '../../lib/api';
 
 type ModuleDef = {
   key: string;
   /* HUB-001 — the exact token key in tokens.css (--hub-<hubKey>-from/-to/-border/-ink/-glow). */
-  hubKey: 'finanzas' | 'operaciones' | 'hsec' | 'comercial' | 'marketing' | 'rrhh' | 'gestion';
+  hubKey: HubModuleKey;
   name: string;
   description: string;
   href: string | null;
   active: boolean;
-  svg: ReactNode;
 };
 
-const FIN_BARS = [
-  { x: 30, y: 180, h: 60, d: '0s' },
-  { x: 60, y: 160, h: 80, d: '0.3s' },
-  { x: 90, y: 140, h: 100, d: '0.6s' },
-  { x: 120, y: 120, h: 120, d: '0.9s' },
-  { x: 150, y: 100, h: 140, d: '1.2s' },
-  { x: 180, y: 80, h: 160, d: '1.5s' },
-];
-
-const FinanzasSvg = () => (
-  <svg
-    viewBox="0 0 240 240"
-    preserveAspectRatio="xMidYMid slice"
-    className="mod-svg"
-    style={{ opacity: 0.45 }}
-  >
-    {FIN_BARS.map((b) => (
-      <rect
-        key={b.x}
-        x={b.x}
-        y={b.y}
-        width="20"
-        height={b.h}
-        rx="2"
-        fill="white"
-        className="fin-bar"
-        style={{ animationDelay: b.d }}
-      />
-    ))}
-    <path
-      d="M 20 160 Q 60 140, 100 120 T 180 60"
-      stroke="white"
-      strokeWidth="3"
-      strokeLinecap="round"
-      fill="none"
-      strokeDasharray="200"
-      className="fin-line"
-    />
-  </svg>
-);
-
-const OperacionesSvg = () => (
-  <svg
-    viewBox="0 0 240 240"
-    preserveAspectRatio="xMidYMid slice"
-    className="mod-svg"
-    style={{ opacity: 0.45 }}
-  >
-    <g className="ops-gear-big">
-      <circle cx="80" cy="100" r="40" fill="none" stroke="white" strokeWidth="3" />
-      <circle cx="80" cy="100" r="14" fill="white" />
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-        <rect
-          key={deg}
-          x="76"
-          y="50"
-          width="8"
-          height="20"
-          rx="2"
-          fill="white"
-          transform={`rotate(${deg} 80 100)`}
-        />
-      ))}
-    </g>
-    <g className="ops-gear-small">
-      <circle cx="170" cy="160" r="28" fill="none" stroke="white" strokeWidth="2.5" />
-      <circle cx="170" cy="160" r="10" fill="white" />
-      {[0, 90, 180, 270].map((deg) => (
-        <rect
-          key={deg}
-          x="167"
-          y="125"
-          width="6"
-          height="14"
-          rx="2"
-          fill="white"
-          transform={`rotate(${deg} 170 160)`}
-        />
-      ))}
-    </g>
-  </svg>
-);
-
-const HsecSvg = () => (
-  <svg
-    viewBox="0 0 240 240"
-    preserveAspectRatio="xMidYMid slice"
-    className="mod-svg"
-    style={{ opacity: 0.5 }}
-  >
-    {[0, 1, 2].map((i) => (
-      <circle
-        key={i}
-        cx="120"
-        cy="120"
-        r="20"
-        fill="none"
-        stroke="white"
-        strokeWidth="2"
-        className="hsec-pulse"
-        style={{ animationDelay: `${i}s` }}
-      />
-    ))}
-    <g>
-      <path
-        d="M 0 -28 L -22 -16 L -22 8 Q -22 22 0 30 Q 22 22 22 8 L 22 -16 Z"
-        transform="translate(120 120)"
-        fill="white"
-        opacity="0.85"
-      />
-      <path
-        d="M -8 0 L -3 6 L 8 -8"
-        transform="translate(120 120)"
-        stroke="#10B981"
-        strokeWidth="3"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </g>
-  </svg>
-);
-
-const ComercialSvg = () => (
-  <svg
-    viewBox="0 0 240 240"
-    preserveAspectRatio="xMidYMid slice"
-    className="mod-svg"
-    style={{ opacity: 0.5 }}
-  >
-    <g stroke="white" strokeWidth="2" fill="none" opacity="0.4">
-      <line x1="40" y1="80" x2="100" y2="120" />
-      <line x1="100" y1="120" x2="160" y2="80" />
-      <line x1="100" y1="120" x2="160" y2="160" />
-      <line x1="160" y1="80" x2="200" y2="120" />
-      <line x1="160" y1="160" x2="200" y2="120" />
-    </g>
-    <circle cx="40" cy="80" r="8" fill="white" className="com-flow" />
-    <circle cx="40" cy="80" r="3" fill="white" opacity="0.5" className="com-dot" />
-    <circle cx="100" cy="120" r="10" fill="white" opacity="0.9" />
-    <circle cx="160" cy="80" r="8" fill="white" opacity="0.7" />
-    <circle cx="160" cy="160" r="8" fill="white" opacity="0.7" />
-    <circle cx="200" cy="120" r="9" fill="white" opacity="0.8" />
-  </svg>
-);
-
-const CalendarioSvg = () => (
-  <ClipboardList
-    className="mod-svg"
-    color="white"
-    strokeWidth={1}
-    style={{ opacity: 0.45 }}
-    aria-hidden="true"
-  />
-);
-
-const MarketingSvg = () => (
-  <svg
-    viewBox="0 0 240 240"
-    preserveAspectRatio="xMidYMid slice"
-    className="mod-svg"
-    style={{ opacity: 0.5 }}
-  >
-    {/* megaphone: mouthpiece + widening cone */}
-    <rect x="55" y="112" width="16" height="26" rx="3" fill="white" opacity="0.85" />
-    <path d="M71 108 L128 84 L128 166 L71 142 Z" fill="white" opacity="0.9" />
-    {/* broadcast waves */}
-    <g stroke="white" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.55">
-      <path d="M140 98 Q158 125 140 152" />
-      <path d="M158 84 Q186 125 158 166" />
-    </g>
-  </svg>
-);
-
-const RRHH_LINES = [
-  { x1: 120, y1: 80, x2: 75, y2: 130, d: '0s' },
-  { x1: 120, y1: 80, x2: 165, y2: 130, d: '0.5s' },
-  { x1: 75, y1: 130, x2: 50, y2: 190, d: '1s' },
-  { x1: 75, y1: 130, x2: 120, y2: 190, d: '1.3s' },
-  { x1: 165, y1: 130, x2: 120, y2: 190, d: '1.6s' },
-  { x1: 165, y1: 130, x2: 190, y2: 190, d: '1.9s' },
-];
-
-const RRHH_PEOPLE = [
-  {
-    x: 120,
-    y: 75,
-    r: 9,
-    body: 'M -14 18 Q -14 8 0 8 Q 14 8 14 18 L 14 22 L -14 22 Z',
-    d: '0s',
-    op: 0.95,
-  },
-  {
-    x: 75,
-    y: 130,
-    r: 8,
-    body: 'M -12 16 Q -12 7 0 7 Q 12 7 12 16 L 12 20 L -12 20 Z',
-    d: '0.5s',
-    op: 0.85,
-  },
-  {
-    x: 165,
-    y: 130,
-    r: 8,
-    body: 'M -12 16 Q -12 7 0 7 Q 12 7 12 16 L 12 20 L -12 20 Z',
-    d: '0.7s',
-    op: 0.85,
-  },
-  {
-    x: 50,
-    y: 190,
-    r: 7,
-    body: 'M -10 14 Q -10 6 0 6 Q 10 6 10 14 L 10 18 L -10 18 Z',
-    d: '1s',
-    op: 0.75,
-  },
-  {
-    x: 120,
-    y: 190,
-    r: 7,
-    body: 'M -10 14 Q -10 6 0 6 Q 10 6 10 14 L 10 18 L -10 18 Z',
-    d: '1.2s',
-    op: 0.75,
-  },
-  {
-    x: 190,
-    y: 190,
-    r: 7,
-    body: 'M -10 14 Q -10 6 0 6 Q 10 6 10 14 L 10 18 L -10 18 Z',
-    d: '1.4s',
-    op: 0.75,
-  },
-];
-
-const RRHH_PLUSES = [
-  { x: 98, y: 105, size: 14, d: '0s' },
-  { x: 142, y: 105, size: 14, d: '1s' },
-  { x: 120, y: 160, size: 12, d: '2s' },
-];
-
-const RrhhSvg = () => (
-  <svg
-    viewBox="0 0 240 240"
-    preserveAspectRatio="xMidYMid slice"
-    className="mod-svg"
-    style={{ opacity: 0.5 }}
-  >
-    {RRHH_LINES.map((l, i) => (
-      <line
-        key={i}
-        x1={l.x1}
-        y1={l.y1}
-        x2={l.x2}
-        y2={l.y2}
-        stroke="white"
-        strokeWidth="2"
-        fill="none"
-        opacity="0.5"
-        className="rrhh-line"
-        style={{ animationDelay: l.d }}
-      />
-    ))}
-    {RRHH_PEOPLE.map((p, i) => (
-      <g
-        key={i}
-        opacity={p.op}
-        className="rrhh-person"
-        style={{
-          transformBox: 'view-box' as CSSProperties['transformBox'],
-          transformOrigin: `${p.x}px ${p.y}px`,
-          animationDelay: p.d,
-        }}
-      >
-        <g transform={`translate(${p.x} ${p.y})`}>
-          <circle r={p.r} fill="white" />
-          <path d={p.body} fill="white" />
-        </g>
-      </g>
-    ))}
-    {RRHH_PLUSES.map((p, i) => (
-      <text
-        key={i}
-        x={p.x}
-        y={p.y}
-        fontSize={p.size}
-        fontWeight="500"
-        textAnchor="middle"
-        fill="white"
-        className="rrhh-plus"
-        style={{ animationDelay: p.d }}
-      >
-        +
-      </text>
-    ))}
-  </svg>
-);
+type ModuleStatusLine = {
+  moduleKey: HubModuleKey;
+  kind: HubStatusKind;
+  message: string;
+};
 
 const MODULES: ModuleDef[] = [
   {
@@ -327,7 +38,6 @@ const MODULES: ModuleDef[] = [
     description: 'Gestión financiera, tributario, conciliación bancaria y reportes ejecutivos',
     href: '/dashboard',
     active: true,
-    svg: <FinanzasSvg />,
   },
   {
     key: 'operaciones',
@@ -336,7 +46,6 @@ const MODULES: ModuleDef[] = [
     description: 'Control de activos, documentos, permisos y procedimientos operacionales',
     href: '/operaciones',
     active: true,
-    svg: <OperacionesSvg />,
   },
   {
     // HSEC-011 (2026-08-03) — un-gated: HSEC is live (incidentes + afectados + adjuntos +
@@ -349,7 +58,6 @@ const MODULES: ModuleDef[] = [
     description: 'Salud, seguridad, medio ambiente y comunidades',
     href: '/hsec',
     active: true,
-    svg: <HsecSvg />,
   },
   {
     key: 'comercial',
@@ -358,7 +66,6 @@ const MODULES: ModuleDef[] = [
     description: 'Pipeline de ventas, CRM, cotizaciones y gestión de clientes',
     href: '/comercial', // COM-015 — un-gated: Comercial is live (CRM, quotes, Operaciones/Finanzas wiring)
     active: true,
-    svg: <ComercialSvg />,
   },
   {
     // MKT-010 — un-gated: Marketing V1 is live (campaigns, expenses, calendar,
@@ -369,7 +76,6 @@ const MODULES: ModuleDef[] = [
     description: 'Campañas, gastos de marketing y presencia digital',
     href: '/marketing',
     active: true,
-    svg: <MarketingSvg />,
   },
   {
     key: 'rrhh',
@@ -378,7 +84,6 @@ const MODULES: ModuleDef[] = [
     description: 'Gestión del talento, nóminas, evaluaciones y desarrollo organizacional',
     href: '/rrhh',
     active: true,
-    svg: <RrhhSvg />,
   },
   {
     // CAL-007 — un-gated: Calendario de Actividades is live (three views, chips by area,
@@ -389,7 +94,6 @@ const MODULES: ModuleDef[] = [
     description: 'To-dos, calendario, áreas y alertas del equipo',
     href: '/actividades',
     active: true,
-    svg: <CalendarioSvg />,
   },
 ];
 
@@ -397,6 +101,28 @@ export default function ModulosPage() {
   const { user, isLoading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
+  const [focusedKey, setFocusedKey] = useState<HubModuleKey | null>(null);
+  const [activeKey, setActiveKey] = useState<HubModuleKey | null>(null);
+  const [lines, setLines] = useState<ModuleStatusLine[]>([]);
+  const isReady = !isLoading && !!user;
+
+  useEffect(() => {
+    if (!isReady) return;
+    let cancelled = false;
+
+    apiClient
+      .get<{ lines: ModuleStatusLine[] }>('/api/hub/status')
+      .then((response) => {
+        if (!cancelled) setLines(response.lines);
+      })
+      .catch(() => {
+        if (!cancelled) setLines([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -415,8 +141,6 @@ export default function ModulosPage() {
     if (!mod.active || !mod.href) return;
     router.push(mod.href);
   };
-
-  const isReady = !isLoading && !!user;
 
   return (
     <div className="modulos-page-wrapper mod-root">
@@ -473,11 +197,27 @@ export default function ModulosPage() {
             <div className="modulos-grid">
               {MODULES.map((mod, index) => {
                 const isActive = mod.active;
+                const line = lines.find((item) => item.moduleKey === mod.hubKey);
                 return (
                   <div
                     key={mod.key}
                     className={`module-card${isActive ? ' module-card--active' : ''}`}
                     onClick={() => handleSelect(mod)}
+                    onFocus={() => {
+                      if (!isActive) return;
+                      setFocusedKey(mod.hubKey);
+                      setActiveKey(mod.hubKey);
+                    }}
+                    onBlur={() => {
+                      setFocusedKey(null);
+                      setActiveKey(null);
+                    }}
+                    onMouseEnter={() => {
+                      if (isActive && focusedKey === null) setActiveKey(mod.hubKey);
+                    }}
+                    onMouseLeave={() => {
+                      if (focusedKey === null) setActiveKey(null);
+                    }}
                     role={isActive ? 'button' : undefined}
                     tabIndex={isActive ? 0 : -1}
                     onKeyDown={(e) => {
@@ -500,7 +240,9 @@ export default function ModulosPage() {
                       } as CSSProperties
                     }
                   >
-                    <div className="module-card__svg">{mod.svg}</div>
+                    <div className="module-card__svg">
+                      <HubScene moduleKey={mod.hubKey} playing={activeKey === mod.hubKey} />
+                    </div>
                     <div className="module-card__shade" aria-hidden="true" />
                     {!isActive && <div className="module-card__badge">PRÓXIMAMENTE</div>}
                     {isActive && (
@@ -511,6 +253,9 @@ export default function ModulosPage() {
                     <div className="module-card__content">
                       <h3 className="module-card__title">{mod.name}</h3>
                       <p className="module-card__desc">{mod.description}</p>
+                      <div className="module-card__status">
+                        {line && <HubStatusLine kind={line.kind} message={line.message} />}
+                      </div>
                     </div>
                   </div>
                 );
@@ -633,14 +378,12 @@ export default function ModulosPage() {
           border-radius: 999px;
           flex: none;
         }
-        /* Status colours — spec §4. --hub-status-correcto / --hub-status-atencion do not
-           exist in tokens.css yet (Codex owns that file this wave), so the raw values live
-           here, in the allowlisted hub page. */
+        /* HUB-002 — status tokens shared by the card lines and footer indicators. */
         .mod-ind__dot--online {
-          background: #86efac;
+          background: var(--hub-status-correcto);
         }
         .mod-ind__dot--failure {
-          background: #fcd34d;
+          background: var(--hub-status-atencion);
         }
         .mod-ind__dot--idle {
           background: var(--hub-text-secondary);
@@ -857,11 +600,6 @@ export default function ModulosPage() {
           inset: 0;
           pointer-events: none;
         }
-        .module-card__svg .mod-svg {
-          width: 100%;
-          height: 100%;
-          transform-origin: center;
-        }
         /* HUB-001 — the veil behind title/description (exact --hub-veil). */
         .module-card__shade {
           position: absolute;
@@ -926,6 +664,11 @@ export default function ModulosPage() {
           color: var(--hub-desc);
         }
 
+        .module-card__status {
+          height: 16px;
+          margin-top: 8px;
+        }
+
         @media (max-width: 900px) {
           .modulos-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -959,157 +702,6 @@ export default function ModulosPage() {
           .modulos-grid {
             grid-template-columns: 1fr;
           }
-        }
-
-        /* ─── Animation primitives (shared) ─── */
-        @keyframes finbar {
-          0%,
-          100% {
-            transform: scaleY(1);
-          }
-          50% {
-            transform: scaleY(1.3);
-          }
-        }
-        @keyframes finline {
-          0% {
-            stroke-dashoffset: 200;
-          }
-          100% {
-            stroke-dashoffset: 0;
-          }
-        }
-        @keyframes opsrot {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        @keyframes opsrotrev {
-          from {
-            transform: rotate(360deg);
-          }
-          to {
-            transform: rotate(0deg);
-          }
-        }
-        @keyframes hsecpulse {
-          0% {
-            transform: scale(1);
-            opacity: 0.8;
-          }
-          100% {
-            transform: scale(2.5);
-            opacity: 0;
-          }
-        }
-        @keyframes comflow {
-          0%,
-          100% {
-            transform: translateX(0);
-          }
-          50% {
-            transform: translateX(20px);
-          }
-        }
-        @keyframes comdot {
-          0% {
-            r: 3;
-            opacity: 1;
-          }
-          100% {
-            r: 8;
-            opacity: 0;
-          }
-        }
-        @keyframes calhighlight {
-          0%,
-          100% {
-            opacity: 0.2;
-          }
-          50% {
-            opacity: 0.8;
-          }
-        }
-        @keyframes rrhhpulse {
-          0%,
-          100% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(1.12);
-          }
-        }
-        @keyframes rrhhline {
-          0%,
-          100% {
-            opacity: 0.25;
-          }
-          50% {
-            opacity: 0.7;
-          }
-        }
-        @keyframes rrhhplus {
-          0% {
-            transform: translateY(0);
-            opacity: 0;
-          }
-          30% {
-            opacity: 0.6;
-          }
-          70% {
-            opacity: 0.6;
-          }
-          100% {
-            transform: translateY(-30px);
-            opacity: 0;
-          }
-        }
-
-        /* ─── Per-module animation hooks ─── */
-        .fin-bar {
-          transform-box: fill-box;
-          transform-origin: 50% 100%;
-          animation: finbar 2s ease-in-out infinite;
-        }
-        .fin-line {
-          animation: finline 3s ease-in-out infinite;
-        }
-        .ops-gear-big {
-          transform-box: view-box;
-          transform-origin: 80px 100px;
-          animation: opsrot 8s linear infinite;
-        }
-        .ops-gear-small {
-          transform-box: view-box;
-          transform-origin: 170px 160px;
-          animation: opsrotrev 6s linear infinite;
-        }
-        .hsec-pulse {
-          transform-box: view-box;
-          transform-origin: 120px 120px;
-          animation: hsecpulse 3s ease-out infinite;
-        }
-        .com-flow {
-          animation: comflow 4s ease-in-out infinite;
-        }
-        .com-dot {
-          animation: comdot 2s ease-out infinite;
-        }
-        .cal-cell {
-          animation: calhighlight 4s ease-in-out infinite;
-        }
-        .rrhh-line {
-          animation: rrhhline 3s ease-in-out infinite;
-        }
-        .rrhh-person {
-          animation: rrhhpulse 2.5s ease-in-out infinite;
-        }
-        .rrhh-plus {
-          opacity: 0;
-          animation: rrhhplus 3s ease-out infinite;
         }
 
         @media (prefers-reduced-motion: reduce) {

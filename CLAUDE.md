@@ -507,6 +507,31 @@ apps/web/src/app/(dashboard)/operaciones/
   en `tokens.css` (pendiente de agregarlos y migrar). CSS crítico de
   `app/layout.tsx`: pre-paint del hub `#000` → `#142941` (= `--hub-bg`,
   hallazgo HUB-001).
+- HUB-002 — Escenas «C · Barrido» y estado vivo en las tarjetas (2026-09-17):
+  `HubScene` selecciona siete escenas por `hubKey`, con cuadrícula de 17 px,
+  etiquetas en la fuente de la app y trazos en `--card-ink` / `--card-border`.
+  Capa decorativa `aria-hidden`, sin interceptar puntero; SVG `240×240`, gráfico
+  acotado sobre el contenido y bajo la flecha. Secuencia CSS de una iteración:
+  opacidad `0.55` → `0.87` en 160 ms; barrido 1050 ms tras 100 ms; etiquetas
+  220 ms tras 180/540 ms; conexiones 650 ms tras 350 ms; nodos escalonados,
+  fin máximo 1330 ms. Sin bucles; al salir queda la composición terminada y
+  se repite por cambio de clase al reingresar. `focusedKey` tiene prioridad
+  sobre el puntero y `activeKey` permite una sola escena activa. Sin handlers
+  touch: el toque navega directamente. `prefers-reduced-motion` muestra el
+  estado terminado, sin barrido, revelados ni transiciones decorativas.
+  `HubStatusLine`: punto de 6 px, prefijo `>`, texto mono de 11 px, ellipsis,
+  `title` y `aria-label` con «Estado: …»; espacio reservado aun sin línea.
+  `--hub-status-atencion` / `--hub-status-correcto` / `--hub-status-informativo`
+  usan `#FCD34D` / `#86EFAC` / `#93C5FD`, idénticos en ambos temas; los dos
+  indicadores de conexión de HUB-004 también pasan a estos tokens, cerrando
+  su pendiente anterior. Una consulta `GET /api/hub/status` de HUB-003a al
+  montar, después del gate de sesión; sin polling ni datos ficticios, error
+  o módulo omitido → sin línea. Se conservan geometría, gradientes, textos,
+  rutas, permisos, borde activo HUB-001 y entrada escalonada UI-002; se retiran
+  las siete ilustraciones anteriores y sus keyframes. Header y `HubFooter`
+  mantienen su tipografía y comportamiento existentes.
+
+Última actualización: 2026-09-17 (HUB-002).
 
 ## Plan de sprints del módulo
 
