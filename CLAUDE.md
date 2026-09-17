@@ -67,6 +67,95 @@ role-based access control (RBAC) prepared for ABAC.
 
 ═══════════════════════════════════════════════════════════════════
 
+# SPRINT 17 — MEJORAS (2026-09-15 → 2026-09-17)
+
+Quince tickets a `develop` en siete olas de rama de revisión, con dos sesiones
+implementadoras en paralelo (Claude Code ∥ Codex). SHAs verificados contra
+`git log --oneline develop` el 2026-09-17. El detalle de cada ticket vive en el
+bloque de su módulo; este bloque es el índice del sprint.
+
+## Tickets
+
+| Ticket    | Título corto                                                      | SHA       | Ola |
+| --------- | ----------------------------------------------------------------- | --------- | --- |
+| COM-016   | Notas internas de oportunidad                                     | `0529814` | 1   |
+| UI-001    | Tokens de tema + guard `lint:theme` en CI                         | `d3926f5` | 1   |
+| UI-002    | Hub como landing + movimiento sobrio en tarjetas                  | `e494fa7` | 2   |
+| COM-017   | Documentos de oportunidad (upload/download streamed, soft delete) | `4afb69c` | 2   |
+| COM-018   | Enterprise + Cuentas v2 (último movimiento derivado, acordeón)    | `ae1adbb` | 3   |
+| FIN-A     | Giro de contraparte, regla `GIRO`, columnas RUT/giro y export     | `368e4d7` | 3   |
+| COM-021   | Gestión de empresas + asignación masiva de cuentas                | `e7e18ea` | 4   |
+| FIN-B     | Recategorización con reglas + no categorizados al pie             | `d090206` | 4   |
+| COM-019   | Dashboard comercial (win rate, pipeline, cuentas)                 | `e304a99` | 5   |
+| UI-003    | Marca nueva: `ExcelsiaLogo`, favicon e íconos                     | `74b5ff7` | 5   |
+| GO-001    | To-dos organizacionales con notificación in-app                   | `395f6a6` | 5   |
+| COM-020   | Pipeline 2.0: vista tabla por etapa con cambio inline             | `1ec2bd3` | 6   |
+| GO-002    | Renombre a Gestión organizacional                                 | `6db8c13` | 6   |
+| ALERT-001 | Panel de alertas comercial                                        | `4b7e11f` | 7   |
+| ALERT-002 | Panel de alertas de Gestión organizacional                        | `412d3a3` | 7   |
+
+## Doctrina nueva o cambiada (dónde vive cada una)
+
+- Tokens de tema como utilidades Tailwind + guard `nx run web:lint:theme` en CI +
+  reglas de allowlist (`theme-allowlist.json`) → § Tokens de tema (UI-001).
+- `dark:` SOLO sobre colores semánticos (rojo/verde/ámbar/azul), nunca neutros →
+  § Tokens de tema (UI-001).
+- Assets de marca en `public/brand/` y `ExcelsiaLogo` (`variant`/`tone`, `auto`
+  vía CSS sin JS) → § Marca (UI-003).
+- `Enterprise` ≠ `Company` (el tenant); una Enterprise → muchas Accounts; sin
+  DELETE, unicidad en la migración → bloque Comercial, COM-018 y COM-021.
+- Campos DERIVADOS EN VIVO con UNA query raw por página, `"companyId"` explícito
+  y `ANY($2::uuid[])`: `lastMovementAt` de cuentas (COM-018) y de oportunidades
+  (COM-020, reusado por ALERT-001) → bloque Comercial.
+- Giro como dato fuente de la contraparte, tipo de regla `GIRO`, precedencia
+  `RUT` → `GIRO` → `KEYWORD`; las filas RCV de BaseAPI NO traen giro
+  (confirmado en producción 2026-09-16) → § FIN-A del bloque Finanzas.
+- "No categorizado" = categorías default `Productos no categorizados` por tipo;
+  recategorización preview-then-apply (`dryRun`); regla de período cerrado
+  (`DRAFT` + `CLOSED` se omite) → § FIN-B del bloque Finanzas.
+- To-dos: VIEWER lee y completa solo lo propio, `/todos/assignees` proyecta
+  miembros activos, notificación en la petición vía `createGeneric` → § GO-001
+  del bloque Gestión organizacional.
+- Paneles de alertas DERIVADOS en vivo, sin cron ni persistencia: umbrales
+  7/14 días (Comercial) y hoy/mañana con fecha Santiago (Gestión) →
+  ALERT-001 (bloque Comercial) y ALERT-002 (bloque Gestión organizacional).
+- Excepción firmada por el fundador: `opportunity_documents` SIN fallback de
+  blob en DB (decisión arquitectónica 10) → COM-017 del bloque Comercial.
+
+## Formas de trabajo que quedaron como práctica
+
+- Rama de revisión `review/<ola>` por ola, merge ff-only, y lectura cruda del
+  commit antes de mergear.
+- Un commit por ticket con rutas explícitas; nunca `-A`.
+- Se commitea solo con la otra sesión ociosa: lint-staged stashea TODO el árbol.
+- Cada prompt implementador lleva el aviso de sesión paralela con los archivos
+  de la otra sesión.
+- `CLAUDE.md` lo edita UNA sesión por ola.
+- Ritual post-push: ambos servicios en SUCCESS y, si hay migración, la línea
+  literal `Applying migration <name>` en los logs de api.
+- Chequeo del fundador en producción después de cada ola.
+
+## Deudas y pendientes
+
+- (siguiente hueco libre) Endpoint de directorio de miembros: los mapas de autor
+  degradan a UUID corto para no-admins porque `/api/users` exige `manage User`.
+- (siguiente hueco libre) Helper de fecha Santiago duplicado en tres módulos
+  (actividades, todos, alertas comercial) → uno en `common`.
+- (V2) El giro debe ingresarse a mano mientras el RCV no lo traiga.
+- (V2) Drag-and-drop SOBRE la tabla del pipeline, solo si el cliente lo pide.
+- (siguiente hueco libre) El keyframe de entrada del hub termina en opacity 1
+  (flicker latente si alguna vez aparece una tarjeta inactiva).
+- (siguiente hueco libre) Botones rellenos oscuros usan `--color-dark` y
+  pierden silueta sobre fondos oscuros.
+- (siguiente hueco libre) `--text-muted` y bordes al 8% quedan con bajo
+  contraste en texto pequeño en modo oscuro.
+- (pendiente de preferencia del fundador) La columna "Industria" salió del
+  listado de Cuentas (sigue en ficha y formulario).
+
+Última actualización: 2026-09-17 (DOC-S17-CLOSE)
+
+═══════════════════════════════════════════════════════════════════
+
 # MÓDULO FINANZAS (V1 COMPLETO EN PRODUCCIÓN)
 
 ═══════════════════════════════════════════════════════════════════
@@ -150,11 +239,9 @@ Aplicado en sync SII y disponible para uso manual
   No hay columnas adicionales de criterios en `CategoryRule`.
 - RUT y Giro aparecen después de Contraparte en la tabla `/movimientos` y en
   el XLSX; valores ausentes quedan vacíos en la exportación.
-- **Pregunta abierta:** no está confirmado que las filas RCV de BaseAPI traigan
-  giro (el dato vive en el XML DTE). El conteo del backfill después del deploy
-  permitirá comprobarlo sobre los documentos almacenados; puede devolver cero.
-  **FIN-B:** las reglas `GIRO` solo coinciden con contrapartes que tengan giro,
-  obtenido de SII o ingresado manualmente.
+- **Confirmado en producción el 2026-09-16:** el backfill devolvió 0 — las
+  filas RCV de BaseAPI no traen giro; el giro se carga a mano en `/contrapartes`
+  y las reglas `GIRO` solo alcanzan contrapartes con giro.
 
 ## FIN-B — Recategorización y movimientos no categorizados (2026-09-16)
 

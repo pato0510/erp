@@ -489,6 +489,45 @@ exist; and this director's own one-transaction spec for HARDEN-004A was wrong an
 to be corrected before commit. **The last one is the important one:** the director is
 not the reliable narrator either. Read the code. Measure. Then decide.
 
+## §10 Sprint 17 intervened between Piece B and Piece E (2026-09-15 → 17)
+
+Added 2026-09-17 (DOC-S17-CLOSE). Fifteen feature tickets landed on `develop` after
+HARDEN-004B (`c7d0ef7`); the index with SHAs and waves is `CLAUDE.md` § SPRINT 17.
+What the hardening director must know before designing Piece E:
+
+- **(a) Four new business tables**, each with the five invariant blocks (table +
+  indexes, `ENABLE ROW LEVEL SECURITY`, one company-isolation policy, `app_user`
+  GRANT, audit trigger): `opportunity_notes`, `opportunity_documents`, `enterprises`
+  and `todos` (migrations `20260916120000` … `20260916160000`). New columns on
+  existing tables: `accounts.enterpriseId` (nullable FK, SET NULL) and
+  `counterparties.giro`. `category_rules` gained **no column** — only the enum value
+  `GIRO` via `ALTER TYPE` (`20260916150000`). `users`, `tenants` and `audit_logs`
+  remain the policy-less three.
+- **(b) NO new crons and NO new background jobs.** Verified 2026-09-17 by grep for
+  `@Cron`, `@Interval`, `@Timeout`, `SchedulerRegistry`, `@Processor`, `@InjectQueue`,
+  `BullMQ` and `repeat:` across every module this sprint touched (comercial
+  opportunity-notes, opportunity-documents, enterprises, dashboard, alerts;
+  actividades todos; catalogs; movements; tax): zero matches. Every new panel is
+  computed at request time; to-do notifications are created **in the request path**
+  via `NotificationService.createGeneric` (`todos.service.ts:191-193`, best-effort
+  after commit). Piece E's inventory of cron sweeps and recipient resolvers is
+  **unchanged** — but `createGeneric` gained one more caller, so its resolver path now
+  serves one more flow.
+- **(c) New raw SQL sites**, both `Prisma.sql` with the explicit `"companyId"` filter
+  and `ANY($2::uuid[])`, one query per page: `accounts.service.ts`
+  (`lastMovementByAccount`, COM-018) and `opportunities.service.ts`
+  (`lastMovementByOpportunity`, COM-020; public, reused by ALERT-001). FIN-A/FIN-B
+  and GO-001 added none. Both run on the bare client — Piece C's read census.
+- **(d) New reads of users/memberships**: `GET /todos/assignees` (gate `create Todo`)
+  lists active memberships with the user's name/email in a transaction
+  (`todos.service.ts:26-28`); the to-do notification resolves the assignee via
+  `membership.findFirst` (`:147`). The enterprise bulk assignment reads **accounts and
+  enterprises only**, not users. On the web, every author/owner map calls `/api/users`,
+  gated on `manage User` (`users.controller.ts:20`), so non-admins fall back to short
+  UUIDs — a debt in `CLAUDE.md` § SPRINT 17, not an isolation gap.
+- **(e) Before touching Piece E:** re-run the cold test of this handoff (§8), then read
+  `CLAUDE.md` § SPRINT 17 in full.
+
 ---
 
 ## Appendix — the uncommitted HARDEN-004B1 migration, in full
