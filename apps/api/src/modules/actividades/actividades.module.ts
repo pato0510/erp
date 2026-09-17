@@ -8,6 +8,7 @@ import { ActivitiesModule } from './activities/activities.module';
 import { AreasModule } from './areas/areas.module';
 import { MembersReadModule } from './members/members-read.module';
 import { ActividadesController } from './actividades.controller';
+import { TodosModule } from './todos/todos.module';
 
 /* CAL-001 — Calendario de Actividades module aggregator (mirrors the COM-001/MKT-001
  * scaffold). Ships the module shell (guarded ping + permissions endpoint + the month feed)
@@ -35,6 +36,7 @@ import { ActividadesController } from './actividades.controller';
     CampaignsModule,
     ComercialCierresReadModule,
     MembersReadModule,
+    TodosModule,
   ],
   controllers: [ActividadesController],
 })

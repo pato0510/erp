@@ -1,6 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
   ActivityAreaSubject,
+  TodoSubject,
   CalendarActivitySubject,
   CampaignSubject,
   DocumentRecordSubject,
@@ -79,7 +80,9 @@ export class ActividadesController {
   @Get('permissions')
   @CheckPolicies((ability) => ability.can('read', CalendarActivitySubject))
   permissions(@CurrentAbility() ability: AppAbility) {
-    const flagsFor = (subject: typeof CalendarActivitySubject | typeof ActivityAreaSubject) => ({
+    const flagsFor = (
+      subject: typeof CalendarActivitySubject | typeof ActivityAreaSubject | typeof TodoSubject,
+    ) => ({
       read: ability.can('read', subject),
       create: ability.can('create', subject),
       update: ability.can('update', subject),
@@ -88,6 +91,7 @@ export class ActividadesController {
     return {
       calendarActivity: flagsFor(CalendarActivitySubject),
       activityArea: flagsFor(ActivityAreaSubject),
+      todo: flagsFor(TodoSubject),
     };
   }
 

@@ -96,3 +96,36 @@ model CalendarActivityNote {
   @@index([activityId])
   @@map("calendar_activity_notes")
 }
+
+// GO-001 — Organizational to-dos. Actor UUIDs follow the calendar convention (no user FK).
+enum TodoStatus {
+  PENDING
+  DONE
+}
+
+enum TodoPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Todo {
+  id          String       @id @default(uuid()) @db.Uuid
+  companyId   String       @db.Uuid
+  title       String
+  description String?
+  status      TodoStatus   @default(PENDING)
+  priority    TodoPriority @default(MEDIUM)
+  dueDate     DateTime?    @db.Date
+  assigneeId  String       @db.Uuid
+  createdBy   String       @db.Uuid
+  completedAt DateTime?
+  completedBy String?      @db.Uuid
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, assigneeId, status])
+  @@index([companyId, dueDate])
+  @@map("todos")
+}

@@ -899,7 +899,8 @@ Schema: apps/api/prisma/schema/actividades.prisma
 Backend: apps/api/src/modules/actividades/ + apps/api/src/modules/rrhh/
 birthday-read/ (la hoja de cumpleaños) · Frontend: /actividades/...
 
-Tablas: activity_areas, calendar_activities.
+Tablas: `activity_areas`, `calendar_activities`,
+`todos` (GO-001 — to-dos organizacionales).
 
 Puntos clave:
 
@@ -1080,7 +1081,23 @@ ausencias, cierres* }` — \*`cierres` es la ÚNICA colección con llave GATED
   Atrasadas · Hechas de la semana + Por responsable, derivadas del set
   kind-scoped, clickeables como filtros. El registro deja de mentir por omisión.
 
-Última actualización: 2026-07-27 (CAL-018 — arco del feed unificado cerrado)
+## GO-001 — To-dos organizacionales (2026-09-17)
+
+`Todo` en Actividades, con `TodoStatus` y `TodoPriority`, fecha `@db.Date`,
+RLS, GRANT `app_user` y `audit_todos`; UUIDs de actores sin FK. `TodoSubject`:
+`MANAGER` CRUD, `ADMIN`/`SUPER_ADMIN` `manage all`, restantes roles `read`.
+Lectores sin `update` solo ven tareas propias y pueden completarlas; solo
+`update` permite reabrir. Con permiso `delete`, creador o `manage` puede borrar
+(DELETE duro aceptado para to-dos; auditoría conserva la fila).
+`/todos/assignees` exige `create` y proyecta miembros activos con nombre/email,
+sin modificar `/users` ni `members-lite`. Lista resuelve nombres por lote.
+Creación/reasignación notifica en la petición por `createGeneric` (best-effort
+después del commit; sin auto-notificación al actor). UI en `/actividades/todos`,
+entrada To-dos, modal y flags `todo` de `/actividades/permissions`.
+Atraso derivado con fecha Santiago; transiciones con compare-and-set.
+Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB.
+
+Última actualización: 2026-09-17 (GO-001 — to-dos organizacionales)
 
 ═══════════════════════════════════════════════════════════════════
 

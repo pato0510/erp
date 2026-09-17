@@ -19,6 +19,7 @@ export interface SubjectFlags {
 }
 export interface ActividadesPermissions {
   calendarActivity: SubjectFlags; // CAL-003/005 — the calendar + activity forms gate on this
+  todo: SubjectFlags; // GO-001 — ownership remains in the service
   activityArea: SubjectFlags; // CAL-002 — the areas config screen gates on this
 }
 export type ActividadesSubject = keyof ActividadesPermissions;
@@ -27,6 +28,7 @@ const NONE: SubjectFlags = { read: false, create: false, update: false, delete: 
 const EMPTY: ActividadesPermissions = {
   calendarActivity: NONE,
   activityArea: NONE,
+  todo: NONE,
 };
 
 /* Session/company-scoped cache: one fetch per company, shared across every hook instance. */

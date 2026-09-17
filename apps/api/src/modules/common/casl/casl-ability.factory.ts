@@ -64,6 +64,7 @@ type Subjects =
       | typeof PresenceSnapshotSubject
       | typeof CalendarActivitySubject
       | typeof ActivityAreaSubject
+      | typeof TodoSubject
       | typeof HsecIncidentSubject
       | typeof HsecIncidentPersonSubject
       | typeof HsecTrainingSubject
@@ -323,6 +324,10 @@ class CalendarActivitySubject {
 class ActivityAreaSubject {
   static readonly modelName = 'ActivityArea' as const;
 }
+/* GO-001 — calendar grants; ownership is enforced in TodosService. */
+class TodoSubject {
+  static readonly modelName = 'Todo' as const;
+}
 
 /* HSEC-001 (2026-07-27) — HSEC module subjects, FOUNDER-SIGNED MATRIX (PART1 decision 3):
    the ENTIRE module is MANAGER/ADMIN/SUPER_ADMIN. MANAGER gets full CRUD on all five
@@ -394,7 +399,7 @@ const MARKETING_SUBJECTS = [CampaignSubject, MarketingExpenseSubject, PresenceSn
 const MARKETING_FINANCIAL_SUBJECTS = [CampaignSubject, MarketingExpenseSubject];
 /* CAL-001 — Calendario de Actividades subjects. The floor is applied per blanket-read
    branch, then read is re-granted to ALL SIX roles (write stays MANAGER+). */
-const CALENDARIO_SUBJECTS = [CalendarActivitySubject, ActivityAreaSubject];
+const CALENDARIO_SUBJECTS = [CalendarActivitySubject, ActivityAreaSubject, TodoSubject];
 /* HSEC-001 — all HSEC subjects. Establishes the default-deny READ floor (COM-001 shape):
    the blanket-`read all` roles revoke their inherited HSEC read in their branches below;
    ONLY MANAGER re-grants (full CRUD — the founder-signed matrix is uniform). */
@@ -515,6 +520,7 @@ export {
   PresenceSnapshotSubject,
   CalendarActivitySubject,
   ActivityAreaSubject,
+  TodoSubject,
   HsecIncidentSubject,
   HsecIncidentPersonSubject,
   HsecTrainingSubject,
@@ -833,6 +839,8 @@ export class CaslAbilityFactory {
            idiom), nothing to floor. Read on both subjects; no write. Per §4. */
         can('read', CalendarActivitySubject);
         can('read', ActivityAreaSubject);
+        // GO-001 — VIEWER reads own to-dos and completes them through the read gate.
+        can('read', TodoSubject);
         /* HSEC-001 (2026-07-27) — default-deny floor on the HSEC subjects, NO re-grant:
            VIEWER has no HSEC access in V1. VIEWER carries no blanket `read all`, so this
            cannot() is technically redundant (granting nothing IS the floor — the MKT-001
