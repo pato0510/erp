@@ -531,7 +531,45 @@ apps/web/src/app/(dashboard)/operaciones/
   las siete ilustraciones anteriores y sus keyframes. Header y `HubFooter`
   mantienen su tipografía y comportamiento existentes.
 
-Última actualización: 2026-09-17 (HUB-002).
+#### Cierre del Sprint 18 (DOC-S18-CLOSE, 2026-09-17)
+
+| Ticket   | Título corto                                         | SHA                                    |
+| -------- | ---------------------------------------------------- | -------------------------------------- |
+| UI-004   | Parpadeo en hard refresh: registry SSR de styled-jsx | `882699d`                              |
+| HUB-001  | Paleta exacta como tokens, acabado y borde activo    | `6f30f42`                              |
+| HUB-003a | `GET /api/hub/status`, una línea viva por módulo     | `efc8c6a`                              |
+| HUB-004  | Footer: reloj, latencia medida y conexión verificada | `da5c85c`                              |
+| HUB-002  | Escenas «C · Barrido» y estado vivo en las tarjetas  | `b214d49`                              |
+| HUB-005  | Auditoría de adopción de paleta (solo decisión)      | `docs/HUB-005-COLOR-ADOPTION-AUDIT.md` |
+
+Decisiones registradas:
+
+- (2026-09-17) Producción muestra DATOS REALES de estado; los textos de ejemplo
+  del equipo de diseño viven solo en builds de demo — ninguno se desplegó.
+- (2026-09-17) El lift de hover de UI-002 se ELIMINÓ; la entrada escalonada
+  (`module-card-enter`, 240 ms, stagger 25 ms) se conserva.
+- (2026-09-17) El hub es oscuro en AMBOS temas: una sola regla, tokens en `:root`.
+- (2026-09-17) Latencia = RTT de APLICACIÓN a `GET /api/health` (no ICMP).
+- (2026-09-17, fundador) La adopción de la paleta en el resto de la app (spec de
+  diseño §5) ESPERA el visto bueno del equipo de diseño sobre los tonos DERIVADOS
+  de HUB-005: los `ink` exactos del hub fallan contraste fuera del hub (1,25–1,55:1
+  como texto sobre el fondo claro).
+
+Deudas:
+
+- `CompanySettings.timezone` existe, se edita en `/configuracion` y NO se usa en
+  ninguna parte: cablearlo en todas las superficies o retirarlo.
+- `API_BASE` duplicado en `HubIndicators` porque `lib/api.ts` no exporta ni la
+  URL base ni un fetch crudo.
+- La «grabación» que entrega el equipo de diseño es la grabación de producción
+  de Pato, no un artefacto del implementador.
+
+Siguiente trabajo: pieza E del arco de hardening — partir del cold test de
+`docs/EXCELSIA-DIRECTOR-HANDOFF-HARDENING-2.md` §8 y su §10; el Sprint 18 no
+agregó crons, jobs ni tablas: solo el endpoint `GET /api/hub/status` (lecturas
+gateadas por módulo) y superficies web.
+
+Última actualización: 2026-09-17 (DOC-S18-CLOSE)
 
 ## Plan de sprints del módulo
 
