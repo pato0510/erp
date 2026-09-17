@@ -485,6 +485,28 @@ apps/web/src/app/(dashboard)/operaciones/
     no existe un resumen puro reutilizable de las tres fuentes.
   - `gestion`: `TodosService.alerts` con `scope: 'mine'` y `summary: true`,
     `counts.overdue` y `counts.dueSoon`; gate `read` sobre `TodoSubject`.
+- HUB-004 — Footer del hub: reloj centrado, latencia medida y conexión
+  verificada (2026-09-17; Sprint 18, ola 2). `HubFooter` (izquierda/derecha
+  intactas, decorativas) + `HubIndicators` al centro en una grilla
+  `1fr auto 1fr` (bajo 640 px el centro baja a su propia fila). Reloj
+  `HH:mm:ss` 24 h en America/Santiago vía Intl (`es-CL`, `hour12: false`; la
+  columna `CompanySettings.timezone` existe pero nadie formatea con ella),
+  tick por segundo solo con la pestaña visible, dígitos `aria-hidden`.
+  Latencia = RTT de APLICACIÓN (no ICMP) de `GET /api/health` (público, sin
+  auth, `@SkipThrottle`, sin DB), `performance.now()` + `cache: 'no-store'` +
+  timeout 4000 ms (AbortController), sin solapes (ref guard), al montar y cada
+  30 s solo con la pestaña visible, re-ejecución al volver visible y en
+  `online`; hasta la primera muestra válida «— ms» + «verificando», tras un
+  fallo «— ms» + etiqueta de fallo (nunca un valor viejo). Conexión: «online»
+  si la última llamada tuvo éxito, «servicio no disponible» en fallo/timeout,
+  «sin conexión» con `navigator.onLine === false` (señal auxiliar, jamás
+  prueba de que el backend esté arriba); solo la etiqueta vive en
+  `aria-live="polite"`. Punto pulsante (≈2 s) solo online y visible, estático
+  con `prefers-reduced-motion`. Colores `#86EFAC` / `#FCD34D` en el CSS de la
+  página (allowlisted) porque `--hub-status-correcto/-atencion` aún no existen
+  en `tokens.css` (pendiente de agregarlos y migrar). CSS crítico de
+  `app/layout.tsx`: pre-paint del hub `#000` → `#142941` (= `--hub-bg`,
+  hallazgo HUB-001).
 
 ## Plan de sprints del módulo
 

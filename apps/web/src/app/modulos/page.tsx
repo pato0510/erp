@@ -8,6 +8,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { ExcelsiaLogo } from '../../components/shared/ExcelsiaLogo';
 import { useTheme } from '../../lib/theme';
 import { Starfield } from '../../components/Starfield';
+// HUB-004 — the footer with the centred clock · latency · connection block.
+import { HubFooter } from '../../components/hub/HubFooter';
 
 type ModuleDef = {
   key: string;
@@ -518,11 +520,8 @@ export default function ModulosPage() {
         </main>
       )}
 
-      {/* Bottom bar */}
-      <div className="mod-bottombar" aria-hidden="true">
-        <span>EXCELSIA ERP · V1.0</span>
-        <span>AGS SOLUTIONS SPA</span>
-      </div>
+      {/* Bottom bar — HUB-004: left/right unchanged, centred indicators in between. */}
+      <HubFooter left="EXCELSIA ERP · V1.0" right="AGS SOLUTIONS SPA" />
 
       <style jsx global>{`
         /* The cards own the entrance; the inherited page fade would outlast them. */
@@ -583,6 +582,81 @@ export default function ModulosPage() {
         .mod-bottombar {
           bottom: 0;
           font-size: 10px;
+          /* HUB-004 — 1fr auto 1fr keeps the centre block centred on the page whatever
+             the side texts measure; the bar keeps its container and positioning. */
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
+          align-items: center;
+          column-gap: 16px;
+          row-gap: 10px;
+        }
+        .mod-bottombar__side {
+          justify-self: start;
+          white-space: nowrap;
+        }
+        .mod-bottombar__side--right {
+          justify-self: end;
+        }
+        .mod-bottombar__center {
+          justify-self: center;
+        }
+        /* HUB-004 — indicators: same mono voice as the bar; tabular digits + fixed width
+           so the ticking clock never shifts its neighbours. */
+        .mod-indicators {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          color: var(--hub-text-secondary);
+          text-transform: none;
+          letter-spacing: 0.12em;
+        }
+        .mod-ind {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          font-variant-numeric: tabular-nums;
+        }
+        .mod-ind--clock {
+          min-width: 8ch;
+          justify-content: center;
+        }
+        .mod-ind--latency {
+          min-width: 7ch;
+          justify-content: center;
+        }
+        .mod-ind__sep {
+          opacity: 0.5;
+        }
+        .mod-ind__dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          flex: none;
+        }
+        /* Status colours — spec §4. --hub-status-correcto / --hub-status-atencion do not
+           exist in tokens.css yet (Codex owns that file this wave), so the raw values live
+           here, in the allowlisted hub page. */
+        .mod-ind__dot--online {
+          background: #86efac;
+        }
+        .mod-ind__dot--failure {
+          background: #fcd34d;
+        }
+        .mod-ind__dot--idle {
+          background: var(--hub-text-secondary);
+          opacity: 0.5;
+        }
+        @keyframes mod-ind-pulse {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.45;
+          }
+        }
+        .mod-ind__dot--pulse {
+          animation: mod-ind-pulse 2s ease-in-out infinite;
         }
         .mod-topbar__left {
           display: flex;
@@ -868,6 +942,14 @@ export default function ModulosPage() {
           .mod-user {
             display: none;
           }
+          /* HUB-004 — the centre block wraps to its own row before it can overlap an end. */
+          .mod-bottombar {
+            grid-template-columns: 1fr 1fr;
+          }
+          .mod-bottombar__center {
+            grid-column: 1 / -1;
+            grid-row: 2;
+          }
           .mod-stage {
             padding: 110px 18px 90px;
           }
@@ -1035,6 +1117,9 @@ export default function ModulosPage() {
           .module-card * {
             animation: none;
             transition: none;
+          }
+          .mod-ind__dot--pulse {
+            animation: none;
           }
         }
       `}</style>

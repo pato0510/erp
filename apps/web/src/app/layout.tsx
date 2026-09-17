@@ -85,7 +85,9 @@ body {
   opacity: 0;
   animation: page-fade-in 0.4s ease-out 0.05s forwards;
   min-height: 100vh;
-  background: #000;
+  /* HUB-001/HUB-004 — pre-paint colour = --hub-bg (#142941); the variable is not
+     available before the stylesheet, so the value is repeated here. */
+  background: #142941;
 }
 @keyframes page-fade-in { to { opacity: 1; } }
 `;
