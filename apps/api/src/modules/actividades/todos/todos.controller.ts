@@ -17,7 +17,7 @@ import { CurrentCompany } from '../../common/decorators/current-company.decorato
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PoliciesGuard } from '../../common/guards/policies.guard';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
-import { CreateTodoDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
+import { CreateTodoDto, FilterTodoAlertsDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
 import { TodosService } from './todos.service';
 
 // GO-001 — every route declares a policy, including the assignee's complete action.
@@ -30,6 +30,17 @@ export class TodosController {
   @CheckPolicies((ability) => ability.can('create', TodoSubject))
   assignees(@CurrentCompany() companyId: string, @CurrentUser() user: { id: string }) {
     return this.service.assignees(companyId, user.id);
+  }
+
+  @Get('alerts')
+  @CheckPolicies((ability) => ability.can('read', TodoSubject))
+  alerts(
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @CurrentAbility() ability: AppAbility,
+    @Query() filters: FilterTodoAlertsDto,
+  ) {
+    return this.service.alerts(companyId, user.id, ability, filters);
   }
 
   @Get()

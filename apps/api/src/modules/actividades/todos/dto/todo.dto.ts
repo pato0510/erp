@@ -2,6 +2,7 @@ import { PartialType } from '@nestjs/mapped-types';
 import { TodoPriority } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsIn,
@@ -56,4 +57,14 @@ export class FilterTodosDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @IsDateString({ strict: true })
   dueBefore?: string;
+}
+
+// ALERT-002 — transform explicitly: Boolean('false') would incorrectly enable summary.
+export class FilterTodoAlertsDto {
+  @IsIn(['mine', 'all'])
+  scope: 'mine' | 'all' = 'mine';
+
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  summary = false;
 }

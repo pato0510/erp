@@ -17,6 +17,7 @@ const reflector = new Reflector();
 const WRITERS: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER];
 const endpoints = [
   ['findAll', 'read'],
+  ['alerts', 'read'],
   ['assignees', 'create'],
   ['create', 'create'],
   ['update', 'update'],

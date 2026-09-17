@@ -1162,7 +1162,23 @@ Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB
   conservados. Lint, guard de tema, TypeScript, build y Prettier aprobados; QA con
   fixtures en claro y oscuro.
 
-Última actualización: 2026-09-17 (GO-002 — Gestión organizacional)
+- ALERT-002 — Alertas de Gestión organizacional (2026-09-17):
+  `GET /api/todos/alerts?scope&summary`, gate `read` sobre `TodoSubject`.
+  Alertas derivadas en vivo de `Todo`: vencidos = `PENDING` con fecha límite
+  anterior a hoy; vencen hoy o mañana = `PENDING` con fecha límite hoy o mañana.
+  Ambas definiciones usan fechas Santiago (`America/Santiago`), sin desplazamiento
+  de la fecha civil. Alcance `scope=mine` por defecto; lectores sin `update` solo
+  ven lo propio, aunque pidan `all`. El badge del sidebar cuenta lo propio.
+  `summary=true` usa solo conteos; lecturas con `companyId` y `executeWithRls`,
+  nombres por lote y `canComplete` compartidos con el listado.
+  Página `/actividades/alertas` con dos secciones y `TodoRowCells` compartido con
+  `/actividades/todos`; completar y actualizar recargan los datos y el contador
+  ámbar de `ActividadesSidebar`, que también se refresca al montar y navegar.
+  Sin cron, sin persistencia, sin notificaciones. Tests, lint, guard de tema,
+  TypeScript, builds y Prettier aprobados; QA con fixtures en claro y oscuro,
+  incluidos alcance de `VIEWER`, estados vacíos y teclado.
+
+Última actualización: 2026-09-17 (ALERT-002 — Alertas de Gestión organizacional)
 
 ═══════════════════════════════════════════════════════════════════
 

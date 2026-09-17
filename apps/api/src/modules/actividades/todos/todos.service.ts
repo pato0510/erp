@@ -9,7 +9,7 @@ import { Prisma, Todo } from '@prisma/client';
 import { AppAbility, TodoSubject } from '../../common/casl/casl-ability.factory';
 import { RlsService } from '../../common/rls/rls.service';
 import { NotificationService } from '../../operations/notifications/notification.service';
-import { CreateTodoDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
+import { CreateTodoDto, FilterTodoAlertsDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
 
 const NAME_SELECT = { id: true, firstName: true, lastName: true, email: true } as const;
 
@@ -38,9 +38,8 @@ export class TodosService {
 
   findAll(companyId: string, userId: string, ability: AppAbility, filters: FilterTodosDto) {
     return this.rls.executeWithRls(companyId, userId, async (tx) => {
-      const where: Prisma.TodoWhereInput = { companyId };
-      if (!ability.can('update', TodoSubject) || filters.scope !== 'all') where.assigneeId = userId;
-      else if (filters.assigneeId) where.assigneeId = filters.assigneeId;
+      const where = this.scopeWhere(companyId, userId, ability, filters.scope);
+      if (!where.assigneeId && filters.assigneeId) where.assigneeId = filters.assigneeId;
       if (filters.status !== 'ALL') where.status = filters.status ?? 'PENDING';
       if (filters.dueBefore) where.dueDate = { lt: this.dateOnly(filters.dueBefore) };
       const rows = await tx.todo.findMany({
@@ -51,35 +50,96 @@ export class TodosService {
           { createdAt: 'desc' },
         ],
       });
-      const ids = [...new Set(rows.flatMap((row) => [row.assigneeId, row.createdBy]))];
-      const members = await this.members(tx, companyId, ids);
-      const names = new Map(members.map(({ user }) => [user.id, user]));
-      // CAL-008b: overdue is derived from the Chilean calendar date, never UTC today.
-      const today = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Santiago',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date());
-      return rows.map((row) => {
-        const assignee = names.get(row.assigneeId);
-        const creator = names.get(row.createdBy);
-        return {
-          ...row,
-          assignee: assignee
-            ? { id: assignee.id, firstName: assignee.firstName, lastName: assignee.lastName }
-            : null,
-          createdByName: creator ? `${creator.firstName} ${creator.lastName}`.trim() : null,
-          overdue:
-            row.status === 'PENDING' &&
-            row.dueDate !== null &&
-            row.dueDate.toISOString().slice(0, 10) < today,
-          // Row ownership is computed from CASL, so ADMIN can delete others' rows without FE roles.
-          canDelete:
-            ability.can('delete', TodoSubject) &&
-            (row.createdBy === userId || ability.can('manage', TodoSubject)),
-        };
+      return this.resolveRows(tx, companyId, userId, ability, rows, this.todayInSantiago());
+    });
+  }
+
+  // ALERT-002 — list and live alerts share scope, Chilean date and one batched name lookup.
+  private scopeWhere(
+    companyId: string,
+    userId: string,
+    ability: AppAbility,
+    scope: 'mine' | 'all',
+  ): Prisma.TodoWhereInput {
+    return {
+      companyId,
+      ...(!ability.can('update', TodoSubject) || scope !== 'all' ? { assigneeId: userId } : {}),
+    };
+  }
+
+  private todayInSantiago(): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Santiago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  }
+
+  private async resolveRows(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    userId: string,
+    ability: AppAbility,
+    rows: Todo[],
+    today: string,
+  ) {
+    const ids = [...new Set(rows.flatMap((row) => [row.assigneeId, row.createdBy]))];
+    const members = await this.members(tx, companyId, ids);
+    const names = new Map(members.map(({ user }) => [user.id, user]));
+    return rows.map((row) => {
+      const assignee = names.get(row.assigneeId);
+      const creator = names.get(row.createdBy);
+      return {
+        ...row,
+        assignee: assignee
+          ? { id: assignee.id, firstName: assignee.firstName, lastName: assignee.lastName }
+          : null,
+        createdByName: creator ? `${creator.firstName} ${creator.lastName}`.trim() : null,
+        overdue:
+          row.status === 'PENDING' &&
+          row.dueDate !== null &&
+          row.dueDate.toISOString().slice(0, 10) < today,
+        canComplete: row.status === 'PENDING' && this.canComplete(row, userId, ability),
+        // Row ownership is computed from CASL, so ADMIN can delete others' rows without FE roles.
+        canDelete:
+          ability.can('delete', TodoSubject) &&
+          (row.createdBy === userId || ability.can('manage', TodoSubject)),
+      };
+    });
+  }
+
+  alerts(companyId: string, userId: string, ability: AppAbility, filters: FilterTodoAlertsDto) {
+    return this.rls.executeWithRls(companyId, userId, async (tx) => {
+      const today = this.todayInSantiago();
+      const start = this.dateOnly(today);
+      // Civil dates stored at UTC midnight: advance the date, independent of Santiago DST.
+      const tomorrow = new Date(start);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+      const where: Prisma.TodoWhereInput = {
+        ...this.scopeWhere(companyId, userId, ability, filters.scope),
+        status: 'PENDING',
+      };
+      if (filters.summary) {
+        const [overdue, dueSoon] = await Promise.all([
+          tx.todo.count({ where: { ...where, dueDate: { lt: start } } }),
+          tx.todo.count({ where: { ...where, dueDate: { gte: start, lte: tomorrow } } }),
+        ]);
+        return { counts: { overdue, dueSoon, total: overdue + dueSoon } };
+      }
+      const rows = await tx.todo.findMany({
+        where: { ...where, dueDate: { lte: tomorrow } },
+        // TodoPriority is declared LOW, MEDIUM, HIGH; DESC puts HIGH first.
+        orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }, { id: 'asc' }],
       });
+      const resolved = await this.resolveRows(tx, companyId, userId, ability, rows, today);
+      const overdue = resolved.filter((row) => row.overdue);
+      const dueSoon = resolved.filter((row) => !row.overdue);
+      return {
+        counts: { overdue: overdue.length, dueSoon: dueSoon.length, total: resolved.length },
+        overdue,
+        dueSoon,
+      };
     });
   }
 
@@ -182,8 +242,12 @@ export class TodosService {
     return result.row;
   }
 
+  private canComplete(row: Todo, userId: string, ability: AppAbility): boolean {
+    return row.assigneeId === userId || ability.can('update', TodoSubject);
+  }
+
   private assertCanComplete(row: Todo, userId: string, ability: AppAbility) {
-    if (row.assigneeId !== userId && !ability.can('update', TodoSubject))
+    if (!this.canComplete(row, userId, ability))
       throw new ForbiddenException('Solo el responsable o un editor puede completar este to-do.');
   }
 

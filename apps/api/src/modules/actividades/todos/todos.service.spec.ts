@@ -8,7 +8,7 @@ import { Todo, UserRole } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CaslAbilityFactory } from '../../common/casl/casl-ability.factory';
-import { CreateTodoDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
+import { CreateTodoDto, FilterTodoAlertsDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
 import { TodosController } from './todos.controller';
 import { TodosService } from './todos.service';
 
@@ -87,7 +87,15 @@ function setup(initial: Todo[] = []) {
   const matches = (row: Todo, where: Any) =>
     Object.entries(where).every(([key, value]) => {
       const actual = row[key as keyof Todo];
-      if (key === 'dueDate') return actual instanceof Date && actual < (value as { lt: Date }).lt;
+      if (key === 'dueDate') {
+        const range = value as { lt?: Date; lte?: Date; gte?: Date };
+        return (
+          actual instanceof Date &&
+          (!range.lt || actual < range.lt) &&
+          (!range.lte || actual <= range.lte) &&
+          (!range.gte || actual >= range.gte)
+        );
+      }
       if (actual instanceof Date && value instanceof Date)
         return actual.getTime() === value.getTime();
       return actual === value;
@@ -99,18 +107,29 @@ function setup(initial: Todo[] = []) {
     }),
     findMany: jest.fn(async ({ where, orderBy }: { where: Any; orderBy: unknown }) => {
       scoped(where);
-      expect(orderBy).toEqual([
-        { status: 'asc' },
-        { dueDate: { sort: 'asc', nulls: 'last' } },
-        { createdAt: 'desc' },
-      ]);
+      const alertOrder = Array.isArray(orderBy) && 'priority' in orderBy[1];
+      expect(orderBy).toEqual(
+        alertOrder
+          ? [{ dueDate: 'asc' }, { priority: 'desc' }, { id: 'asc' }]
+          : [{ status: 'asc' }, { dueDate: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }],
+      );
       return rows
         .filter((row) => matches(row, where))
         .sort((a, b) => {
-          if (a.status !== b.status) return a.status === 'PENDING' ? -1 : 1;
+          if (!alertOrder && a.status !== b.status) return a.status === 'PENDING' ? -1 : 1;
           const due = (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity);
-          return (Number.isNaN(due) ? 0 : due) || b.createdAt.getTime() - a.createdAt.getTime();
+          const priorities = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+          return (
+            (Number.isNaN(due) ? 0 : due) ||
+            (alertOrder
+              ? priorities[b.priority] - priorities[a.priority] || a.id.localeCompare(b.id)
+              : b.createdAt.getTime() - a.createdAt.getTime())
+          );
         });
+    }),
+    count: jest.fn(async ({ where }: { where: Any }) => {
+      scoped(where);
+      return rows.filter((row) => matches(row, where)).length;
     }),
     create: jest.fn(async ({ data }: { data: Partial<Todo> }) => {
       scoped(data as Any);
@@ -464,5 +483,162 @@ describe('GO-001 DTO validation', () => {
         )
       ).length,
     ).toBe(4);
+  });
+});
+
+const alertFilters = (values: Partial<FilterTodoAlertsDto> = {}) => ({
+  ...new FilterTodoAlertsDto(),
+  ...values,
+});
+
+describe('ALERT-002 live todo alerts', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    // UTC is already the 17th; Santiago is still the 16th.
+    jest.setSystemTime(new Date('2026-09-17T01:00:00Z'));
+  });
+  afterEach(() => jest.useRealTimers());
+  const dated = (id: string, date: string, values: Partial<Todo> = {}) =>
+    seed({ id, dueDate: new Date(`${date}T00:00:00Z`), ...values });
+  const mixed = () => [
+    dated('yesterday', '2026-09-15'),
+    dated('today-low', '2026-09-16', { priority: 'LOW' }),
+    dated('tomorrow', '2026-09-17'),
+    dated('day-after', '2026-09-18'),
+    dated('today-high', '2026-09-16', { priority: 'HIGH' }),
+    dated('today-medium', '2026-09-16'),
+    dated('done', '2026-09-15', { status: 'DONE' }),
+    dated('done-today', '2026-09-16', { status: 'DONE' }),
+    dated('foreign', '2026-09-15', { companyId: 'other' }),
+    seed({ id: 'no-date' }),
+  ];
+
+  it('uses Santiago boundaries, excludes DONE/null/foreign, sorts dates then HIGH to LOW and batches names once', async () => {
+    const { svc, todo, membership, rls, notifications } = setup(mixed());
+    const controller = new TodosController(svc);
+    const result = await controller.alerts(
+      'c1',
+      { id: 'u1' },
+      manager,
+      alertFilters({ scope: 'all' }),
+    );
+    expect(result.counts).toEqual({ overdue: 1, dueSoon: 4, total: 5 });
+    expect(result.overdue?.map((row) => row.id)).toEqual(['yesterday']);
+    expect(result.dueSoon?.map((row) => row.id)).toEqual([
+      'today-high',
+      'today-medium',
+      'today-low',
+      'tomorrow',
+    ]);
+    expect(result.overdue?.[0]).toMatchObject({
+      overdue: true,
+      canComplete: true,
+      assignee: { id: 'u2', firstName: 'Luis', lastName: 'Bravo' },
+      createdByName: 'Ana Zapata',
+    });
+    expect(result.dueSoon?.every((row) => !row.overdue)).toBe(true);
+    expect(todo.findMany).toHaveBeenCalledTimes(1);
+    expect(membership.findMany).toHaveBeenCalledTimes(1);
+    expect(membership.findMany.mock.calls[0][0].where).toEqual({
+      companyId: 'c1',
+      userId: { in: ['u2', 'u1'] },
+    });
+    expect(rls.executeWithRls).toHaveBeenCalledWith('c1', 'u1', expect.any(Function));
+    expect(todo.create).not.toHaveBeenCalled();
+    expect(todo.updateMany).not.toHaveBeenCalled();
+    expect(todo.delete).not.toHaveBeenCalled();
+    expect(notifications.createGeneric).not.toHaveBeenCalled();
+  });
+
+  it.each([UserRole.VIEWER, UserRole.ACCOUNTANT, UserRole.ANALYST])(
+    'forces %s to mine in full and summary even when all is requested',
+    async (role) => {
+      const { svc, todo } = setup([
+        dated('own', '2026-09-15'),
+        dated('other', '2026-09-16', { assigneeId: 'u1' }),
+      ]);
+      const result = await svc.alerts('c1', 'u2', ability(role), alertFilters({ scope: 'all' }));
+      expect(result.counts).toEqual({ overdue: 1, dueSoon: 0, total: 1 });
+      expect(result.overdue?.[0]).toMatchObject({ id: 'own', canComplete: true });
+      const summary = await svc.alerts(
+        'c1',
+        'u2',
+        ability(role),
+        alertFilters({ scope: 'all', summary: true }),
+      );
+      expect(summary).toEqual({ counts: result.counts });
+      expect(todo.findMany.mock.calls[0][0].where.assigneeId).toBe('u2');
+      expect(todo.count.mock.calls.every(([args]) => args.where.assigneeId === 'u2')).toBe(true);
+    },
+  );
+
+  it('defaults to mine for editors and honours all; summary reads only counts', async () => {
+    const { svc, todo, membership } = setup(mixed());
+    expect(await svc.alerts('c1', 'u1', manager, alertFilters({ summary: true }))).toEqual({
+      counts: { overdue: 0, dueSoon: 0, total: 0 },
+    });
+    expect(
+      await svc.alerts('c1', 'u1', manager, alertFilters({ scope: 'all', summary: true })),
+    ).toEqual({
+      counts: { overdue: 1, dueSoon: 4, total: 5 },
+    });
+    expect(todo.count).toHaveBeenCalledTimes(4);
+    expect(todo.findMany).not.toHaveBeenCalled();
+    expect(membership.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['2026-10-01T01:00:00Z', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'],
+    // Santiago advances from 23:59:59 to 01:00 at the spring DST transition.
+    ['2026-09-06T03:59:59Z', '2026-09-04', '2026-09-05', '2026-09-06', '2026-09-07'],
+    ['2026-09-06T04:00:00Z', '2026-09-05', '2026-09-06', '2026-09-07', '2026-09-08'],
+  ])(
+    'uses civil dates across month/DST boundary %s',
+    async (now, yesterday, today, tomorrow, after) => {
+      jest.setSystemTime(new Date(now));
+      const { svc } = setup([
+        dated('late', yesterday),
+        dated('today', today),
+        dated('tomorrow', tomorrow),
+        dated('after', after),
+      ]);
+      const result = await svc.alerts('c1', 'u2', viewer, alertFilters());
+      expect(result.overdue?.map((row) => row.id)).toEqual(['late']);
+      expect(result.dueSoon?.map((row) => row.id)).toEqual(['today', 'tomorrow']);
+    },
+  );
+
+  it('completion removes the alert from both full and summary responses', async () => {
+    const { svc } = setup([dated('own', '2026-09-15')]);
+    await svc.complete('own', 'c1', 'u2', viewer);
+    expect(await svc.alerts('c1', 'u2', viewer, alertFilters())).toEqual({
+      counts: { overdue: 0, dueSoon: 0, total: 0 },
+      overdue: [],
+      dueSoon: [],
+    });
+    expect(await svc.alerts('c1', 'u2', viewer, alertFilters({ summary: true }))).toEqual({
+      counts: { overdue: 0, dueSoon: 0, total: 0 },
+    });
+  });
+
+  it('validates scope and summary without coercing false to true', async () => {
+    for (const value of ['true', 'false']) {
+      const dto = plainToInstance(FilterTodoAlertsDto, { summary: value });
+      expect(await validate(dto)).toEqual([]);
+      expect(dto).toMatchObject({ scope: 'mine', summary: value === 'true' });
+    }
+    expect(plainToInstance(FilterTodoAlertsDto, {})).toMatchObject({
+      scope: 'mine',
+      summary: false,
+    });
+    for (const invalid of [
+      { scope: 'other' },
+      { summary: '1' },
+      { summary: '' },
+      { summary: null },
+    ])
+      expect(
+        (await validate(plainToInstance(FilterTodoAlertsDto, invalid))).length,
+      ).toBeGreaterThan(0);
   });
 });
