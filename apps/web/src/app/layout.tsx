@@ -60,6 +60,11 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata = {
   title: 'Excelsia ERP',
   description: 'Plataforma financiera gerencial para empresas chilenas',
+  // UI-003 — brand icons (public/): one source of truth, no app/icon.* convention files.
+  icons: {
+    icon: [{ url: '/favicon.ico' }, { url: '/favicon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '512x512' }],
+  },
 };
 
 const criticalCss = `

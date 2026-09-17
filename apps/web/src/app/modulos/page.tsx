@@ -4,6 +4,8 @@ import { useEffect, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+// UI-003 — the brand isotype (designer SVG) replaces the inline gradient mark.
+import { ExcelsiaLogo } from '../../components/shared/ExcelsiaLogo';
 import { useTheme } from '../../lib/theme';
 import { Starfield } from '../../components/Starfield';
 
@@ -454,29 +456,10 @@ export default function ModulosPage() {
       {/* Top bar — renders immediately; user-specific controls appear when auth resolves */}
       <header className="mod-topbar">
         <div className="mod-topbar__left">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 40 40"
-            fill="none"
-            aria-hidden="true"
-            className="mod-topbar__mark"
-          >
-            <defs>
-              <linearGradient id="mod-tri-grad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="oklch(0.88 0.10 220)" />
-                <stop offset="100%" stopColor="oklch(0.55 0.14 235)" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M20 4 L36 32 L4 32 Z"
-              stroke="url(#mod-tri-grad)"
-              strokeWidth="1.4"
-              fill="none"
-              strokeLinejoin="round"
-            />
-            <path d="M20 14 L28 28 L12 28 Z" fill="url(#mod-tri-grad)" opacity="0.85" />
-          </svg>
+          {/* UI-003 — isotype at the guide's 32 px minimum; the horizontal wordmark needs
+              ≥ 240 px (≈ 61 px tall) and does not fit a 60 px topbar. The surface is dark
+              in both themes → inverse (steel blue). Decorative: the label follows. */}
+          <ExcelsiaLogo variant="isotype" tone="inverse" height={32} alt="" />
           <span>EXCELSIA · MÓDULOS</span>
         </div>
         <div className="mod-topbar__right">
@@ -636,9 +619,6 @@ export default function ModulosPage() {
           display: flex;
           align-items: center;
           gap: 12px;
-        }
-        .mod-topbar__mark {
-          filter: drop-shadow(0 0 8px rgba(120, 170, 230, 0.3));
         }
         .mod-topbar__right {
           display: flex;

@@ -1,23 +1,19 @@
 'use client';
 
+import { ExcelsiaLogo } from '../shared/ExcelsiaLogo';
+
 interface SidebarBrandProps {
   name: string;
 }
 
+/* UI-003 — the brand isotype (designer SVG, monochrome white) next to the module name.
+   White because the light sidebar gradient (#3b5c8a → #284b75) is itself steel/navy and
+   the inverse mark's steel blue would sit blue-on-blue; the guide allows the monochrome
+   white mark on gradient surfaces. Decorative: the module name is the visible label. */
 export function SidebarBrand({ name }: SidebarBrandProps) {
   return (
     <div className="tn-sidebar__brand">
-      <svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <polygon
-          points="16,4 30,28 2,28"
-          fill="none"
-          stroke="#60a5fa"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-        <polygon points="16,12 23,26 9,26" fill="#60a5fa" opacity="0.22" />
-        <circle cx="16" cy="22" r="1.8" fill="#60a5fa" />
-      </svg>
+      <ExcelsiaLogo variant="isotype" tone="white" height={22} alt="" />
       <span className="tn-sidebar__brand-text">{name}</span>
     </div>
   );

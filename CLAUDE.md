@@ -324,6 +324,20 @@ apps/web/src/app/(dashboard)/operaciones/
 - La paleta clara cambió levemente por diseño: `gray-50` → `subtle` (`#f3f4f6`),
   bordes `gray-200/300` → `line` (`#e8eaed`); se conservan el acento y la identidad visual.
 
+### Marca (UI-003, 2026-09-17)
+
+- Assets del kit en `apps/web/public/brand/` (7 SVG: horizontal/vertical/isotipo en
+  color e inverso, isotipo blanco) e íconos en `apps/web/public/` (`favicon.ico`,
+  `favicon.svg`, `apple-touch-icon.png`), expuestos vía `metadata.icons` del layout raíz.
+- `ExcelsiaLogo` los renderiza con `<img>`: `variant` horizontal | vertical | isotype,
+  `tone` auto | color | inverse | white; `auto` = color en claro e inverso en `html.dark`
+  vía CSS (`dark:hidden`/`dark:block`), sin JS ni flicker. Ancho = alto × ratio del archivo.
+- Uso por superficie: login (vertical) y hub (isotipo) en `inverse` porque son oscuros en
+  AMBOS temas; sidebars isotipo `white` (gradiente steel/navy); páginas públicas `auto`.
+- Mínimos de la guía: horizontal 240 px de ancho, isotipo 32 px (el sidebar usa 22 px por
+  su altura fija — excepción registrada); nunca estirar, rotar ni aplicar filtros/recolor.
+  El acento de la app (`#2563eb`) no cambia; el azul de marca `#92A6BD` vive solo en los SVG.
+
 ## Plan de sprints del módulo
 
 Sprint 1: Fundación — panel módulos + estructura base ✓
@@ -696,6 +710,15 @@ Puntos clave:
   dependencias; `prefers-reduced-motion` desactiva todo; la entrada se
   reproduce en cada montaje del hub. Archivos: `app/page.tsx`,
   `app/modulos/page.tsx`, `global.css`.
+- UI-003 — Marca nueva (2026-09-17; GEN-3): isotipo + wordmark del kit del
+  diseñador en toda la web, favicon e íconos (doctrina en § Marca (UI-003)).
+  `ExcelsiaLogo` pasa de SVG inline + texto a `<img>` de los assets; el
+  triángulo inline del login, del hub y de `SidebarBrand` desaparece. Archivos:
+  `public/brand/*.svg` (7), `public/favicon.ico`, `public/favicon.svg`,
+  `public/apple-touch-icon.png`, `components/shared/ExcelsiaLogo.tsx`,
+  `components/sidebars/SidebarBrand.tsx`, `app/layout.tsx`,
+  `app/(auth)/login/page.tsx`, `app/modulos/page.tsx`,
+  `app/p/asset/[qrToken]/page.tsx`, `scripts/theme-allowlist.json`.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -804,7 +827,7 @@ Opportunity && read Account` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT).
   sección. SIN tocar la fábrica CASL (GO-001 de Codex): puertas sobre subjects
   existentes.
 
-Última actualización: 2026-09-16 (COM-019)
+Última actualización: 2026-09-17 (COM-019 + UI-003)
 
 ═══════════════════════════════════════════════════════════════════
 

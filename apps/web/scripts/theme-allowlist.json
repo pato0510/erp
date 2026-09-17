@@ -650,11 +650,6 @@
     "matches": ["background: '#16a34a'"]
   },
   {
-    "path": "apps/web/src/components/shared/ExcelsiaLogo.tsx",
-    "reason": "UI-001: explicit brand logo variants retain the white wordmark on the dark/colored variant.",
-    "matches": ["'#ffffff'"]
-  },
-  {
     "path": "apps/web/src/lib/file-icons.tsx",
     "reason": "UI-001: existing status, severity, catalog/category or chart-series palette; white labels sit on filled controls. Neutral UI utilities remain guarded.",
     "matches": ["color: '#16a34a'", "color: '#64748b'", "color: '#dc2626'"]

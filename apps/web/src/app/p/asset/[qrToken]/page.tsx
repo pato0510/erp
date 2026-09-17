@@ -165,7 +165,8 @@ export default async function PublicAssetPage({ params }: PageProps) {
             marginBottom: 16,
           }}
         >
-          <ExcelsiaLogo size={26} variant="dark" />
+          {/* UI-003 — isotype (32 px minimum); the page follows the theme → tone auto. */}
+          <ExcelsiaLogo variant="isotype" tone="auto" height={32} alt="Excelsia" />
           <span
             style={{
               fontFamily: 'var(--font-ibm-plex-mono), monospace',
@@ -586,7 +587,8 @@ function NotFoundScreen() {
         textAlign: 'center',
       }}
     >
-      <ExcelsiaLogo size={32} variant="dark" />
+      {/* UI-003 — centered space → vertical brand, theme-following. */}
+      <ExcelsiaLogo variant="vertical" tone="auto" height={120} alt="Excelsia" />
       <h1
         style={{
           marginTop: 32,

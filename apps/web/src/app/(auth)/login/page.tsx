@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Moon, Sun } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 import { Starfield } from '../../../components/Starfield';
+// UI-003 — the brand vertical logo (designer SVG), replaces the inline mark + text wordmark.
+import { ExcelsiaLogo } from '../../../components/shared/ExcelsiaLogo';
 import { useTheme } from '../../../lib/theme';
 
 const loginSchema = z.object({
@@ -82,34 +84,11 @@ export default function LoginPage() {
 
         <main className="sw-stage">
           <section className="sw-card">
-            {/* Logo */}
+            {/* Logo — UI-003: vertical brand ("marca principal" for centered spaces). The
+                login surface is dark in BOTH themes (black starfield / navy), so the
+                inverse asset is the guide's correct choice here, not the color one. */}
             <div className="sw-logo">
-              <svg
-                width="38"
-                height="38"
-                viewBox="0 0 40 40"
-                fill="none"
-                aria-hidden="true"
-                className="sw-logo__mark"
-              >
-                <defs>
-                  <linearGradient id="sw-tri-grad" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.88 0.10 220)" />
-                    <stop offset="100%" stopColor="oklch(0.55 0.14 235)" />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M20 4 L36 32 L4 32 Z"
-                  stroke="url(#sw-tri-grad)"
-                  strokeWidth="1.4"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-                <path d="M20 14 L28 28 L12 28 Z" fill="url(#sw-tri-grad)" opacity="0.85" />
-              </svg>
-              <span className="sw-wordmark">
-                Excelsia<span className="sw-wordmark__dot">.</span>
-              </span>
+              <ExcelsiaLogo variant="vertical" tone="inverse" height={160} alt="Excelsia" />
             </div>
 
             <p className="sw-tagline">
@@ -334,21 +313,6 @@ export default function LoginPage() {
           gap: 12px;
           margin-bottom: 18px;
         }
-        .sw-logo__mark {
-          filter: drop-shadow(0 0 12px rgba(120, 170, 230, 0.35));
-        }
-        .sw-wordmark {
-          font-family: var(--font-space-grotesk), sans-serif;
-          font-weight: 500;
-          font-size: 19px;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: var(--ink);
-          text-shadow: 0 0 16px rgba(120, 170, 230, 0.18);
-        }
-        .sw-wordmark__dot {
-          color: var(--accent);
-        }
         .sw-tagline {
           font-family: var(--font-space-grotesk), sans-serif;
           font-weight: 300;
@@ -556,9 +520,6 @@ export default function LoginPage() {
           }
           .sw-stage {
             padding: 70px 18px;
-          }
-          .sw-wordmark {
-            font-size: 17px;
           }
           .sw-tagline {
             font-size: 12.5px;
