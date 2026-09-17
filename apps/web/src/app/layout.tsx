@@ -9,6 +9,8 @@ import {
   Space_Grotesk,
 } from 'next/font/google';
 import { ThemeProvider, themeHydrationScript } from '../lib/theme';
+// UI-004 — styled-jsx SSR registry: flushes `<style jsx>` rules into the server HTML.
+import { StyledJsxRegistry } from './registry';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -103,7 +105,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`min-h-screen antialiased ${inter.variable} ${jetbrainsMono.variable} ${dmSerifDisplay.variable} ${outfit.variable} ${spaceGrotesk.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <StyledJsxRegistry>
+          <ThemeProvider>{children}</ThemeProvider>
+        </StyledJsxRegistry>
       </body>
     </html>
   );
