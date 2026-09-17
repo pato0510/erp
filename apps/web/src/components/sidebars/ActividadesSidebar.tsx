@@ -31,7 +31,7 @@ export function ActividadesSidebar() {
         <Link href="/modulos" className="tn-back-modulos">
           ← Volver a módulos
         </Link>
-        <SidebarBrand name="ACTIVIDADES" />
+        <SidebarBrand name="Gestión organizacional" />
       </div>
 
       <nav className="tn-sidebar__nav">

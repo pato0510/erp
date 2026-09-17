@@ -922,7 +922,7 @@ Puntos clave:
 
 ═══════════════════════════════════════════════════════════════════
 
-# 🏁 MÓDULO CALENDARIO DE ACTIVIDADES — V1 EN PRODUCCIÓN (live desde 2026-07-21)
+# 🏁 MÓDULO GESTIÓN ORGANIZACIONAL — V1 EN PRODUCCIÓN (live desde 2026-07-21)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1129,7 +1129,14 @@ entrada To-dos, modal y flags `todo` de `/actividades/permissions`.
 Atraso derivado con fecha Santiago; transiciones con compare-and-set.
 Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB.
 
-Última actualización: 2026-09-17 (GO-001 — to-dos organizacionales)
+- GO-002 — Gestión organizacional (2026-09-17): renombrado el módulo en la tarjeta
+  del hub, `SidebarBrand` y breadcrumbs; descripción «To-dos, calendario, áreas y
+  alertas del equipo» e icono `ClipboardList` de Lucide; título de la página
+  «Calendario». Rutas `/actividades/**`, nombres de funciones, APIs y paleta
+  conservados. Lint, guard de tema, TypeScript, build y Prettier aprobados; QA con
+  fixtures en claro y oscuro.
+
+Última actualización: 2026-09-17 (GO-002 — Gestión organizacional)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1755,7 +1762,7 @@ correcciones de sesión)
   acotada a superficies protegidas o expresiones exactas. Verificación web:
   `lint` + `lint:theme` + `tsc --noEmit` + `build`; no existe un target `web:test`.
 - Módulos V1 completos: Finanzas, Operaciones, RRHH, Comercial, Marketing,
-  Calendario de Actividades.
+  Gestión organizacional.
 - Vista Gestión de actividades — LISTA (CAL-008…CAL-010, live 2026-07-22):
   la reunión semanal de AGS migró de la planilla al módulo (tabla con estado
   inline, atrasadas derivadas con fecha chilena, bitácora inmutable). Detalle

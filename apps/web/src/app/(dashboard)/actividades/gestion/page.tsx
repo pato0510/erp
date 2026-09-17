@@ -346,7 +346,7 @@ export default function ActividadesGestionPage() {
   return (
     <div className="px-4 sm:px-6 py-6 max-w-[1400px] mx-auto">
       <div className="mb-2 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
-        Actividades / Gestión
+        Gestión organizacional / Gestión
       </div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>

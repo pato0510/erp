@@ -2,7 +2,7 @@
 
 import { useEffect, type CSSProperties, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, LogOut, Moon, Sun } from 'lucide-react';
+import { ArrowRight, ClipboardList, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 // UI-003 — the brand isotype (designer SVG) replaces the inline gradient mark.
 import { ExcelsiaLogo } from '../../components/shared/ExcelsiaLogo';
@@ -165,47 +165,14 @@ const ComercialSvg = () => (
   </svg>
 );
 
-const CALENDAR_CELLS: { x: number; y: number; delay: string | null }[] = [
-  { x: 40, y: 80, delay: '0s' },
-  { x: 80, y: 80, delay: null },
-  { x: 120, y: 80, delay: '1s' },
-  { x: 160, y: 80, delay: null },
-  { x: 40, y: 120, delay: null },
-  { x: 80, y: 120, delay: '2s' },
-  { x: 120, y: 120, delay: null },
-  { x: 160, y: 120, delay: '3s' },
-  { x: 40, y: 160, delay: '1s' },
-  { x: 80, y: 160, delay: null },
-  { x: 120, y: 160, delay: null },
-  { x: 160, y: 160, delay: '0s' },
-];
-
 const CalendarioSvg = () => (
-  <svg
-    viewBox="0 0 240 240"
-    preserveAspectRatio="xMidYMid slice"
+  <ClipboardList
     className="mod-svg"
+    color="white"
+    strokeWidth={1}
     style={{ opacity: 0.45 }}
-  >
-    <rect x="40" y="50" width="160" height="20" rx="2" fill="white" />
-    {CALENDAR_CELLS.map((c, i) =>
-      c.delay !== null ? (
-        <rect
-          key={i}
-          x={c.x}
-          y={c.y}
-          width="35"
-          height="35"
-          rx="3"
-          fill="white"
-          className="cal-cell"
-          style={{ animationDelay: c.delay }}
-        />
-      ) : (
-        <rect key={i} x={c.x} y={c.y} width="35" height="35" rx="3" fill="white" opacity="0.3" />
-      ),
-    )}
-  </svg>
+    aria-hidden="true"
+  />
 );
 
 const MarketingSvg = () => (
@@ -414,8 +381,8 @@ const MODULES: ModuleDef[] = [
     // CAL-007 — un-gated: Calendario de Actividades is live (three views, chips by area,
     // birthdays feed). Was gated ("Próximamente") through CAL-001..006 (COM-015/MKT-010 pattern).
     key: 'calendario-actividades',
-    name: 'Calendario de Actividades',
-    description: 'Calendario maestro de actividades internas de la organización',
+    name: 'Gestión organizacional',
+    description: 'To-dos, calendario, áreas y alertas del equipo',
     gradient: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
     href: '/actividades',
     active: true,

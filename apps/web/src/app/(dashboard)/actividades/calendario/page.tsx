@@ -412,13 +412,11 @@ export default function ActividadesCalendarioPage() {
   return (
     <div className="px-4 sm:px-6 py-6 max-w-[1400px] mx-auto">
       <div className="mb-2 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
-        Actividades / Calendario
+        Gestión organizacional / Calendario
       </div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-            Calendario de actividades
-          </h1>
+          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Calendario</h1>
           <p className="mt-1 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
             Actividades internas de la empresa
           </p>
