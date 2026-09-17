@@ -425,6 +425,35 @@ apps/web/src/app/(dashboard)/operaciones/
   su altura fija — excepción registrada); nunca estirar, rotar ni aplicar filtros/recolor.
   El acento de la app (`#2563eb`) no cambia; el azul de marca `#92A6BD` vive solo en los SVG.
 
+### Hub — Sprint 18 (Alternativa C)
+
+- Fuente: spec aprobada "Alternativa C · Barrido, paleta Color refinado", equipo
+  de diseño, 2026-09-17 (HUB-001). REGLA: los tokens del hub son VALORES EXACTOS
+  de diseño, NO derivados de la paleta de la app; no se redondean ni armonizan.
+- Tokens en `apps/web/src/styles/tokens.css`, sección "Hub (Sprint 18)", solo en
+  `:root` (el hub es oscuro en ambos temas → sin variantes por tema): `--hub-bg`
+  `#142941`, `--hub-bg-light` `#244367`, `--hub-title` `#FFFFFF`, `--hub-desc`
+  `#E1E9F3`, `--hub-text-secondary` `#AEBED3`, `--hub-shadow`
+  `0 5px 13px #030C1729`, `--hub-highlight` `inset 0 1px 0 #FFFFFF0C`,
+  `--hub-veil` `linear-gradient(0deg, #06111B38, transparent 70%)`; por módulo
+  (`finanzas` · `operaciones` · `hsec` · `comercial` · `marketing` · `rrhh` ·
+  `gestion`) `--hub-<key>-from/-to/-border/-ink` y `-glow` = borde al 20%
+  (hex + `33`). Cada tarjeta recibe `hubKey` y expone `--card-from/-to/-border/
+-ink/-glow` inline para que UNA regla sirva a todas.
+- Tarjeta: fondo `linear-gradient(150deg, from, to)`, borde en reposo `-border`
+  (mismo ancho y radio), `box-shadow: var(--hub-shadow), var(--hub-highlight)`,
+  luz radial superior con `-glow` (`::before`, bajo la escena), velo `--hub-veil`
+  tras título/descripción, título `--hub-title`, descripción `--hub-desc`.
+  Activo (`:hover`/`:focus-visible`): borde → `-ink` en 180 ms y anillo de foco
+  en `-ink`. El LIFT de UI-002 (`--module-card-y`, `translateY(-2px)`) se
+  ELIMINÓ: sin transform, scale, rotate ni tilt; el keyframe de entrada
+  `module-card-enter` termina en `translateY(0)`. Página: fondo `--hub-bg` con
+  iluminación superior `--hub-bg-light` en UNA regla (se retiró la variante
+  `html:not(.dark)`); Starfield y viñeta siguen como capas aparte; texto
+  secundario de header/footer `--hub-text-secondary`. Geometría, tipografía,
+  textos, orden, escenas SVG (HUB-002), línea de estado y footer (HUB-003b/004)
+  intactos.
+
 ## Plan de sprints del módulo
 
 Sprint 1: Fundación — panel módulos + estructura base ✓
@@ -807,6 +836,9 @@ Puntos clave:
   `components/sidebars/SidebarBrand.tsx`, `app/layout.tsx`,
   `app/(auth)/login/page.tsx`, `app/modulos/page.tsx`,
   `app/p/asset/[qrToken]/page.tsx`, `scripts/theme-allowlist.json`.
+- HUB-001 — Hub: paleta exacta como tokens, acabado de tarjeta y borde activo
+  (2026-09-17; Sprint 18, ola 1): doctrina en § Hub — Sprint 18 (Alternativa C).
+  Archivos: `styles/tokens.css`, `app/modulos/page.tsx`, `app/global.css`.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -972,7 +1004,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-17 (ALERT-001)
+Última actualización: 2026-09-17 (ALERT-001 + HUB-001)
 
 ═══════════════════════════════════════════════════════════════════
 

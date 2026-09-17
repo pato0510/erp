@@ -45,6 +45,65 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
+
+  /* ───────────────────────────────────────────────────────────────────────
+     Hub (Sprint 18) — "Alternativa C · Barrido, paleta Color refinado",
+     design team, 2026-09-17 (HUB-001). EXACT design values: NOT derived from
+     the app palette, never rounded or harmonised. The hub is dark in both
+     themes, so there are NO per-theme variants (nothing under html.dark).
+     Per-module keys: finanzas · operaciones · hsec · comercial · marketing ·
+     rrhh · gestion; -glow = the border colour at 20% opacity (hex + 33).
+     ─────────────────────────────────────────────────────────────────────── */
+  --hub-bg: #142941;
+  --hub-bg-light: #244367;
+  --hub-title: #ffffff;
+  --hub-desc: #e1e9f3;
+  --hub-text-secondary: #aebed3;
+  --hub-shadow: 0 5px 13px #030c1729;
+  --hub-highlight: inset 0 1px 0 #ffffff0c;
+  --hub-veil: linear-gradient(0deg, #06111b38, transparent 70%);
+
+  --hub-finanzas-from: #2461bc;
+  --hub-finanzas-to: #17488f;
+  --hub-finanzas-border: #669bdc;
+  --hub-finanzas-ink: #aec8ee;
+  --hub-finanzas-glow: #669bdc33;
+
+  --hub-operaciones-from: #aa582a;
+  --hub-operaciones-to: #864323;
+  --hub-operaciones-border: #ca916c;
+  --hub-operaciones-ink: #f1ccb0;
+  --hub-operaciones-glow: #ca916c33;
+
+  --hub-hsec-from: #237b58;
+  --hub-hsec-to: #195c44;
+  --hub-hsec-border: #65a98c;
+  --hub-hsec-ink: #b6e6d5;
+  --hub-hsec-glow: #65a98c33;
+
+  --hub-comercial-from: #a14370;
+  --hub-comercial-to: #7c3458;
+  --hub-comercial-border: #bf7da0;
+  --hub-comercial-ink: #ebbad0;
+  --hub-comercial-glow: #bf7da033;
+
+  --hub-marketing-from: #7650b1;
+  --hub-marketing-to: #593b89;
+  --hub-marketing-border: #a587cd;
+  --hub-marketing-ink: #d3c7ed;
+  --hub-marketing-glow: #a587cd33;
+
+  --hub-rrhh-from: #1d7680;
+  --hub-rrhh-to: #175b66;
+  --hub-rrhh-border: #63aeb4;
+  --hub-rrhh-ink: #b6e0dc;
+  --hub-rrhh-glow: #63aeb433;
+
+  --hub-gestion-from: #2a719b;
+  --hub-gestion-to: #215978;
+  --hub-gestion-border: #71accb;
+  --hub-gestion-ink: #b5ddeb;
+  --hub-gestion-glow: #71accb33;
 }
 
 html.dark {

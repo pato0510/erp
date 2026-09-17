@@ -54,7 +54,8 @@ html.starfield-page.dark body {
   background-color: #000;
 }
 
-/* UI-002: one entrance per card mount; hover can adjust the final offset. */
+/* UI-002: one entrance per card mount. HUB-001 removed the hover lift, so the
+   final offset is plain zero (no --module-card-y). */
 @keyframes module-card-enter {
   from {
     opacity: 0;
@@ -62,7 +63,7 @@ html.starfield-page.dark body {
   }
   to {
     opacity: 1;
-    transform: translateY(var(--module-card-y, 0px));
+    transform: translateY(0);
   }
 }
 

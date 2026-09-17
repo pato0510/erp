@@ -11,9 +11,10 @@ import { Starfield } from '../../components/Starfield';
 
 type ModuleDef = {
   key: string;
+  /* HUB-001 — the exact token key in tokens.css (--hub-<hubKey>-from/-to/-border/-ink/-glow). */
+  hubKey: 'finanzas' | 'operaciones' | 'hsec' | 'comercial' | 'marketing' | 'rrhh' | 'gestion';
   name: string;
   description: string;
-  gradient: string;
   href: string | null;
   active: boolean;
   svg: ReactNode;
@@ -319,18 +320,18 @@ const RrhhSvg = () => (
 const MODULES: ModuleDef[] = [
   {
     key: 'finanzas',
+    hubKey: 'finanzas',
     name: 'Finanzas',
     description: 'Gestión financiera, tributario, conciliación bancaria y reportes ejecutivos',
-    gradient: 'linear-gradient(135deg, #1E3A5F, #2563EB)',
     href: '/dashboard',
     active: true,
     svg: <FinanzasSvg />,
   },
   {
     key: 'operaciones',
+    hubKey: 'operaciones',
     name: 'Operaciones',
     description: 'Control de activos, documentos, permisos y procedimientos operacionales',
-    gradient: 'linear-gradient(135deg, #FF6B35, #F7931E)',
     href: '/operaciones',
     active: true,
     svg: <OperacionesSvg />,
@@ -341,18 +342,18 @@ const MODULES: ModuleDef[] = [
     // entregas + acuse, dashboard mensual). Was gated ("Próximamente") through HSEC-001..010
     // (COM-015/MKT-010/CAL-007 pattern).
     key: 'hsec',
+    hubKey: 'hsec',
     name: 'HSEC',
     description: 'Salud, seguridad, medio ambiente y comunidades',
-    gradient: 'linear-gradient(135deg, #10B981, #059669)',
     href: '/hsec',
     active: true,
     svg: <HsecSvg />,
   },
   {
     key: 'comercial',
+    hubKey: 'comercial',
     name: 'Comercial',
     description: 'Pipeline de ventas, CRM, cotizaciones y gestión de clientes',
-    gradient: 'linear-gradient(135deg, #EC4899, #BE185D)',
     href: '/comercial', // COM-015 — un-gated: Comercial is live (CRM, quotes, Operaciones/Finanzas wiring)
     active: true,
     svg: <ComercialSvg />,
@@ -361,18 +362,18 @@ const MODULES: ModuleDef[] = [
     // MKT-010 — un-gated: Marketing V1 is live (campaigns, expenses, calendar,
     // attribution/ROI, presence). COM-015 analog: active flips to true, href unchanged.
     key: 'marketing',
+    hubKey: 'marketing',
     name: 'Marketing',
     description: 'Campañas, gastos de marketing y presencia digital',
-    gradient: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
     href: '/marketing',
     active: true,
     svg: <MarketingSvg />,
   },
   {
     key: 'rrhh',
+    hubKey: 'rrhh',
     name: 'Recursos Humanos',
     description: 'Gestión del talento, nóminas, evaluaciones y desarrollo organizacional',
-    gradient: 'linear-gradient(135deg, #14B8A6, #0F766E)',
     href: '/rrhh',
     active: true,
     svg: <RrhhSvg />,
@@ -381,9 +382,9 @@ const MODULES: ModuleDef[] = [
     // CAL-007 — un-gated: Calendario de Actividades is live (three views, chips by area,
     // birthdays feed). Was gated ("Próximamente") through CAL-001..006 (COM-015/MKT-010 pattern).
     key: 'calendario-actividades',
+    hubKey: 'gestion',
     name: 'Gestión organizacional',
     description: 'To-dos, calendario, áreas y alertas del equipo',
-    gradient: 'linear-gradient(135deg, #0EA5E9, #0284C7)',
     href: '/actividades',
     active: true,
     svg: <CalendarioSvg />,
@@ -473,7 +474,7 @@ export default function ModulosPage() {
                 return (
                   <div
                     key={mod.key}
-                    className={`module-card${isActive ? ' module-card--active hover:border-accent focus-visible:border-accent' : ''}`}
+                    className={`module-card${isActive ? ' module-card--active' : ''}`}
                     onClick={() => handleSelect(mod)}
                     role={isActive ? 'button' : undefined}
                     tabIndex={isActive ? 0 : -1}
@@ -485,7 +486,17 @@ export default function ModulosPage() {
                       }
                     }}
                     aria-disabled={!isActive}
-                    style={{ background: mod.gradient, '--i': index } as CSSProperties}
+                    style={
+                      {
+                        // HUB-001 — per-card variables so ONE stylesheet rule serves all cards.
+                        '--card-from': `var(--hub-${mod.hubKey}-from)`,
+                        '--card-to': `var(--hub-${mod.hubKey}-to)`,
+                        '--card-border': `var(--hub-${mod.hubKey}-border)`,
+                        '--card-ink': `var(--hub-${mod.hubKey}-ink)`,
+                        '--card-glow': `var(--hub-${mod.hubKey}-glow)`,
+                        '--i': index,
+                      } as CSSProperties
+                    }
                   >
                     <div className="module-card__svg">{mod.svg}</div>
                     <div className="module-card__shade" aria-hidden="true" />
@@ -529,19 +540,17 @@ export default function ModulosPage() {
           inset: 0;
           color: var(--ink);
           font-family: var(--font-space-grotesk), var(--font-outfit), sans-serif;
-          background-color: #000;
-          background-image:
-            radial-gradient(ellipse at 50% 40%, rgba(20, 30, 55, 0.35) 0%, transparent 55%),
-            radial-gradient(ellipse at 80% 80%, rgba(40, 20, 60, 0.3) 0%, transparent 60%);
+          /* HUB-001 — exact hub background with the top illumination; ONE rule for both
+             themes (the hub is dark in both). The Starfield canvas stays as a separate
+             layer (z-index 1) above this backdrop. */
+          background-color: var(--hub-bg);
+          background-image: radial-gradient(
+            ellipse at 50% 0%,
+            var(--hub-bg-light) 0%,
+            transparent 65%
+          );
           overflow-y: auto;
           overflow-x: hidden;
-        }
-        html:not(.dark) .mod-root {
-          background-color: #1d3358;
-          background-image:
-            radial-gradient(ellipse at 50% 30%, rgba(110, 170, 230, 0.45) 0%, transparent 60%),
-            radial-gradient(ellipse at 20% 90%, rgba(70, 130, 200, 0.35) 0%, transparent 60%),
-            linear-gradient(180deg, #2a4f82 0%, #1a3158 50%, #142544 100%);
         }
         .mod-vignette {
           position: fixed;
@@ -549,13 +558,6 @@ export default function ModulosPage() {
           z-index: 2;
           pointer-events: none;
           background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.55) 95%);
-        }
-        html:not(.dark) .mod-vignette {
-          background: radial-gradient(
-            circle at 50% 50%,
-            transparent 35%,
-            rgba(8, 18, 38, 0.45) 95%
-          );
         }
         .mod-topbar,
         .mod-bottombar {
@@ -566,7 +568,7 @@ export default function ModulosPage() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          color: var(--ink-faint);
+          color: var(--hub-text-secondary); /* HUB-001 */
           font-family: var(--font-ibm-plex-mono), var(--font-jetbrains-mono), monospace;
           font-weight: 400;
           text-transform: uppercase;
@@ -733,15 +735,23 @@ export default function ModulosPage() {
           overflow: hidden;
           opacity: 0.72;
           cursor: not-allowed;
-          border-color: transparent;
-          transition:
-            transform 180ms ease-out,
-            border-color 180ms ease-out;
+          /* HUB-001 — exact palette per card via the inline --card-* variables; resting
+             border in the module's border colour, finish = shadow + 1px highlight. */
+          background: linear-gradient(150deg, var(--card-from), var(--card-to));
+          border-color: var(--card-border);
+          transition: border-color 180ms ease-out;
           animation: module-card-enter 240ms ease-out calc(var(--i) * 25ms) backwards;
           isolation: isolate;
-          box-shadow:
-            0 12px 36px rgba(0, 0, 0, 0.55),
-            0 0 0 1px rgba(255, 255, 255, 0.04);
+          box-shadow: var(--hub-shadow), var(--hub-highlight);
+        }
+        /* HUB-001 — radial light at the top of the card (border colour at 20%), under the scene. */
+        .module-card::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(ellipse at 50% 0%, var(--card-glow) 0%, transparent 60%);
+          pointer-events: none;
+          z-index: 0;
         }
         /* An inset border preserves the existing card and content dimensions. */
         .module-card::after {
@@ -758,13 +768,14 @@ export default function ModulosPage() {
           opacity: 1;
           cursor: pointer;
         }
+        /* HUB-001 — active state is the border turning to the module's ink; the UI-002
+           lift (translateY) is REMOVED: no transform, scale, rotate or tilt. */
         .module-card--active:hover,
         .module-card--active:focus-visible {
-          --module-card-y: -2px;
-          transform: translateY(var(--module-card-y));
+          border-color: var(--card-ink);
         }
         .module-card--active:focus-visible {
-          outline: 2px solid var(--color-accent);
+          outline: 2px solid var(--card-ink);
           outline-offset: 3px;
         }
         .module-card__svg {
@@ -777,10 +788,11 @@ export default function ModulosPage() {
           height: 100%;
           transform-origin: center;
         }
+        /* HUB-001 — the veil behind title/description (exact --hub-veil). */
         .module-card__shade {
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.78) 100%);
+          background: var(--hub-veil);
           pointer-events: none;
         }
         .module-card__badge {
@@ -821,14 +833,14 @@ export default function ModulosPage() {
           right: 20px;
           bottom: 18px;
           z-index: 2;
-          color: #ffffff;
+          color: var(--hub-title);
         }
         .module-card__title {
           font-family: var(--font-space-grotesk), var(--font-outfit), sans-serif;
           font-weight: 600;
           font-size: 18px;
           letter-spacing: -0.01em;
-          color: #ffffff;
+          color: var(--hub-title);
           margin: 0;
         }
         .module-card__desc {
@@ -837,7 +849,7 @@ export default function ModulosPage() {
           font-weight: 400;
           font-size: 13px;
           line-height: 1.5;
-          color: rgba(255, 255, 255, 0.92);
+          color: var(--hub-desc);
         }
 
         @media (max-width: 900px) {
@@ -1023,10 +1035,6 @@ export default function ModulosPage() {
           .module-card * {
             animation: none;
             transition: none;
-          }
-          .module-card--active:hover,
-          .module-card--active:focus-visible {
-            transform: none;
           }
         }
       `}</style>
