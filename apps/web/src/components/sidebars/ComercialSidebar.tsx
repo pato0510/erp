@@ -1,8 +1,19 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, KanbanSquare, LayoutDashboard, LogOut, Moon, Sun, Users } from 'lucide-react';
+import {
+  Bell,
+  Building2,
+  KanbanSquare,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  Sun,
+  Users,
+} from 'lucide-react';
+import { apiClient } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -12,9 +23,12 @@ import { SidebarBrand } from './SidebarBrand';
  * SidebarBrand component (zero new CSS). Config-driven: append entries to
  * navItems as later COM tickets ship (Cotizaciones, …). COM-007 adds Pipeline
  * (the flagship board), placed first. COM-021 adds Empresas (the clients' parent
- * companies) right after Cuentas. COM-019 adds Dashboard, placed FIRST. */
+ * companies) right after Cuentas. COM-019 adds Dashboard, placed FIRST. ALERT-001 adds
+ * Alertas right after Dashboard with a live count badge (GET comercial/alerts?summary=true
+ * on mount and on every pathname change; hidden at 0 — the FinanceSidebar badge pattern). */
 const navItems = [
   { href: '/comercial/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: false },
+  { href: '/comercial/alertas', label: 'Alertas', icon: Bell, exact: false },
   { href: '/comercial/pipeline', label: 'Pipeline', icon: KanbanSquare, exact: false },
   { href: '/comercial/cuentas', label: 'Cuentas', icon: Users, exact: false },
   { href: '/comercial/empresas', label: 'Empresas', icon: Building2, exact: false },
@@ -24,6 +38,23 @@ export function ComercialSidebar() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
+  const [alertsCount, setAlertsCount] = useState(0);
+
+  // ALERT-001 — summary counts only; a 403 (no Opportunity/Quote read) or a network blip
+  // leaves the badge hidden, matching the other sidebars.
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    apiClient
+      .get<{ counts: { total: number } }>('/api/comercial/alerts?summary=true')
+      .then((res) => {
+        if (alive) setAlertsCount(res.counts.total);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [user, pathname]);
 
   if (!user) return null;
 
@@ -50,6 +81,14 @@ export function ComercialSidebar() {
             >
               <Icon size={15} />
               <span style={{ flex: 1 }}>{item.label}</span>
+              {item.href === '/comercial/alertas' && alertsCount > 0 && (
+                <span
+                  className="tn-nav__badge !bg-amber-400 !text-amber-950"
+                  aria-label={`${alertsCount} alertas`}
+                >
+                  {alertsCount}
+                </span>
+              )}
             </Link>
           );
         })}

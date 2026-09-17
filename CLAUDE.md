@@ -595,8 +595,8 @@ Status: V1 completo (COM-001…COM-015), desplegado y visible en /modulos.
 Post-V1: COM-016 (notas internas de oportunidad), COM-017 (documentos adjuntos
 de oportunidad), COM-018 (Cuentas v2: Enterprise + columnas + acordeón) y
 COM-021 (gestión de empresas + asignación masiva), COM-019 (dashboard
-comercial) y COM-020 (Pipeline 2.0: vista tabla), 2026-09-15/17 — ver bloques
-abajo.
+comercial), COM-020 (Pipeline 2.0: vista tabla) y ALERT-001 (panel de alertas),
+2026-09-15/17 — ver bloques abajo.
 Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
@@ -858,8 +858,34 @@ enterprise }` (el responsable sigue siendo `ownerId`, UUID sin relación) y
   `updatedAt` propio, actividades, notas y documentos vivos, `WHERE
 o."companyId" = $1::uuid AND o.id = ANY($2::uuid[])`. Sin migración, sin
   subject nuevo, sin CASL.
+- ALERT-001 — PANEL DE ALERTAS COMERCIAL (2026-09-17; CRM-6): UN PANEL, NO UN
+  NOTIFICADOR — cero cron, cero persistencia, cero notificaciones, sin "dismiss"
+  por usuario (V2). Todo DERIVADO EN VIVO al leer. Umbrales del fundador
+  (2026-09-17) como constantes en UN solo lugar (`alerts.service.ts`:
+  `QUOTE_UNANSWERED_DAYS = 7`, `STALE_OPPORTUNITY_DAYS = 14`). Definiciones:
+  cotizaciones sin respuesta = `Quote` en `ENVIADA` (el único estado "enviada
+  al cliente"; `sentAt` lo fija la máquina de estados de COM-010) con `sentAt`
+  ≥ 7 días, más antiguas primero · oportunidades sin movimiento = ABIERTAS
+  con `lastMovementAt` (REUSO de `lastMovementByOpportunity` de COM-020,
+  ahora público — una sola implementación de la derivación) ≥ 14 días, más
+  antiguas primero (null imposible: GREATEST incluye el propio `updatedAt`) ·
+  cierre esperado vencido = ABIERTAS con `expectedCloseDate` < HOY EN CHILE
+  (America/Santiago, doctrina CAL-008b; helper local al módulo como en
+  actividades), más atrasadas primero. ABIERTA = las cinco etapas activas:
+  EN_PAUSA queda EXCLUIDA a propósito (pausar es un acto deliberado; una
+  pausada no está "sin movimiento" ni "vencida"); GANADA/PERDIDA cerradas. Una
+  oportunidad puede estar en ambas listas. Endpoint GET `/comercial/alerts`
+  (`?summary=true` → solo `counts`, con `count` + select de ids para el
+  helper; lo que consume el badge), gateado en UNA lambda `read Opportunity &&
+read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
+  en cada query, una ronda, sin SQL crudo más allá del helper reusado. FE:
+  entrada "Alertas" en el sidebar Comercial justo tras Dashboard con badge de
+  conteo (`tn-nav__badge` ámbar, `aria-label` "N alertas", oculto en 0,
+  refetch al montar y al cambiar de ruta) y página `/comercial/alertas` de
+  solo lectura (tres secciones en orden, "Sin alertas." por sección,
+  "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-17 (COM-020)
+Última actualización: 2026-09-17 (ALERT-001)
 
 ═══════════════════════════════════════════════════════════════════
 

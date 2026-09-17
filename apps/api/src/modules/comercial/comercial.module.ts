@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DisponibilidadModule } from '../rrhh/disponibilidad/disponibilidad.module';
 import { AccountsModule } from './accounts/accounts.module';
+import { AlertsModule } from './alerts/alerts.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { ComercialController } from './comercial.controller';
 import { ContactsModule } from './contacts/contacts.module';
@@ -19,7 +20,8 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
  * timeline); COM-016 adds OpportunityNotesModule (the internal note thread on a deal);
  * COM-017 adds OpportunityDocumentsModule (files attached to a deal); COM-018 adds
  * EnterprisesModule (the client's parent company, one Enterprise → many Accounts); COM-019
- * adds DashboardModule (the live-derived Comercial dashboard).
+ * adds DashboardModule (the live-derived Comercial dashboard); ALERT-001 adds AlertsModule
+ * (the live-derived alerts panel).
  * Remaining feature submodules are imported here as their tickets land, mirroring how RrhhModule / OperationsModule aggregate their feature
  * submodules. PoliciesGuard / CaslAbilityFactory / PrismaService are provided by the
  * global Casl/Prisma modules.
@@ -40,6 +42,7 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
     QuotesModule,
     DisponibilidadModule,
     DashboardModule,
+    AlertsModule,
   ],
   controllers: [ComercialController],
 })

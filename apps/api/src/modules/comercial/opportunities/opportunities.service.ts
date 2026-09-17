@@ -136,8 +136,9 @@ export class OpportunitiesService {
    * never cached): ONE raw query for the whole list — no per-row work, no N+1. The twin
    * of COM-018's lastMovementByAccount: GREATEST of the row's own updatedAt (stage moves,
    * edits), its activities, its notes (COM-016) and its live documents (COM-017).
-   * Doctrine: raw SQL ALWAYS carries the explicit "companyId" filter (HARDEN arc). */
-  private async lastMovementByOpportunity(
+   * Doctrine: raw SQL ALWAYS carries the explicit "companyId" filter (HARDEN arc).
+   * ALERT-001 — PUBLIC so the alerts panel reuses it (one implementation of the derivation). */
+  async lastMovementByOpportunity(
     companyId: string,
     opportunityIds: string[],
   ): Promise<Map<string, Date>> {
