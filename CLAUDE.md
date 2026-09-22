@@ -171,11 +171,12 @@ AUTH-001 · 2 AUTH-002 → BRAND-001 ∥ HUB-007 · 3 HUB-008 ∥ MEM-001 → GO
 acciones, Lead, reglas); S21 Configuración de empresa + áreas unificadas +
 calendario total.
 
-| Ticket  | Título corto                                                  | Ola | Detalle                               |
-| ------- | ------------------------------------------------------------- | --- | ------------------------------------- |
-| HUB-006 | Fondo «espacio» compartido login + hub, persistente al entrar | 1   | § Hub — Sprint 18, subsección HUB-006 |
+| Ticket   | Título corto                                                                                                                                  | Ola | Detalle                               |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------- |
+| HUB-006  | Fondo «espacio» compartido login + hub, persistente al entrar                                                                                 | 1   | § Hub — Sprint 18, subsección HUB-006 |
+| AUTH-001 | Recuperar acceso V1 (api): restablecimiento por admin con clave temporal + cambio obligatorio, cambio de contraseña propio, versión de sesión | 1   | § Credenciales y sesiones (AUTH-001)  |
 
-Última actualización: 2026-09-22 (HUB-006)
+Última actualización: 2026-09-22 (HUB-006 + AUTH-001)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -634,7 +635,7 @@ gateadas por módulo) y superficies web.
 - `Starfield` NO respeta `prefers-reduced-motion` (titila y hace fade igual);
   comportamiento previo, sin cambios.
 
-Última actualización: 2026-09-22 (HUB-006)
+Última actualización: 2026-09-22 (HUB-006 + AUTH-001)
 
 ## Plan de sprints del módulo
 
@@ -1025,6 +1026,7 @@ Puntos clave:
   doctrina en § Hub, subsección HUB-006. Archivos: `components/SpaceBackdrop.tsx`,
   `app/layout.tsx`, `app/global.css`, `lib/theme.tsx`, `app/(auth)/login/page.tsx`,
   `app/modulos/page.tsx`, `styles/tokens.css`.
+- AUTH-001 — Recuperar acceso V1, api (2026-09-22; Sprint 19, ola 1; Codex): doctrina en § Credenciales y sesiones. Archivos: prisma/schema/iam.prisma, la migración, iam/{auth.controller,auth.service,users.controller,users.service,password-policy}.ts, iam/dto/{change-password,create-user,update-user}.dto.ts, iam/strategies/{jwt,refresh}.strategy.ts, iam/guards/jwt-auth.guard.ts, el decorador AllowPendingPasswordChange, common/guards/policies.guard.ts, common/filters/sentry-exception.filter.ts y sus specs.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -1190,7 +1192,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-22 (HUB-006)
+Última actualización: 2026-09-22 (HUB-006 + AUTH-001)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1744,6 +1746,19 @@ docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
   datos" resultó falso; y una auditoría que decía "revisé todos los controladores
   de operaciones" nunca había visto el controlador del calendario. Leer el código.
   Después decidir.
+
+### Credenciales y sesiones (AUTH-001, 2026-09-22)
+
+- `users` gana `mustChangePassword`, `tokenVersion`, `passwordChangedAt` (migración `20260922180000_add_user_credential_state`; tabla global sin `companyId` → sin RLS; conserva su trigger de auditoría).
+- Access y refresh JWT llevan `tv = tokenVersion`. `JwtStrategy` lee el usuario en CADA request (`isActive` + `tv`). Cambiar o restablecer una contraseña incrementa `tokenVersion` y borra `refreshTokenHash`: toda otra sesión muere en su próximo request. Un token sin `tv` vale 0 (el deploy no desloguea a nadie).
+- Cambio obligatorio: con `mustChangePassword`, `JwtAuthGuard` responde 403 `{ code: 'PASSWORD_CHANGE_REQUIRED' }` en TODA ruta autenticada, salvo las marcadas `@AllowPendingPasswordChange()` (`/auth/me`, `/auth/change-password`, `/auth/logout`). `PoliciesGuard` repite el chequeo como defensa en profundidad. `SentryExceptionFilter` preserva `code` en los errores codificados.
+- `POST /auth/change-password`: solo `JwtAuthGuard` (acción de identidad, sin empresa), throttle de login; valida la actual, la política y que sea distinta; re-emite las cookies de ESTA sesión.
+- `POST /users/:id/reset-access` (`manage User`): clave temporal de 12 caracteres sin ambiguos, devuelta UNA vez con `Cache-Control: no-store`, jamás logueada; fija `mustChangePassword`. No aplica a uno mismo; 404 fuera de la empresa.
+- La contraseña es GLOBAL: cambiarla (reset-access o PATCH con `password`) a quien tiene membresía activa en otra empresa exige SUPER_ADMIN (409). La cuenta de un SUPER_ADMIN solo la modifica otro SUPER_ADMIN (403). Asignar o quitar SUPER_ADMIN exige SUPER_ADMIN. Nadie cambia su propio rol ni se desactiva a sí mismo.
+- Política única (`iam/password-policy.ts`): 10–100 caracteres, al menos una letra y un dígito, en create/update/change-password. El login conserva su regla: claves antiguas de 8–9 caracteres siguen entrando.
+- El login compara el email recortado y sin distinguir mayúsculas.
+- Recuperación por correo (opción A): pendiente hasta que exista proveedor de email.
+- DEUDA (hardening): el trigger de auditoría copia `passwordHash` y `refreshTokenHash` de `users` a `audit_logs` en cada login y cambio de clave.
 
 ## Verificación en producción (2026-08-05, consultas read-only del fundador)
 
