@@ -148,6 +148,92 @@ describe('UsersService access recovery and administration', () => {
     );
   });
 
+  it('forbids ADMIN resetting a SUPER_ADMIN before hashing or writing', async () => {
+    targetMembership = { ...membership, role: UserRole.SUPER_ADMIN };
+    await expect(service.resetAccess(userId, companyId, actorId)).rejects.toMatchObject({
+      status: 403,
+      message: 'Solo un superadministrador puede modificar la cuenta de un superadministrador.',
+    });
+    expect(hash).not.toHaveBeenCalled();
+    expect(rls.executeWithRls).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { firstName: 'Changed' },
+    { lastName: 'Changed' },
+    { isActive: false },
+    { password: 'ChangedPass123' },
+  ])('forbids ADMIN modifying a SUPER_ADMIN with %p', async (dto) => {
+    targetMembership = { ...membership, role: UserRole.SUPER_ADMIN };
+    await expect(service.update(userId, companyId, actorId, dto)).rejects.toMatchObject({
+      status: 403,
+      message: 'Solo un superadministrador puede modificar la cuenta de un superadministrador.',
+    });
+    expect(hash).not.toHaveBeenCalled();
+    expect(rls.executeWithRls).not.toHaveBeenCalled();
+  });
+
+  it('allows SUPER_ADMIN resetting another SUPER_ADMIN', async () => {
+    actorRole = UserRole.SUPER_ADMIN;
+    targetMembership = { ...membership, role: UserRole.SUPER_ADMIN };
+    await expect(service.resetAccess(userId, companyId, actorId)).resolves.toHaveProperty(
+      'temporaryPassword',
+    );
+    expect(tx.user.update).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { firstName: 'Changed' },
+    { lastName: 'Changed' },
+    { isActive: false },
+    { password: 'ChangedPass123' },
+  ])('allows SUPER_ADMIN modifying another SUPER_ADMIN with %p', async (dto) => {
+    actorRole = UserRole.SUPER_ADMIN;
+    targetMembership = { ...membership, role: UserRole.SUPER_ADMIN };
+    await expect(service.update(userId, companyId, actorId, dto)).resolves.toMatchObject({
+      id: userId,
+    });
+    expect(rls.executeWithRls).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects ADMIN changing a global password across active companies', async () => {
+    prisma.membership.findFirst.mockResolvedValue({ id: 'foreign' });
+    await expect(
+      service.update(userId, companyId, actorId, { password: 'ChangedPass123' }),
+    ).rejects.toMatchObject({
+      status: 409,
+      message:
+        'Este usuario también pertenece a otra empresa; solo un superadministrador puede cambiar su contraseña.',
+    });
+    expect(prisma.membership.findFirst).toHaveBeenCalledWith({
+      where: { userId, companyId: { not: companyId }, isActive: true },
+      select: { id: true },
+    });
+    expect(hash).not.toHaveBeenCalled();
+    expect(rls.executeWithRls).not.toHaveBeenCalled();
+  });
+
+  it('still allows ADMIN editing names for a member of another active company', async () => {
+    prisma.membership.findFirst.mockResolvedValue({ id: 'foreign' });
+    await service.update(userId, companyId, actorId, { firstName: 'Changed' });
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: userId },
+      data: { firstName: 'Changed' },
+    });
+    expect(prisma.membership.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('allows SUPER_ADMIN changing a password across active companies', async () => {
+    actorRole = UserRole.SUPER_ADMIN;
+    prisma.membership.findFirst.mockResolvedValue({ id: 'foreign' });
+    await service.update(userId, companyId, actorId, { password: 'ChangedPass123' });
+    expect(tx.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tokenVersion: { increment: 1 }, refreshTokenHash: null }),
+      }),
+    );
+  });
+
   it('does not reactivate an inactive membership when resetting credentials', async () => {
     targetMembership = { ...membership, isActive: false };
     await service.resetAccess(userId, companyId, actorId);

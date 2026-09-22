@@ -55,7 +55,7 @@ describe('HUB-003a guard chain', () => {
     }
     const { guard, context, prisma } = setup({ headers: { 'x-company-id': 'company-a' } });
     const membershipCheck = jest.spyOn(guard, 'canActivate');
-    const jwt = new JwtAuthGuard();
+    const jwt = new JwtAuthGuard(reflector);
     const chain = async () => {
       await jwt.canActivate(context);
       return guard.canActivate(context);

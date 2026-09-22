@@ -38,9 +38,12 @@ describe('AUTH-001 session lifecycle', () => {
           }),
         },
         membership: {
-          findUnique: jest
-            .fn()
-            .mockResolvedValue({ id: 'm1', isActive: true, role: UserRole.ADMIN }),
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'm1',
+            userId: 'target',
+            isActive: true,
+            role: UserRole.ADMIN,
+          }),
           findFirst: jest.fn().mockResolvedValue(null),
         },
       };

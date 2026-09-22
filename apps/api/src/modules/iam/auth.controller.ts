@@ -10,6 +10,7 @@ import { CheckPolicies } from '../common/decorators/check-policies.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { MovementSubject } from '../common/casl/casl-ability.factory';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { AllowPendingPasswordChange } from '../common/decorators/allow-pending-password-change.decorator';
 
 // Auth endpoints get stricter per-IP rate limits than the global 100/min
 // default — brute-force on login or token refresh is the most common attack
@@ -32,6 +33,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @AllowPendingPasswordChange()
   @Post('logout')
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const user = req.user as { id: string };
@@ -40,6 +42,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @AllowPendingPasswordChange()
   @Get('me')
   async me(@CurrentUser() user: { id: string }) {
     return this.authService.getMe(user.id);
@@ -49,6 +52,7 @@ export class AuthController {
   // remains available before choosing a company and while a change is required.
   @Throttle(LOGIN_LIMIT)
   @UseGuards(JwtAuthGuard)
+  @AllowPendingPasswordChange()
   @Post('change-password')
   @HttpCode(200)
   async changePassword(

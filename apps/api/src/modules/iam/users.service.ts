@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, User, UserRole } from '@prisma/client';
+import { Membership, Prisma, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -120,6 +120,10 @@ export class UsersService {
     ) {
       await this.requireSuperAdmin(companyId, actorUserId);
     }
+    await this.assertMayModifyAccount(membership, companyId, actorUserId, {
+      credential: dto.password !== undefined,
+      operation: 'update',
+    });
     if (dto.password !== undefined) assertPasswordPolicy(dto.password);
 
     // Hash outside the transaction if password is being changed.
@@ -166,21 +170,10 @@ export class UsersService {
       throw new BadRequestException('Usa "Cambiar contraseña" para tu propia cuenta.');
     }
 
-    // Global credentials require checking other companies, not only the current scope.
-    // This identity lookup follows the existing IAM client path; HARDEN-004 must
-    // preserve cross-company visibility before switching runtime to app_user.
-    const otherMembership = await this.prisma.membership.findFirst({
-      where: { userId, companyId: { not: companyId }, isActive: true },
-      select: { id: true },
+    await this.assertMayModifyAccount(membership, companyId, actorUserId, {
+      credential: true,
+      operation: 'reset-access',
     });
-    if (
-      otherMembership &&
-      (await this.actorRole(companyId, actorUserId)) !== UserRole.SUPER_ADMIN
-    ) {
-      throw new ConflictException(
-        'Este usuario también pertenece a otra empresa; solo un superadministrador puede restablecer su acceso.',
-      );
-    }
 
     const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     const digits = '23456789';
@@ -207,6 +200,36 @@ export class UsersService {
       }),
     );
     return { temporaryPassword };
+  }
+
+  private async assertMayModifyAccount(
+    targetMembership: Pick<Membership, 'userId' | 'role'>,
+    companyId: string,
+    actorUserId: string,
+    options: { credential: boolean; operation: 'update' | 'reset-access' },
+  ) {
+    const isSuperAdmin = (await this.actorRole(companyId, actorUserId)) === UserRole.SUPER_ADMIN;
+    if (targetMembership.role === UserRole.SUPER_ADMIN && !isSuperAdmin) {
+      throw new ForbiddenException(
+        'Solo un superadministrador puede modificar la cuenta de un superadministrador.',
+      );
+    }
+    if (!options.credential || isSuperAdmin) return;
+
+    // Global credentials require checking other companies, not only the current scope.
+    // This identity lookup follows the existing IAM client path; HARDEN-004 must
+    // preserve cross-company visibility before switching runtime to app_user.
+    const otherMembership = await this.prisma.membership.findFirst({
+      where: { userId: targetMembership.userId, companyId: { not: companyId }, isActive: true },
+      select: { id: true },
+    });
+    if (otherMembership) {
+      throw new ConflictException(
+        options.operation === 'reset-access'
+          ? 'Este usuario también pertenece a otra empresa; solo un superadministrador puede restablecer su acceso.'
+          : 'Este usuario también pertenece a otra empresa; solo un superadministrador puede cambiar su contraseña.',
+      );
+    }
   }
 
   private async actorRole(companyId: string, actorUserId: string) {

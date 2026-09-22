@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { CHECK_POLICIES_KEY, PolicyHandler } from '../decorators/check-policies.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { passwordChangeRequiredException } from '../../iam/password-change-required.exception';
 
 @Injectable()
 export class PoliciesGuard implements CanActivate {
@@ -16,13 +17,10 @@ export class PoliciesGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const user = request.user as { id: string; mustChangePassword?: boolean } | undefined;
-    // Credential recovery precedes even the legacy no-policy fail-open branch.
+    // JwtAuthGuard is the primary gate; retain this defence in depth before
+    // even the legacy no-policy fail-open branch.
     if (user?.mustChangePassword) {
-      throw new ForbiddenException({
-        statusCode: 403,
-        code: 'PASSWORD_CHANGE_REQUIRED',
-        message: 'Debes cambiar tu contraseña para continuar.',
-      });
+      throw passwordChangeRequiredException();
     }
 
     const handlers = this.reflector.get<PolicyHandler[]>(CHECK_POLICIES_KEY, context.getHandler());

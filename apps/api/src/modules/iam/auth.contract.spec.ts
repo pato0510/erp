@@ -14,6 +14,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PASSWORD_POLICY_MESSAGE } from './password-policy';
+import { ALLOW_PENDING_PASSWORD_CHANGE_KEY } from '../common/decorators/allow-pending-password-change.decorator';
 
 describe('AUTH-002 backend contract', () => {
   const reflector = new Reflector();
@@ -29,8 +30,20 @@ describe('AUTH-002 backend contract', () => {
       expect(
         Reflect.getMetadata(CHECK_POLICIES_KEY, AuthController.prototype[method]),
       ).toBeUndefined();
+      expect(
+        Reflect.getMetadata(ALLOW_PENDING_PASSWORD_CHANGE_KEY, AuthController.prototype[method]),
+      ).toBe(true);
     },
   );
+
+  it('limits the pending-password exception to the three recovery actions', () => {
+    expect(Reflect.getMetadata(ALLOW_PENDING_PASSWORD_CHANGE_KEY, AuthController)).toBeUndefined();
+    for (const method of ['login', 'refresh', 'testPermissions'] as const) {
+      expect(
+        Reflect.getMetadata(ALLOW_PENDING_PASSWORD_CHANGE_KEY, AuthController.prototype[method]),
+      ).toBeUndefined();
+    }
+  });
 
   it('throttles change-password exactly like login and returns 200', () => {
     for (const key of ['THROTTLER:LIMITdefault', 'THROTTLER:TTLdefault']) {
