@@ -54,6 +54,50 @@ html.starfield-page.dark body {
   background-color: #000;
 }
 
+/* HUB-006 — the shared "space" backdrop (components/SpaceBackdrop.tsx), mounted once
+   from the root layout for SPACE_PATHS (/login, /modulos). Values copied verbatim from
+   the login's former .sw-root / .sw-vignette rules; pages above it are transparent. */
+.space-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: #000000;
+  background-image:
+    radial-gradient(ellipse at 50% 40%, rgba(20, 30, 55, 0.35) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 80%, rgba(40, 20, 60, 0.3) 0%, transparent 60%);
+}
+html:not(.dark) .space-backdrop {
+  background-color: #1d3358;
+  background-image:
+    radial-gradient(ellipse at 50% 30%, rgba(110, 170, 230, 0.45) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 90%, rgba(70, 130, 200, 0.35) 0%, transparent 60%),
+    linear-gradient(180deg, #2a4f82 0%, #1a3158 50%, #142544 100%);
+}
+.space-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.55) 95%);
+}
+html:not(.dark) .space-vignette {
+  background: radial-gradient(circle at 50% 50%, transparent 35%, rgba(8, 18, 38, 0.45) 95%);
+}
+/* Plays once per backdrop mount (first arrival), not on the login → hub step. */
+@keyframes sw-stars-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.space-backdrop canvas {
+  animation: sw-stars-in 500ms ease-out both;
+}
+
 /* UI-002: one entrance per card mount. HUB-001 removed the hover lift, so the
    final offset is plain zero (no --module-card-y). */
 @keyframes module-card-enter {

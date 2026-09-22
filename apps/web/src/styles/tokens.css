@@ -49,13 +49,13 @@
   /* ───────────────────────────────────────────────────────────────────────
      Hub (Sprint 18) — "Alternativa C · Barrido, paleta Color refinado",
      design team, 2026-09-17 (HUB-001). EXACT design values: NOT derived from
-     the app palette, never rounded or harmonised. The hub is dark in both
-     themes, so there are NO per-theme variants (nothing under html.dark).
+     the app palette, never rounded or harmonised. No per-theme variants
+     (nothing under html.dark). HUB-006 (2026-09-22): the page no longer has a
+     hub background — it sits on the shared space backdrop (global.css
+     .space-backdrop, same as /login); these tokens serve the cards and text.
      Per-module keys: finanzas · operaciones · hsec · comercial · marketing ·
      rrhh · gestion; -glow = the border colour at 20% opacity (hex + 33).
      ─────────────────────────────────────────────────────────────────────── */
-  --hub-bg: #142941;
-  --hub-bg-light: #244367;
   --hub-title: #ffffff;
   --hub-desc: #e1e9f3;
   --hub-text-secondary: #aebed3;

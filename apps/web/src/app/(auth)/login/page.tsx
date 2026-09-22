@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Moon, Sun } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
-import { Starfield } from '../../../components/Starfield';
 // UI-003 — the brand vertical logo (designer SVG), replaces the inline mark + text wordmark.
 import { ExcelsiaLogo } from '../../../components/shared/ExcelsiaLogo';
 import { useTheme } from '../../../lib/theme';
@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [info, setInfo] = useState('');
   const { theme, toggleTheme } = useTheme();
+  const router = useRouter();
 
   const {
     register,
@@ -41,20 +42,14 @@ export default function LoginPage() {
       if (me.companies.length > 0) {
         apiClient.setCompanyId(me.companies[0].companyId);
       }
-      window.location.href = '/modulos';
+      // HUB-006 — client navigation: the root layout (and the shared SpaceBackdrop with
+      // its stars) persists into the hub. isLoading stays true until this page unmounts.
+      router.replace('/modulos');
     } catch {
       setError('Credenciales inválidas');
-    } finally {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    document.documentElement.classList.add('starfield-page');
-    return () => {
-      document.documentElement.classList.remove('starfield-page');
-    };
-  }, []);
 
   const handleForgotPassword = () => {
     setError('');
@@ -63,10 +58,8 @@ export default function LoginPage() {
 
   return (
     <div className="sw-root">
-      <Starfield zIndex={0} />
+      {/* HUB-006 — starfield, backdrop and vignette live in the shared SpaceBackdrop. */}
       <div className="login-page">
-        <div className="sw-vignette" aria-hidden="true" />
-
         <div className="sw-topbar">
           <span>PORTAL · ACCESO</span>
           <div className="sw-topbar__right">
@@ -193,32 +186,8 @@ export default function LoginPage() {
           inset: 0;
           color: var(--ink);
           font-family: var(--font-space-grotesk), var(--font-outfit), sans-serif;
-          background-color: #000000;
-          background-image:
-            radial-gradient(ellipse at 50% 40%, rgba(20, 30, 55, 0.35) 0%, transparent 55%),
-            radial-gradient(ellipse at 80% 80%, rgba(40, 20, 60, 0.3) 0%, transparent 60%);
+          /* HUB-006 — transparent over the shared SpaceBackdrop (global.css). */
           overflow: hidden;
-        }
-        html:not(.dark) .sw-root {
-          background-color: #1d3358;
-          background-image:
-            radial-gradient(ellipse at 50% 30%, rgba(110, 170, 230, 0.45) 0%, transparent 60%),
-            radial-gradient(ellipse at 20% 90%, rgba(70, 130, 200, 0.35) 0%, transparent 60%),
-            linear-gradient(180deg, #2a4f82 0%, #1a3158 50%, #142544 100%);
-        }
-        .sw-vignette {
-          position: fixed;
-          inset: 0;
-          z-index: 1;
-          pointer-events: none;
-          background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.55) 95%);
-        }
-        html:not(.dark) .sw-vignette {
-          background: radial-gradient(
-            circle at 50% 50%,
-            transparent 35%,
-            rgba(8, 18, 38, 0.45) 95%
-          );
         }
         .sw-topbar,
         .sw-bottombar {
@@ -294,17 +263,6 @@ export default function LoginPage() {
           background: transparent;
           border: none;
           animation: sw-rise 450ms ease-out both;
-        }
-        @keyframes sw-stars-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        .sw-root canvas {
-          animation: sw-stars-in 500ms ease-out both;
         }
         .sw-logo {
           display: flex;

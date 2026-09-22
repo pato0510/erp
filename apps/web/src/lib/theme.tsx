@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { SPACE_PATHS } from '../components/SpaceBackdrop';
 
 export type Theme = 'light' | 'dark';
 
@@ -77,6 +78,7 @@ export function useTheme(): ThemeContextValue {
  * Inline script (string) injected into <head> so the dark class — and the
  * starfield-page class for routes that override the body background — are
  * applied before React hydrates, avoiding a flash of the wrong theme or a
- * white flash on the dark "portal" pages.
+ * white flash on the dark "portal" pages. HUB-006: the path list is
+ * SPACE_PATHS, the same constant SpaceBackdrop uses on client navigation.
  */
-export const themeHydrationScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t==='dark'){document.documentElement.classList.add('dark');}var p=window.location.pathname;if(p==='/login'||p==='/modulos'){document.documentElement.classList.add('starfield-page');}}catch(e){}})();`;
+export const themeHydrationScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t==='dark'){document.documentElement.classList.add('dark');}var p=window.location.pathname;if(${JSON.stringify(SPACE_PATHS)}.indexOf(p)!==-1){document.documentElement.classList.add('starfield-page');}}catch(e){}})();`;

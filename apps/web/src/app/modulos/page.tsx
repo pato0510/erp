@@ -7,7 +7,6 @@ import { useAuth } from '../../hooks/useAuth';
 // UI-003 — the brand isotype (designer SVG) replaces the inline gradient mark.
 import { ExcelsiaLogo } from '../../components/shared/ExcelsiaLogo';
 import { useTheme } from '../../lib/theme';
-import { Starfield } from '../../components/Starfield';
 // HUB-004 — the footer with the centred clock · latency · connection block.
 import { HubFooter } from '../../components/hub/HubFooter';
 import { HubScene, type HubModuleKey } from '../../components/hub/HubScene';
@@ -126,16 +125,10 @@ export default function ModulosPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      window.location.href = '/login';
+      // HUB-006 — client navigation keeps the shared SpaceBackdrop (and its stars).
+      router.replace('/login');
     }
-  }, [isLoading, user]);
-
-  useEffect(() => {
-    document.documentElement.classList.add('starfield-page');
-    return () => {
-      document.documentElement.classList.remove('starfield-page');
-    };
-  }, []);
+  }, [isLoading, user, router]);
 
   const handleSelect = (mod: ModuleDef) => {
     if (!mod.active || !mod.href) return;
@@ -144,8 +137,7 @@ export default function ModulosPage() {
 
   return (
     <div className="modulos-page-wrapper mod-root">
-      <Starfield zIndex={1} />
-      <div className="mod-vignette" aria-hidden="true" />
+      {/* HUB-006 — starfield, backdrop and vignette live in the shared SpaceBackdrop. */}
 
       {/* Top bar — renders immediately; user-specific controls appear when auth resolves */}
       <header className="mod-topbar">
@@ -284,24 +276,10 @@ export default function ModulosPage() {
           inset: 0;
           color: var(--ink);
           font-family: var(--font-space-grotesk), var(--font-outfit), sans-serif;
-          /* HUB-001 — exact hub background with the top illumination; ONE rule for both
-             themes (the hub is dark in both). The Starfield canvas stays as a separate
-             layer (z-index 1) above this backdrop. */
-          background-color: var(--hub-bg);
-          background-image: radial-gradient(
-            ellipse at 50% 0%,
-            var(--hub-bg-light) 0%,
-            transparent 65%
-          );
+          /* HUB-006 — transparent over the shared SpaceBackdrop (global.css); reverses
+             HUB-001's fixed navy page background (founder, 2026-09-22). */
           overflow-y: auto;
           overflow-x: hidden;
-        }
-        .mod-vignette {
-          position: fixed;
-          inset: 0;
-          z-index: 2;
-          pointer-events: none;
-          background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.55) 95%);
         }
         .mod-topbar,
         .mod-bottombar {

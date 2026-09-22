@@ -156,6 +156,29 @@ bloque de su módulo; este bloque es el índice del sprint.
 
 ═══════════════════════════════════════════════════════════════════
 
+# SPRINT 19 — HUB, ACCESO, DIRECTORIO Y TO-DOS (2026-09-22 → )
+
+Sprint 19 (2026-09-22) — hub, acceso, directorio y to-dos. Decisiones del
+fundador 2026-09-22: fondo del hub = fondo del login (starfield, ambos temas,
+sin cambio visible al entrar); animaciones = variante C del prototipo del equipo
+de diseño (referencia en docs/design/hub-c/, llega en HUB-007); hover = esquinas
+de encuadre + brillo leve, sin mover ni escalar; logo del login recompuesto con
+isotipo + logotipo del kit; recuperar acceso = restablecimiento por
+administrador (opción B), correo (opción A) cuando exista proveedor; to-dos
+estilo Monday con 5 estados; directorio de miembros común. Olas: 1 HUB-006 ∥
+AUTH-001 · 2 AUTH-002 → BRAND-001 ∥ HUB-007 · 3 HUB-008 ∥ MEM-001 → GO-003 ·
+4 GO-004 ∥ MEM-002 · cierre DOC-S19-CLOSE. Después: S20 pipeline (vista tabla,
+acciones, Lead, reglas); S21 Configuración de empresa + áreas unificadas +
+calendario total.
+
+| Ticket  | Título corto                                                  | Ola | Detalle                               |
+| ------- | ------------------------------------------------------------- | --- | ------------------------------------- |
+| HUB-006 | Fondo «espacio» compartido login + hub, persistente al entrar | 1   | § Hub — Sprint 18, subsección HUB-006 |
+
+Última actualización: 2026-09-22 (HUB-006)
+
+═══════════════════════════════════════════════════════════════════
+
 # MÓDULO FINANZAS (V1 COMPLETO EN PRODUCCIÓN)
 
 ═══════════════════════════════════════════════════════════════════
@@ -432,7 +455,7 @@ apps/web/src/app/(dashboard)/operaciones/
   de diseño, NO derivados de la paleta de la app; no se redondean ni armonizan.
 - Tokens en `apps/web/src/styles/tokens.css`, sección "Hub (Sprint 18)", solo en
   `:root` (el hub es oscuro en ambos temas → sin variantes por tema): `--hub-bg`
-  `#142941`, `--hub-bg-light` `#244367`, `--hub-title` `#FFFFFF`, `--hub-desc`
+  `#142941`, `--hub-bg-light` `#244367` (ambos RETIRADOS en HUB-006), `--hub-title` `#FFFFFF`, `--hub-desc`
   `#E1E9F3`, `--hub-text-secondary` `#AEBED3`, `--hub-shadow`
   `0 5px 13px #030C1729`, `--hub-highlight` `inset 0 1px 0 #FFFFFF0C`,
   `--hub-veil` `linear-gradient(0deg, #06111B38, transparent 70%)`; por módulo
@@ -570,6 +593,48 @@ agregó crons, jobs ni tablas: solo el endpoint `GET /api/hub/status` (lecturas
 gateadas por módulo) y superficies web.
 
 Última actualización: 2026-09-17 (DOC-S18-CLOSE)
+
+#### HUB-006 (Sprint 19) — Fondo «espacio» compartido (2026-09-22)
+
+- Decisión del fundador (2026-09-22): el fondo del hub es EXACTAMENTE el del
+  login (starfield, ambos temas) y entrar al hub tras el login no muestra
+  cambio de fondo. REVIERTE el fondo de página navy de HUB-001 (`--hub-bg` +
+  iluminación `--hub-bg-light`): ambos tokens se ELIMINARON de `tokens.css`.
+  Los colores refinados quedan SOLO en las tarjetas; los `--hub-<key>-*` y el
+  resto de tokens del hub no cambian.
+- `components/SpaceBackdrop.tsx`, montado UNA vez desde el layout RAÍZ (dentro
+  de `ThemeProvider`, antes de `{children}`): se renderiza solo si
+  `usePathname()` está en `SPACE_PATHS` (constante exportada, hoy
+  `['/login', '/modulos']`; tickets futuros agregan rutas ahí). Pinta la capa
+  fija de fondo, `<Starfield zIndex={0} />` (componente sin cambios) y la
+  viñeta; todo `aria-hidden`, sin puntero, bajo el contenido. Como el layout
+  raíz persiste en navegación de cliente, el canvas y sus estrellas SOBREVIVEN
+  login → hub; al salir a otra ruta se desmonta y el rAF se cancela.
+  `sw-stars-in` suena una vez por montaje (primera llegada), no en el paso
+  login → hub.
+- CSS compartido en `global.css`: `.space-backdrop` y `.space-vignette` con su
+  variante `html:not(.dark)`, valores COPIADOS de las antiguas `.sw-root` /
+  `.sw-vignette` del login. Login y hub quedan TRANSPARENTES encima; se
+  retiraron sus `<Starfield/>`, `.sw-vignette`, `.mod-vignette`, el fondo de
+  `.sw-root` / `.mod-root` y sus efectos `starfield-page`.
+- `html.starfield-page`: el script bloqueante la pone en el primer pintado
+  (interpola `SPACE_PATHS`: UNA sola lista) y `SpaceBackdrop` la sincroniza en
+  navegación de cliente (entra → agrega, sale → quita).
+- Primer pintado (CSS crítico de `layout.tsx`, que va DESPUÉS del stylesheet):
+  `html.starfield-page` → `#1d3358`, `html.starfield-page.dark` → `#000`.
+  Se conserva `body { background: #000 }` como default de rutas no-espacio:
+  el dashboard lo necesita en oscuro (`.tn-shell` es transparente y
+  `DarkGradientBackground` monta tras la hidratación).
+- Navegación: login exitoso → `router.replace('/modulos')` (tras
+  `setCompanyId`; el botón queda en «verificando» hasta desmontar) y hub sin
+  sesión → `router.replace('/login')`. `logout` de `useAuth` SIGUE con recarga
+  completa: es compartido con los sidebars y descarta el estado en memoria.
+- Contraste medido en claro: `--hub-text-secondary` sobre el punto más claro
+  del fondo tras header/footer = 5,47:1 (peor caso, «EXCELSIA · MÓDULOS»).
+- `Starfield` NO respeta `prefers-reduced-motion` (titila y hace fade igual);
+  comportamiento previo, sin cambios.
+
+Última actualización: 2026-09-22 (HUB-006)
 
 ## Plan de sprints del módulo
 
@@ -956,6 +1021,10 @@ Puntos clave:
 - HUB-001 — Hub: paleta exacta como tokens, acabado de tarjeta y borde activo
   (2026-09-17; Sprint 18, ola 1): doctrina en § Hub — Sprint 18 (Alternativa C).
   Archivos: `styles/tokens.css`, `app/modulos/page.tsx`, `app/global.css`.
+- HUB-006 — Fondo «espacio» compartido login + hub (2026-09-22; Sprint 19, ola 1):
+  doctrina en § Hub, subsección HUB-006. Archivos: `components/SpaceBackdrop.tsx`,
+  `app/layout.tsx`, `app/global.css`, `lib/theme.tsx`, `app/(auth)/login/page.tsx`,
+  `app/modulos/page.tsx`, `styles/tokens.css`.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -1121,7 +1190,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-17 (ALERT-001 + HUB-001)
+Última actualización: 2026-09-22 (HUB-006)
 
 ═══════════════════════════════════════════════════════════════════
 
