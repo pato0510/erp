@@ -1,5 +1,6 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { UserRole } from '@prisma/client';
+import { IsPassword } from '../password-policy';
 
 export class CreateUserDto {
   @IsString()
@@ -16,9 +17,7 @@ export class CreateUserDto {
   @MaxLength(200)
   email: string;
 
-  @IsString()
-  @MinLength(8)
-  @MaxLength(100)
+  @IsPassword()
   password: string;
 
   @IsEnum(UserRole)

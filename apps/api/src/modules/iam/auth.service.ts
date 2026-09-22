@@ -1,9 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
 import { Response } from 'express';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { assertPasswordPolicy } from './password-policy';
 
 @Injectable()
 export class AuthService {
@@ -13,7 +16,9 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+    });
     if (!user || !user.isActive) return null;
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -24,8 +29,17 @@ export class AuthService {
     return result;
   }
 
-  async login(user: { id: string; email: string }, response: Response) {
-    const payload = { sub: user.id, email: user.email };
+  async login(user: { id: string; email: string; tokenVersion: number }, response: Response) {
+    await this.issueSession(user, response, true);
+    return { id: user.id, email: user.email };
+  }
+
+  private async issueSession(
+    user: { id: string; email: string; tokenVersion: number },
+    response: Response,
+    recordLogin = false,
+  ) {
+    const payload = { sub: user.id, email: user.email, tv: user.tokenVersion };
 
     const accessToken = this.jwtService.sign(payload);
 
@@ -36,20 +50,31 @@ export class AuthService {
 
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date(), refreshTokenHash },
-    });
+    // A concurrent reset must not let an older login overwrite the new refresh slot.
+    try {
+      await this.prisma.user.update({
+        where: { id: user.id, tokenVersion: user.tokenVersion, isActive: true },
+        data: { refreshTokenHash, ...(recordLogin ? { lastLoginAt: new Date() } : {}) },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new UnauthorizedException();
+      }
+      throw error;
+    }
 
     this.setAccessTokenCookie(response, accessToken);
     this.setRefreshTokenCookie(response, refreshToken);
-
-    return { id: user.id, email: user.email };
   }
 
-  async refresh(userId: string, refreshToken: string, response: Response) {
+  async refresh(userId: string, refreshToken: string, response: Response, tokenVersion?: number) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.isActive || !user.refreshTokenHash) {
+    if (
+      !user ||
+      !user.isActive ||
+      (tokenVersion ?? 0) !== user.tokenVersion ||
+      !user.refreshTokenHash
+    ) {
       throw new UnauthorizedException();
     }
 
@@ -58,11 +83,47 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    const payload = { sub: user.id, email: user.email };
+    const payload = { sub: user.id, email: user.email, tv: user.tokenVersion };
     const newAccessToken = this.jwtService.sign(payload);
     this.setAccessTokenCookie(response, newAccessToken);
 
     return { message: 'Token refreshed' };
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto, response: Response) {
+    assertPasswordPolicy(dto.newPassword);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive) throw new UnauthorizedException();
+
+    if (!(await bcrypt.compare(dto.currentPassword, user.passwordHash))) {
+      throw new BadRequestException('La contraseña actual no es correcta.');
+    }
+    if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
+      throw new BadRequestException('La nueva contraseña debe ser distinta de la actual.');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    let updated;
+    try {
+      updated = await this.prisma.user.update({
+        // Do not overwrite a password changed while bcrypt was running.
+        where: { id: user.id, tokenVersion: user.tokenVersion, isActive: true },
+        data: {
+          passwordHash,
+          mustChangePassword: false,
+          passwordChangedAt: new Date(),
+          tokenVersion: { increment: 1 },
+          refreshTokenHash: null,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new UnauthorizedException();
+      }
+      throw error;
+    }
+    await this.issueSession(updated, response);
+    return { message: 'Contraseña actualizada correctamente.' };
   }
 
   async logout(userId: string, response: Response) {
@@ -99,6 +160,7 @@ export class AuthService {
         firstName: true,
         lastName: true,
         isActive: true,
+        mustChangePassword: true,
         lastLoginAt: true,
         memberships: {
           where: { isActive: true },
@@ -125,6 +187,7 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       isActive: user.isActive,
+      mustChangePassword: user.mustChangePassword,
       lastLoginAt: user.lastLoginAt,
       companies: user.memberships.map((m) => ({
         companyId: m.company.id,

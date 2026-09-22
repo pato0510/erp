@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -41,5 +51,17 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
   ) {
     return this.usersService.update(id, companyId, actor.id, dto);
+  }
+
+  @Post(':id/reset-access')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @CheckPolicies((ability) => ability.can('manage', UserSubject))
+  resetAccess(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.usersService.resetAccess(id, companyId, actor.id);
   }
 }

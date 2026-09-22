@@ -48,7 +48,7 @@ describe('HUB-003a guard chain', () => {
     const previousSecret = process.env.JWT_SECRET;
     try {
       process.env.JWT_SECRET = 'hub-guard-test-only';
-      new JwtStrategy();
+      new JwtStrategy({ user: { findUnique: jest.fn() } } as never);
     } finally {
       if (previousSecret === undefined) delete process.env.JWT_SECRET;
       else process.env.JWT_SECRET = previousSecret;

@@ -14,8 +14,8 @@ export class RefreshStrategy extends PassportStrategy(Strategy, 'refresh') {
     });
   }
 
-  validate(req: Request, payload: { sub: string; email: string }) {
+  validate(req: Request, payload: { sub: string; email: string; tv?: number }) {
     const refreshToken = req.cookies['refresh_token'];
-    return { id: payload.sub, email: payload.email, refreshToken };
+    return { id: payload.sub, email: payload.email, refreshToken, tv: payload.tv };
   }
 }

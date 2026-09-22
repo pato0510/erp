@@ -34,8 +34,17 @@ export class SentryExceptionFilter implements ExceptionFilter {
          the string contract while surfacing every failing constraint.
        - anything else / non-HttpException → the previous fallback, UNCHANGED. */
     let message: string;
+    let code: string | undefined;
     if (exception instanceof HttpException) {
       const res = exception.getResponse();
+      if (
+        typeof res === 'object' &&
+        res !== null &&
+        'code' in res &&
+        typeof res.code === 'string'
+      ) {
+        code = res.code;
+      }
       const resMessage =
         typeof res === 'object' && res !== null
           ? (res as { message?: unknown }).message
@@ -65,6 +74,13 @@ export class SentryExceptionFilter implements ExceptionFilter {
         `${request.method} ${request.url} ${status} - ${exception instanceof Error ? exception.message : 'Unknown error'}`,
         exception instanceof Error ? exception.stack : undefined,
       );
+    }
+
+    // Coded HTTP errors are explicit API contracts (AUTH-001); retain their
+    // machine-readable code without changing the existing uncoded error shape.
+    if (code !== undefined) {
+      response.status(status).json({ statusCode: status, code, message });
+      return;
     }
 
     response.status(status).json({

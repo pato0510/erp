@@ -14,13 +14,22 @@ export class PoliciesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<Request>();
+    const user = request.user as { id: string; mustChangePassword?: boolean } | undefined;
+    // Credential recovery precedes even the legacy no-policy fail-open branch.
+    if (user?.mustChangePassword) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: 'Debes cambiar tu contraseña para continuar.',
+      });
+    }
+
     const handlers = this.reflector.get<PolicyHandler[]>(CHECK_POLICIES_KEY, context.getHandler());
     if (!handlers || handlers.length === 0) {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
-    const user = request.user as { id: string } | undefined;
     if (!user) {
       throw new ForbiddenException('User not authenticated');
     }

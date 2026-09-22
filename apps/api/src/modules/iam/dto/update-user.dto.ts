@@ -1,5 +1,6 @@
-import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { UserRole } from '@prisma/client';
+import { IsPassword } from '../password-policy';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -20,9 +21,7 @@ export class UpdateUserDto {
   @IsBoolean()
   isActive?: boolean;
 
-  @IsOptional()
-  @IsString()
-  @MinLength(8)
-  @MaxLength(100)
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsPassword()
   password?: string;
 }
