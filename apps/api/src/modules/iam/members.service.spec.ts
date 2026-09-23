@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client';
-import { ActividadesController } from '../actividades/actividades.controller';
 import { MembersService } from './members.service';
 
 const rows = [
@@ -111,23 +110,5 @@ describe('MEM-001 members directory', () => {
   it('returns an empty array for a company without members', async () => {
     const { service } = setup();
     await expect(service.listForCompany('empty', 'actor')).resolves.toEqual([]);
-  });
-
-  it('keeps the Actividades alias identical to scope=all with the authenticated actor', async () => {
-    const { service, rls } = setup();
-    const controller = new ActividadesController(
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      service,
-    );
-    const expected = await service.listForCompany('company-a', 'actor', 'all');
-    const list = jest.spyOn(service, 'listForCompany');
-    await expect(controller.listMembers('company-a', { id: 'actor' })).resolves.toEqual(expected);
-    expect(list).toHaveBeenCalledWith('company-a', 'actor', 'all');
-    expect(rls.executeWithRls).toHaveBeenLastCalledWith('company-a', 'actor', expect.any(Function));
   });
 });

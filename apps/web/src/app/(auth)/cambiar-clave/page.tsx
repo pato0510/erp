@@ -282,12 +282,6 @@ export default function CambiarClavePage() {
           display: flex;
           gap: 18px;
         }
-        @media (max-width: 640px) {
-          /* iOS zooms a focused input under 16px; the stage keeps its mono voice. */
-          .cc-root .sw-field__input {
-            font-size: 16px;
-          }
-        }
       `}</style>
     </div>
   );

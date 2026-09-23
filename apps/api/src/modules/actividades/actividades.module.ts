@@ -6,7 +6,6 @@ import { CampaignsModule } from '../marketing/campaigns/campaigns.module';
 import { ComercialCierresReadModule } from '../comercial/cierres-read/cierres-read.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { AreasModule } from './areas/areas.module';
-import { IamModule } from '../iam/iam.module';
 import { ActividadesController } from './actividades.controller';
 import { TodosModule } from './todos/todos.module';
 
@@ -35,7 +34,6 @@ import { TodosModule } from './todos/todos.module';
     OpsCalendarReadModule,
     CampaignsModule,
     ComercialCierresReadModule,
-    IamModule,
     TodosModule,
   ],
   controllers: [ActividadesController],

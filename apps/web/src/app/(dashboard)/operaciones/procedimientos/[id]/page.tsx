@@ -29,7 +29,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../../../../lib/api';
-import { useAuth } from '../../../../../hooks/useAuth';
+import { currentCompanyRole, useAuth } from '../../../../../hooks/useAuth';
 import { Toast } from '../../../../../components/shared/Toast';
 import { ProcedureNewVersionModal } from '../../../../../components/operations/ProcedureNewVersionModal';
 import { ProcedureRevisionsTimeline } from '../../../../../components/operations/ProcedureRevisionsTimeline';
@@ -150,11 +150,7 @@ export default function ProcedureDetailPage(props: { params: Promise<{ id: strin
   const { id } = use(props.params);
   const { user } = useAuth();
   const companyId = apiClient.getCompanyId();
-  const role = (
-    companyId
-      ? user?.companies.find((company) => company.companyId === companyId)
-      : user?.companies[0]
-  )?.role;
+  const role = currentCompanyRole(user, companyId);
   const isAdminOrManager = role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'MANAGER';
   const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
 

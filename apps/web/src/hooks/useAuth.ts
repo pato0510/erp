@@ -21,6 +21,15 @@ interface User {
   mustChangePassword?: boolean;
 }
 
+// UI gating only: a selected company must never inherit another company's role.
+export function currentCompanyRole(user: User | null | undefined, companyId: string | null) {
+  return (
+    companyId
+      ? user?.companies.find((company) => company.companyId === companyId)
+      : user?.companies[0]
+  )?.role;
+}
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);

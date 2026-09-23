@@ -25,7 +25,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../../../../../lib/api';
-import { useAuth } from '../../../../../../hooks/useAuth';
+import { currentCompanyRole, useAuth } from '../../../../../../hooks/useAuth';
 import { Toast } from '../../../../../../components/shared/Toast';
 import { PermitApprovalTimeline } from '../../../../../../components/operations/PermitApprovalTimeline';
 import { formatDate } from '../../../../../../lib/formatters';
@@ -237,11 +237,7 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
   const isSupervisor = permit.supervisorId === user?.id;
   const isRequester = permit.requestedBy === user?.id;
   const companyId = apiClient.getCompanyId();
-  const role = (
-    companyId
-      ? user?.companies.find((company) => company.companyId === companyId)
-      : user?.companies[0]
-  )?.role;
+  const role = currentCompanyRole(user, companyId);
   const isAdminOrManager = role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'MANAGER';
   const canAuthorize =
     permit.status === 'PENDING_AUTHORIZATION' &&

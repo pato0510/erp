@@ -13,7 +13,6 @@ import type { AppAbility } from '../common/casl/casl-ability.factory';
 import { CheckPolicies } from '../common/decorators/check-policies.decorator';
 import { CurrentAbility } from '../common/decorators/current-ability.decorator';
 import { CurrentCompany } from '../common/decorators/current-company.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PoliciesGuard } from '../common/guards/policies.guard';
 import { BirthdayReadService } from '../rrhh/birthday-read/birthday-read.service';
 import { RrhhAbsenceReadService } from '../rrhh/absence-read/absence-read.service';
@@ -22,7 +21,6 @@ import { CampaignLookupService } from '../marketing/campaigns/campaign-lookup.se
 import { ComercialCierresReadService } from '../comercial/cierres-read/cierres-read.service';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { ActivitiesService } from './activities/activities.service';
-import { MembersService } from '../iam/members.service';
 
 /* CAL-001 — Calendario de Actividades module shell.
  *
@@ -55,8 +53,6 @@ export class ActividadesController {
     // otherwise, not an empty array).
     private readonly campaignLookup: CampaignLookupService,
     private readonly cierres: ComercialCierresReadService,
-    // CAL-008 — members-lite read (§2.4). Same all-roles read gate = the signed name exposure.
-    private readonly members: MembersService,
   ) {}
 
   /* Proves the guard chain end-to-end. Gated on `read CalendarActivity` — which all six
@@ -194,13 +190,5 @@ export class ActividadesController {
       }));
     }
     return envelope;
-  }
-
-  /* MEM-001 — compatibility alias of GET /members?scope=all; MEM-002 migrates callers.
-     Keep CAL-008's read CalendarActivity gate and names-only response. */
-  @Get('members')
-  @CheckPolicies((ability) => ability.can('read', CalendarActivitySubject))
-  listMembers(@CurrentCompany() companyId: string, @CurrentUser() user: { id: string }) {
-    return this.members.listForCompany(companyId, user.id, 'all');
   }
 }

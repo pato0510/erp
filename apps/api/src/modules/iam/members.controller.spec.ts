@@ -39,13 +39,15 @@ function setup(
 }
 
 describe('MEM-001 members controller and authorization', () => {
-  it('registers and exports the directory in IAM and imports IAM for the alias', () => {
+  it('registers and exports the directory in IAM without coupling Actividades to IAM', () => {
     expect(Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, IamModule)).toContain(
       MembersController,
     );
     expect(Reflect.getMetadata(MODULE_METADATA.PROVIDERS, IamModule)).toContain(MembersService);
     expect(Reflect.getMetadata(MODULE_METADATA.EXPORTS, IamModule)).toContain(MembersService);
-    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, ActividadesModule)).toContain(IamModule);
+    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, ActividadesModule)).not.toContain(
+      IamModule,
+    );
     expect(Reflect.getMetadata(PATH_METADATA, MembersController)).toBe('members');
   });
 
@@ -112,22 +114,24 @@ describe('MEM-001 members controller and authorization', () => {
     expect(prisma.membership.findUnique).not.toHaveBeenCalled();
   });
 
-  it('preserves the alias guards, route and read CalendarActivity policy', () => {
+  it('keeps only the guarded calendar routes in the Actividades inventory', () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, ActividadesController)).toEqual([
       JwtAuthGuard,
       PoliciesGuard,
     ]);
-    expect(Reflect.getMetadata(PATH_METADATA, ActividadesController.prototype.listMembers)).toBe(
-      'members',
+    const methods = Object.getOwnPropertyNames(ActividadesController.prototype).filter(
+      (method) => method !== 'constructor',
     );
-    const handlers = reflector.get<PolicyHandler[]>(
-      CHECK_POLICIES_KEY,
-      ActividadesController.prototype.listMembers,
-    );
-    expect(handlers).toHaveLength(1);
-    const can = jest.fn(() => true);
-    handlers[0]({ can } as never);
-    expect(can).toHaveBeenCalledWith('read', CalendarActivitySubject);
+    expect(methods.sort()).toEqual(['calendar', 'permissions', 'ping']);
+    for (const method of methods) {
+      const handler = ActividadesController.prototype[method];
+      expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(method);
+      const handlers = reflector.get<PolicyHandler[]>(CHECK_POLICIES_KEY, handler);
+      expect(handlers).toHaveLength(1);
+      const can = jest.fn(() => true);
+      handlers[0]({ can } as never);
+      expect(can).toHaveBeenCalledWith('read', CalendarActivitySubject);
+    }
   });
 
   it.each(['all', 'active'] as const)(

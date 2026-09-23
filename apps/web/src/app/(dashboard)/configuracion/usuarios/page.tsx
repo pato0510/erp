@@ -17,7 +17,7 @@ import {
 import { apiClient } from '../../../../lib/api';
 import { formatRelativeDate } from '../../../../lib/formatters';
 import { Toast } from '../../../../components/shared/Toast';
-import { useAuth } from '../../../../hooks/useAuth';
+import { currentCompanyRole, useAuth } from '../../../../hooks/useAuth';
 import { meetsPasswordPolicy, PASSWORD_POLICY_MESSAGE } from '../../../../lib/password-policy';
 import { PasswordChecklist } from '../../../../components/shared/PasswordChecklist';
 
@@ -131,9 +131,7 @@ export default function UsuariosPage() {
   // AUTH-002 — the actor: id from /auth/me, role from its membership in the current company.
   const { user: me } = useAuth();
   const currentCompanyId = apiClient.getCompanyId();
-  const actorRole = (
-    me?.companies.find((c) => c.companyId === currentCompanyId) ?? me?.companies[0]
-  )?.role;
+  const actorRole = currentCompanyRole(me, currentCompanyId);
   const actorIsSuperAdmin = actorRole === 'SUPER_ADMIN';
   const roleOptions = actorIsSuperAdmin ? ROLES : ROLES.filter((r) => r !== 'SUPER_ADMIN');
   const [toast, setToast] = useState<{

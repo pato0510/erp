@@ -19,7 +19,7 @@ export class ApiError<TData = unknown> extends Error {
 /* AUTH-002 — AUTH-001's coded 403: while the account must change its password, every
    other authenticated call answers { code: 'PASSWORD_CHANGE_REQUIRED' }. Full navigation,
    like the 401 → /login below; no loop when the page is already /cambiar-clave. */
-function redirectIfPasswordChangeRequired(status: number, body: unknown) {
+export function redirectIfPasswordChangeRequired(status: number, body: unknown) {
   if (status !== 403 || typeof window === 'undefined') return;
   if ((body as { code?: unknown } | null)?.code !== 'PASSWORD_CHANGE_REQUIRED') return;
   if (window.location.pathname === '/cambiar-clave') return;
