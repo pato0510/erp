@@ -11,7 +11,7 @@
   opacity: 0.87;
 }
 
-/* Keep the original full-card SVG viewport, with all decoration clipped above
+/* Keep the full-card decoration layer, with all decoration clipped above
    the title/description/status block. Labels stay at 12 CSS px at every width. */
 .canvas {
   position: absolute;
@@ -31,18 +31,17 @@
 
 .graphic {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  /* Keep pathLength dashes at 1:1 CSS pixels; stretching truncates their draw. */
+  top: 44px;
+  right: 28px;
+  width: 96px;
+  height: 52px;
+  overflow: visible;
   fill: none;
   stroke: var(--card-ink);
   stroke-width: 1px;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.graphic * {
-  vector-effect: non-scaling-stroke;
 }
 
 .secondary {

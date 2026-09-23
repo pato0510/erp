@@ -6,18 +6,18 @@ export function HsecScene() {
     <SceneFrame labels={['Riesgos', 'Controles']}>
       <path
         className={styles.secondary}
-        d="M150 26H230M150 43H230M150 60H230M150 77H230M150 94H230M163 26V94M180 26V94M197 26V94M214 26V94"
+        d="M16 4H96V48H16ZM42.7 4V48M69.3 4V48M16 26H96"
         opacity={0.35}
       />
-      <path className={styles.connection} pathLength={1} d="M163 43L197 77L222 43Z" />
+      <path className={styles.connection} pathLength={1} d="M16 38L44 18L92 38" />
       <SceneNode step={0}>
-        <rect className={styles.point} x={161} y={41} width={4} height={4} />
+        <circle className={styles.point} cx={16} cy={38} r={2} />
+      </SceneNode>
+      <SceneNode step={1}>
+        <circle className={styles.point} cx={44} cy={18} r={2} />
       </SceneNode>
       <SceneNode step={2}>
-        <rect className={styles.point} x={195} y={75} width={4} height={4} />
-      </SceneNode>
-      <SceneNode step={5}>
-        <rect className={styles.point} x={220} y={41} width={4} height={4} />
+        <circle className={styles.point} cx={92} cy={38} r={2} />
       </SceneNode>
     </SceneFrame>
   );

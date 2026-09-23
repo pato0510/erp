@@ -4,18 +4,17 @@ import styles from '../HubScene.module.css';
 export function MarketingScene() {
   return (
     <SceneFrame labels={['Campañas', 'Audiencias']}>
-      <path className={styles.connection} pathLength={1} d="M164 60H188V33H210" />
-      <path className={styles.connection} pathLength={1} d="M188 60V87H210" />
+      <path className={styles.connection} pathLength={1} d="M2 30H26L34 16L44 40L56 24" />
+      <path className={styles.connection} pathLength={1} d="M56 24L94 4" />
+      <path className={styles.connection} pathLength={1} d="M56 24L94 48" />
       <SceneNode step={0}>
-        <rect x={154} y={55} width={10} height={10} rx={1} />
+        <circle className={styles.point} cx={2} cy={30} r={2} />
+      </SceneNode>
+      <SceneNode step={1}>
+        <circle className={styles.point} cx={94} cy={4} r={2} />
       </SceneNode>
       <SceneNode step={2}>
-        <rect x={210} y={28} width={20} height={10} rx={1} />
-        <path className={styles.secondary} d="M214 33H226" />
-      </SceneNode>
-      <SceneNode step={5}>
-        <rect x={210} y={82} width={20} height={10} rx={1} />
-        <path className={styles.secondary} d="M214 87H226" />
+        <circle className={styles.point} cx={94} cy={48} r={2} />
       </SceneNode>
     </SceneFrame>
   );

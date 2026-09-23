@@ -10,14 +10,8 @@ export function SceneFrame({ labels, children }: SceneFrameProps) {
   return (
     <div className={styles.canvas}>
       <div className={styles.grid} />
-      <svg
-        viewBox="0 0 240 240"
-        preserveAspectRatio="none"
-        className={styles.graphic}
-        focusable="false"
-      >
-        {/* Fit the technical graphic below the existing top-right arrow. */}
-        <g transform="translate(0 22) scale(1 0.75)">{children}</g>
+      <svg width={96} height={52} viewBox="0 0 96 52" className={styles.graphic} focusable="false">
+        {children}
       </svg>
       {labels.map((label, index) => (
         <span
