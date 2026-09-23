@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useActividadesPermissions } from '../../../../hooks/useActividadesPermissions';
+import { useMembers } from '../../../../hooks/useMembers';
 
 import {
-  TodoRowCells,
   Todo,
   Priority,
   Person,
@@ -15,8 +15,21 @@ import {
   nameOf,
   TODOS_CHANGED_EVENT,
 } from '../../../../components/actividades/TodoRowCells';
+import { TodoBoardTable } from '../../../../components/actividades/TodoBoardTable';
+import { TodoKanban } from '../../../../components/actividades/TodoKanban';
+import {
+  addDays,
+  santiagoToday,
+  type TodoStatus,
+} from '../../../../components/actividades/todoStatus';
+
+/* GO-004 — the to-dos board (Monday-style): a grouped table (default) and a kanban by
+ * status. ONE request per load — every status, DONE bounded to the last 30 Santiago days
+ * by completedAfter — and mutate → refetch; a status change (select, drop or «Mover a…»)
+ * is optimistic with revert + toast. Gating: Actividades flags + the rows' own flags. */
 
 type Assignee = Person & { email: string };
+type View = 'table' | 'cards';
 const INPUT =
   'w-full rounded-lg border border-line bg-input px-3 py-2 text-sm text-fg focus-visible:outline-accent';
 const BUTTON =
@@ -25,33 +38,51 @@ const PRIMARY =
   'rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50 focus-visible:outline-accent';
 const messageOf = (error: unknown) =>
   error instanceof Error ? error.message : 'No se pudo completar la acción.';
+const normalize = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es-CL');
+
 export default function TodosPage() {
   const { user } = useAuth();
   const permissions = useActividadesPermissions();
   const flags = permissions?.todo;
   const companyId = apiClient.getCompanyId();
   const userId = user?.id;
+  const { members: activeMembers } = useMembers('active');
+  const [view, setView] = useState<View>('table');
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
-  const [status, setStatus] = useState<'PENDING' | 'DONE' | 'ALL'>('PENDING');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [search, setSearch] = useState('');
   const [rows, setRows] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [modal, setModal] = useState<{ editing: Todo | null } | null>(null);
   const canRead = flags?.read ?? false;
   const canUpdate = flags?.update ?? false;
   const effectiveScope = canUpdate ? scope : 'mine';
+  const effectiveAssignee = canUpdate ? assigneeId : '';
+  const today = santiagoToday();
+  const completedAfter = addDays(today, -30);
 
   useEffect(() => {
     if (!canRead || !companyId || !userId) return;
     let active = true;
     setLoading(true);
-    setRows([]);
     setError(null);
+    const params = new URLSearchParams({
+      scope: effectiveScope,
+      status: 'ALL',
+      completedAfter,
+    });
+    if (effectiveAssignee) params.set('assigneeId', effectiveAssignee);
     apiClient
-      .get<Todo[]>(`/api/todos?scope=${effectiveScope}&status=${status}`)
+      .get<Todo[]>(`/api/todos?${params.toString()}`)
       .then((data) => {
         if (active) setRows(data);
       })
@@ -64,24 +95,47 @@ export default function TodosPage() {
     return () => {
       active = false;
     };
-  }, [canRead, companyId, userId, effectiveScope, status, refresh]);
+  }, [canRead, companyId, userId, effectiveScope, effectiveAssignee, completedAfter, refresh]);
 
-  async function mutate(row: Todo, action: 'complete' | 'reopen' | 'delete') {
-    if (action === 'delete' && !window.confirm(`¿Eliminar el to-do «${row.title}»?`)) return;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    toastTimer.current = setTimeout(() => setToast(null), 5000);
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, [toast]);
+
+  const visibleRows = useMemo(() => {
+    const q = normalize(search.trim());
+    return q ? rows.filter((row) => normalize(row.title).includes(q)) : rows;
+  }, [rows, search]);
+
+  /* The one status-change path: table select, kanban drop and «Mover a…». Optimistic,
+     then PATCH /status; success → badge event + refetch; failure → revert + toast. */
+  async function moveTo(row: Todo, target: TodoStatus) {
+    if (row.status === target || !row.canChangeStatus) return;
+    setRows((current) => current.map((r) => (r.id === row.id ? { ...r, status: target } : r)));
+    setToast(null);
+    try {
+      await apiClient.patch(`/api/todos/${row.id}/status`, { status: target });
+      window.dispatchEvent(new Event(TODOS_CHANGED_EVENT));
+      setRefresh((value) => value + 1);
+    } catch (err) {
+      setRows((current) => current.map((r) => (r.id === row.id ? row : r)));
+      setToast(messageOf(err));
+    }
+  }
+
+  async function remove(row: Todo) {
+    if (!window.confirm(`¿Eliminar el to-do «${row.title}»?`)) return;
     setBusy(row.id);
     setError(null);
     setNotice(null);
     try {
-      if (action === 'delete') await apiClient.delete(`/api/todos/${row.id}`);
-      else await apiClient.patch(`/api/todos/${row.id}/${action}`);
+      await apiClient.delete(`/api/todos/${row.id}`);
       window.dispatchEvent(new Event(TODOS_CHANGED_EVENT));
-      setNotice(
-        action === 'delete'
-          ? 'To-do eliminado.'
-          : action === 'complete'
-            ? 'To-do completado.'
-            : 'To-do reabierto.',
-      );
+      setNotice('To-do eliminado.');
       setRefresh((value) => value + 1);
     } catch (err) {
       setError(messageOf(err));
@@ -103,6 +157,8 @@ export default function TodosPage() {
       </p>
     );
 
+  const toggleClass = (on: boolean) => `${BUTTON} ${on ? 'bg-subtle font-medium' : ''}`;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -116,10 +172,26 @@ export default function TodosPage() {
           </button>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-2" role="group" aria-label="Alcance de los to-dos">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex gap-1" role="group" aria-label="Vista">
           <button
-            className={`${BUTTON} ${effectiveScope === 'mine' ? 'bg-subtle' : ''}`}
+            className={toggleClass(view === 'table')}
+            aria-pressed={view === 'table'}
+            onClick={() => setView('table')}
+          >
+            Tabla
+          </button>
+          <button
+            className={toggleClass(view === 'cards')}
+            aria-pressed={view === 'cards'}
+            onClick={() => setView('cards')}
+          >
+            Tarjetas
+          </button>
+        </div>
+        <div className="flex gap-1" role="group" aria-label="Alcance de los to-dos">
+          <button
+            className={toggleClass(effectiveScope === 'mine')}
             aria-pressed={effectiveScope === 'mine'}
             onClick={() => setScope('mine')}
           >
@@ -127,7 +199,7 @@ export default function TodosPage() {
           </button>
           {canUpdate && (
             <button
-              className={`${BUTTON} ${effectiveScope === 'all' ? 'bg-subtle' : ''}`}
+              className={toggleClass(effectiveScope === 'all')}
               aria-pressed={effectiveScope === 'all'}
               onClick={() => setScope('all')}
             >
@@ -135,17 +207,32 @@ export default function TodosPage() {
             </button>
           )}
         </div>
-        <label className="flex items-center gap-2 text-sm text-fg-secondary">
-          Estado
-          <select
+        {canUpdate && (
+          <label className="flex items-center gap-2 text-sm text-fg-secondary">
+            Responsable
+            <select
+              className={`${INPUT} w-auto min-w-[180px]`}
+              value={assigneeId}
+              onChange={(e) => setAssigneeId(e.target.value)}
+            >
+              <option value="">Todos los responsables</option>
+              {activeMembers.map((member) => (
+                <option key={member.userId} value={member.userId}>
+                  {member.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="flex min-w-[200px] flex-1 items-center gap-2 text-sm text-fg-secondary sm:max-w-xs">
+          <span className="sr-only">Buscar por título</span>
+          <input
+            type="search"
             className={INPUT}
-            value={status}
-            onChange={(e) => setStatus(e.target.value as typeof status)}
-          >
-            <option value="PENDING">Pendientes</option>
-            <option value="DONE">Hechos</option>
-            <option value="ALL">Todos</option>
-          </select>
+            placeholder="Buscar por título…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </label>
       </div>
       {error && (
@@ -158,68 +245,46 @@ export default function TodosPage() {
           {notice}
         </p>
       )}
-      {loading ? (
+      {loading && rows.length === 0 ? (
         <p role="status" className="text-fg-secondary">
           Cargando to-dos…
         </p>
-      ) : !error && rows.length === 0 ? (
+      ) : !error && visibleRows.length === 0 ? (
         <p className="rounded-xl border border-line bg-card p-6 text-fg-secondary">
-          {effectiveScope === 'mine' && status === 'PENDING'
-            ? 'No tienes to-dos pendientes.'
-            : 'No hay to-dos.'}
+          {search.trim()
+            ? 'Ningún to-do coincide con la búsqueda.'
+            : effectiveScope === 'mine'
+              ? 'No tienes to-dos.'
+              : 'No hay to-dos.'}
         </p>
+      ) : view === 'table' ? (
+        <TodoBoardTable
+          rows={visibleRows}
+          today={today}
+          canUpdate={canUpdate}
+          canDelete={flags?.delete ?? false}
+          busy={busy !== null}
+          onMove={moveTo}
+          onEdit={(row) => setModal({ editing: row })}
+          onDelete={remove}
+        />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-line bg-card">
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">To-dos de la organización</caption>
-            <thead className="bg-subtle text-fg-secondary">
-              <tr>
-                {['Hecho', 'Título', 'Responsable', 'Fecha límite', 'Prioridad', 'Acciones'].map(
-                  (heading) => (
-                    <th key={heading} scope="col" className="px-4 py-3 font-medium">
-                      {heading}
-                    </th>
-                  ),
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.map((row) => (
-                <tr key={row.id} className={row.status === 'DONE' ? 'text-fg-muted' : 'text-fg'}>
-                  <TodoRowCells
-                    row={row}
-                    busy={busy}
-                    canReopen={canUpdate}
-                    onToggle={() => mutate(row, row.status === 'DONE' ? 'reopen' : 'complete')}
-                  />
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      {canUpdate && row.status === 'PENDING' && (
-                        <button
-                          className={BUTTON}
-                          disabled={busy !== null}
-                          onClick={() => setModal({ editing: row })}
-                          aria-label={`Editar: ${row.title}`}
-                        >
-                          Editar
-                        </button>
-                      )}
-                      {flags?.delete && row.canDelete && (
-                        <button
-                          className={BUTTON}
-                          disabled={busy !== null}
-                          onClick={() => mutate(row, 'delete')}
-                          aria-label={`Eliminar: ${row.title}`}
-                        >
-                          Eliminar
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <TodoKanban rows={visibleRows} onMove={moveTo} />
+      )}
+      {toast && (
+        <div
+          role="alert"
+          className="fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+        >
+          <span>{toast}</span>
+          <button
+            type="button"
+            aria-label="Cerrar aviso"
+            onClick={() => setToast(null)}
+            className="shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
       {modal && (

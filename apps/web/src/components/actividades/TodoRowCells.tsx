@@ -1,21 +1,39 @@
 'use client';
 
+import { TODO_STATUS, type TodoStatus } from './todoStatus';
+
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type Person = { id: string; firstName: string; lastName: string };
 export interface Todo {
   id: string;
   title: string;
   description: string | null;
-  status: 'PENDING' | 'DONE';
+  // GO-003 — five statuses; open = everything but DONE.
+  status: TodoStatus;
   priority: Priority;
   dueDate: string | null;
   assigneeId: string;
   assignee: Person | null;
   createdBy: string;
   createdByName: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
   overdue: boolean;
   canDelete: boolean;
   canComplete: boolean;
+  canChangeStatus: boolean;
+}
+
+/** GO-004 — static status pill (the board's vocabulary). */
+export function TodoStatusPill({ status }: { status: TodoStatus }) {
+  const meta = TODO_STATUS[status];
+  return (
+    <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${meta.fill}`}>
+      {meta.label}
+    </span>
+  );
 }
 export const PRIORITIES: Record<Priority, { label: string; classes: string }> = {
   LOW: { label: 'Baja', classes: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200' },
@@ -68,7 +86,8 @@ export function TodoRowCells({
       <td className="px-4 py-3">
         <span className={`break-words ${row.status === 'DONE' ? 'line-through' : ''}`}>
           {row.title}
-        </span>
+        </span>{' '}
+        <TodoStatusPill status={row.status} />
         {row.description && (
           <p className="mt-1 max-w-md whitespace-pre-wrap break-words text-xs text-fg-secondary">
             {row.description}

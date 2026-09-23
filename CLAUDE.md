@@ -137,7 +137,7 @@ bloque de su módulo; este bloque es el índice del sprint.
 
 ## Deudas y pendientes
 
-- Directorio de miembros: entregado en MEM-001; la sustitución de /api/users y de los UUID abreviados en pantallas queda para MEM-002.
+- Directorio de miembros: CERRADA (MEM-002). /api/users solo queda en configuración de usuarios, la vinculación de usuario en RRHH y la cobertura de acuses, que requieren email/rol/estado.
 - (siguiente hueco libre) Helper de fecha Santiago duplicado en tres módulos
   (actividades, todos, alertas comercial) → uno en `common`.
 - (V2) El giro debe ingresarse a mano mientras el RCV no lo traiga.
@@ -151,7 +151,7 @@ bloque de su módulo; este bloque es el índice del sprint.
 - (pendiente de preferencia del fundador) La columna "Industria" salió del
   listado de Cuentas (sigue en ficha y formulario).
 
-Última actualización: 2026-09-23 (MEM-001: deuda del directorio de miembros)
+Última actualización: 2026-09-23 (MEM-002: deuda del directorio de miembros cerrada)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -170,18 +170,20 @@ AUTH-001 · 2 AUTH-002 → BRAND-001 ∥ HUB-007 · 3 HUB-008 ∥ MEM-001 → GO
 acciones, Lead, reglas); S21 Configuración de empresa + áreas unificadas +
 calendario total.
 
-| Ticket    | Título corto                                                                                                                                  | Ola | Detalle                                   |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --- | ----------------------------------------- |
-| HUB-006   | Fondo «espacio» compartido login + hub, persistente al entrar                                                                                 | 1   | § Hub — Sprint 18, subsección HUB-006     |
-| AUTH-001  | Recuperar acceso V1 (api): restablecimiento por admin con clave temporal + cambio obligatorio, cambio de contraseña propio, versión de sesión | 1   | § Credenciales y sesiones (AUTH-001)      |
-| AUTH-002  | Recuperar acceso V1 (web): /cambiar-clave (obligatorio y voluntario) y «Restablecer acceso» con clave temporal de un solo uso en Usuarios     | 2   | § Credenciales y sesiones, AUTH-002 (web) |
-| BRAND-001 | Lockup apilado del login (isotipo + logotipo del kit, aire del horizontal del diseñador)                                                      | 2   | § Marca, Lockup apilado (BRAND-001)       |
-| HUB-007   | Escenas C · Barrido redibujadas desde el prototipo: SVG fijo 96×52 a escala 1:1                                                               | 2   | § Hub — Sprint 18, HUB-007                |
-| MEM-001   | Directorio común de miembros: GET /api/members (+ alias), useMembers, MemberAvatar                                                            | 2   | § Members — exposición firmada            |
-| GO-003    | Estados de to-dos (api): cinco estados, abierto = todo salvo DONE, PATCH /status                                                              | 2   | § Gestión organizacional, To-dos (GO-003) |
-| HUB-008   | Encuadre de la tarjeta activa (esquinas + brillo, una fuente de estado), starfield con movimiento reducido, barras móviles sin tapar tarjetas | 3   | § Hub — Sprint 18, HUB-008                |
+| Ticket    | Título corto                                                                                                                                                | Ola | Detalle                                   |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ----------------------------------------- |
+| HUB-006   | Fondo «espacio» compartido login + hub, persistente al entrar                                                                                               | 1   | § Hub — Sprint 18, subsección HUB-006     |
+| AUTH-001  | Recuperar acceso V1 (api): restablecimiento por admin con clave temporal + cambio obligatorio, cambio de contraseña propio, versión de sesión               | 1   | § Credenciales y sesiones (AUTH-001)      |
+| AUTH-002  | Recuperar acceso V1 (web): /cambiar-clave (obligatorio y voluntario) y «Restablecer acceso» con clave temporal de un solo uso en Usuarios                   | 2   | § Credenciales y sesiones, AUTH-002 (web) |
+| BRAND-001 | Lockup apilado del login (isotipo + logotipo del kit, aire del horizontal del diseñador)                                                                    | 2   | § Marca, Lockup apilado (BRAND-001)       |
+| HUB-007   | Escenas C · Barrido redibujadas desde el prototipo: SVG fijo 96×52 a escala 1:1                                                                             | 2   | § Hub — Sprint 18, HUB-007                |
+| MEM-001   | Directorio común de miembros: GET /api/members (+ alias), useMembers, MemberAvatar                                                                          | 2   | § Members — exposición firmada            |
+| GO-003    | Estados de to-dos (api): cinco estados, abierto = todo salvo DONE, PATCH /status                                                                            | 2   | § Gestión organizacional, To-dos (GO-003) |
+| HUB-008   | Encuadre de la tarjeta activa (esquinas + brillo, una fuente de estado), starfield con movimiento reducido, barras móviles sin tapar tarjetas               | 3   | § Hub — Sprint 18, HUB-008                |
+| MEM-002   | Nombres en vez de UUID: 23 superficies migradas a useMembers                                                                                                | 3   | § Members                                 |
+| GO-004    | To-dos estilo Monday (web): tabla agrupada por plazo con Estado/Prioridad a celda completa, avatares y Cronograma; kanban por estado con arrastrar y soltar | 3   | § Gestión organizacional, GO-004 (web)    |
 
-Última actualización: 2026-09-23 (GO-003 + HUB-008)
+Última actualización: 2026-09-23 (MEM-002 + GO-004)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1108,6 +1110,8 @@ Puntos clave:
 - MEM-001 — Directorio común de miembros (2026-09-23; Sprint 19, ola 2; Codex): GET /api/members en IAM, alias /actividades/members, useMembers, MemberAvatar. Archivos: iam/{members.controller,members.service}.ts, iam/dto/members-query.dto.ts, sus specs, iam/iam.module.ts, actividades/{actividades.controller,actividades.module}.ts; eliminados actividades/members/members-read.{service,module}.ts; web hooks/useMembers.ts, components/shared/MemberAvatar.tsx.
 - GO-003 — Estados de to-dos, api (2026-09-23; Sprint 19, ola 2; Codex): PENDING / IN_PROGRESS / IN_REVIEW / BLOCKED / DONE (migración aditiva 20260923120000_expand_todo_status); abierto = todo salvo DONE; listado OPEN por defecto, completedAfter en día civil Santiago, PATCH /todos/:id/status, flag canChangeStatus; alertas y línea del hub cuentan todos los abiertos. Archivos: prisma/schema/actividades.prisma, la migración, actividades/todos/{todo-status,todos.controller,todos.service}.ts, actividades/todos/dto/todo.dto.ts y los specs de todos y hub.
 - HUB-008 — Encuadre de la tarjeta activa (2026-09-23; Sprint 19, ola 3): esquinas de visor + brillo desde `activeKey` (`data-active`), sin `outline` aparte; starfield estático con movimiento reducido; padding y fundido de barras en móvil. Doctrina en § Hub, subsección HUB-008. Archivos: `app/modulos/page.tsx`, `components/Starfield.tsx`, `styles/tokens.css`, `app/global.css`.
+- MEM-002 — Nombres en vez de UUID (2026-09-23; Sprint 19, ola 3; Codex): 23 superficies de Comercial, Operaciones y Actividades migradas a useMembers (all para la historia, active para seleccionar); ninguna muestra UUID («Usuario desconocido»); MemberAvatar en el propietario del kanban del pipeline; catálogos del permiso de trabajo independientes (MANAGER vuelve a poder crear permisos); los campos «UUID del responsable/supervisor» de equipos, vehículos y reportes pasan a selectores con nombres; los gates visuales de permisos de trabajo y procedimientos derivan el rol de la membresía de la empresa actual. Archivos: los 23 del commit de MEM-002.
+- GO-004 — To-dos estilo Monday, web (2026-09-23; Sprint 19, ola 3): tabla agrupada por plazo (Santiago, semanas lunes–domingo) y kanban por estado con arrastrar y soltar nativo + «Mover a…»; gating solo por flags. Doctrina en § Gestión organizacional, GO-004 (web). Archivos: `app/(dashboard)/actividades/todos/page.tsx`, `components/actividades/{todoStatus.ts,TodoBoardTable.tsx,TodoKanban.tsx,TodoMoveMenu.tsx,TodoRowCells.tsx}`.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -1232,15 +1236,16 @@ Opportunity && read Account` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT).
   llama al MISMO `attemptMove` del kanban → GANADA confirm liviano, PERDIDA
   `LostReasonModal`, resto PATCH `/:id/stage` canónico, optimista + revert +
   toast `role="alert"`; lectores ven la pill estática. Filtros server-side
-  (q, etapas múltiples, responsable — directorio `/api/users` si el rol lo
-  lee, si no los ownerIds cargados —, empresa vía `EnterpriseSelect`,
+  (q, etapas múltiples, responsable — nombres del directorio de miembros,
+  `useMembers` (MEM-002; antes `/api/users` o UUID corto) —, empresa vía `EnterpriseSelect`,
   "Limpiar"); orden client-side por columna (`aria-sort`) dentro de cada
   grupo. API: GET `/comercial/opportunities` EXTENDIDO, no bifurcado — gana
   `q`, `stage` repetible, `enterpriseId`/`noEnterprise`, `includeClosed`
   TRI-ESTADO (omitido = set completo legado que esperan kanban y
   ActivityTimeline; `false` = solo abiertas; `true` = abiertas + cerradas con
   `closedAt` en los últimos 90 días); cada fila suma `account { id, name,
-enterprise }` (el responsable sigue siendo `ownerId`, UUID sin relación) y
+enterprise }` (el responsable sigue siendo `ownerId`, UUID sin relación; su nombre
+  se resuelve en el directorio de miembros, MEM-002) y
   `lastMovementAt` DERIVADO POR OPORTUNIDAD, jamás almacenado: UNA query raw
   por llamada (`Prisma.sql`, gemela de la de COM-018) con `GREATEST` de
   `updatedAt` propio, actividades, notas y documentos vivos, `WHERE
@@ -1273,7 +1278,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-23 (GO-003 + HUB-008)
+Última actualización: 2026-09-23 (MEM-002 + GO-004)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1411,7 +1416,7 @@ Puntos clave:
   CAL-008b — jamás la fecha UTC, que se dispara en la tarde chilena;
   precedente CHILE_IVA_RATE; tz por empresa = semilla V2). La UI pinta el
   flag del servidor, JAMÁS lo recomputa.
-- Members — EXPOSICIÓN FIRMADA (2026-07-21; promovida por MEM-001, 2026-09-23): GET /api/members?scope=all|active → [{ userId, displayName }] ESTRUCTURAL, jamás email/rol/estado. JwtAuthGuard + PoliciesGuard + @CheckPolicies(() => true): cualquier miembro activo de la empresa, de los seis roles. scope=all (default) conserva miembros inactivos para la historia; active filtra Membership.isActive para pickers. Orden apellido/nombre. Lee Membership→User dentro de executeWithRls(companyId, userId), con companyId explícito. displayName = "firstName lastName" recortado, fallback al local-part del email. GET /api/actividades/members queda como alias de scope=all y conserva read CalendarActivity. /todos/assignees mantiene su contrato y su política. Web: useMembers (caché por empresa+scope, refresh, nameOf devuelve null — jamás un UUID) y MemberAvatar (iniciales, nombre accesible, solo tokens).
+- Members — EXPOSICIÓN FIRMADA (2026-07-21; promovida por MEM-001, 2026-09-23): GET /api/members?scope=all|active → [{ userId, displayName }] ESTRUCTURAL, jamás email/rol/estado. JwtAuthGuard + PoliciesGuard + @CheckPolicies(() => true): cualquier miembro activo de la empresa, de los seis roles. scope=all (default) conserva miembros inactivos para la historia; active filtra Membership.isActive para pickers. Orden apellido/nombre. Lee Membership→User dentro de executeWithRls(companyId, userId), con companyId explícito. displayName = "firstName lastName" recortado, fallback al local-part del email. GET /api/actividades/members queda como alias de scope=all y conserva read CalendarActivity. /todos/assignees mantiene su contrato y su política. Web: useMembers (caché por empresa+scope, refresh, nameOf devuelve null — jamás un UUID) y MemberAvatar (iniciales, nombre accesible, solo tokens). Consumidores web: useMembers en toda pantalla que solo necesita nombres (MEM-002); las asignaciones históricas inactivas conservan su nombre y no se ofrecen para nuevas selecciones. El alias /api/actividades/members queda sin consumidores web (se retira en S19-POLISH).
 - Bitácora — EDICIÓN LIBRE (revertido por el fundador 2026-07-22:
   edición/borrado libre por writers; auditoría conserva el contenido previo).
   CAL-009 la lanzó INMUTABLE (sin updatedAt, sin rutas de edición/borrado);
@@ -1540,6 +1545,8 @@ Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB
 
 To-dos (GO-003): OPEN_TODO_STATUSES centraliza todos los estados salvo DONE. VIEWER y demás lectores sin update solo consultan lo propio y pueden mover sus tareas abiertas entre estados o completarlas; DONE → abierto exige update. Toda transición comprueba permisos, incluso los no-op, y usa compare-and-set sobre estado leído, responsable y updatedAt; carrera perdida → 409. complete/reopen comparten la transición. Listado: status=OPEN por defecto; PENDING sigue siendo exacto; completedAfter limita únicamente DONE desde el inicio del día civil Santiago. DONE queda último en el orden del enum.
 
+**GO-004 (web, 2026-09-23).** `/actividades/todos` es un tablero estilo Monday con dos vistas (estado React, sin storage): «Tabla» por defecto y «Tarjetas». UNA petición por carga: `GET /api/todos?scope=…&status=ALL&completedAfter=<hoy Santiago − 30 días>[&assigneeId=…]` — los DONE quedan acotados a los últimos 30 días civiles de Santiago; mutar → recargar. Barra: vista, alcance («Mis to-dos» / «Todos» con `update`), filtro «Responsable» con `update` (`useMembers('active')`, envía `assigneeId`) y búsqueda por título en el cliente. Vocabulario único en `components/actividades/todoStatus.ts`: Pendiente (neutro por tokens), En curso (ámbar), En revisión (violeta), Detenida (rojo), Hecha (verde); prioridad Alta/Media/Baja en escala índigo-azul-celeste para no compartir tono con el estado. Contraste medido, texto sobre relleno, claro/oscuro: Pendiente 17,36/14,24 · En curso 8,97 · En revisión 5,70 · Detenida 4,83 · Hecha 5,02 · Alta 11,42 · Media 5,17 · Baja 10,46:1 (rellenos semánticos idénticos en ambos temas). Tabla agrupada por plazo con fechas Santiago y semanas lunes–domingo: «Vencidos» (abierto, plazo < hoy) · «Esta semana» (hoy → domingo) · «Próxima semana» (lunes → domingo siguientes) · «Más adelante» · «Sin plazo» · «Hechos (últimos 30 días)», este plegado por defecto; cabecera con barra de color, título, conteo y botón con `aria-expanded`/`aria-controls`. Columnas Tarea (fija a la izquierda bajo scroll horizontal) · Responsable (`MemberAvatar` + nombre, oculto bajo `md` pero en el `aria-label`) · Estado (celda completa: `<select>` nativo si la fila trae `canChangeStatus`, píldora estática si no) · Prioridad (celda completa, estática; se edita en el modal) · Plazo (dd-mm-aaaa + «Atrasado») · Cronograma (creación → plazo, fracción transcurrida; vencido lleno en rojo, hecha lleno en verde, sin plazo «—»; texto alternativo «Quedan N días» / «Vence hoy» / «Venció hace N días» / «Completada»). Tarjetas: cinco columnas en el orden del enum con cabecera de color y conteo; tarjeta con título, avatar + nombre, plazo dd-mm, prioridad y «Atrasado». Arrastrar y soltar HTML5 nativo (patrón del pipeline, con autoscroll en los bordes) solo si `canChangeStatus`; optimista, `PATCH /api/todos/:id/status`, y ante error revierte con aviso `role="alert"` que muestra el mensaje del servidor (403/409). Alternativa de teclado «Mover a…» por tarjeta (`TodoMoveMenu`, mismo manejador): flechas, Escape, clic fuera, scroll o resize la cierran y el foco vuelve a su disparador, también tras mover. Todo cambio de estado dispara `TODOS_CHANGED_EVENT` y recarga. Permisos SOLO por flags (`useActividadesPermissions().todo` y los flags de la fila), jamás por rol. `TodoRowCells` (alertas) acepta los cinco estados, mantiene el check abierto ↔ DONE y muestra la píldora de estado junto al título. El modal crear/editar no cambia (`/todos/assignees`).
+
 - GO-002 — Gestión organizacional (2026-09-17): renombrado el módulo en la tarjeta
   del hub, `SidebarBrand` y breadcrumbs; descripción «To-dos, calendario, áreas y
   alertas del equipo» e icono `ClipboardList` de Lucide; título de la página
@@ -1563,7 +1570,7 @@ To-dos (GO-003): OPEN_TODO_STATUSES centraliza todos los estados salvo DONE. VIE
   TypeScript, builds y Prettier aprobados; QA con fixtures en claro y oscuro,
   incluidos alcance de `VIEWER`, estados vacíos y teclado.
 
-Última actualización: 2026-09-23 (GO-003 — estados de to-dos)
+Última actualización: 2026-09-23 (GO-004 — tablero de to-dos)
 
 ═══════════════════════════════════════════════════════════════════
 
