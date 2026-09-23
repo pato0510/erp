@@ -8,6 +8,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
+import { LOST_REASON_LABELS } from '../opportunities/opportunity-labels';
 import { DashboardService } from './dashboard.service';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 
@@ -437,4 +438,17 @@ describe('DashboardService — COM-022 manual actions', () => {
       },
     });
   });
+});
+
+describe('COM-023 shared lost-reason labels', () => {
+  it.each(Object.entries(LOST_REASON_LABELS))(
+    'dashboard uses shared label for %s',
+    async (reason, label) => {
+      const { svc } = makeService([
+        opp({ id: reason, stage: 'PERDIDA', closedAt: '2026-03-15T00:00:00Z', lostReason: reason }),
+      ]);
+      const result = await svc.getDashboard('c1', RANGE);
+      expect(result.lostReasons).toEqual([{ reason, label, count: 1 }]);
+    },
+  );
 });

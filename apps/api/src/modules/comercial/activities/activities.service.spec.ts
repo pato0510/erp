@@ -320,7 +320,7 @@ describe('ActivitiesService — COM-022 actions', () => {
     'impossible civil date %s rejects both writes with Spanish 400',
     async (activityDate) => {
       const { svc, activity } = makeService({ activities: [{ ...manual }] });
-      const error = { status: 400, message: 'Fecha de actividad inválida; indica una fecha real.' };
+      const error = { status: 400, message: 'Fecha de acción inválida; indica una fecha real.' };
       await expect(
         svc.create('c1', 'u1', { ...baseCreate, accountId: 'acc1', activityDate }),
       ).rejects.toMatchObject(error);
@@ -377,7 +377,7 @@ describe('ActivitiesService — COM-022 actions', () => {
     await expect(svc.updateStatus('c1', 'u1', 'm1', { status: 'HECHA' })).rejects.toMatchObject({
       status: 409,
       message:
-        'Las actividades generadas por el sistema son un registro histórico: no pueden editarse ni eliminarse.',
+        'Las acciones generadas por el sistema son un registro histórico: no pueden editarse ni eliminarse.',
     });
     expect(activity.update).not.toHaveBeenCalled();
   });
@@ -461,4 +461,35 @@ describe('ActivitiesService — COM-022 actions', () => {
       expect(activity.update).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('COM-023-A user-facing action vocabulary', () => {
+  it('account mismatch says acción', async () => {
+    const { svc } = makeService({
+      activities: [{ id: 'm1', companyId: 'c1', accountId: 'acc1', isSystemGenerated: false }],
+    });
+    await expect(svc.update('c1', 'u1', 'm1', { opportunityId: 'o2' })).rejects.toThrow(
+      'La oportunidad no pertenece a la cuenta de esta acción.',
+    );
+  });
+  it('immutable system rows say acciones', async () => {
+    const { svc } = makeService({
+      activities: [{ id: 's1', companyId: 'c1', accountId: 'acc1', isSystemGenerated: true }],
+    });
+    await expect(svc.update('c1', 'u1', 's1', { subject: 'Cambio' })).rejects.toThrow(
+      'Las acciones generadas por el sistema son un registro histórico: no pueden editarse ni eliminarse.',
+    );
+  });
+  it('missing action says Acción no encontrada', async () => {
+    const { svc } = makeService();
+    await expect(svc.update('c1', 'u1', 'missing', { subject: 'Cambio' })).rejects.toThrow(
+      'Acción no encontrada',
+    );
+  });
+  it('invalid civil date says acción', async () => {
+    const { svc } = makeService();
+    await expect(
+      svc.create('c1', 'u1', { ...baseCreate, accountId: 'acc1', activityDate: '2026-02-30' }),
+    ).rejects.toThrow('Fecha de acción inválida; indica una fecha real.');
+  });
 });

@@ -21,7 +21,7 @@ export function parseSantiagoActionDate(value: string): Date {
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
   const date = new Date(dateOnly ? `${value}T15:00:00.000Z` : value);
   if (Number.isNaN(date.getTime()) || (dateOnly && date.toISOString().slice(0, 10) !== value)) {
-    throw new BadRequestException('Fecha de actividad inválida; indica una fecha real.');
+    throw new BadRequestException('Fecha de acción inválida; indica una fecha real.');
   }
   return date;
 }

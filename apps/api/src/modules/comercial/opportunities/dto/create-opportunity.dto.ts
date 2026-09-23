@@ -1,5 +1,7 @@
 import {
   IsDateString,
+  IsDivisibleBy,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -9,12 +11,29 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
-/* COM-005 — create an opportunity. Always starts at stage PROSPECTO (stage is NOT
-   settable here — stage changes go through PATCH /:id/stage so the transition rules
-   are the only path to closed/paused states). */
+import { OpportunityStage } from '@prisma/client';
+import { PROBABILITY_MESSAGE } from '../stage-probabilities';
+
+export const ACTIVE_STAGES: OpportunityStage[] = [
+  'PROSPECTO',
+  'CONTACTO',
+  'VISITA_TECNICA',
+  'COTIZACION',
+  'NEGOCIACION',
+];
+
+/* COM-023 — create in any active stage, PROSPECTO when omitted. */
 export class CreateOpportunityDto {
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(ACTIVE_STAGES, {
+    message:
+      'La etapa inicial debe ser Prospecto, Contacto, Visita Técnica, Cotización o Negociación.',
+  })
+  stage?: OpportunityStage;
+
   // Required parent account (validated company-scoped in the service).
   @IsUUID()
   accountId: string;
@@ -28,23 +47,24 @@ export class CreateOpportunityDto {
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
-  estimatedValue?: number;
+  estimatedValue?: number | null;
 
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(100)
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt({ message: PROBABILITY_MESSAGE })
+  @Min(0, { message: PROBABILITY_MESSAGE })
+  @Max(100, { message: PROBABILITY_MESSAGE })
+  @IsDivisibleBy(10, { message: PROBABILITY_MESSAGE })
   probability?: number;
 
   // Date-only (YYYY-MM-DD or ISO); stored UTC-anchored @db.Date in the service.
   @IsOptional()
   @IsDateString()
-  expectedCloseDate?: string;
+  expectedCloseDate?: string | null;
 
   // Commercial executive — bare actor UUID (no FK, codebase convention).
   @IsOptional()
   @IsUUID()
-  ownerId?: string;
+  ownerId?: string | null;
 
   @IsOptional()
   @IsString()

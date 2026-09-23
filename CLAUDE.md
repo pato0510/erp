@@ -248,20 +248,50 @@ Pendiente sin sprint: recuperación de acceso por correo (opción A), cuando exi
 
 # SPRINT 20 — PIPELINE: VISTA TABLA, ACCIONES, LEAD Y REGLAS (2026-09-23 → )
 
-Plan aprobado por el fundador: ola 1, COM-022 → COM-023 → COM-024 por Codex ∥
-COM-025 web por CC; ola 2, las 10 columnas con edición en celda, panel de acciones,
-fichas de Lead, pantalla de probabilidades y motivos. T16 Novandino comienza con
-inventario de solo lectura; el borrado requiere confirmación del fundador. Cierre:
-DOC-S20-CLOSE.
+Plan aprobado por el fundador (2026-09-23): ola 1 cerrada, COM-022 `405261a`
+y COM-025 `98eccf0`; deploy de la web SKIPPED por Railway sin motivo con CI verde
+y relanzado a mano. Ola 2: COM-023 (reglas, api) ∥ COM-026 (acciones: desplegable
+por oportunidad en la tabla, agrupada por Etapa y por Cuenta; un solo componente
+de acciones en tabla, ficha y Cuentas; indicadores; «Actualización» en vivo),
+después COM-027 (UI de reglas + edición en celda de valor, fecha de cierre,
+probabilidad y responsable + probabilidad en el modal de nueva oportunidad +
+pantalla de probabilidades). Ola 3: COM-024 Lead + su web, Novandino y
+DOC-S20-CLOSE. Motivo del orden: ninguna regla llega a producción sin su pantalla;
+las reglas y su UI se integran juntas. T16 Novandino comienza con inventario de
+solo lectura; el borrado requiere confirmación del fundador.
+
+Decisiones del fundador (2026-09-23): F1, valor estimado obligatorio en Cotización,
+Negociación y Ganada; fecha estimada de cierre obligatoria en Visita Técnica,
+Cotización, Negociación y Ganada; Perdida y En Pausa no exigen ninguno al entrar.
+F2, solo ADMIN / SUPER_ADMIN editan probabilidades por defecto; quien lee
+Oportunidades las lee. F3, retroceder y reabrir requieren motivo libre registrado
+en el detalle de la acción de sistema. F4, Responsable editable y cada cambio
+real queda registrado.
+
+Decisiones del director, no vetadas: probabilidad en pasos de 10, no editable en
+Ganada / Perdida y reiniciada al valor por defecto de destino en cada movimiento;
+Ganada 100 y Perdida 0 fijos, las otras seis etapas configurables. Se registra el
+valor recalculado por líneas de servicios. Ganar pasa la cuenta PROSPECTO / INACTIVA
+a ACTIVA («Cliente») con registro; reabrir nunca la revierte. Se permite crear en
+cualquiera de las cinco etapas activas cumpliendo sus requisitos. Salir de En Pausa
+a una etapa anterior a aquella donde se pausó cuenta como retroceso.
+
+Vocabulario (fundador, 2026-09-23): en Comercial la oportunidad tiene acciones
+(pendientes / hechas), no «actividades»; la UI dice «acción / acciones» y «Registrar
+acción». El modelo Activity, la tabla activities, los enums y las rutas
+/comercial/activities no cambian. Las «actividades» de Gestión organizacional
+(calendario) son otro concepto y no se tocan.
 
 | Ticket  | Título corto                                                                       | SHA       | Ola |
 | ------- | ---------------------------------------------------------------------------------- | --------- | --- |
-| COM-022 | Acciones Pendiente/Hecha, Actualización en vivo y registros de cambios comerciales | pendiente | 1   |
+| COM-022 | Acciones Pendiente/Hecha, Actualización en vivo y registros de cambios comerciales | `405261a` | 1   |
+| COM-025 | Pipeline Tabla V2, agrupación por Etapa o Cuenta y fechas civiles                  | `98eccf0` | 1   |
+| COM-023 | Reglas del pipeline, probabilidades, responsables y conversión a Cliente (api)     | pendiente | 2   |
 
 Deuda: helper de fecha Santiago — Comercial ya usa common/santiago-date.ts (COM-022);
 quedan actividades, todos, hsec y hub.
 
-Última actualización: 2026-09-23 (COM-022)
+Última actualización: 2026-09-23 (COM-023 y COM-023-A; orden de olas y decisiones)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1055,8 +1085,8 @@ Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
 Tablas: service_catalog, enterprises, accounts, contacts, opportunities,
-opportunity_services, activities, opportunity_notes, opportunity_documents,
-quotes, quote_lines
+opportunity_services, opportunity_stage_probabilities, activities, opportunity_notes,
+opportunity_documents, quotes, quote_lines
 (+ service_orders en Operaciones, target del handoff COM-013a).
 
 Puntos clave:
@@ -1067,7 +1097,8 @@ Puntos clave:
   (deliberado). Link opcional y desacoplado a counterparties (SET NULL).
   sourceCampaignId: hook UUID sin FK, reservado para Marketing.
   paymentTermDays (30/60/90) alimenta el Commitment proyectado de COM-014.
-- opportunities: stage machine — 5 etapas activas con movimiento libre,
+- opportunities: stage machine — 5 etapas activas (COM-023: requisitos al entrar
+  y retroceso con motivo),
   EN_PAUSA con previousStage, GANADA/PERDIDA semi-terminales (reopen
   explícito). PERDIDA exige razón categorizada (detalle obligatorio en
   OTRO). Endpoint canónico PATCH /:id/stage. COM-009: cada transición
@@ -1384,23 +1415,69 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   `lastUpdate { at, kind }` se deriva EN VIVO de createdAt de toda acción (sistema:
   systemEvent o SISTEMA; manual: ACCION_AGREGADA) y del statusChangedAt manual
   (HECHA: ACCION_COMPLETADA; PENDIENTE: ACCION_REABIERTA). Desempates: fecha DESC,
-  transición antes de creación, kind ASC; sin acciones ⇒ createdAt de la oportunidad
-  - CREACION. Notas, documentos y updatedAt propio no alimentan lastUpdate. UNA
-    sola query raw por llamada obtiene lastMovementAt y lastUpdate; conserva companyId
-    explícito y ANY($2::uuid[]), la definición de lastMovementAt y la firma pública
-    `lastMovementByOpportunity` usada por ALERT-001, sobre un método privado común.
-    Escritor único `activities/system-activity.ts`, siempre en la transacción de la
-    mutación: los asuntos existentes permanecen idénticos. DELETE registra
-    ACCION_ELIMINADA solo si la acción está vinculada a una oportunidad (asunto hasta
-    200 caracteres, detalle tipo/fecha Santiago/estado); sin vínculo solo borra.
-    update de oportunidad registra VALOR_ESTIMADO / FECHA_CIERRE / PROBABILIDAD solo
-    con cambio real (Decimal / día civil / número); nombre, responsable, notas y
-    cuenta no generan registro. Valor derivado por bundle sin registro, decisión del
-    director; COM-023 lo revisita. Dashboard cuenta únicamente manuales creadas en
-    rango, en ambos estados; mapa único de etiquetas: Correo / Visita técnica
-    (ActivityType intacto). LEAD queda declarado para COM-024, sin implementar Lead.
+  transición antes de creación, kind ASC; sin acciones ⇒
+  (createdAt de la oportunidad, CREACION). Notas, documentos y updatedAt propio no alimentan lastUpdate. UNA
+  sola query raw por llamada obtiene lastMovementAt y lastUpdate; conserva companyId
+  explícito y ANY($2::uuid[]), la definición de lastMovementAt y la firma pública
+  `lastMovementByOpportunity` usada por ALERT-001, sobre un método privado común.
+  Escritor único `activities/system-activity.ts`, siempre en la transacción de la
+  mutación: los asuntos existentes permanecen idénticos. DELETE registra
+  ACCION_ELIMINADA solo si la acción está vinculada a una oportunidad (asunto hasta
+  200 caracteres, detalle tipo/fecha Santiago/estado); sin vínculo solo borra.
+  update de oportunidad registra VALOR_ESTIMADO / FECHA_CIERRE / PROBABILIDAD solo
+  con cambio real (Decimal / día civil / número); nombre, notas y cuenta no generan registro. Responsable y valor derivado por
+  bundle, originalmente sin registro en COM-022, se registran desde COM-023. Dashboard cuenta únicamente manuales creadas en
+  rango, en ambos estados; mapa único de etiquetas: Correo / Visita técnica
+  (ActivityType intacto). LEAD queda declarado para COM-024, sin implementar Lead.
 
-Última actualización: 2026-09-23 (COM-022)
+- COM-025 — PIPELINE TABLA V2 (2026-09-23; Sprint 20, ola 1; web): la vista Tabla de /comercial/pipeline pide solo GET /comercial/opportunities?includeClosed=true; búsqueda (nombre de oportunidad o de cuenta, sin mayúsculas ni tildes), filtros Responsable / Empresa y agrupación son del cliente. «Agrupar por» Etapa (las ocho de STAGE_ORDER; Ganada y Perdida plegadas con «últimos 90 días») o Cuenta (orden es-CL). Una <table> table-fixed con <colgroup>, un <tbody> por grupo, un solo scroll horizontal y primera columna sticky. Columnas: Oportunidad y Cuenta · Responsable (MemberAvatar) · Etapa (celda llena con el color de la etapa; <select> con los destinos de stageMoveTargets y el mismo attemptMove del kanban) · Valor estimado · Fecha de creación · Fecha estimada de cierre (roja con ícono si ya pasó en etapa activa; En Pausa y cerradas nunca) · Cuenta · Actualización (interino: lastMovementAt) · Probabilidad; la columna 7 Lead llega en la ola 3. Ayuda de encabezado accesible (ColumnHelp, WCAG 1.4.13). Alta rápida en el grupo Prospecto y en cada grupo de Cuenta, con quien crea como responsable. «Nueva oportunidad» del encabezado solo en Kanban. ACTIVA se muestra «Cliente» (enum intacto); Empresas usa EnterpriseStatusBadge. Tipos de acción: EMAIL «Correo», VISITA_FAENA «Visita técnica». CardMoveMenu con el modelo de teclado de TodoMoveMenu (conserva el backdrop). Fechas: lib/dates.ts (helpers Santiago que todoStatus re-exporta) + formatDbDate (un @db.Date por su fecha civil, jamás por hora local), formatSantiagoDate y relativeDayLabel; corrige el día de desfase del cierre esperado en kanban, ficha y alertas y de «Válida» en cotizaciones. Sin api, sin migración, sin CASL.
+- COM-023 — REGLAS DEL PIPELINE (2026-09-23; Sprint 20, ola 2; api): todos los
+  clientes usan la misma máquina. Al entrar: Visita Técnica exige fecha estimada de
+  cierre; Cotización, Negociación y Ganada exigen valor estimado y fecha; Prospecto,
+  Contacto, En Pausa y Perdida no exigen ninguno. El valor derivado del bundle
+  cuenta. PATCH general no permite quitar un campo exigido por la etapa efectiva
+  (stage; en En Pausa, previousStage; NULL no exige); un legado incompleto admite
+  ediciones que no tocan lo faltante. PATCH /:id/stage, POST /:id/resume y POST
+  /:id/reopen aceptan estimatedValue / expectedCloseDate para completar en la misma
+  transacción, con los asuntos VALOR_ESTIMADO / FECHA_CIERRE de COM-022; valor
+  manual con bundle se rechaza con el mensaje COM-006. Resume sin body sigue válido.
+  Retroceso = destino activo anterior en Prospecto < Contacto < Visita Técnica <
+  Cotización < Negociación; referencia stage activo o previousStage en pausa
+  (NULL ⇒ Negociación). Pausar, ganar y perder nunca son retrocesos; resume vuelve
+  sin motivo. Retroceder y reabrir exigen motivo trimmed de 3..500 caracteres:
+  detalle «Motivo: …», asuntos existentes intactos. Motivo en otro movimiento se
+  ignora. Reabrir vuelve a Negociación y conserva lostReason como historia.
+  Tabla opportunity_stage_probabilities, migración hand-authored
+  20260923200000_add_commercial_rules con tabla/índices/CHECKs, RLS, política gemela
+  de activity_isolation, GRANT app_user y auditoría. Filas perezosas: sin fila,
+  Prospecto 10, Contacto 20, Visita Técnica 40, Cotización 60, Negociación 80,
+  En Pausa 10; Ganada 100 / Perdida 0 fijos, sin filas permitidas. GET /comercial/
+  stage-probabilities devuelve las ocho etapas en orden del pipeline con
+  stage/probability/editable/isDefault; PUT acepta 1..6 etapas editables, sin
+  duplicados, updatedBy del JWT. Lectura con read Opportunity; escritura con
+  manage Opportunity (ADMIN / SUPER_ADMIN), flags stageProbabilities.read/update
+  derivados de CASL. Cambiar defaults nunca modifica oportunidades existentes.
+  Probabilidad entera 0..100 en pasos de 10; no se edita en Ganada / Perdida.
+  Crear usa la explícita o el default; todo movimiento/resume/reopen reinicia al
+  default de destino sin fila PROBABILIDAD automática. Crear permite las cinco
+  etapas activas, Prospecto por omisión, con requisitos y detalle «Etapa inicial:
+  …» si no es Prospecto (asunto «Oportunidad creada» intacto). Responsable no nulo
+  debe ser membresía activa de la empresa; null quita. Cambio real escribe
+  RESPONSABLE con nombres (helper puro compartido con MembersService, fallback
+  local-part del email; sin membresía ⇒ «Usuario desconocido»), nunca UUIDs.
+  Ganar pasa cuenta PROSPECTO / INACTIVA a ACTIVA («Cliente») en la misma
+  transacción; CUENTA_CLIENTE en la cuenta con opportunityId NULL y detalle
+  «Oportunidad ganada: …». Ya ACTIVA no escribe; reabrir nunca revierte la cuenta.
+  Recalcular bundle registra solo cambios reales como VALOR_ESTIMADO con sufijo
+  « (según servicios)» y actor; quitar la última línea conserva el valor. findAll
+  agrega valueFromBundle por \_count de services en la misma query, sin exponer
+  \_count. Seis motivos de pérdida, en orden: PRECIO, PLAZO, COMPETENCIA,
+  SIN_RESPUESTA, PROYECTO_CANCELADO, OTRO; OTRO exige detalle. Mapa único de etiquetas
+  api en opportunity-labels.ts, compartido por oportunidades y dashboard; conserva
+  STAGE_LABELS y los asuntos de sistema. COM-023-A cambia solo los cuatro mensajes
+  api al vocabulario «acción», sin renombrar Activity, activities, enums ni rutas.
+
+Última actualización: 2026-09-23 (COM-023, COM-023-A y COM-025)
 
 ═══════════════════════════════════════════════════════════════════
 

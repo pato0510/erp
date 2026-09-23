@@ -114,7 +114,7 @@ export class ActivitiesService {
       });
       if (!opp) throw new BadRequestException('Oportunidad no encontrada en esta empresa.');
       if (opp.accountId !== existing.accountId) {
-        throw new BadRequestException('La oportunidad no pertenece a la cuenta de esta actividad.');
+        throw new BadRequestException('La oportunidad no pertenece a la cuenta de esta acción.');
       }
     }
 
@@ -183,14 +183,14 @@ export class ActivitiesService {
   private assertMutable(activity: { isSystemGenerated: boolean }) {
     if (activity.isSystemGenerated) {
       throw new ConflictException(
-        'Las actividades generadas por el sistema son un registro histórico: no pueden editarse ni eliminarse.',
+        'Las acciones generadas por el sistema son un registro histórico: no pueden editarse ni eliminarse.',
       );
     }
   }
 
   private async findActivity(id: string, companyId: string) {
     const activity = await this.prisma.activity.findFirst({ where: { id, companyId } });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+    if (!activity) throw new NotFoundException('Acción no encontrada');
     return activity;
   }
 

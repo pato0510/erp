@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { OpportunityStage, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ACTIVITY_TYPE_LABELS } from '../activities/system-activity';
+import { LOST_REASON_LABELS } from '../opportunities/opportunity-labels';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 
 /* COM-019 — the Comercial dashboard (CRM-4): win rate, KPIs, pipeline by stage, lost
@@ -34,12 +35,6 @@ export const PIPELINE_STAGES: { stage: OpportunityStage; label: string }[] = [
 ];
 const OPEN_STAGES = PIPELINE_STAGES.map((s) => s.stage);
 
-const LOST_REASON_LABELS: Record<string, string> = {
-  PRECIO: 'Precio',
-  COMPETENCIA: 'Competencia',
-  PROYECTO_CANCELADO: 'Canceló el proyecto',
-  OTRO: 'Otro',
-};
 export interface DashboardRange {
   from: string;
   to: string;

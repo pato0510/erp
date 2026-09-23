@@ -26,6 +26,7 @@ function makeWorld(opts: FakeOpts = {}) {
   const opp: Any = {
     id: 'o1',
     companyId: 'c1',
+    accountId: 'acc1',
     stage: opts.stage ?? S.NEGOCIACION,
     estimatedValue: opts.estimatedValue ?? null,
   };
@@ -98,8 +99,10 @@ function makeWorld(opts: FakeOpts = {}) {
     }),
   };
   const account = { findFirst: jest.fn(() => Promise.resolve({ id: 'acc1' })) };
-  // COM-009 — bundle mutations must NEVER write a timeline activity. This spy proves it.
-  const activity = { create: jest.fn(() => Promise.resolve({ id: 'act1' })) };
+  // COM-023 — actual derived value changes write a system action in the same tx.
+  const activity = {
+    create: jest.fn((args: Any) => Promise.resolve({ id: 'act1', ...(args.data as Any) })),
+  };
 
   const prisma = {
     opportunity,
@@ -123,6 +126,7 @@ function makeWorld(opts: FakeOpts = {}) {
     lines,
     catalog,
     activityCreate: activity.create,
+    oppUpdate: opportunity.update,
   };
 }
 
@@ -262,12 +266,49 @@ describe('OpportunityServicesService — closed-opportunity guard (Rule 5)', () 
   });
 });
 
-describe('OpportunityServicesService — COM-009: bundle mutations write NO timeline entry', () => {
-  it('add / edit / remove never create a system activity (too noisy)', async () => {
-    const { bundle, lines, activityCreate } = makeWorld({ catalog: { s1: { basePrice: 10000 } } });
+describe('OpportunityServicesService — COM-023 derived value records', () => {
+  it('records actual changes on add/edit/remove, preserves the last value without a new record', async () => {
+    const { bundle, lines, activityCreate } = makeWorld();
     await bundle.add('c1', 'u1', 'o1', { serviceId: 's1', quantity: 2 });
-    await bundle.update('c1', 'u1', 'o1', (lines[0] as Any).id as string, { quantity: 3 });
-    await bundle.remove('c1', 'u1', 'o1', (lines[0] as Any).id as string);
+    await bundle.update('c1', 'u1', 'o1', lines[0].id as string, { quantity: 3 });
+    await bundle.add('c1', 'u1', 'o1', { serviceId: 's2', quantity: 1 });
+    await bundle.remove('c1', 'u1', 'o1', lines[1].id as string);
+    await bundle.remove('c1', 'u1', 'o1', lines[0].id as string);
+    expect(activityCreate.mock.calls.map(([arg]) => (arg as Any).data)).toEqual([
+      expect.objectContaining({ subject: 'Valor estimado definido: $20.000 (según servicios)' }),
+      expect.objectContaining({ subject: 'Valor estimado: $20.000 → $30.000 (según servicios)' }),
+      expect.objectContaining({ subject: 'Valor estimado: $30.000 → $35.000 (según servicios)' }),
+      expect.objectContaining({ subject: 'Valor estimado: $35.000 → $30.000 (según servicios)' }),
+    ]);
+    for (const [arg] of activityCreate.mock.calls)
+      expect((arg as Any).data).toMatchObject({
+        companyId: 'c1',
+        accountId: 'acc1',
+        opportunityId: 'o1',
+        createdBy: 'u1',
+        systemEvent: 'VALOR_ESTIMADO',
+      });
+  });
+
+  it('same Decimal total, notes-only edit and last-line removal do not write records', async () => {
+    const { bundle, lines, activityCreate, oppUpdate } = makeWorld({
+      estimatedValue: new Prisma.Decimal('20000.00'),
+    });
+    await bundle.add('c1', 'u1', 'o1', { serviceId: 's1', quantity: 2 });
+    await bundle.update('c1', 'u1', 'o1', lines[0].id as string, { notes: 'Texto' });
+    await bundle.remove('c1', 'u1', 'o1', lines[0].id as string);
+    expect(activityCreate).not.toHaveBeenCalled();
+    expect(oppUpdate).toHaveBeenCalledTimes(2); // preserve COM-006 movement touches
+  });
+});
+
+describe('COM-023 Decimal(18,2) comparison', () => {
+  it('fractional quantity times price compares the stored two-decimal total', async () => {
+    const { bundle, lines, activityCreate } = makeWorld({
+      estimatedValue: new Prisma.Decimal('1.02'),
+    });
+    await bundle.add('c1', 'u1', 'o1', { serviceId: 's1', quantity: 1.01, unitPrice: 1.01 });
+    await bundle.update('c1', 'u1', 'o1', lines[0].id as string, { notes: 'Sin cambio de valor' });
     expect(activityCreate).not.toHaveBeenCalled();
   });
 });

@@ -88,6 +88,10 @@ export class ComercialController {
       // COM-007 — the kanban gates drag/create/close/reopen on opportunity.update
       // (MANAGER/ADMIN/SUPER_ADMIN); ACCOUNTANT reads the board but sees no controls.
       opportunity: flagsFor(OpportunitySubject),
+      stageProbabilities: {
+        read: ability.can('read', OpportunitySubject),
+        update: ability.can('manage', OpportunitySubject),
+      },
       // COM-008 — the activity timeline gates register/edit/delete on activity writes;
       // ACCOUNTANT reads timelines but sees no controls.
       activity: flagsFor(ActivitySubject),

@@ -19,6 +19,8 @@ import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { ChangeStageDto } from './dto/change-stage.dto';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { OpportunitiesService } from './opportunities.service';
+import { ResumeOpportunityDto } from './dto/resume-opportunity.dto';
+import { ReopenOpportunityDto } from './dto/reopen-opportunity.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 
 /* COM-005 — opportunities CRUD + stage transitions (the pipeline). EVERY endpoint
@@ -110,8 +112,9 @@ export class OpportunitiesController {
     @Param('id') id: string,
     @CurrentCompany() companyId: string,
     @CurrentUser() user: { id: string },
+    @Body() dto: ResumeOpportunityDto = {},
   ) {
-    return this.service.resume(id, companyId, user.id);
+    return this.service.resume(id, companyId, user.id, dto);
   }
 
   /* Reopen a closed (GANADA/PERDIDA) opportunity back to NEGOCIACION. */
@@ -121,8 +124,9 @@ export class OpportunitiesController {
     @Param('id') id: string,
     @CurrentCompany() companyId: string,
     @CurrentUser() user: { id: string },
+    @Body() dto: ReopenOpportunityDto,
   ) {
-    return this.service.reopen(id, companyId, user.id);
+    return this.service.reopen(id, companyId, user.id, dto);
   }
 
   /* COM-013b — send a WON opportunity to Operaciones (validates the critical rule, emits

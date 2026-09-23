@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { RlsService } from '../common/rls/rls.service';
+import { memberDisplayName } from './member-display-name';
 
 export type MembersScope = 'active' | 'all';
 
@@ -32,7 +33,7 @@ export class MembersService {
       });
       return memberships.map(({ userId, user }) => ({
         userId,
-        displayName: `${user.firstName} ${user.lastName}`.trim() || user.email.split('@')[0],
+        displayName: memberDisplayName(user),
       }));
     });
   }

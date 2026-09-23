@@ -4,6 +4,9 @@ import { OpportunitiesService } from './opportunities.service';
 import { OpportunityServicesController } from './opportunity-services/opportunity-services.controller';
 import { OpportunityServicesService } from './opportunity-services/opportunity-services.service';
 
+import { StageProbabilitiesController } from './stage-probabilities.controller';
+import { StageProbabilitiesService } from './stage-probabilities.service';
+
 /* COM-005 — opportunities feature module (the pipeline core). COM-006 adds the
    opportunity_services bundle as a SUB-RESOURCE (…/opportunities/:id/services),
    registered here (not a sibling module) since the bundle is part of the opportunity
@@ -12,8 +15,12 @@ import { OpportunityServicesService } from './opportunity-services/opportunity-s
    are provided here. Exported so later Comercial modules (activities, quotes, the
    GANADA handoff) can reuse them. */
 @Module({
-  controllers: [OpportunitiesController, OpportunityServicesController],
-  providers: [OpportunitiesService, OpportunityServicesService],
+  controllers: [
+    OpportunitiesController,
+    OpportunityServicesController,
+    StageProbabilitiesController,
+  ],
+  providers: [OpportunitiesService, OpportunityServicesService, StageProbabilitiesService],
   exports: [OpportunitiesService, OpportunityServicesService],
 })
 export class OpportunitiesModule {}

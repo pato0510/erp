@@ -183,7 +183,9 @@ enum OpportunityStage {
 
 enum LostReason {
   PRECIO
+  PLAZO
   COMPETENCIA
+  SIN_RESPUESTA
   PROYECTO_CANCELADO
   OTRO
 }
@@ -228,6 +230,25 @@ model Opportunity {
   @@index([accountId])
   @@index([stage])
   @@map("opportunities")
+}
+
+/* COM-023 — per-company pipeline defaults, created lazily on explicit edits.
+   Missing rows use the initial probabilities; GANADA=100 / PERDIDA=0 are fixed
+   and cannot have rows. updatedBy is the bare actor UUID from JWT (no FK).
+   Probability/stage CHECKs and the platform invariant (RLS + audit + GRANT)
+   live together in 20260923200000_add_commercial_rules. */
+model OpportunityStageProbability {
+  id          String           @id @default(uuid()) @db.Uuid
+  companyId   String           @db.Uuid
+  stage       OpportunityStage
+  probability Int
+  updatedBy   String           @db.Uuid
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([companyId, stage])
+  @@index([companyId])
+  @@map("opportunity_stage_probabilities")
 }
 
 /* COM-006 — opportunity_services: the service bundle of an opportunity (which
@@ -290,9 +311,11 @@ enum CommercialActivityEvent {
   GANADA
   PERDIDA
   REAPERTURA
+  CUENTA_CLIENTE
   VALOR_ESTIMADO
   FECHA_CIERRE
   PROBABILIDAD
+  RESPONSABLE
   LEAD
   ACCION_ELIMINADA
 }

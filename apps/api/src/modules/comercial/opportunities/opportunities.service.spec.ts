@@ -1,9 +1,9 @@
-/* COM-005 — proves the stage-transition rules (the pipeline invariants) and the
+/* COM-005/COM-023 — proves the stage-transition rules (the pipeline invariants) and the
  * cross-company account guard. COM-009 — proves each movement ALSO writes exactly one
  * system activity, in the SAME transaction, with the right subject text.
  *
- * The fake separates READS (this.prisma: findFirst / count) from WRITES (a distinct
- * `tx` object the fake executeWithRls passes). So the activity write can ONLY happen
+ * The fake keeps WRITES on a distinct `tx` object passed by executeWithRls;
+ * COM-023 mutation reads also use that transaction. So the activity write can ONLY happen
  * on the tx (this.prisma has no write methods) and a single executeWithRls call proves
  * the activity is atomic with the stage mutation — not a separate transaction. */
 import { BadRequestException, ConflictException } from '@nestjs/common';
@@ -12,7 +12,11 @@ import { OpportunitiesService } from './opportunities.service';
 
 type Any = Record<string, unknown>;
 
-function makeService(oppRow: Any | null, accountRow: Any | null = { id: 'acc1' }, quoteCount = 0) {
+function makeService(
+  oppRow: Any | null,
+  accountRow: Any | null = { id: 'acc1', status: 'ACTIVA' },
+  quoteCount = 0,
+) {
   const oppUpdate = jest.fn((args: Any) =>
     Promise.resolve({ id: 'o1', accountId: 'acc1', companyId: 'c1', ...(args.data as Any) }),
   );
@@ -21,9 +25,17 @@ function makeService(oppRow: Any | null, accountRow: Any | null = { id: 'acc1' }
   const activityCreate = jest.fn((args: Any) =>
     Promise.resolve({ id: 'act1', ...(args.data as Any) }),
   );
-  // WRITES live on the tx only (mirrors a real Prisma transaction client).
+  // Mutation reads and WRITES live on the tx (mirrors a real Prisma transaction client).
   const tx = {
-    opportunity: { update: oppUpdate, create: oppCreate, delete: oppDelete },
+    opportunity: {
+      findFirst: () => Promise.resolve(oppRow),
+      update: oppUpdate,
+      create: oppCreate,
+      delete: oppDelete,
+    },
+    opportunityService: { count: () => Promise.resolve(0) },
+    opportunityStageProbability: { findMany: () => Promise.resolve([]) },
+    account: { findFirst: () => Promise.resolve(accountRow) },
     activity: { create: activityCreate },
   };
   // READS live on this.prisma only (findOne / assertAccountInCompany / bundle count).
@@ -57,8 +69,8 @@ const opp = (stage: OpportunityStage, extra: Any = {}) => ({
   accountId: 'acc1',
   stage,
   previousStage: null,
-  estimatedValue: null,
-  expectedCloseDate: null,
+  estimatedValue: new Prisma.Decimal(100),
+  expectedCloseDate: new Date('2026-10-01'),
   probability: null,
   ...extra,
 });
@@ -77,7 +89,7 @@ describe('OpportunitiesService — stage transition rules', () => {
 
   it('Rule 1: free movement — backward NEGOCIACION→CONTACTO', async () => {
     const { svc, oppUpdate } = makeService(opp(S.NEGOCIACION));
-    await svc.changeStage('o1', 'c1', 'u1', { stage: S.CONTACTO });
+    await svc.changeStage('o1', 'c1', 'u1', { stage: S.CONTACTO, reason: 'Revisar alcance' });
     expect(lastData(oppUpdate).stage).toBe(S.CONTACTO);
   });
 
@@ -130,7 +142,7 @@ describe('OpportunitiesService — stage transition rules', () => {
         closedAt: new Date(),
       }),
     );
-    await svc.reopen('o1', 'c1', 'u1');
+    await svc.reopen('o1', 'c1', 'u1', { reason: 'Retomar propuesta' });
     const d = lastData(oppUpdate);
     expect(d.stage).toBe(S.NEGOCIACION);
     expect(d.closedAt).toBeNull();
@@ -164,7 +176,7 @@ describe('OpportunitiesService — stage transition rules', () => {
 
   it('Rule 4: direct move from EN_PAUSA to a different active stage clears previousStage', async () => {
     const { svc, oppUpdate } = makeService(opp(S.EN_PAUSA, { previousStage: S.COTIZACION }));
-    await svc.changeStage('o1', 'c1', 'u1', { stage: S.PROSPECTO });
+    await svc.changeStage('o1', 'c1', 'u1', { stage: S.PROSPECTO, reason: 'Revisar alcance' });
     const d = lastData(oppUpdate);
     expect(d.stage).toBe(S.PROSPECTO);
     expect(d.previousStage).toBeNull();
@@ -275,14 +287,14 @@ describe('OpportunitiesService — COM-009 system-generated timeline entries', (
 
   it('direct EN_PAUSA→active (resume-elsewhere) also reads as reanudada', async () => {
     const { svc, activityCreate } = makeService(opp(S.EN_PAUSA, { previousStage: S.COTIZACION }));
-    await svc.changeStage('o1', 'c1', 'u1', { stage: S.PROSPECTO });
+    await svc.changeStage('o1', 'c1', 'u1', { stage: S.PROSPECTO, reason: 'Revisar alcance' });
     expect(sysActivity(activityCreate).subject).toBe('Oportunidad reanudada (a Prospecto)');
     expect(sysActivity(activityCreate).systemEvent).toBe('REANUDACION');
   });
 
   it('reopen writes "Oportunidad reabierta"', async () => {
     const { svc, activityCreate } = makeService(opp(S.GANADA, { closedAt: new Date() }));
-    await svc.reopen('o1', 'c1', 'u1');
+    await svc.reopen('o1', 'c1', 'u1', { reason: 'Retomar propuesta' });
     expect(sysActivity(activityCreate).subject).toBe('Oportunidad reabierta');
     expect(sysActivity(activityCreate).systemEvent).toBe('REAPERTURA');
   });
@@ -417,7 +429,11 @@ describe('OpportunitiesService — COM-020 list filters + lastMovementAt', () =>
       Promise.resolve(
         rows
           .filter((r) => matches(r, args.where as Row))
-          .map((r) => ({ ...r, createdAt: new Date('2026-09-01T12:00:00Z') })),
+          .map((r) => ({
+            ...r,
+            _count: { services: r.id === 'n1' ? 2 : 0 },
+            createdAt: new Date('2026-09-01T12:00:00Z'),
+          })),
       ),
     );
     const queryRaw = jest.fn(() => Promise.resolve(lastMovement));
@@ -443,10 +459,14 @@ describe('OpportunitiesService — COM-020 list filters + lastMovementAt', () =>
     const list = (await svc.findAll('c1')) as Row[];
     expect(ids(list)).toEqual(['p1', 'n1', 'w-recent', 'l-old']);
     expect(list[0]).toHaveProperty('lastMovementAt', null);
+    expect(list[0]).toHaveProperty('valueFromBundle', false);
+    expect(list[1]).toHaveProperty('valueFromBundle', true);
+    expect(list.every((row) => !('_count' in row))).toBe(true);
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { companyId: 'c1' },
         include: {
+          _count: { select: { services: true } },
           account: {
             select: { id: true, name: true, enterprise: { select: { id: true, name: true } } },
           },
@@ -633,7 +653,7 @@ describe('OpportunitiesService — COM-022 real field edits', () => {
     'writes exact defined/changed/removed subjects: $subjects',
     async ({ before, dto, subjects }) => {
       const { svc, activityCreate, oppUpdate, executeWithRls } = makeService(
-        opp(S.PROSPECTO, before),
+        opp(S.PROSPECTO, { estimatedValue: null, expectedCloseDate: null, ...before }),
       );
       await svc.update('o1', 'c1', 'u1', dto as never);
       expect(executeWithRls).toHaveBeenCalledTimes(1);
@@ -674,12 +694,13 @@ describe('OpportunitiesService — COM-022 real field edits', () => {
     expect(executeWithRls).toHaveBeenCalledTimes(1);
   });
 
-  it('clearing fields already null and editing name/owner/notes/account write nothing', async () => {
-    const { svc, activityCreate } = makeService(opp(S.PROSPECTO));
+  it('clearing fields already null and editing name/notes/account write nothing', async () => {
+    const { svc, activityCreate } = makeService(
+      opp(S.PROSPECTO, { estimatedValue: null, expectedCloseDate: null }),
+    );
     await svc.update('o1', 'c1', 'u1', {
       name: 'Renombrada',
       notes: 'Nota',
-      ownerId: 'u2',
       accountId: 'acc1',
       estimatedValue: null,
       expectedCloseDate: null,
@@ -689,7 +710,9 @@ describe('OpportunitiesService — COM-022 real field edits', () => {
   });
 
   it('logs only the changed field; zero is a defined value', async () => {
-    const { svc, activityCreate } = makeService(opp(S.PROSPECTO, { probability: 40 }));
+    const { svc, activityCreate } = makeService(
+      opp(S.PROSPECTO, { probability: 40, estimatedValue: null, expectedCloseDate: null }),
+    );
     await svc.update('o1', 'c1', 'u1', { estimatedValue: 0, probability: 40 });
     expect(activityCreate).toHaveBeenCalledTimes(1);
     expect(sysActivity(activityCreate)).toMatchObject({

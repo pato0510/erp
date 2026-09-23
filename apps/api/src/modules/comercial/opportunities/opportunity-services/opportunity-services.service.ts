@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { OpportunityStage, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { formatCLP, writeSystemActivity } from '../../activities/system-activity';
 import { RlsService } from '../../../common/rls/rls.service';
 import { AddOpportunityServiceDto } from './dto/add-opportunity-service.dto';
 import { UpdateOpportunityServiceDto } from './dto/update-opportunity-service.dto';
@@ -71,7 +72,7 @@ export class OpportunityServicesService {
           notes: dto.notes ?? null,
         },
       });
-      await this.recomputeEstimatedValue(tx, companyId, opportunityId);
+      await this.recomputeEstimatedValue(tx, companyId, opportunityId, userId);
       return line;
     });
   }
@@ -94,7 +95,7 @@ export class OpportunityServicesService {
       if (dto.unitPrice !== undefined) data.unitPrice = new Prisma.Decimal(dto.unitPrice);
       if (dto.notes !== undefined) data.notes = dto.notes;
       const line = await tx.opportunityService.update({ where: { id: lineId }, data });
-      await this.recomputeEstimatedValue(tx, companyId, opportunityId);
+      await this.recomputeEstimatedValue(tx, companyId, opportunityId, userId);
       return line;
     });
   }
@@ -108,7 +109,7 @@ export class OpportunityServicesService {
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       await tx.opportunityService.delete({ where: { id: lineId } });
-      await this.recomputeEstimatedValue(tx, companyId, opportunityId);
+      await this.recomputeEstimatedValue(tx, companyId, opportunityId, userId);
       return { id: lineId, deleted: true };
     });
   }
@@ -122,19 +123,42 @@ export class OpportunityServicesService {
     tx: Prisma.TransactionClient,
     companyId: string,
     opportunityId: string,
+    userId: string,
   ) {
+    const opportunity = await tx.opportunity.findFirst({
+      where: { id: opportunityId, companyId },
+      select: { accountId: true, estimatedValue: true },
+    });
+    if (!opportunity) throw new NotFoundException('Oportunidad no encontrada');
+    const before = opportunity.estimatedValue;
     const lines = await tx.opportunityService.findMany({
       where: { companyId, opportunityId },
       select: { quantity: true, unitPrice: true },
     });
     if (lines.length === 0) return; // keep last derived value; manual editing re-enabled
-    const total = lines.reduce(
-      (acc, l) => acc.add(new Prisma.Decimal(l.quantity).mul(new Prisma.Decimal(l.unitPrice))),
-      new Prisma.Decimal(0),
-    );
+    // Compare the persisted Decimal(18,2), including fractional quantity × price.
+    const total = lines
+      .reduce(
+        (acc, l) => acc.add(new Prisma.Decimal(l.quantity).mul(new Prisma.Decimal(l.unitPrice))),
+        new Prisma.Decimal(0),
+      )
+      .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
     await tx.opportunity.update({
-      where: { id: opportunityId },
+      where: { id: opportunityId, companyId },
       data: { estimatedValue: total },
+    });
+    // Preserve COM-006's updatedAt/lastMovementAt touch even when the value is unchanged.
+    if (before !== null && before.equals(total)) return;
+    await writeSystemActivity(tx, {
+      companyId,
+      accountId: opportunity.accountId,
+      opportunityId,
+      userId,
+      event: 'VALOR_ESTIMADO',
+      subject:
+        (before === null
+          ? `Valor estimado definido: ${formatCLP(total)}`
+          : `Valor estimado: ${formatCLP(before)} → ${formatCLP(total)}`) + ' (según servicios)',
     });
   }
 
