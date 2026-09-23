@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { formatCLP, formatDate } from '../../lib/formatters';
+import { formatDbDate } from '../../lib/dates';
 import { QUOTE_STATUS_LABELS, QuoteStatusBadge, isTerminalQuote } from './quoteLabels';
 import { QuoteLineModal } from './QuoteLineModal';
 import { SendQuoteModal } from './SendQuoteModal';
@@ -339,7 +340,7 @@ export function OpportunityQuotes({
                       {formatCLP(q.totalAmount)}
                     </span>
                     <span className="w-full text-xs text-[var(--text-secondary)] sm:w-auto sm:pl-2">
-                      Válida: {q.validUntil ? formatDate(q.validUntil) : '—'}
+                      Válida: {q.validUntil ? formatDbDate(q.validUntil) : '—'}
                       {rd.date && (
                         <>
                           {' · '}

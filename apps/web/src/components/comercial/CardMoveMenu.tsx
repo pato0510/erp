@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { MoreVertical, Play } from 'lucide-react';
 import {
-  ACTIVE_STAGES,
   isClosedStage,
   STAGE_LABELS,
   stageAccent,
+  stageMoveTargets,
   type OpportunityStage,
 } from './stageLabels';
 
@@ -23,7 +23,12 @@ import {
 
    The dropdown is position:fixed (anchored to the button rect) so the board's
    overflow-x scroll container cannot clip it. It closes on outside click, scroll or
-   resize (any of which would leave the anchored position stale). */
+   resize (any of which would leave the anchored position stale).
+
+   COM-025 — keyboard model of GO-004's TodoMoveMenu: aria-haspopup/aria-expanded on the
+   trigger, role="menu"/"menuitem", focus on the first item when it opens, ArrowUp /
+   ArrowDown cycle, Escape closes and returns focus to the trigger, Tab closes. The
+   click-away backdrop stays: it keeps the click from reaching the card (which navigates). */
 export function CardMoveMenu({
   stage,
   onMove,
@@ -33,92 +38,124 @@ export function CardMoveMenu({
   onMove: (target: OpportunityStage) => void;
   onResume: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const open = pos !== null;
+
+  const close = (returnFocus = true) => {
+    setPos(null);
+    if (returnFocus) btnRef.current?.focus();
+  };
 
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
     // Any scroll (capture: also inner containers) or resize invalidates the anchor.
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
+    const onScrollOrResize = () => close();
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
     return () => {
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
     };
+    // close only touches refs and a setter; the listeners re-bind when the menu opens.
   }, [open]);
 
   if (isClosedStage(stage)) return null;
 
   const isPaused = stage === 'EN_PAUSA';
-  const targets: OpportunityStage[] = ACTIVE_STAGES.includes(stage as OpportunityStage)
-    ? [...ACTIVE_STAGES.filter((s) => s !== stage), 'EN_PAUSA', 'GANADA', 'PERDIDA']
-    : [...ACTIVE_STAGES]; // En Pausa card → the active stages (+ Reanudar, below)
+  const targets = stageMoveTargets(stage);
 
   const toggle = (ev: React.MouseEvent) => {
     ev.stopPropagation();
     ev.preventDefault();
     if (open) {
-      setOpen(false);
+      close();
       return;
     }
     const r = btnRef.current?.getBoundingClientRect();
-    if (r) {
-      const itemCount = targets.length + (isPaused ? 1 : 0);
-      const estH = itemCount * 32 + 34;
-      let top = r.bottom + 4;
-      if (top + estH > window.innerHeight - 8) top = Math.max(8, r.top - estH - 4);
-      const left = Math.max(8, Math.min(r.right - 200, window.innerWidth - 208));
-      setPos({ top, left });
-    }
-    setOpen(true);
+    if (!r) return;
+    const itemCount = targets.length + (isPaused ? 1 : 0);
+    const estH = itemCount * 32 + 34;
+    let top = r.bottom + 4;
+    if (top + estH > window.innerHeight - 8) top = Math.max(8, r.top - estH - 4);
+    const left = Math.max(8, Math.min(r.right - 200, window.innerWidth - 208));
+    setPos({ top, left });
   };
 
   const pick = (ev: React.MouseEvent, fn: () => void) => {
     ev.stopPropagation();
-    setOpen(false);
+    close(false);
     fn();
+  };
+
+  const onMenuKeyDown = (e: React.KeyboardEvent) => {
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    );
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      items[(index + 1) % items.length]?.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      items[(index - 1 + items.length) % items.length]?.focus();
+    } else if (e.key === 'Tab') {
+      close(false);
+    }
   };
 
   return (
     <>
       <button
         ref={btnRef}
+        type="button"
         onClick={toggle}
+        aria-haspopup="menu"
+        aria-expanded={open}
         title="Mover a…"
         aria-label="Mover a…"
-        className="rounded-md p-1 text-[var(--text-secondary)] hover:bg-black/[0.05] hover:text-[var(--text-primary)]"
+        className="rounded-md p-1 text-fg-secondary hover:bg-subtle-hover hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       >
-        <MoreVertical size={15} />
+        <MoreVertical size={15} aria-hidden="true" />
       </button>
 
-      {open && pos && (
+      {pos && (
         <>
           {/* click-away backdrop (stops the click from reaching the card underneath) */}
           <div
             className="fixed inset-0 z-[55]"
             onClick={(e) => {
               e.stopPropagation();
-              setOpen(false);
+              close(false);
             }}
           />
           <div
-            className="fixed z-[56] w-[200px] overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-lg"
+            ref={menuRef}
+            role="menu"
+            aria-label="Mover a"
+            onKeyDown={onMenuKeyDown}
+            className="fixed z-[56] w-[200px] overflow-hidden rounded-lg border border-line bg-card-solid py-1 shadow-lg"
             style={{ top: pos.top, left: pos.left }}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+            <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-fg-secondary">
               Mover a…
             </p>
             {isPaused && (
               <MenuItem onClick={(e) => pick(e, onResume)}>
-                <Play size={12} /> Reanudar
+                <Play size={12} aria-hidden="true" /> Reanudar
               </MenuItem>
             )}
             {targets.map((t) => (
               <MenuItem key={t} onClick={(e) => pick(e, () => onMove(t))}>
                 <span
+                  aria-hidden="true"
                   className="h-2 w-2 shrink-0 rounded-full"
                   style={{ background: stageAccent(t) }}
                 />
@@ -141,8 +178,11 @@ function MenuItem({
 }) {
   return (
     <button
+      type="button"
+      role="menuitem"
+      tabIndex={-1}
       onClick={onClick}
-      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--text-primary)] hover:bg-black/[0.04]"
+      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-fg hover:bg-subtle-hover focus-visible:bg-subtle-hover focus-visible:outline-none"
     >
       {children}
     </button>

@@ -8,6 +8,8 @@
  * either background. Priority uses a blue/indigo scale so it never shares a hue with
  * a status. */
 
+import { addDays, civilDate, daysBetween, santiagoDate } from '../../lib/dates';
+
 export type TodoStatus = 'PENDING' | 'IN_PROGRESS' | 'IN_REVIEW' | 'BLOCKED' | 'DONE';
 export type TodoPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -35,31 +37,18 @@ export const TODO_PRIORITY: Record<TodoPriority, { label: string; fill: string }
 
 export const isOpenStatus = (status: TodoStatus) => status !== 'DONE';
 
-/* ── Santiago calendar dates (CAL-008b doctrine: never the UTC date) ── */
+/* ── Santiago calendar dates (CAL-008b doctrine: never the UTC date) ──
+ * The shared helpers live in lib/dates.ts since COM-025; re-exported here so GO-004's
+ * imports stay as they were. */
 
-const santiagoDay = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/Santiago',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-/** YYYY-MM-DD of an instant in America/Santiago. */
-export const santiagoDate = (instant: Date | string) => santiagoDay.format(new Date(instant));
-
-/** Today's YYYY-MM-DD in America/Santiago. */
-export const santiagoToday = () => santiagoDate(new Date());
-
-/** Adds calendar days to a YYYY-MM-DD (UTC arithmetic on the civil date — no shift). */
-export function addDays(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Whole days from a to b (both YYYY-MM-DD). */
-export const daysBetween = (a: string, b: string) =>
-  Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+export {
+  santiagoDate,
+  santiagoToday,
+  addDays,
+  daysBetween,
+  civilDate,
+  formatDmy,
+} from '../../lib/dates';
 
 /** The Sunday closing the Monday–Sunday week that contains `today`. */
 export function weekEnd(today: string): string {
@@ -67,12 +56,7 @@ export function weekEnd(today: string): string {
   return addDays(today, dow === 0 ? 0 : 7 - dow);
 }
 
-/** A @db.Date value ("YYYY-MM-DDT00:00:00.000Z") as its civil date. */
-export const civilDate = (value: string) => value.slice(0, 10);
-
-/** dd-mm-aaaa (Plazo column) and dd-mm (kanban card). */
-export const formatDmy = (ymd: string) =>
-  `${ymd.slice(8, 10)}-${ymd.slice(5, 7)}-${ymd.slice(0, 4)}`;
+/** dd-mm (kanban card). */
 export const formatDm = (ymd: string) => `${ymd.slice(8, 10)}-${ymd.slice(5, 7)}`;
 
 /* ── Table groups ── */

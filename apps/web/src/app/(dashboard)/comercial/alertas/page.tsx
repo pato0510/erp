@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { RefreshCw } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { formatDate } from '../../../../lib/formatters';
+import { formatDbDate } from '../../../../lib/dates';
 import { useComercialPermissions } from '../../../../hooks/useCanWrite';
 import { StageBadge } from '../../../../components/comercial/stageLabels';
 
@@ -256,7 +257,7 @@ export default function ComercialAlertasPage() {
                 '—'
               )}
             </td>
-            <td className={TD}>{formatDate(o.expectedCloseDate)}</td>
+            <td className={TD}>{formatDbDate(o.expectedCloseDate)}</td>
             <td className={TD}>{days(o.daysOverdue)}</td>
           </tr>
         ))}

@@ -9,7 +9,7 @@ export const ACCOUNT_STATUSES = ['PROSPECTO', 'ACTIVA', 'INACTIVA'] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 export const STATUS_LABELS: Record<string, string> = {
   PROSPECTO: 'Prospecto',
-  ACTIVA: 'Activa',
+  ACTIVA: 'Cliente', // COM-025 — the enum value stays ACTIVA; an active account is a client
   INACTIVA: 'Inactiva',
 };
 

@@ -12,8 +12,8 @@ export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 export const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   LLAMADA: 'Llamada',
   REUNION: 'Reunión',
-  EMAIL: 'Email',
-  VISITA_FAENA: 'Visita a faena',
+  EMAIL: 'Correo',
+  VISITA_FAENA: 'Visita técnica', // COM-025 — label only; the enum stays VISITA_FAENA
   NOTA: 'Nota',
 };
 

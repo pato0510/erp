@@ -23,14 +23,21 @@ import { useMembers } from '../../../../hooks/useMembers';
  *
  * COM-020 — Pipeline 2.0: a "Tabla | Kanban" toggle (React state only), default Tabla.
  * The table (PipelineTable) reuses attemptMove for its inline stage select, so both
- * views share ONE stage-change path; its filters (q, stages, owner, enterprise, closed
- * window) are server-side params the page adds only in table view — the kanban's fetch
- * and rendering are untouched. */
+ * views share ONE stage-change path.
+ *
+ * COM-025 — table v2: the table view fetches ?includeClosed=true and nothing else;
+ * search, filters and grouping are client-side in PipelineTable. Its quick-add row
+ * POSTs through onAdd (the creator is the default Responsable), and the header's
+ * «Nueva oportunidad» shows only in kanban view (the table has its own «Agregar
+ * oportunidad»). The kanban's fetch and rendering are untouched except the close-date
+ * line (formatDbDate: a @db.Date no longer renders one day early). */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KanbanSquare, LayoutList, Play, Plus, RotateCcw } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
-import { formatCLP, formatDate } from '../../../../lib/formatters';
+import { formatCLP } from '../../../../lib/formatters';
+import { formatDbDate } from '../../../../lib/dates';
+import { useAuth } from '../../../../hooks/useAuth';
 import { useComercialPermissions } from '../../../../hooks/useCanWrite';
 import {
   isClosedStage,
@@ -47,12 +54,9 @@ import {
 } from '../../../../components/comercial/NewOpportunityModal';
 import { LostReasonModal } from '../../../../components/comercial/LostReasonModal';
 import { CardMoveMenu } from '../../../../components/comercial/CardMoveMenu';
-// COM-020 — the grouped table view + the sentinel EnterpriseSelect uses for "Sin empresa".
-import {
-  PipelineTable,
-  type PipelineFilters,
-} from '../../../../components/comercial/PipelineTable';
-import { NO_ENTERPRISE } from '../../../../components/comercial/EnterpriseSelect';
+// COM-025 — the grouped table view (Etapa | Cuenta) with its quick-add row.
+import { PipelineTable } from '../../../../components/comercial/PipelineTable';
+import type { QuickAddBody } from '../../../../components/comercial/PipelineQuickAdd';
 
 interface Opportunity {
   id: string;
@@ -68,6 +72,7 @@ interface Opportunity {
   lostReasonDetail: string | null;
   closedAt: string | null;
   notes: string | null;
+  createdAt: string; // COM-025 — «Fecha de creación» column
   updatedAt: string;
   lastMovementAt?: string | null; // COM-020 — derived by the API
   account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null; // COM-020
@@ -84,6 +89,7 @@ export default function PipelinePage() {
   const perms = useComercialPermissions();
   const canWrite = perms?.opportunity.update ?? false;
   const canCreate = perms?.opportunity.create ?? false;
+  const { user } = useAuth();
 
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
@@ -95,15 +101,8 @@ export default function PipelinePage() {
 
   const [accountFilter, setAccountFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
-  // COM-020 — view toggle (React state only) + the table's server-side filters.
+  // COM-020 — view toggle (React state only). COM-025: the table filters client-side.
   const [view, setView] = useState<'table' | 'kanban'>('table');
-  const [tableFilters, setTableFilters] = useState<PipelineFilters>({
-    q: '',
-    stages: [],
-    ownerId: '',
-    enterprise: '',
-    showClosed: false,
-  });
   const [newModal, setNewModal] = useState(false);
   const [lostModal, setLostModal] = useState<{
     id: string;
@@ -177,14 +176,9 @@ export default function PipelinePage() {
     setLoading(true);
     const params = new URLSearchParams();
     if (view === 'table') {
-      // COM-020 — table filters are server-side; includeClosed is explicit so the
-      // kanban (which sends nothing) keeps its legacy full set.
-      if (tableFilters.q.trim()) params.set('q', tableFilters.q.trim());
-      tableFilters.stages.forEach((st) => params.append('stage', st));
-      if (tableFilters.ownerId) params.set('ownerId', tableFilters.ownerId);
-      if (tableFilters.enterprise === NO_ENTERPRISE) params.set('noEnterprise', 'true');
-      else if (tableFilters.enterprise) params.set('enterpriseId', tableFilters.enterprise);
-      params.set('includeClosed', tableFilters.showClosed ? 'true' : 'false');
+      // COM-025 — open deals + closed ones from the last 90 days; everything else is
+      // client-side. The kanban (which sends no includeClosed) keeps its legacy full set.
+      params.set('includeClosed', 'true');
     } else {
       if (accountFilter) params.set('accountId', accountFilter);
       if (ownerFilter) params.set('ownerId', ownerFilter);
@@ -202,7 +196,7 @@ export default function PipelinePage() {
         else setError('No se pudieron cargar las oportunidades.');
       })
       .finally(() => setLoading(false));
-  }, [accountFilter, ownerFilter, view, tableFilters]);
+  }, [accountFilter, ownerFilter, view]);
 
   useEffect(() => {
     fetchOpps();
@@ -333,6 +327,21 @@ export default function PipelinePage() {
       });
     }
   };
+  /* COM-025 — the table's quick-add row: POST (always PROSPECTO today) with the creator
+     as Responsable; the api's message goes to the page toast on error. */
+  const addFromTable = async (body: QuickAddBody): Promise<boolean> => {
+    try {
+      await apiClient.post('/api/comercial/opportunities', body);
+      return true;
+    } catch (e) {
+      setToast({
+        msg: e instanceof ApiError ? e.message : 'No se pudo crear la oportunidad.',
+        type: 'error',
+      });
+      return false;
+    }
+  };
+
   const resume = async (opp: Opportunity, ev?: React.MouseEvent) => {
     ev?.stopPropagation();
     try {
@@ -358,7 +367,7 @@ export default function PipelinePage() {
           Pipeline
         </h1>
       </div>
-      {canCreate && !forbidden && (
+      {canCreate && !forbidden && view === 'kanban' && (
         <button
           onClick={() => setNewModal(true)}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
@@ -429,15 +438,19 @@ export default function PipelinePage() {
         <PipelineTable
           rows={opps}
           loading={loading}
+          accounts={accounts}
           canWrite={canWrite}
-          filters={tableFilters}
-          onFiltersChange={setTableFilters}
+          canCreate={canCreate}
+          currentUserId={user?.id ?? null}
           ownerOptions={ownerOptions}
-          ownerLabel={(id) => (id ? (nameOf(id) ?? 'Usuario desconocido') : '—')}
+          nameOf={nameOf}
           onChangeStage={(row, stage) => {
             const opp = opps.find((o) => o.id === row.id);
             if (opp) attemptMove(opp, stage);
           }}
+          onNew={() => setNewModal(true)}
+          onAdd={addFromTable}
+          onCreated={fetchOpps}
         />
       ) : (
         <>
@@ -597,7 +610,7 @@ export default function PipelinePage() {
                                 {o.estimatedValue != null ? formatCLP(o.estimatedValue) : '—'}
                               </span>
                               <span className="text-[var(--text-secondary)]">
-                                {o.expectedCloseDate ? formatDate(o.expectedCloseDate) : '—'}
+                                {o.expectedCloseDate ? formatDbDate(o.expectedCloseDate) : '—'}
                               </span>
                             </div>
 

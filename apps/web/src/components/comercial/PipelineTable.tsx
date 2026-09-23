@@ -1,143 +1,147 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { formatCLP, formatDate, formatRelativeDate } from '../../lib/formatters';
-import { EnterpriseSelect } from './EnterpriseSelect';
+import { AlertTriangle, ChevronDown, ChevronRight, Plus, Search } from 'lucide-react';
+import { formatCLP } from '../../lib/formatters';
 import {
-  ACTIVE_STAGES,
-  CLOSED_STAGES,
+  civilDate,
+  formatDbDate,
+  formatSantiagoDate,
+  relativeDayLabel,
+  santiagoToday,
+} from '../../lib/dates';
+import { MemberAvatar } from '../shared/MemberAvatar';
+import { ColumnHelp } from './ColumnHelp';
+import { EnterpriseSelect, NO_ENTERPRISE } from './EnterpriseSelect';
+import { PipelineQuickAdd, type QuickAddBody } from './PipelineQuickAdd';
+import {
+  COLUMNS,
+  filterRows,
+  groupRows,
+  sortRows,
+  type GroupBy,
+  type PipelineRow,
+  type RowGroup,
+  type SortDir,
+  type SortKey,
+  type TableFilters,
+} from './pipelineTableModel';
+import {
   STAGE_LABELS,
-  STAGE_ORDER,
-  StageBadge,
+  isActiveStage,
   isClosedStage,
-  stageStyle,
+  stageAccent,
+  stageMoveTargets,
   type OpportunityStage,
 } from './stageLabels';
 
-/* COM-020 — Pipeline 2.0: the TABLE view of the pipeline (founder decision 2026-09-17,
- * "inspired by Monday but minimalist", NO drag-and-drop — deferred; it would be an
- * extension over this view). Groups by stage in STAGE_ORDER: one collapsible group per
- * open stage (button + aria-expanded/aria-controls; open groups expanded, empty groups
- * collapsed with "0"), plus GANADA/PERDIDA groups (collapsed) when "Ver cerradas" is on.
- * The stage pill is a native <select> for writers — choosing a stage calls the page's
- * attemptMove, i.e. EXACTLY the kanban's path (GANADA light confirm, PERDIDA modal,
- * canonical PATCH /:id/stage, optimistic + revert + toast) — read-only users see the
- * static pill. Filters are server-side (the page owns them and refetches); sorting is
- * client-side within each group (aria-sort headers). Token utilities only. */
+export type { PipelineRow } from './pipelineTableModel';
 
-export interface PipelineRow {
-  id: string;
-  accountId: string;
-  name: string;
-  stage: string;
-  estimatedValue: string | null;
-  expectedCloseDate: string | null;
-  ownerId: string | null;
-  closedAt: string | null;
-  updatedAt: string;
-  lastMovementAt?: string | null;
-  account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null;
-}
+/* COM-025 — Pipeline table v2, the daily work view (replaces COM-020's table). ONE
+ * <table> with a <tbody> per group, table-fixed + <colgroup> so every group lines up,
+ * ONE horizontal scroll container and a sticky first column (header, rows, group
+ * headers, footers). Grouped by Etapa (the eight stages in STAGE_ORDER; Ganada and
+ * Perdida start collapsed) or Cuenta (one group per account, by name). Search and the
+ * Responsable / Empresa filters are client-side over the page's single fetch
+ * (?includeClosed=true); while any is active, groups without matches hide.
+ *
+ * The stage cell is filled with the stage's accent (white text ≥ 4.9:1 on all eight);
+ * writers get a native <select> over the same targets as CardMoveMenu, calling the
+ * page's attemptMove — the kanban's own path. Quick add: Prospecto group (today's POST
+ * creates at PROSPECTO) and every Cuenta group. Rows accept an optional full-width
+ * detail row (expandedId + renderRowDetail) for ola 2's actions panel. Token utilities
+ * only; hex only through stageLabels. */
 
-export interface PipelineFilters {
-  q: string;
-  stages: string[];
-  ownerId: string;
-  enterprise: string; // '' | NO_ENTERPRISE | id
-  showClosed: boolean;
-}
+const CONTROL =
+  'h-9 rounded-lg border border-line bg-card-solid px-3 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+const TD = 'border-b border-line px-3 py-2.5 align-middle';
+const STICKY = 'sticky left-0 z-10';
+const N_COLS = COLUMNS.length;
+const EMPTY_FILTERS: TableFilters = { q: '', ownerId: '', enterprise: '' };
 
-type SortKey = 'name' | 'value' | 'lastMovement' | 'expectedClose';
-type SortDir = 'asc' | 'desc';
+const santiagoTime = new Intl.DateTimeFormat('es-CL', {
+  timeZone: 'America/Santiago',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+const formatSantiagoDateTime = (iso: string) =>
+  `${formatSantiagoDate(iso)} ${santiagoTime.format(new Date(iso))}`;
 
-const OPEN_STAGES: OpportunityStage[] = [...ACTIVE_STAGES, 'EN_PAUSA'];
-const SELECT =
-  'rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]';
-
-const COLUMNS: { key: SortKey | null; label: string; align?: 'right' }[] = [
-  { key: 'name', label: 'Oportunidad' },
-  { key: null, label: 'Cuenta' },
-  { key: null, label: 'Empresa' },
-  { key: null, label: 'Etapa' },
-  { key: 'value', label: 'Valor', align: 'right' },
-  { key: null, label: 'Responsable' },
-  { key: 'lastMovement', label: 'Último movimiento' },
-  { key: 'expectedClose', label: 'Cierre esperado' },
-];
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('es-CL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+const countLabel = (n: number) => `${n} ${n === 1 ? 'oportunidad' : 'oportunidades'}`;
 
 export function PipelineTable({
   rows,
   loading,
+  accounts,
   canWrite,
-  filters,
-  onFiltersChange,
+  canCreate,
+  currentUserId,
   ownerOptions,
-  ownerLabel,
+  nameOf,
   onChangeStage,
+  onNew,
+  onAdd,
+  onCreated,
+  expandedId = null,
+  renderRowDetail,
 }: {
   rows: PipelineRow[];
   loading: boolean;
+  accounts: { id: string; name: string }[];
   canWrite: boolean;
-  filters: PipelineFilters;
-  onFiltersChange: (next: PipelineFilters) => void;
+  canCreate: boolean;
+  currentUserId: string | null;
   ownerOptions: { id: string; label: string }[];
-  ownerLabel: (ownerId: string | null) => string;
+  nameOf: (userId: string | null | undefined) => string | null;
   onChangeStage: (row: PipelineRow, stage: OpportunityStage) => void;
+  /** Opens the page's NewOpportunityModal. */
+  onNew: () => void;
+  /** POSTs the quick-add row; true on success (the page toasts errors). */
+  onAdd: (body: QuickAddBody) => Promise<boolean>;
+  /** Refetch after a write. */
+  onCreated: () => void;
+  /** Ola 2 — the row whose full-width detail row is open. */
+  expandedId?: string | null;
+  renderRowDetail?: (row: PipelineRow) => ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [groupBy, setGroupBy] = useState<GroupBy>('stage');
+  const [filters, setFilters] = useState<TableFilters>(EMPTY_FILTERS);
+  const [collapsed, setCollapsed] = useState<Record<GroupBy, Record<string, boolean>>>({
+    stage: {},
+    account: {},
+  });
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  // Skeleton only on the first load: a refetch after a write keeps the table mounted, so
+  // focus (e.g. back on «+ Agregar oportunidad») survives it.
+  const loadedOnce = useRef(false);
+  if (!loading) loadedOnce.current = true;
 
-  const stages: OpportunityStage[] = filters.showClosed
-    ? [...OPEN_STAGES, ...CLOSED_STAGES]
-    : OPEN_STAGES;
+  const q = filters.q.trim();
+  const hasFilters = filters.ownerId !== '' || filters.enterprise !== '';
+  const narrowing = q !== '' || hasFilters;
+  const today = santiagoToday();
 
-  const byStage = useMemo(() => {
-    const m = new Map<string, PipelineRow[]>();
-    for (const r of rows) {
-      const list = m.get(r.stage) ?? [];
-      list.push(r);
-      m.set(r.stage, list);
-    }
-    return m;
-  }, [rows]);
+  const sortedAccounts = useMemo(
+    () => [...accounts].sort((a, b) => a.name.localeCompare(b.name, 'es-CL')),
+    [accounts],
+  );
 
-  const sortRows = (list: PipelineRow[]): PipelineRow[] => {
-    if (!sortKey) return list;
-    const dir = sortDir === 'asc' ? 1 : -1;
-    const val = (r: PipelineRow): number | string | null => {
-      switch (sortKey) {
-        case 'name':
-          return r.name.toLowerCase();
-        case 'value':
-          return r.estimatedValue === null ? null : Number(r.estimatedValue);
-        case 'lastMovement':
-          return r.lastMovementAt ? new Date(r.lastMovementAt).getTime() : null;
-        case 'expectedClose':
-          return r.expectedCloseDate ? new Date(r.expectedCloseDate).getTime() : null;
-      }
-    };
-    return [...list].sort((a, b) => {
-      const va = val(a);
-      const vb = val(b);
-      if (va === null && vb === null) return 0;
-      if (va === null) return 1; // nulls last, whatever the direction
-      if (vb === null) return -1;
-      return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
-    });
-  };
+  const groups = useMemo(() => {
+    const all = groupRows(filterRows(rows, filters, NO_ENTERPRISE), groupBy);
+    return narrowing ? all.filter((g) => g.rows.length > 0) : all;
+  }, [rows, filters, groupBy, narrowing]);
+
+  const isCollapsed = (g: RowGroup) =>
+    collapsed[groupBy][g.key] ?? (g.kind === 'stage' && isClosedStage(g.key));
+  const toggleGroup = (g: RowGroup) =>
+    setCollapsed((cur) => ({
+      ...cur,
+      [groupBy]: { ...cur[groupBy], [g.key]: !isCollapsed(g) },
+    }));
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -147,274 +151,541 @@ export function PipelineTable({
     }
   };
 
-  const isCollapsed = (stage: string, count: number) =>
-    collapsed[stage] ?? (count === 0 || isClosedStage(stage));
-  const toggleGroup = (stage: string, count: number) =>
-    setCollapsed((cur) => ({ ...cur, [stage]: !isCollapsed(stage, count) }));
+  const set = (patch: Partial<TableFilters>) => setFilters((f) => ({ ...f, ...patch }));
 
-  const set = (patch: Partial<PipelineFilters>) => onFiltersChange({ ...filters, ...patch });
-  const hasFilters =
-    filters.q !== '' ||
-    filters.stages.length > 0 ||
-    filters.ownerId !== '' ||
-    filters.enterprise !== '';
+  /* ── toolbar ── */
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="relative min-w-[220px] flex-1">
+        <label htmlFor="pipeline-q" className="sr-only">
+          Buscar oportunidad o cuenta
+        </label>
+        <Search
+          size={15}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-secondary"
+        />
+        <input
+          id="pipeline-q"
+          type="search"
+          value={filters.q}
+          onChange={(e) => set({ q: e.target.value })}
+          placeholder="Buscar oportunidad o cuenta…"
+          className={`${CONTROL} w-full pl-9`}
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <span id="pipeline-groupby-label" className="text-sm text-fg-secondary">
+          Agrupar por
+        </span>
+        <div
+          role="group"
+          aria-labelledby="pipeline-groupby-label"
+          className="inline-flex rounded-lg border border-line p-0.5"
+        >
+          {(
+            [
+              ['stage', 'Etapa'],
+              ['account', 'Cuenta'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={groupBy === value}
+              onClick={() => setGroupBy(value)}
+              className={`rounded-md px-3 py-1 text-sm ${FOCUS} ${
+                groupBy === value ? 'bg-accent text-white' : 'text-fg-secondary hover:text-fg'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <label htmlFor="pipeline-owner" className="sr-only">
+        Responsable
+      </label>
+      <select
+        id="pipeline-owner"
+        value={filters.ownerId}
+        onChange={(e) => set({ ownerId: e.target.value })}
+        className={CONTROL}
+      >
+        <option value="">Todos los responsables</option>
+        {ownerOptions.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <label htmlFor="pipeline-enterprise" className="sr-only">
+        Empresa
+      </label>
+      <EnterpriseSelect
+        mode="filter"
+        id="pipeline-enterprise"
+        value={filters.enterprise}
+        onChange={(v) => set({ enterprise: v })}
+        className={CONTROL}
+      />
+      {hasFilters && (
+        <button
+          type="button"
+          onClick={() => set({ ownerId: '', enterprise: '' })}
+          className={`rounded-md px-1 text-sm text-fg-secondary underline-offset-2 hover:text-fg hover:underline ${FOCUS}`}
+        >
+          Limpiar filtros
+        </button>
+      )}
+      {canCreate && (
+        <button
+          type="button"
+          onClick={onNew}
+          className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <Plus size={16} aria-hidden="true" /> Agregar oportunidad
+        </button>
+      )}
+    </div>
+  );
 
-  const colCount = COLUMNS.length;
+  /* ── empty states ── */
+  const showSkeleton = loading && !loadedOnce.current;
+  if (!showSkeleton && narrowing && groups.length === 0) {
+    return (
+      <div className="space-y-4">
+        {toolbar}
+        <div className="rounded-xl border border-line bg-card-solid px-6 py-10 text-center">
+          <p className="text-sm text-fg">
+            {q
+              ? `No hay oportunidades que coincidan con «${q}».`
+              : 'No hay oportunidades que coincidan con los filtros.'}
+          </p>
+          <div className="mt-3 flex justify-center gap-4">
+            {q && (
+              <button
+                type="button"
+                onClick={() => set({ q: '' })}
+                className={`rounded-md text-sm font-medium text-accent hover:underline ${FOCUS}`}
+              >
+                Limpiar búsqueda
+              </button>
+            )}
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => set({ ownerId: '', enterprise: '' })}
+                className={`rounded-md text-sm font-medium text-accent hover:underline ${FOCUS}`}
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (!showSkeleton && groups.length === 0) {
+    return (
+      <div className="space-y-4">
+        {toolbar}
+        <div className="rounded-xl border border-line bg-card-solid px-6 py-10 text-center text-sm text-fg-secondary">
+          Aún no hay oportunidades. Crea la primera con «Agregar oportunidad».
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {/* Filters — server-side (the page refetches on change). */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1">
-          <label htmlFor="pipeline-q" className="sr-only">
-            Buscar oportunidad o cuenta
-          </label>
-          <input
-            id="pipeline-q"
-            value={filters.q}
-            onChange={(e) => set({ q: e.target.value })}
-            placeholder="Buscar oportunidad o cuenta…"
-            className={`${SELECT} w-full`}
-          />
-        </div>
-        <div>
-          <label htmlFor="pipeline-stages" className="sr-only">
-            Etapas
-          </label>
-          <select
-            id="pipeline-stages"
-            multiple
-            value={filters.stages}
-            onChange={(e) =>
-              set({ stages: Array.from(e.target.selectedOptions).map((o) => o.value) })
-            }
-            className={`${SELECT} h-[42px] min-w-[160px]`}
-            title="Etapas (Ctrl/Cmd + clic para varias)"
-          >
-            {STAGE_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {STAGE_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="pipeline-owner" className="sr-only">
-            Responsable
-          </label>
-          <select
-            id="pipeline-owner"
-            value={filters.ownerId}
-            onChange={(e) => set({ ownerId: e.target.value })}
-            className={SELECT}
-          >
-            <option value="">Todos los responsables</option>
-            {ownerOptions.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <EnterpriseSelect
-          mode="filter"
-          id="pipeline-enterprise"
-          value={filters.enterprise}
-          onChange={(v) => set({ enterprise: v })}
-          className={SELECT}
-        />
-        <label className="flex items-center gap-2 py-2 text-sm text-[var(--text-primary)]">
-          <input
-            type="checkbox"
-            checked={filters.showClosed}
-            onChange={(e) => set({ showClosed: e.target.checked })}
-            className="h-4 w-4 rounded border-[var(--border-color)]"
-          />
-          Ver cerradas (90 días)
-        </label>
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={() => set({ q: '', stages: [], ownerId: '', enterprise: '' })}
-            className="py-2 text-sm text-[var(--text-secondary)] underline-offset-2 hover:underline"
-          >
-            Limpiar
-          </button>
-        )}
-      </div>
+      {toolbar}
 
-      {/* Grouped table — horizontally scrollable in narrow viewports. */}
-      <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
-        <table className="w-full min-w-[960px] text-sm">
-          <thead className="border-b border-[var(--border-color)] bg-subtle">
+      {/* relative: the sr-only (absolute) texts must stay inside the scroll box. */}
+      <div className="relative overflow-x-auto rounded-xl border border-line bg-card-solid">
+        <table className="w-full min-w-[1280px] table-fixed border-separate border-spacing-0 text-sm text-fg md:min-w-[1320px]">
+          <caption className="sr-only">
+            Pipeline agrupado por {groupBy === 'stage' ? 'etapa' : 'cuenta'}
+          </caption>
+          <colgroup>
+            {COLUMNS.map((c) => (
+              <col key={c.key} className={c.width} />
+            ))}
+          </colgroup>
+          <thead>
             <tr>
-              {COLUMNS.map((c) => {
-                const active = c.key !== null && sortKey === c.key;
-                const ariaSort = active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+              {COLUMNS.map((c, i) => {
+                const active = c.sort !== undefined && sortKey === c.sort;
                 return (
                   <th
-                    key={c.label}
+                    key={c.key}
                     scope="col"
-                    aria-sort={c.key ? ariaSort : undefined}
-                    className={`label px-4 py-3 text-[11px] uppercase tracking-wider text-[var(--text-secondary)] ${
+                    aria-sort={
+                      c.sort
+                        ? active
+                          ? sortDir === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                        : undefined
+                    }
+                    className={`border-b border-line bg-subtle px-3 py-2.5 align-bottom text-xs font-medium text-fg-secondary ${
                       c.align === 'right' ? 'text-right' : 'text-left'
-                    }`}
+                    } ${i === 0 ? 'sticky left-0 z-20' : ''}`}
                   >
-                    {c.key ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleSort(c.key as SortKey)}
-                        className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-[var(--text-primary)]"
-                      >
-                        {c.label}
-                        {active && <span aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>}
-                      </button>
-                    ) : (
-                      c.label
-                    )}
+                    <ColumnHelp help={c.help}>
+                      {c.sort ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(c.sort as SortKey)}
+                          className={`inline-flex items-center gap-1 rounded text-left hover:text-fg ${FOCUS} ${
+                            active ? 'text-fg' : ''
+                          }`}
+                        >
+                          {c.label}
+                          <span aria-hidden="true" className="w-3 shrink-0">
+                            {active ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                          </span>
+                        </button>
+                      ) : (
+                        <span tabIndex={0} className={`rounded ${FOCUS}`}>
+                          {c.label}
+                        </span>
+                      )}
+                    </ColumnHelp>
                   </th>
                 );
               })}
             </tr>
           </thead>
-          {loading ? (
+
+          {showSkeleton ? (
             <tbody>
-              {Array.from({ length: 5 }).map((_, i) => (
+              {Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i} className="animate-pulse">
-                  {Array.from({ length: colCount }).map((_, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="h-4 w-24 rounded bg-subtle-hover" />
+                  {COLUMNS.map((c, j) => (
+                    <td key={c.key} className={`${TD} ${j === 0 ? `${STICKY} bg-card-solid` : ''}`}>
+                      <div className="h-4 w-3/4 rounded bg-subtle-hover" />
                     </td>
                   ))}
                 </tr>
               ))}
             </tbody>
           ) : (
-            stages.map((stage) => {
-              const group = byStage.get(stage) ?? [];
-              const count = group.length;
-              const total = group.reduce((acc, r) => acc + Number(r.estimatedValue ?? 0), 0);
-              const open = !isCollapsed(stage, count);
-              const bodyId = `pipeline-group-${stage}`;
-              return (
-                <tbody key={stage} className="border-t border-[var(--border-color)]">
-                  <tr className="bg-subtle">
-                    <td colSpan={colCount} className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(stage, count)}
-                        aria-expanded={open}
-                        aria-controls={bodyId}
-                        className="flex w-full items-center gap-3 text-left"
-                      >
-                        <span className="text-[var(--text-secondary)]" aria-hidden="true">
-                          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </span>
-                        <StageBadge stage={stage} />
-                        <span className="text-xs text-[var(--text-secondary)]">
-                          {count} {count === 1 ? 'oportunidad' : 'oportunidades'}
-                        </span>
-                        <span className="ml-auto text-xs font-medium text-[var(--text-primary)]">
-                          {formatCLP(total)}
-                        </span>
-                      </button>
-                    </td>
-                  </tr>
-                  {open &&
-                    (count === 0 ? (
-                      <tr id={bodyId}>
-                        <td
-                          colSpan={colCount}
-                          className="px-4 py-3 text-sm text-[var(--text-secondary)]"
-                        >
-                          Sin oportunidades en esta etapa.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortRows(group).map((r, i) => (
-                        <tr
-                          key={r.id}
-                          id={i === 0 ? bodyId : undefined}
-                          className="border-t border-[var(--border-color)] hover:bg-black/[0.02]"
-                        >
-                          <td className="px-4 py-3 font-medium">
-                            <Link
-                              href={`/comercial/pipeline/${r.id}`}
-                              className="hover:underline"
-                              style={{ color: 'var(--color-accent)' }}
-                            >
-                              {r.name}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 text-[var(--text-secondary)]">
-                            {r.account ? (
-                              <Link
-                                href={`/comercial/cuentas/${r.account.id}`}
-                                className="hover:underline"
-                              >
-                                {r.account.name}
-                              </Link>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--text-secondary)]">
-                            {r.account?.enterprise?.name ?? '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            {canWrite && !isClosedStage(r.stage) ? (
-                              <>
-                                <label htmlFor={`pipeline-stage-${r.id}`} className="sr-only">
-                                  Etapa de {r.name}
-                                </label>
-                                <select
-                                  id={`pipeline-stage-${r.id}`}
-                                  value={r.stage}
-                                  onChange={(e) =>
-                                    onChangeStage(r, e.target.value as OpportunityStage)
-                                  }
-                                  className="rounded-full border border-[var(--border-color)] px-2 py-0.5 text-[11px] font-medium"
-                                  style={stageStyle(r.stage)}
-                                >
-                                  {STAGE_ORDER.map((s) => (
-                                    <option key={s} value={s}>
-                                      {STAGE_LABELS[s]}
-                                    </option>
-                                  ))}
-                                </select>
-                              </>
-                            ) : (
-                              <StageBadge stage={r.stage} />
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right text-[var(--text-primary)]">
-                            {r.estimatedValue != null ? formatCLP(r.estimatedValue) : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--text-secondary)]">
-                            {ownerLabel(r.ownerId)}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--text-secondary)]">
-                            {r.lastMovementAt ? (
-                              <span title={formatDateTime(r.lastMovementAt)}>
-                                {formatRelativeDate(r.lastMovementAt)}
-                              </span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-[var(--text-secondary)]">
-                            {r.expectedCloseDate ? formatDate(r.expectedCloseDate) : '—'}
-                          </td>
-                        </tr>
-                      ))
-                    ))}
-                </tbody>
-              );
-            })
+            groups.map((g) => (
+              <GroupBody
+                key={`${g.kind}-${g.key}`}
+                group={g}
+                open={!isCollapsed(g)}
+                onToggle={() => toggleGroup(g)}
+                rows={sortRows(g.rows, sortKey, sortDir)}
+                today={today}
+                canWrite={canWrite}
+                nameOf={nameOf}
+                onChangeStage={onChangeStage}
+                quickAdd={
+                  canCreate && (g.kind === 'account' || g.key === 'PROSPECTO') ? (
+                    <PipelineQuickAdd
+                      groupLabel={g.kind === 'stage' ? STAGE_LABELS[g.key] : g.label}
+                      fixedAccountId={g.kind === 'account' ? g.key : undefined}
+                      accounts={sortedAccounts}
+                      currentUserId={currentUserId}
+                      restColSpan={N_COLS - 1}
+                      onAdd={onAdd}
+                      onCreated={onCreated}
+                    />
+                  ) : null
+                }
+                expandedId={expandedId}
+                renderRowDetail={renderRowDetail}
+              />
+            ))
           )}
         </table>
       </div>
     </div>
+  );
+}
+
+/* ── one group: header row, data rows, quick add, footer ── */
+
+function GroupBody({
+  group,
+  open,
+  onToggle,
+  rows,
+  today,
+  canWrite,
+  nameOf,
+  onChangeStage,
+  quickAdd,
+  expandedId,
+  renderRowDetail,
+}: {
+  group: RowGroup;
+  open: boolean;
+  onToggle: () => void;
+  rows: PipelineRow[];
+  today: string;
+  canWrite: boolean;
+  nameOf: (userId: string | null | undefined) => string | null;
+  onChangeStage: (row: PipelineRow, stage: OpportunityStage) => void;
+  quickAdd: ReactNode;
+  expandedId: string | null;
+  renderRowDetail?: (row: PipelineRow) => ReactNode;
+}) {
+  const bodyId = `pipeline-group-${group.kind}-${group.key}`;
+  const isStage = group.kind === 'stage';
+  const accent = isStage ? stageAccent(group.key) : undefined;
+  const total = rows.reduce((acc, r) => acc + Number(r.estimatedValue ?? 0), 0);
+  const valueIndex = COLUMNS.findIndex((c) => c.key === 'value');
+
+  return (
+    <tbody id={bodyId}>
+      <tr>
+        <th
+          scope="rowgroup"
+          className={`${STICKY} border-b border-line bg-subtle px-3 py-2 text-left font-normal`}
+        >
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-controls={bodyId}
+            className={`flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md text-left ${FOCUS}`}
+          >
+            <span className="text-fg-secondary" aria-hidden="true">
+              {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </span>
+            {isStage ? (
+              <span
+                className="inline-flex rounded-md px-2 py-0.5 text-xs font-semibold text-white"
+                style={{ background: accent }}
+              >
+                {STAGE_LABELS[group.key]}
+              </span>
+            ) : (
+              <span className="min-w-0 truncate text-sm font-semibold text-fg">{group.label}</span>
+            )}
+            <span className="text-xs text-fg-secondary">
+              {countLabel(rows.length)}
+              {isStage && isClosedStage(group.key) && ' · últimos 90 días'}
+            </span>
+          </button>
+        </th>
+        <td colSpan={N_COLS - 1} className="border-b border-line bg-subtle" />
+      </tr>
+
+      {open && (
+        <>
+          {rows.length === 0 && (
+            <tr>
+              <td className={`${TD} ${STICKY} bg-card-solid text-fg-secondary`}>
+                Sin oportunidades en esta etapa.
+              </td>
+              <td colSpan={N_COLS - 1} className={TD} />
+            </tr>
+          )}
+          {rows.map((r) => (
+            <Fragment key={r.id}>
+              <DataRow
+                row={r}
+                today={today}
+                canWrite={canWrite}
+                nameOf={nameOf}
+                onChangeStage={onChangeStage}
+              />
+              {expandedId === r.id && renderRowDetail && (
+                <tr>
+                  <td colSpan={N_COLS} className="border-b border-line p-0">
+                    {renderRowDetail(r)}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
+          {quickAdd}
+          <tr>
+            {COLUMNS.map((c, i) => (
+              <td
+                key={c.key}
+                className={`border-t-2 px-3 py-2 ${isStage ? '' : 'border-line'} ${
+                  i === 0 ? `${STICKY} bg-card-solid text-xs text-fg-secondary` : ''
+                } ${i === valueIndex ? 'text-right font-semibold tabular-nums' : ''}`}
+                style={isStage ? { borderTopColor: accent } : undefined}
+              >
+                {i === 0 && 'Total'}
+                {i === valueIndex && (
+                  <>
+                    <span className="sr-only">
+                      Valor estimado total de {isStage ? STAGE_LABELS[group.key] : group.label}
+                      :{' '}
+                    </span>
+                    {formatCLP(total)}
+                  </>
+                )}
+              </td>
+            ))}
+          </tr>
+        </>
+      )}
+    </tbody>
+  );
+}
+
+/* ── one opportunity ── */
+
+function DataRow({
+  row: r,
+  today,
+  canWrite,
+  nameOf,
+  onChangeStage,
+}: {
+  row: PipelineRow;
+  today: string;
+  canWrite: boolean;
+  nameOf: (userId: string | null | undefined) => string | null;
+  onChangeStage: (row: PipelineRow, stage: OpportunityStage) => void;
+}) {
+  const accountName = r.account?.name ?? '—';
+  const ownerName = r.ownerId ? (nameOf(r.ownerId) ?? 'Usuario desconocido') : null;
+  const overdue =
+    !!r.expectedCloseDate && isActiveStage(r.stage) && civilDate(r.expectedCloseDate) < today;
+  const targets = canWrite ? stageMoveTargets(r.stage) : [];
+  const fill = { background: stageAccent(r.stage) };
+
+  return (
+    <tr className="group hover:bg-subtle">
+      {/* 1 · Oportunidad y Cuenta (sticky) */}
+      <td className={`${TD} ${STICKY} bg-card-solid group-hover:bg-subtle`}>
+        <Link
+          href={`/comercial/pipeline/${r.id}`}
+          title={r.name}
+          className={`block truncate rounded font-semibold text-fg hover:text-accent hover:underline ${FOCUS}`}
+        >
+          {r.name}
+        </Link>
+        <span className="block truncate text-xs text-fg-secondary" title={accountName}>
+          {accountName}
+        </span>
+      </td>
+
+      {/* 2 · Responsable */}
+      <td className={TD}>
+        {ownerName ? (
+          <MemberAvatar size="sm" displayName={ownerName} />
+        ) : (
+          <span className="text-xs text-fg-secondary">Sin responsable</span>
+        )}
+      </td>
+
+      {/* 3 · Etapa — full-cell fill */}
+      <td className="relative h-12 border-b border-line p-0">
+        {targets.length > 0 ? (
+          <>
+            <label htmlFor={`pipeline-stage-${r.id}`} className="sr-only">
+              Etapa de «{r.name}»
+            </label>
+            <select
+              id={`pipeline-stage-${r.id}`}
+              value={r.stage}
+              onChange={(e) => onChangeStage(r, e.target.value as OpportunityStage)}
+              className="absolute inset-0 h-full w-full cursor-pointer appearance-none border-0 pl-3 pr-8 text-xs font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
+              style={fill}
+            >
+              <option value={r.stage} className="bg-card-solid text-fg">
+                {STAGE_LABELS[r.stage] ?? r.stage}
+              </option>
+              {targets.map((t) => (
+                <option key={t} value={t} className="bg-card-solid text-fg">
+                  {STAGE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={14}
+              aria-hidden="true"
+              className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-white"
+            />
+          </>
+        ) : (
+          <span
+            className="absolute inset-0 flex items-center px-3 text-xs font-semibold text-white"
+            style={fill}
+          >
+            {STAGE_LABELS[r.stage] ?? r.stage}
+          </span>
+        )}
+      </td>
+
+      {/* 4 · Valor estimado */}
+      <td className={`${TD} text-right tabular-nums`}>
+        {r.estimatedValue != null ? formatCLP(r.estimatedValue) : '—'}
+      </td>
+
+      {/* 5 · Fecha de creación */}
+      <td className={`${TD} tabular-nums text-fg-secondary`}>{formatSantiagoDate(r.createdAt)}</td>
+
+      {/* 6 · Fecha estimada de cierre */}
+      <td className={`${TD} tabular-nums`}>
+        {r.expectedCloseDate ? (
+          overdue ? (
+            <span className="inline-flex items-center gap-1 font-medium text-red-700 dark:text-red-400">
+              <AlertTriangle size={13} aria-hidden="true" />
+              {formatDbDate(r.expectedCloseDate)}
+              <span className="sr-only"> (vencida)</span>
+            </span>
+          ) : (
+            <span className="text-fg-secondary">{formatDbDate(r.expectedCloseDate)}</span>
+          )
+        ) : (
+          <span className="text-fg-secondary">—</span>
+        )}
+      </td>
+
+      {/* 8 · Cuenta (column 7 «Lead» arrives in ola 2) */}
+      <td className={TD}>
+        <Link
+          href={`/comercial/cuentas/${r.accountId}`}
+          title={accountName}
+          className={`block truncate rounded text-fg-secondary hover:text-fg hover:underline ${FOCUS}`}
+        >
+          {accountName}
+        </Link>
+      </td>
+
+      {/* 9 · Actualización — interim source lastMovementAt (ola 2: the api's lastUpdate) */}
+      <td className={`${TD} text-fg-secondary`}>
+        {r.lastMovementAt ? (
+          <span title={formatSantiagoDateTime(r.lastMovementAt)}>
+            {relativeDayLabel(r.lastMovementAt)}
+          </span>
+        ) : (
+          '—'
+        )}
+      </td>
+
+      {/* 10 · Probabilidad */}
+      <td className={TD}>
+        {r.probability != null ? (
+          <span className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-14 overflow-hidden rounded-full bg-subtle-hover"
+            >
+              <span
+                className="block h-full rounded-full bg-accent"
+                style={{ width: `${Math.max(0, Math.min(100, r.probability))}%` }}
+              />
+            </span>
+            <span className="tabular-nums">{r.probability}%</span>
+          </span>
+        ) : (
+          <span className="text-fg-secondary">—</span>
+        )}
+      </td>
+    </tr>
   );
 }
 

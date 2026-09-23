@@ -24,7 +24,7 @@ import {
 import { AssignAccountsModal } from '../../../../components/comercial/AssignAccountsModal';
 // Estado badge: the account status badge already renders ACTIVA / INACTIVA with the
 // house token styles, so the enterprise flag maps onto it (no new palette).
-import { StatusBadge } from '../../../../components/comercial/accountLabels';
+import { EnterpriseStatusBadge } from '../../../../components/comercial/EnterpriseStatusBadge';
 
 interface EnterpriseRow {
   id: string;
@@ -248,7 +248,7 @@ export default function EmpresasPage() {
                   <td className="px-4 py-3 text-[var(--text-secondary)]">{e.industry ?? '—'}</td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">{e.accountsCount}</td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={e.isActive ? 'ACTIVA' : 'INACTIVA'} />
+                    <EnterpriseStatusBadge isActive={e.isActive} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center justify-end gap-2">

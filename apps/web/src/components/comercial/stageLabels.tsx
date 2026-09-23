@@ -49,6 +49,16 @@ export const CLOSED_STAGES: OpportunityStage[] = ['GANADA', 'PERDIDA'];
 export const isActiveStage = (stage: string) => ACTIVE_STAGES.includes(stage as OpportunityStage);
 export const isClosedStage = (stage: string) => CLOSED_STAGES.includes(stage as OpportunityStage);
 
+/** COM-025 — the stages a card may move to (shared by CardMoveMenu and the table's stage
+ * cell): active → the other active stages + En Pausa + Ganada + Perdida; En Pausa → the
+ * five active stages; Ganada/Perdida → none (semi-terminal, Reabrir lives elsewhere). */
+export function stageMoveTargets(stage: string): OpportunityStage[] {
+  if (isActiveStage(stage))
+    return [...ACTIVE_STAGES.filter((s) => s !== stage), 'EN_PAUSA', 'GANADA', 'PERDIDA'];
+  if (stage === 'EN_PAUSA') return [...ACTIVE_STAGES];
+  return [];
+}
+
 /* LostReason enum (COM-005). "Canceló el proyecto" is the display for
    PROYECTO_CANCELADO; detail is required ONLY for OTRO (enforced in the modal AND
    ultimately by the backend 400). */

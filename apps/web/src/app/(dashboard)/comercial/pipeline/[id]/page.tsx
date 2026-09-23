@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, Pause, Play, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
 import { formatCLP, formatDate } from '../../../../../lib/formatters';
+import { formatDbDate } from '../../../../../lib/dates';
 import { useComercialPermissions } from '../../../../../hooks/useCanWrite';
 import {
   isActiveStage,
@@ -268,7 +269,7 @@ export default function OpportunityDetailPage() {
           />
           <KV
             label="Cierre estimado"
-            value={opp.expectedCloseDate ? formatDate(opp.expectedCloseDate) : '—'}
+            value={opp.expectedCloseDate ? formatDbDate(opp.expectedCloseDate) : '—'}
           />
           <KV label="Probabilidad" value={opp.probability != null ? `${opp.probability}%` : '—'} />
           <KV label="Responsable" value={ownerName ?? '—'} />
