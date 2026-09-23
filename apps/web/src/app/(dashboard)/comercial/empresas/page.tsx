@@ -22,8 +22,8 @@ import {
   type EnterpriseForForm,
 } from '../../../../components/comercial/EnterpriseFormModal';
 import { AssignAccountsModal } from '../../../../components/comercial/AssignAccountsModal';
-// Estado badge: the account status badge already renders ACTIVA / INACTIVA with the
-// house token styles, so the enterprise flag maps onto it (no new palette).
+// Estado badge: EnterpriseStatusBadge renders the enterprise's own Activa / Inactiva flag
+// (separate from the account status badge since COM-025, when ACTIVA became «Cliente»).
 import { EnterpriseStatusBadge } from '../../../../components/comercial/EnterpriseStatusBadge';
 
 interface EnterpriseRow {
@@ -153,7 +153,7 @@ export default function EmpresasPage() {
     );
   }
 
-  const cols = COLUMNS.length + 1; // "Acciones" always present (Ver cuentas is read-only)
+  const cols = COLUMNS.length + 1; // "Opciones" always present (Ver cuentas is read-only)
 
   return (
     <div className="pt-2">
@@ -214,7 +214,7 @@ export default function EmpresasPage() {
                 </th>
               ))}
               <th className="label px-4 py-3 text-right text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                Acciones
+                Opciones
               </th>
             </tr>
           </thead>

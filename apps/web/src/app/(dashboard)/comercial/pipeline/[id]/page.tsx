@@ -4,8 +4,8 @@ import { useMembers } from '../../../../../hooks/useMembers';
 
 /* COM-007b — the opportunity detail: the deal's operating center. Header + stage
  * actions (Pausar/Reanudar/Reabrir, canonical COM-005 endpoints), the read-only
- * fields, the "Servicios" bundle editor (COM-006), the Actividad timeline (COM-008),
- * and a Delete danger zone (COM-005 DELETE). ALL rules live in the backend — the UI
+ * fields, the "Acciones" list (COM-026's ActionList, right after the fields), the
+ * "Servicios" bundle editor (COM-006), and a Delete danger zone (COM-005 DELETE). ALL rules live in the backend — the UI
  * renders them and relays their 4xx messages, never re-implements them. Ability-driven
  * via /comercial/permissions. Tokens: accent #2563eb, Outfit headings, glass cards. */
 import { useCallback, useEffect, useState } from 'react';
@@ -22,7 +22,7 @@ import {
   LOST_REASON_LABELS,
   StageBadge,
 } from '../../../../../components/comercial/stageLabels';
-import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
+import { ActionList } from '../../../../../components/comercial/ActionList';
 import OpportunityNotes from './opportunity-notes';
 import OpportunityDocuments from './opportunity-documents';
 import { OpportunityBundle } from '../../../../../components/comercial/OpportunityBundle';
@@ -299,6 +299,21 @@ export default function OpportunityDetailPage() {
         )}
       </div>
 
+      {/* COM-026 — this opportunity's actions (pending / done): register, complete,
+          reopen, edit, delete. Gated by the activity flags inside ActionList. */}
+      <section className="mt-4" aria-labelledby="opportunity-actions-title">
+        <h2
+          id="opportunity-actions-title"
+          className="mb-3 text-sm font-semibold text-[var(--text-primary)]"
+          style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
+        >
+          Acciones
+        </h2>
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 sm:p-5">
+          <ActionList scope="opportunity" scopeId={opp.id} variant="full" />
+        </div>
+      </section>
+
       {/* COM-007b — service bundle (COM-006). Editable for writers on non-closed deals;
           closed deals show it frozen. Refreshing the opp keeps the header value in sync
           with the derived total. */}
@@ -324,19 +339,7 @@ export default function OpportunityDetailPage() {
         onQuotesChanged={handleQuotesChanged}
       />
 
-      {/* COM-008 — this opportunity's activity timeline. New entries derive the account
-          (not asked). */}
-      <div className="mt-4">
-        <h2
-          className="mb-3 text-sm font-semibold text-[var(--text-primary)]"
-          style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
-        >
-          Actividad
-        </h2>
-        <ActivityTimeline scope="opportunity" scopeId={opp.id} canWrite={canWrite} />
-      </div>
-
-      {/* COM-016 — internal note thread (distinct from the Actividad timeline). */}
+      {/* COM-016 — internal note thread (distinct from the Acciones list). */}
       <div className="mt-4">
         <h2
           className="mb-3 text-sm font-semibold text-[var(--text-primary)]"
@@ -373,8 +376,8 @@ export default function OpportunityDetailPage() {
             <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Eliminar la oportunidad y su paquete de servicios. Las actividades permanecen en
-                  la cuenta.
+                  Eliminar la oportunidad y su paquete de servicios. Las acciones permanecen en la
+                  cuenta.
                 </p>
                 {quotesExist && (
                   <p className="mt-1 text-[11px] text-[var(--text-secondary)]">

@@ -9,15 +9,15 @@ import { useAuth } from '../../../../../hooks/useAuth';
 import { useComercialPermissions } from '../../../../../hooks/useCanWrite';
 
 /* COM-016 — the internal note thread on a deal ("Notas"): free-text notes the team
- * writes ABOUT the opportunity, distinct from the Actividad timeline (dated interactions
- * WITH the client). Self-loading, mutate → refetch (the POST/PATCH body is never used as
+ * writes ABOUT the opportunity, distinct from the Acciones list (dated actions WITH the
+ * client, COM-026). Self-loading, mutate → refetch (the POST/PATCH body is never used as
  * state). Ability-driven: writes gate on the `opportunityNote` flags from
  * /comercial/permissions (useComercialPermissions — the same hook the page uses for the
  * activity flags). Author-only Editar (update + own); Eliminar on own notes (delete), or on
  * any note when `manageAny` (CASL `manage`, ADMIN/SUPER_ADMIN) — never a role string; the
  * backend enforces both rules regardless of what the UI shows. useAuth supplies ONLY the
  * current user id (own-note detection). Classnames
- * mirror ActivityTimeline verbatim so the UI-001 token sweep treats both sections alike. */
+ * mirrored COM-008's timeline (since replaced by ActionList) for the UI-001 token sweep. */
 
 interface OpportunityNote {
   id: string;

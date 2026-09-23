@@ -1,7 +1,7 @@
 'use client';
 
 /* COM-019 — Comercial dashboard (CRM-4): win rate, KPIs, pipeline by stage, lost reasons,
- * lost and top accounts, activities by type — all DERIVED LIVE by the API for a selectable
+ * lost and top accounts, actions by type — all DERIVED LIVE by the API for a selectable
  * range (GET comercial/dashboard?from&to). Read-only page, no mutations. Follows the
  * Finance dashboard's card / chart patterns (KpiCard markup, recharts with
  * useThemeTokens(), formatCLP) and the Cuentas list's table markup; token utilities only.
@@ -405,7 +405,7 @@ export default function ComercialDashboardPage() {
           )}
         </Card>
 
-        {/* Top accounts + activities */}
+        {/* Top accounts + actions by type */}
         <div className="space-y-4">
           <Card title="Cuentas top">
             {state === 'loading' ? (
@@ -448,7 +448,7 @@ export default function ComercialDashboardPage() {
               </table>
             )}
           </Card>
-          <Card title="Actividades por tipo">
+          <Card title="Acciones por tipo">
             {state === 'loading' ? (
               <Skeleton rows={3} />
             ) : !data || data.activitiesByType.length === 0 ? (

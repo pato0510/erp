@@ -1,18 +1,21 @@
 'use client';
 
-import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronDown, ChevronRight, Plus, Search } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Plus, Search } from 'lucide-react';
 import { formatCLP } from '../../lib/formatters';
 import {
   civilDate,
+  daysBetween,
   formatDbDate,
   formatSantiagoDate,
   relativeDayLabel,
+  santiagoDate,
   santiagoToday,
 } from '../../lib/dates';
 import { MemberAvatar } from '../shared/MemberAvatar';
 import { ColumnHelp } from './ColumnHelp';
+import { lastUpdateKindLabel } from './activityLabels';
 import { EnterpriseSelect, NO_ENTERPRISE } from './EnterpriseSelect';
 import { PipelineQuickAdd, type QuickAddBody } from './PipelineQuickAdd';
 import {
@@ -49,9 +52,16 @@ export type { PipelineRow } from './pipelineTableModel';
  * The stage cell is filled with the stage's accent (white text ≥ 4.9:1 on all eight);
  * writers get a native <select> over the same targets as CardMoveMenu, calling the
  * page's attemptMove — the kanban's own path. Quick add: Prospecto group (today's POST
- * creates at PROSPECTO) and every Cuenta group. Rows accept an optional full-width
- * detail row (expandedId + renderRowDetail) for ola 2's actions panel. Token utilities
- * only; hex only through stageLabels. */
+ * creates at PROSPECTO) and every Cuenta group. Token utilities only; hex only through
+ * stageLabels.
+ *
+ * COM-026 — the actions dropdown (Monday-subitem style): the opportunity name is a toggle
+ * that opens a full-width detail row rendered by the page (renderRowDetail → ActionList);
+ * the table owns the open set, so several rows stay open across refetches, sorting and
+ * Etapa ↔ Cuenta. The detail row's content is sticky at the left and exactly as wide as
+ * the scroll box (container query units), so it never needs horizontal scrolling. Row
+ * and group indicators show the api's pendingActions / overdueActions (display only) and
+ * «Actualización» reads the api's lastUpdate { at, kind }. */
 
 const CONTROL =
   'h-9 rounded-lg border border-line bg-card-solid px-3 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
@@ -71,6 +81,23 @@ const formatSantiagoDateTime = (iso: string) =>
   `${formatSantiagoDate(iso)} ${santiagoTime.format(new Date(iso))}`;
 
 const countLabel = (n: number) => `${n} ${n === 1 ? 'oportunidad' : 'oportunidades'}`;
+const pendingLabel = (n: number) => `${n} ${n === 1 ? 'pendiente' : 'pendientes'}`;
+const overdueSr = (n: number) => `, ${n} ${n === 1 ? 'vencida' : 'vencidas'}`;
+const RED_TEXT = 'text-red-700 dark:text-red-400';
+
+/** COM-026 — «N pendientes» (red + icon + sr-only «, N vencidas» when any is overdue). */
+function PendingCount({ pending, overdue }: { pending: number; overdue: number }) {
+  if (pending <= 0) return null;
+  return overdue > 0 ? (
+    <span className={`inline-flex items-center gap-1 font-medium ${RED_TEXT}`}>
+      <AlertTriangle size={12} aria-hidden="true" />
+      {pendingLabel(pending)}
+      <span className="sr-only">{overdueSr(overdue)}</span>
+    </span>
+  ) : (
+    <span>{pendingLabel(pending)}</span>
+  );
+}
 
 export function PipelineTable({
   rows,
@@ -85,7 +112,6 @@ export function PipelineTable({
   onNew,
   onAdd,
   onCreated,
-  expandedId = null,
   renderRowDetail,
 }: {
   rows: PipelineRow[];
@@ -103,8 +129,7 @@ export function PipelineTable({
   onAdd: (body: QuickAddBody) => Promise<boolean>;
   /** Refetch after a write. */
   onCreated: () => void;
-  /** Ola 2 — the row whose full-width detail row is open. */
-  expandedId?: string | null;
+  /** COM-026 — the content of a row's full-width actions panel. */
   renderRowDetail?: (row: PipelineRow) => ReactNode;
 }) {
   const [groupBy, setGroupBy] = useState<GroupBy>('stage');
@@ -117,8 +142,19 @@ export function PipelineTable({
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   // Skeleton only on the first load: a refetch after a write keeps the table mounted, so
   // focus (e.g. back on «+ Agregar oportunidad») survives it.
-  const loadedOnce = useRef(false);
-  if (!loading) loadedOnce.current = true;
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  useEffect(() => {
+    if (!loading) setLoadedOnce(true);
+  }, [loading]);
+  // COM-026 — rows whose actions panel is open (several at once, like Monday).
+  const [openRows, setOpenRows] = useState<Set<string>>(() => new Set());
+  const toggleRow = (id: string) =>
+    setOpenRows((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const q = filters.q.trim();
   const hasFilters = filters.ownerId !== '' || filters.enterprise !== '';
@@ -251,7 +287,7 @@ export function PipelineTable({
   );
 
   /* ── empty states ── */
-  const showSkeleton = loading && !loadedOnce.current;
+  const showSkeleton = loading && !loadedOnce;
   if (!showSkeleton && narrowing && groups.length === 0) {
     return (
       <div className="space-y-4">
@@ -291,7 +327,8 @@ export function PipelineTable({
       <div className="space-y-4">
         {toolbar}
         <div className="rounded-xl border border-line bg-card-solid px-6 py-10 text-center text-sm text-fg-secondary">
-          Aún no hay oportunidades. Crea la primera con «Agregar oportunidad».
+          Aún no hay oportunidades.
+          {canCreate && ' Crea la primera con «Agregar oportunidad».'}
         </div>
       </div>
     );
@@ -301,8 +338,9 @@ export function PipelineTable({
     <div className="space-y-4">
       {toolbar}
 
-      {/* relative: the sr-only (absolute) texts must stay inside the scroll box. */}
-      <div className="relative overflow-x-auto rounded-xl border border-line bg-card-solid">
+      {/* relative: the sr-only (absolute) texts must stay inside the scroll box.
+          container-type: the actions panel sizes itself to this box (100cqw). */}
+      <div className="relative overflow-x-auto rounded-xl border border-line bg-card-solid [container-type:inline-size]">
         <table className="w-full min-w-[1280px] table-fixed border-separate border-spacing-0 text-sm text-fg md:min-w-[1320px]">
           <caption className="sr-only">
             Pipeline agrupado por {groupBy === 'stage' ? 'etapa' : 'cuenta'}
@@ -396,7 +434,8 @@ export function PipelineTable({
                     />
                   ) : null
                 }
-                expandedId={expandedId}
+                openRows={openRows}
+                onToggleRow={toggleRow}
                 renderRowDetail={renderRowDetail}
               />
             ))
@@ -419,7 +458,8 @@ function GroupBody({
   nameOf,
   onChangeStage,
   quickAdd,
-  expandedId,
+  openRows,
+  onToggleRow,
   renderRowDetail,
 }: {
   group: RowGroup;
@@ -431,13 +471,18 @@ function GroupBody({
   nameOf: (userId: string | null | undefined) => string | null;
   onChangeStage: (row: PipelineRow, stage: OpportunityStage) => void;
   quickAdd: ReactNode;
-  expandedId: string | null;
+  openRows: Set<string>;
+  onToggleRow: (id: string) => void;
   renderRowDetail?: (row: PipelineRow) => ReactNode;
 }) {
   const bodyId = `pipeline-group-${group.kind}-${group.key}`;
   const isStage = group.kind === 'stage';
   const accent = isStage ? stageAccent(group.key) : undefined;
+  const groupName = isStage ? STAGE_LABELS[group.key] : group.label;
   const total = rows.reduce((acc, r) => acc + Number(r.estimatedValue ?? 0), 0);
+  // COM-026 — sums of the api's per-row counts (display, not re-derivation).
+  const pending = rows.reduce((acc, r) => acc + (r.pendingActions ?? 0), 0);
+  const overdue = rows.reduce((acc, r) => acc + (r.overdueActions ?? 0), 0);
   const valueIndex = COLUMNS.findIndex((c) => c.key === 'value');
 
   return (
@@ -467,13 +512,29 @@ function GroupBody({
             ) : (
               <span className="min-w-0 truncate text-sm font-semibold text-fg">{group.label}</span>
             )}
-            <span className="text-xs text-fg-secondary">
+            <span className="inline-flex flex-wrap items-center gap-x-1 text-xs text-fg-secondary">
               {countLabel(rows.length)}
               {isStage && isClosedStage(group.key) && ' · últimos 90 días'}
+              {pending > 0 && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <PendingCount pending={pending} overdue={overdue} />
+                </>
+              )}
             </span>
           </button>
         </th>
-        <td colSpan={N_COLS - 1} className="border-b border-line bg-subtle" />
+        {/* Collapsed: the group's Σ under «Valor estimado» (expanded, the footer has it). */}
+        <td colSpan={valueIndex - 1} className="border-b border-line bg-subtle" />
+        <td className="border-b border-line bg-subtle px-3 py-2 text-right text-xs font-semibold tabular-nums text-fg">
+          {!open && rows.length > 0 && (
+            <>
+              <span className="sr-only">Valor estimado total de {groupName}: </span>
+              {formatCLP(total)}
+            </>
+          )}
+        </td>
+        <td colSpan={N_COLS - valueIndex - 1} className="border-b border-line bg-subtle" />
       </tr>
 
       {open && (
@@ -486,24 +547,41 @@ function GroupBody({
               <td colSpan={N_COLS - 1} className={TD} />
             </tr>
           )}
-          {rows.map((r) => (
-            <Fragment key={r.id}>
-              <DataRow
-                row={r}
-                today={today}
-                canWrite={canWrite}
-                nameOf={nameOf}
-                onChangeStage={onChangeStage}
-              />
-              {expandedId === r.id && renderRowDetail && (
-                <tr>
-                  <td colSpan={N_COLS} className="border-b border-line p-0">
-                    {renderRowDetail(r)}
-                  </td>
-                </tr>
-              )}
-            </Fragment>
-          ))}
+          {rows.map((r) => {
+            const expanded = openRows.has(r.id) && !!renderRowDetail;
+            const panelId = `pipeline-actions-${r.id}`;
+            return (
+              <Fragment key={r.id}>
+                <DataRow
+                  row={r}
+                  today={today}
+                  canWrite={canWrite}
+                  nameOf={nameOf}
+                  onChangeStage={onChangeStage}
+                  expanded={expanded}
+                  panelId={panelId}
+                  onToggle={renderRowDetail ? () => onToggleRow(r.id) : undefined}
+                />
+                {expanded && renderRowDetail && (
+                  <tr id={panelId}>
+                    <td colSpan={N_COLS} className="border-b border-line bg-subtle p-0">
+                      {/* Sticky + as wide as the scroll box: the panel never scrolls sideways. */}
+                      <div className="sticky left-0 w-[100cqw] py-3 pl-3 pr-3 sm:pl-6 md:pl-10">
+                        <div
+                          role="region"
+                          aria-label={`Acciones de «${r.name}»`}
+                          className="border-l-[3px] pl-2 sm:pl-3 md:pl-4"
+                          style={{ borderLeftColor: stageAccent(r.stage) }}
+                        >
+                          {renderRowDetail(r)}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
           {quickAdd}
           <tr>
             {COLUMNS.map((c, i) => (
@@ -517,10 +595,7 @@ function GroupBody({
                 {i === 0 && 'Total'}
                 {i === valueIndex && (
                   <>
-                    <span className="sr-only">
-                      Valor estimado total de {isStage ? STAGE_LABELS[group.key] : group.label}
-                      :{' '}
-                    </span>
+                    <span className="sr-only">Valor estimado total de {groupName}: </span>
                     {formatCLP(total)}
                   </>
                 )}
@@ -535,18 +610,85 @@ function GroupBody({
 
 /* ── one opportunity ── */
 
+/** COM-026 — «Sin acción» / «N pendientes» under the account name. En Pausa and closed
+ *  rows show nothing (ALERT-001's rule: only the five active stages ask for a next step). */
+function ActionIndicator({ row: r }: { row: PipelineRow }) {
+  const pending = r.pendingActions ?? 0;
+  const overdue = r.overdueActions ?? 0;
+  if (pending > 0) {
+    return (
+      <span
+        className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[11px] font-medium ${
+          overdue > 0
+            ? 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300'
+            : 'bg-subtle-hover text-fg-secondary'
+        }`}
+      >
+        {overdue > 0 && <AlertTriangle size={11} aria-hidden="true" />}
+        {pendingLabel(pending)}
+        {overdue > 0 && <span className="sr-only">{overdueSr(overdue)}</span>}
+      </span>
+    );
+  }
+  if (isActiveStage(r.stage) && r.pendingActions !== undefined) {
+    return (
+      <span className="inline-flex shrink-0 rounded-full bg-red-100 px-1.5 py-px text-[11px] font-medium text-red-800 dark:bg-red-500/20 dark:text-red-300">
+        Sin acción
+      </span>
+    );
+  }
+  return null;
+}
+
+/** COM-026 — «Actualización»: relative day + what changed (the api's lastUpdate). Active
+ *  stages turn amber after 3 Santiago days and red after 7; the text says the days, so
+ *  colour is never the only signal. The exact date/time is a keyboard-reachable tip. */
+function LastUpdateCell({ row: r, today }: { row: PipelineRow; today: string }) {
+  const at = r.lastUpdate?.at ?? r.lastMovementAt ?? null;
+  if (!at) return <span className="text-fg-secondary">—</span>;
+  const days = daysBetween(santiagoDate(at), today);
+  const tone = !isActiveStage(r.stage)
+    ? 'text-fg-secondary'
+    : days > 7
+      ? `font-medium ${RED_TEXT}`
+      : days > 3
+        ? 'font-medium text-amber-700 dark:text-amber-400'
+        : 'text-fg-secondary';
+  return (
+    <span className="block min-w-0">
+      <ColumnHelp help={`Fecha exacta: ${formatSantiagoDateTime(at)}`}>
+        <span tabIndex={0} className={`block truncate rounded ${tone} ${FOCUS}`}>
+          {relativeDayLabel(at)}
+        </span>
+      </ColumnHelp>
+      {r.lastUpdate && (
+        <span className="block truncate text-xs text-fg-secondary">
+          {lastUpdateKindLabel(r.lastUpdate.kind)}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function DataRow({
   row: r,
   today,
   canWrite,
   nameOf,
   onChangeStage,
+  expanded,
+  panelId,
+  onToggle,
 }: {
   row: PipelineRow;
   today: string;
   canWrite: boolean;
   nameOf: (userId: string | null | undefined) => string | null;
   onChangeStage: (row: PipelineRow, stage: OpportunityStage) => void;
+  expanded: boolean;
+  panelId: string;
+  /** Opens / closes the row's actions panel (absent → the name is a plain link). */
+  onToggle?: () => void;
 }) {
   const accountName = r.account?.name ?? '—';
   const ownerName = r.ownerId ? (nameOf(r.ownerId) ?? 'Usuario desconocido') : null;
@@ -557,20 +699,44 @@ function DataRow({
 
   return (
     <tr className="group hover:bg-subtle">
-      {/* 1 · Oportunidad y Cuenta (sticky) */}
+      {/* 1 · Oportunidad y Cuenta (sticky): name = actions toggle, icon = ficha */}
       <td className={`${TD} ${STICKY} bg-card-solid group-hover:bg-subtle`}>
-        <Link
-          href={`/comercial/pipeline/${r.id}`}
-          title={r.name}
-          className={`block truncate rounded font-semibold text-fg hover:text-accent hover:underline ${FOCUS}`}
-        >
-          {r.name}
-        </Link>
-        <span className="block truncate text-xs text-fg-secondary" title={accountName}>
-          {accountName}
+        <div className="flex min-w-0 items-center gap-1">
+          {onToggle ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              aria-controls={expanded ? panelId : undefined}
+              title={r.name}
+              className={`flex min-w-0 flex-1 items-center gap-1 rounded text-left font-semibold text-fg hover:text-accent ${FOCUS}`}
+            >
+              <span className="shrink-0 text-fg-secondary" aria-hidden="true">
+                {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+              </span>
+              <span className="truncate">{r.name}</span>
+            </button>
+          ) : (
+            <span className="min-w-0 flex-1 truncate font-semibold text-fg" title={r.name}>
+              {r.name}
+            </span>
+          )}
+          <Link
+            href={`/comercial/pipeline/${r.id}`}
+            aria-label={`Abrir ficha de «${r.name}»`}
+            title="Abrir ficha"
+            className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-fg-secondary hover:bg-subtle-hover hover:text-accent ${FOCUS}`}
+          >
+            <ExternalLink size={13} aria-hidden="true" />
+          </Link>
+        </div>
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 pl-5">
+          <span className="min-w-0 truncate text-xs text-fg-secondary" title={accountName}>
+            {accountName}
+          </span>
+          <ActionIndicator row={r} />
         </span>
       </td>
-
       {/* 2 · Responsable */}
       <td className={TD}>
         {ownerName ? (
@@ -655,15 +821,9 @@ function DataRow({
         </Link>
       </td>
 
-      {/* 9 · Actualización — interim source lastMovementAt (ola 2: the api's lastUpdate) */}
-      <td className={`${TD} text-fg-secondary`}>
-        {r.lastMovementAt ? (
-          <span title={formatSantiagoDateTime(r.lastMovementAt)}>
-            {relativeDayLabel(r.lastMovementAt)}
-          </span>
-        ) : (
-          '—'
-        )}
+      {/* 9 · Actualización — the api's lastUpdate (COM-026) */}
+      <td className={TD}>
+        <LastUpdateCell row={r} today={today} />
       </td>
 
       {/* 10 · Probabilidad */}

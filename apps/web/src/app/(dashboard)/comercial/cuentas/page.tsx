@@ -10,9 +10,10 @@ import { useMembers } from '../../../../hooks/useMembers';
  * COM-018 — columns: Nombre de la cuenta · Empresa · Estado · Prioridad · Responsable ·
  * Creado · Último movimiento (DERIVED by the API, "—" when null; no server-side sort on
  * it in V1). "Empresa" filter (all / sin empresa / one). Row click (or Enter/Space on the
- * focused row, aria-expanded) toggles an inline accordion with the account's activities
- * (ActivityTimeline scope="account", lazy on first open, one row open at a time) and a
- * "Ver cuenta" link; the ficha is no longer the row's click target. */
+ * focused row, aria-expanded) toggles an inline accordion with the account's actions
+ * (ActionList scope="account", COM-026; lazy on first open, one row open at a time) and a
+ * "Ver cuenta" link; the ficha is no longer the row's click target. A write in the
+ * accordion refreshes the list SILENTLY (no loading state), so it stays open. */
 import { Fragment, Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -28,7 +29,7 @@ import {
   StatusBadge,
 } from '../../../../components/comercial/accountLabels';
 import { AccountFormModal } from '../../../../components/comercial/AccountFormModal';
-import { ActivityTimeline } from '../../../../components/comercial/ActivityTimeline';
+import { ActionList } from '../../../../components/comercial/ActionList';
 import { EnterpriseSelect, NO_ENTERPRISE } from '../../../../components/comercial/EnterpriseSelect';
 
 interface AccountRow {
@@ -74,8 +75,6 @@ function CuentasContent() {
   const { nameOf } = useMembers('all');
   const searchParams = useSearchParams();
   const canWrite = useCanWrite();
-  // COM-018 — the accordion's timeline gates Registrar/Editar/Eliminar on the activity flags.
-  const canWriteActivity = useCanWrite('activity');
   const [rows, setRows] = useState<AccountRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,28 +91,33 @@ function CuentasContent() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AccountRow | null>(null);
 
-  const fetchAccounts = useCallback(() => {
-    setIsLoading(true);
-    const params = new URLSearchParams();
-    if (statusFilter) params.set('status', statusFilter);
-    if (priorityFilter) params.set('priority', priorityFilter);
-    if (search.trim()) params.set('search', search.trim());
-    if (enterpriseFilter === NO_ENTERPRISE) params.set('noEnterprise', 'true');
-    else if (enterpriseFilter) params.set('enterpriseId', enterpriseFilter);
-    const qs = params.toString();
-    apiClient
-      .get<AccountRow[]>(`/api/comercial/accounts${qs ? `?${qs}` : ''}`)
-      .then((data) => {
-        setRows(data);
-        setError(null);
-        setForbidden(false);
-      })
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 403) setForbidden(true);
-        else setError('No se pudieron cargar las cuentas.');
-      })
-      .finally(() => setIsLoading(false));
-  }, [statusFilter, priorityFilter, search, enterpriseFilter]);
+  // silent (COM-026): a refresh after an action in the accordion — no loading state, so
+  // the open accordion is neither collapsed nor remounted.
+  const fetchAccounts = useCallback(
+    (silent = false) => {
+      if (!silent) setIsLoading(true);
+      const params = new URLSearchParams();
+      if (statusFilter) params.set('status', statusFilter);
+      if (priorityFilter) params.set('priority', priorityFilter);
+      if (search.trim()) params.set('search', search.trim());
+      if (enterpriseFilter === NO_ENTERPRISE) params.set('noEnterprise', 'true');
+      else if (enterpriseFilter) params.set('enterpriseId', enterpriseFilter);
+      const qs = params.toString();
+      apiClient
+        .get<AccountRow[]>(`/api/comercial/accounts${qs ? `?${qs}` : ''}`)
+        .then((data) => {
+          setRows(data);
+          setError(null);
+          setForbidden(false);
+        })
+        .catch((e) => {
+          if (e instanceof ApiError && e.status === 403) setForbidden(true);
+          else setError('No se pudieron cargar las cuentas.');
+        })
+        .finally(() => setIsLoading(false));
+    },
+    [statusFilter, priorityFilter, search, enterpriseFilter],
+  );
 
   useEffect(() => {
     fetchAccounts();
@@ -224,8 +228,8 @@ function CuentasContent() {
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+      {/* Table. container-type: the actions accordion sizes itself to this box (100cqw). */}
+      <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] [container-type:inline-size]">
         <table className="w-full text-sm">
           <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>
@@ -239,7 +243,7 @@ function CuentasContent() {
               ))}
               {canWrite && (
                 <th className="label px-4 py-3 text-right text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">
-                  Acciones
+                  Opciones
                 </th>
               )}
             </tr>
@@ -267,7 +271,7 @@ function CuentasContent() {
             ) : (
               rows.map((a) => {
                 const expanded = expandedId === a.id;
-                const panelId = `account-activities-${a.id}`;
+                const panelId = `account-actions-${a.id}`;
                 return (
                   <Fragment key={a.id}>
                     <tr
@@ -358,29 +362,34 @@ function CuentasContent() {
                         </td>
                       )}
                     </tr>
-                    {/* COM-018 — inline accordion: the account's activities (newest-first) +
+                    {/* COM-018 — inline accordion: the account's actions (COM-026) +
                         "Ver cuenta". Mounted only while open → lazy on first open. */}
                     {expanded && (
                       <tr id={panelId}>
-                        <td colSpan={cols} className="bg-subtle px-4 py-4">
-                          <div className="mb-3 flex items-center justify-between gap-3">
-                            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
-                              Actividad de {a.name}
-                            </p>
-                            <Link
-                              href={`/comercial/cuentas/${a.id}`}
-                              onClick={(ev) => ev.stopPropagation()}
-                              className="inline-flex items-center gap-1 text-sm font-medium hover:underline"
-                              style={{ color: 'var(--color-accent)' }}
-                            >
-                              Ver cuenta <ExternalLink size={13} />
-                            </Link>
+                        <td colSpan={cols} className="bg-subtle p-0">
+                          {/* COM-026 — as wide as the table's box, so a narrow screen never
+                              hides part of the actions panel. */}
+                          <div className="sticky left-0 w-[100cqw] px-4 py-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                                Acciones de {a.name}
+                              </p>
+                              <Link
+                                href={`/comercial/cuentas/${a.id}`}
+                                onClick={(ev) => ev.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-sm font-medium hover:underline"
+                                style={{ color: 'var(--color-accent)' }}
+                              >
+                                Ver cuenta <ExternalLink size={13} />
+                              </Link>
+                            </div>
+                            <ActionList
+                              scope="account"
+                              scopeId={a.id}
+                              variant="full"
+                              onChanged={() => fetchAccounts(true)}
+                            />
                           </div>
-                          <ActivityTimeline
-                            scope="account"
-                            scopeId={a.id}
-                            canWrite={canWriteActivity}
-                          />
                         </td>
                       </tr>
                     )}

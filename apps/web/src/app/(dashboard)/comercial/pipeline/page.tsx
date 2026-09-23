@@ -30,7 +30,10 @@ import { useMembers } from '../../../../hooks/useMembers';
  * POSTs through onAdd (the creator is the default Responsable), and the header's
  * «Nueva oportunidad» shows only in kanban view (the table has its own «Agregar
  * oportunidad»). The kanban's fetch and rendering are untouched except the close-date
- * line (formatDbDate: a @db.Date no longer renders one day early). */
+ * line (formatDbDate: a @db.Date no longer renders one day early).
+ *
+ * COM-026 — every table row opens its actions (ActionList, compact) under it; a write
+ * there refetches the list so the pending indicators and «Actualización» follow. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KanbanSquare, LayoutList, Play, Plus, RotateCcw } from 'lucide-react';
@@ -56,6 +59,8 @@ import { LostReasonModal } from '../../../../components/comercial/LostReasonModa
 import { CardMoveMenu } from '../../../../components/comercial/CardMoveMenu';
 // COM-025 — the grouped table view (Etapa | Cuenta) with its quick-add row.
 import { PipelineTable } from '../../../../components/comercial/PipelineTable';
+// COM-026 — each table row's actions dropdown.
+import { ActionList } from '../../../../components/comercial/ActionList';
 import type { QuickAddBody } from '../../../../components/comercial/PipelineQuickAdd';
 
 interface Opportunity {
@@ -75,6 +80,10 @@ interface Opportunity {
   createdAt: string; // COM-025 — «Fecha de creación» column
   updatedAt: string;
   lastMovementAt?: string | null; // COM-020 — derived by the API
+  // COM-026 — derived by the API (COM-022): the row / group indicators and «Actualización».
+  pendingActions?: number;
+  overdueActions?: number;
+  lastUpdate?: { at: string; kind: string } | null;
   account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null; // COM-020
 }
 interface AccountRow {
@@ -451,6 +460,14 @@ export default function PipelinePage() {
           onNew={() => setNewModal(true)}
           onAdd={addFromTable}
           onCreated={fetchOpps}
+          renderRowDetail={(row) => (
+            <ActionList
+              scope="opportunity"
+              scopeId={row.id}
+              variant="compact"
+              onChanged={fetchOpps}
+            />
+          )}
         />
       ) : (
         <>

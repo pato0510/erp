@@ -64,8 +64,8 @@ export function DeleteOpportunityModal({
           <ul className="list-disc space-y-1 pl-5">
             <li>Se elimina también su paquete de servicios.</li>
             <li>
-              Las actividades registradas permanecen en la línea de tiempo de la cuenta (quedan
-              desvinculadas de la oportunidad).
+              Las acciones registradas permanecen en la cuenta (quedan desvinculadas de la
+              oportunidad).
             </li>
             <li>
               Si la oportunidad tiene cotizaciones, no puede eliminarse (son documentos

@@ -3,7 +3,8 @@
 /* COM-004b — Account ficha. Tabbed from day one (mirrors the RRHH worker ficha):
  * header + a config-driven TABS array. "Datos generales" (inline, pure display +
  * counterparty link section) and "Contactos" (self-loading). Future tabs
- * (Oportunidades, Actividad) append to TABS with one line each. Write controls are
+ * (Oportunidades, …) append to TABS with one line each. COM-026: «Acciones» is the
+ * account's actions (ActionList scope="account", gated by the activity flags). Write controls are
  * role-gated via useCanWrite (ACCOUNTANT sees everything read-only). Tokens:
  * accent #2563eb, Outfit headings, glassmorphism cards. */
 import { useCallback, useEffect, useState } from 'react';
@@ -19,7 +20,7 @@ import {
 } from '../../../../../components/comercial/accountLabels';
 import { AccountFormModal } from '../../../../../components/comercial/AccountFormModal';
 import AccountContactsTab from '../../../../../components/comercial/AccountContactsTab';
-import { ActivityTimeline } from '../../../../../components/comercial/ActivityTimeline';
+import { ActionList } from '../../../../../components/comercial/ActionList';
 
 interface Account {
   id: string;
@@ -44,7 +45,7 @@ interface Account {
 const TABS = [
   { key: 'datos', label: 'Datos generales' },
   { key: 'contactos', label: 'Contactos' },
-  { key: 'actividad', label: 'Actividad' },
+  { key: 'acciones', label: 'Acciones' },
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
 
@@ -170,7 +171,11 @@ export default function AccountFichaPage() {
         <AccountDatosTab account={account} canWrite={canWrite} onChanged={load} />
       )}
       {tab === 'contactos' && <AccountContactsTab accountId={id} canWrite={canWrite} />}
-      {tab === 'actividad' && <ActivityTimeline scope="account" scopeId={id} canWrite={canWrite} />}
+      {tab === 'acciones' && (
+        <div className="rounded-xl border border-line bg-card p-4 sm:p-5">
+          <ActionList scope="account" scopeId={id} variant="full" />
+        </div>
+      )}
     </div>
   );
 }

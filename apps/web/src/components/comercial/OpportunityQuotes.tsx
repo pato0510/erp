@@ -189,7 +189,7 @@ export function OpportunityQuotes({
       await apiClient.patch(`/api/comercial/quotes/${quoteId}/status`, { status });
       if (status === 'ACEPTADA') {
         setNudge(
-          'Cotización aceptada. La oportunidad puede marcarse como Ganada con las acciones de etapa de arriba.',
+          'Cotización aceptada. La oportunidad puede marcarse como Ganada con los botones de etapa de arriba.',
         );
       }
       await loadQuotes();
@@ -617,7 +617,7 @@ function QuoteDetailPanel({
       )}
       {canWrite && isTerminalQuote(detail.status) && (
         <p className="border-t border-[var(--border-color)] pt-3 text-xs text-[var(--text-secondary)]">
-          Documento en estado final: sin más acciones.
+          Documento en estado final: sin más cambios.
         </p>
       )}
     </div>

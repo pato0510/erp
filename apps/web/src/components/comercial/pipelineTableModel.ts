@@ -17,6 +17,10 @@ export interface PipelineRow {
   createdAt: string;
   updatedAt: string;
   lastMovementAt?: string | null;
+  // COM-026 — derived by the api (COM-022); displayed, never recomputed.
+  pendingActions?: number;
+  overdueActions?: number;
+  lastUpdate?: { at: string; kind: string } | null;
   account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null;
 }
 
@@ -50,7 +54,7 @@ export const COLUMNS: ColumnDef[] = [
   {
     key: 'opportunity',
     label: 'Oportunidad y Cuenta',
-    help: 'Nombre de la oportunidad y cuenta asociada.',
+    help: 'Nombre de la oportunidad y su cuenta. Clic en el nombre para ver y registrar sus acciones.',
     sort: 'name',
     width: 'w-[200px] md:w-[240px]',
   },
@@ -97,7 +101,7 @@ export const COLUMNS: ColumnDef[] = [
   {
     key: 'updated',
     label: 'Actualización',
-    help: 'Cuándo fue el último cambio registrado en la oportunidad.',
+    help: 'Último cambio registrado en la oportunidad y qué fue.',
     sort: 'updated',
     width: 'w-[128px]',
   },
@@ -190,7 +194,7 @@ function sortValue(r: PipelineRow, key: SortKey): number | string | null {
       // Civil date string compares correctly as text (YYYY-MM-DD).
       return r.expectedCloseDate ? r.expectedCloseDate.slice(0, 10) : null;
     case 'updated':
-      return time(r.lastMovementAt);
+      return time(r.lastUpdate?.at ?? r.lastMovementAt);
     case 'probability':
       return r.probability;
   }
