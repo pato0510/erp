@@ -9,6 +9,8 @@ import { UsersService } from './users.service';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshStrategy } from './strategies/refresh.strategy';
+import { MembersController } from './members.controller';
+import { MembersService } from './members.service';
 
 @Module({
   imports: [
@@ -20,8 +22,15 @@ import { RefreshStrategy } from './strategies/refresh.strategy';
       },
     }),
   ],
-  controllers: [AuthController, UsersController],
-  providers: [AuthService, UsersService, LocalStrategy, JwtStrategy, RefreshStrategy],
-  exports: [AuthService, UsersService],
+  controllers: [AuthController, UsersController, MembersController],
+  providers: [
+    AuthService,
+    UsersService,
+    LocalStrategy,
+    JwtStrategy,
+    RefreshStrategy,
+    MembersService,
+  ],
+  exports: [AuthService, UsersService, MembersService],
 })
 export class IamModule {}
