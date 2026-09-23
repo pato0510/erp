@@ -587,8 +587,8 @@ function NotFoundScreen() {
         textAlign: 'center',
       }}
     >
-      {/* UI-003 — centered space → vertical brand, theme-following. */}
-      <ExcelsiaLogo variant="vertical" tone="auto" height={120} alt="Excelsia" />
+      {/* BRAND-001 — centered space → stacked lockup at the guide's 200 px minimum. */}
+      <ExcelsiaLogo variant="stacked" tone="auto" width={200} alt="Excelsia" />
       <h1
         style={{
           marginTop: 32,

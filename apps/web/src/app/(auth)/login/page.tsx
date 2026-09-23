@@ -86,11 +86,12 @@ export default function LoginPage() {
 
         <main className="sw-stage">
           <section className="sw-card">
-            {/* Logo — UI-003: vertical brand ("marca principal" for centered spaces). The
+            {/* Logo — BRAND-001: stacked lockup (isotipo + logotipo, spacing from the
+                designer's horizontal file) at 220 px, above the guide's 200 px minimum. The
                 login surface is dark in BOTH themes (black starfield / navy), so the
-                inverse asset is the guide's correct choice here, not the color one. */}
+                inverse assets are the guide's correct choice here, not the color ones. */}
             <div className="sw-logo">
-              <ExcelsiaLogo variant="vertical" tone="inverse" height={160} alt="Excelsia" />
+              <ExcelsiaLogo variant="stacked" tone="inverse" width={220} alt="Excelsia" />
             </div>
 
             <p className="sw-tagline">

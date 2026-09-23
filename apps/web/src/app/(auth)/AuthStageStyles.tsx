@@ -317,6 +317,10 @@ export function AuthStageStyles() {
           .sw-tagline {
             font-size: 12.5px;
           }
+          /* BRAND-001 — iOS zooms a focused input under 16px (as /cambiar-clave already did). */
+          .sw-field__input {
+            font-size: 16px;
+          }
         }
       `}</style>
     </>

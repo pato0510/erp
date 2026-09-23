@@ -137,8 +137,7 @@ bloque de su módulo; este bloque es el índice del sprint.
 
 ## Deudas y pendientes
 
-- (siguiente hueco libre) Endpoint de directorio de miembros: los mapas de autor
-  degradan a UUID corto para no-admins porque `/api/users` exige `manage User`.
+- Directorio de miembros: entregado en MEM-001; la sustitución de /api/users y de los UUID abreviados en pantallas queda para MEM-002.
 - (siguiente hueco libre) Helper de fecha Santiago duplicado en tres módulos
   (actividades, todos, alertas comercial) → uno en `common`.
 - (V2) El giro debe ingresarse a mano mientras el RCV no lo traiga.
@@ -152,7 +151,7 @@ bloque de su módulo; este bloque es el índice del sprint.
 - (pendiente de preferencia del fundador) La columna "Industria" salió del
   listado de Cuentas (sigue en ficha y formulario).
 
-Última actualización: 2026-09-17 (DOC-S17-CLOSE)
+Última actualización: 2026-09-23 (MEM-001: deuda del directorio de miembros)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -171,13 +170,16 @@ AUTH-001 · 2 AUTH-002 → BRAND-001 ∥ HUB-007 · 3 HUB-008 ∥ MEM-001 → GO
 acciones, Lead, reglas); S21 Configuración de empresa + áreas unificadas +
 calendario total.
 
-| Ticket   | Título corto                                                                                                                                  | Ola | Detalle                                   |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --- | ----------------------------------------- |
-| HUB-006  | Fondo «espacio» compartido login + hub, persistente al entrar                                                                                 | 1   | § Hub — Sprint 18, subsección HUB-006     |
-| AUTH-001 | Recuperar acceso V1 (api): restablecimiento por admin con clave temporal + cambio obligatorio, cambio de contraseña propio, versión de sesión | 1   | § Credenciales y sesiones (AUTH-001)      |
-| AUTH-002 | Recuperar acceso V1 (web): /cambiar-clave (obligatorio y voluntario) y «Restablecer acceso» con clave temporal de un solo uso en Usuarios     | 2   | § Credenciales y sesiones, AUTH-002 (web) |
+| Ticket    | Título corto                                                                                                                                  | Ola | Detalle                                   |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --- | ----------------------------------------- |
+| HUB-006   | Fondo «espacio» compartido login + hub, persistente al entrar                                                                                 | 1   | § Hub — Sprint 18, subsección HUB-006     |
+| AUTH-001  | Recuperar acceso V1 (api): restablecimiento por admin con clave temporal + cambio obligatorio, cambio de contraseña propio, versión de sesión | 1   | § Credenciales y sesiones (AUTH-001)      |
+| AUTH-002  | Recuperar acceso V1 (web): /cambiar-clave (obligatorio y voluntario) y «Restablecer acceso» con clave temporal de un solo uso en Usuarios     | 2   | § Credenciales y sesiones, AUTH-002 (web) |
+| BRAND-001 | Lockup apilado del login (isotipo + logotipo del kit, aire del horizontal del diseñador)                                                      | 2   | § Marca, Lockup apilado (BRAND-001)       |
+| HUB-007   | Escenas C · Barrido redibujadas desde el prototipo: SVG fijo 96×52 a escala 1:1                                                               | 2   | § Hub — Sprint 18, HUB-007                |
+| MEM-001   | Directorio común de miembros: GET /api/members (+ alias), useMembers, MemberAvatar                                                            | 2   | § Members — exposición firmada            |
 
-Última actualización: 2026-09-22 (AUTH-002)
+Última actualización: 2026-09-23 (BRAND-001 + HUB-007 + MEM-001)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -438,17 +440,49 @@ apps/web/src/app/(dashboard)/operaciones/
 
 ### Marca (UI-003, 2026-09-17)
 
-- Assets del kit en `apps/web/public/brand/` (7 SVG: horizontal/vertical/isotipo en
-  color e inverso, isotipo blanco) e íconos en `apps/web/public/` (`favicon.ico`,
+- Assets del kit en `apps/web/public/brand/` (10 SVG: horizontal/vertical/isotipo en
+  color e inverso, isotipo blanco; logotipo en color, inverso y blanco desde BRAND-001) e íconos en `apps/web/public/` (`favicon.ico`,
   `favicon.svg`, `apple-touch-icon.png`), expuestos vía `metadata.icons` del layout raíz.
 - `ExcelsiaLogo` los renderiza con `<img>`: `variant` horizontal | vertical | isotype,
   `tone` auto | color | inverse | white; `auto` = color en claro e inverso en `html.dark`
   vía CSS (`dark:hidden`/`dark:block`), sin JS ni flicker. Ancho = alto × ratio del archivo.
-- Uso por superficie: login (vertical) y hub (isotipo) en `inverse` porque son oscuros en
+- Uso por superficie: login (apilado, BRAND-001) y hub (isotipo) en `inverse` porque son oscuros en
   AMBOS temas; sidebars isotipo `white` (gradiente steel/navy); páginas públicas `auto`.
 - Mínimos de la guía: horizontal 240 px de ancho, isotipo 32 px (el sidebar usa 22 px por
   su altura fija — excepción registrada); nunca estirar, rotar ni aplicar filtros/recolor.
   El acento de la app (`#2563eb`) no cambia; el azul de marca `#92A6BD` vive solo en los SVG.
+
+**Lockup apilado (BRAND-001, 2026-09-23).** Motivo (fundador, 2026-09-22): «El logo de
+Excelsia está muy pegado a las letras EXCELSIA en el login; corregir.» El archivo vertical
+es el lockup del diseñador con su espaciado horneado y la guía prohíbe editarlo, así que
+`ExcelsiaLogo` suma `variant="wordmark"` (archivos `excelsia_logotipo_*`, 1300×330) y
+`variant="stacked"`: isotipo sobre logotipo, centrados, compuestos desde los dos archivos
+oficiales de un solo elemento con sus márgenes intactos y un solo prop de tamaño (`width` =
+ancho de la imagen del logotipo). Medido en Chromium (cajas de elemento; el barrido de
+píxeles coincide ±1 px), en unidades de archivo: isotipo 740×740, símbolo visible 516,86×540
+con márgenes 111,57 a los lados y 100 arriba/abajo; logotipo 1300×330, letras visibles
+1120×147,15 con márgenes 90 a los lados y 91,43 arriba/abajo. Relaciones: r_h = 85 ÷ 318,66
+= **0,2667** (hueco visible ÷ altura visible del isotipo en el horizontal: el ritmo del
+diseñador); r_v = 45,87 ÷ 541 = **0,0848** (el vertical, lo que se veía apretado); k = 541 ÷
+1098 = **0,4927** (altura visible del isotipo ÷ ancho visible del logotipo en el vertical: la
+proporción que se conserva). Decisión del director (opción A): hueco visible = r_h × altura
+visible del isotipo. Razón: los márgenes de cada archivo son zona de resguardo AISLADA, no
+espaciado de lockup — el propio vertical del diseñador pone las letras a 45,87 u del
+símbolo, muy dentro del margen de 100 u del isotipo. Dentro del lockup el espaciado se mide
+visible a visible y el lockup conserva como resguardo los márgenes exteriores (isotipo
+arriba y a los lados, logotipo abajo y a los lados), que es lo que protege «Mantén libres los
+márgenes incluidos en los archivos». Regla: las dos imágenes se solapan SOLO en sus márgenes
+transparentes (desplazamiento negativo del logotipo calculado por `stackedGeometry()` desde
+constantes nombradas `STACKED`), nada se recorta ni se edita, y la caja del contenedor = la
+unión de ambas imágenes, fijada de antemano (sin salto de layout). Un solo nombre accesible
+(el isotipo lleva `alt`, el logotipo es decorativo). Login: `width={220}` en `inverse` →
+caja 220×176 (antes 209×160 del vertical), isotipo visible 93,4 px, letras visibles 189,5 px
+(antes 183), hueco visible 24,9 px (antes 7,6), solape −7,9 px; sin scroll a 1440×900 ni a
+390×844. `/cambiar-clave` sigue sin logo. Página pública del QR (`NotFoundScreen` de
+`/p/asset/[qrToken]`): `stacked` `auto` con `width={200}` (mínimo de la guía; antes vertical
+de 157×120, ahora 200×160). Los archivos y la variante `vertical` se conservan pero YA NO se
+usan en la app: no reutilizarlos en superficies nuevas sin el diseñador. **Pendiente de
+validación del diseñador.**
 
 ### Hub — Sprint 18 (Alternativa C)
 
@@ -535,8 +569,7 @@ apps/web/src/app/(dashboard)/operaciones/
 - HUB-002 — Escenas «C · Barrido» y estado vivo en las tarjetas (2026-09-17):
   `HubScene` selecciona siete escenas por `hubKey`, con cuadrícula de 17 px,
   etiquetas en la fuente de la app y trazos en `--card-ink` / `--card-border`.
-  Capa decorativa `aria-hidden`, sin interceptar puntero; SVG `240×240`, gráfico
-  acotado sobre el contenido y bajo la flecha. Secuencia CSS de una iteración:
+  Capa decorativa `aria-hidden`, sin interceptar puntero. HUB-007 (2026-09-23): las siete escenas se redibujaron desde las referencias del prototipo (docs/design/hub-c/). SVG fijo width=96 height=52 viewBox="0 0 96 52", en top:44px / right:28px, escala 1:1. PROHIBIDO estirar, escalar o usar vector-effect: con pathLength=1 los guiones se calculan en espacio de usuario y, estirados, las conexiones quedan dibujadas a medias (62–74 % del largo en una tarjeta de 384 px). Máximo cinco nodos por glifo; etiquetas, retícula, clip, opacidades y tiempos de C · Barrido sin cambios; con movimiento reducido, composición terminada. Secuencia CSS de una iteración:
   opacidad `0.55` → `0.87` en 160 ms; barrido 1050 ms tras 100 ms; etiquetas
   220 ms tras 180/540 ms; conexiones 650 ms tras 350 ms; nodos escalonados,
   fin máximo 1330 ms. Sin bucles; al salir queda la composición terminada y
@@ -636,7 +669,7 @@ gateadas por módulo) y superficies web.
 - `Starfield` NO respeta `prefers-reduced-motion` (titila y hace fade igual);
   comportamiento previo, sin cambios.
 
-Última actualización: 2026-09-22 (HUB-006 + AUTH-001)
+Última actualización: 2026-09-23 (HUB-007)
 
 ## Plan de sprints del módulo
 
@@ -1029,6 +1062,9 @@ Puntos clave:
   `app/modulos/page.tsx`, `styles/tokens.css`.
 - AUTH-001 — Recuperar acceso V1, api (2026-09-22; Sprint 19, ola 1; Codex): doctrina en § Credenciales y sesiones. Archivos: prisma/schema/iam.prisma, la migración, iam/{auth.controller,auth.service,users.controller,users.service,password-policy}.ts, iam/dto/{change-password,create-user,update-user}.dto.ts, iam/strategies/{jwt,refresh}.strategy.ts, iam/guards/jwt-auth.guard.ts, el decorador AllowPendingPasswordChange, common/guards/policies.guard.ts, common/filters/sentry-exception.filter.ts y sus specs.
 - AUTH-002 — Recuperar acceso V1, web (2026-09-22; Sprint 19, ola 2): doctrina en § Credenciales y sesiones, AUTH-002 (web). Archivos: `app/(auth)/cambiar-clave/page.tsx`, `app/(auth)/AuthStageStyles.tsx`, `app/(auth)/login/page.tsx`, `app/(dashboard)/configuracion/usuarios/page.tsx`, `components/SpaceBackdrop.tsx`, `components/shared/PasswordChecklist.tsx`, `components/sidebars/SidebarChangePassword.tsx` + los siete `*Sidebar.tsx`, `hooks/useAuth.ts`, `lib/api.ts`, `lib/password-policy.ts`.
+- BRAND-001 — Lockup apilado del login (2026-09-23; Sprint 19, ola 2): isotipo + logotipo del kit con el aire del horizontal del diseñador (opción A del director), doctrina en § Marca, Lockup apilado (BRAND-001). Archivos: `components/shared/ExcelsiaLogo.tsx`, `app/(auth)/login/page.tsx`, `app/(auth)/AuthStageStyles.tsx` (inputs de 16 px en móvil), `app/p/asset/[qrToken]/page.tsx`; `public/brand/excelsia_logotipo_{color,inverso,blanco}.svg` (archivos del kit, sin editar).
+- HUB-007 — Escenas C · Barrido redibujadas desde el prototipo (2026-09-23; Sprint 19, ola 2; Codex): SVG fijo 96×52 a escala 1:1, conexiones completas; QA Chromium + WebKit a 1440/390. Archivos: components/hub/HubScene.module.css, components/hub/scenes/SceneFrame.tsx, components/hub/scenes/{finanzas,operaciones,hsec,comercial,marketing,rrhh,gestion}Scene.tsx, docs/design/hub-c/ (2 PNG de referencia).
+- MEM-001 — Directorio común de miembros (2026-09-23; Sprint 19, ola 2; Codex): GET /api/members en IAM, alias /actividades/members, useMembers, MemberAvatar. Archivos: iam/{members.controller,members.service}.ts, iam/dto/members-query.dto.ts, sus specs, iam/iam.module.ts, actividades/{actividades.controller,actividades.module}.ts; eliminados actividades/members/members-read.{service,module}.ts; web hooks/useMembers.ts, components/shared/MemberAvatar.tsx.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -1194,7 +1230,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-22 (AUTH-002)
+Última actualización: 2026-09-23 (BRAND-001 + HUB-007 + MEM-001)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1332,12 +1368,7 @@ Puntos clave:
   CAL-008b — jamás la fecha UTC, que se dispara en la tarde chilena;
   precedente CHILE_IVA_RATE; tz por empresa = semilla V2). La UI pinta el
   flag del servidor, JAMÁS lo recomputa.
-- Members — EXPOSICIÓN FIRMADA (2026-07-21): GET /actividades/members →
-  { userId, displayName } ESTRUCTURAL (jamás email/rol/estado), gate read
-  CalendarActivity (los seis roles — todo lector de la tabla resuelve
-  nombres). Lee Membership/User (infra común, no frontera de módulo de
-  negocio). displayName = "firstName lastName", fallback al local-part del
-  email.
+- Members — EXPOSICIÓN FIRMADA (2026-07-21; promovida por MEM-001, 2026-09-23): GET /api/members?scope=all|active → [{ userId, displayName }] ESTRUCTURAL, jamás email/rol/estado. JwtAuthGuard + PoliciesGuard + @CheckPolicies(() => true): cualquier miembro activo de la empresa, de los seis roles. scope=all (default) conserva miembros inactivos para la historia; active filtra Membership.isActive para pickers. Orden apellido/nombre. Lee Membership→User dentro de executeWithRls(companyId, userId), con companyId explícito. displayName = "firstName lastName" recortado, fallback al local-part del email. GET /api/actividades/members queda como alias de scope=all y conserva read CalendarActivity. /todos/assignees mantiene su contrato y su política. Web: useMembers (caché por empresa+scope, refresh, nameOf devuelve null — jamás un UUID) y MemberAvatar (iniciales, nombre accesible, solo tokens).
 - Bitácora — EDICIÓN LIBRE (revertido por el fundador 2026-07-22:
   edición/borrado libre por writers; auditoría conserva el contenido previo).
   CAL-009 la lanzó INMUTABLE (sin updatedAt, sin rutas de edición/borrado);
@@ -1487,7 +1518,7 @@ Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB
   TypeScript, builds y Prettier aprobados; QA con fixtures en claro y oscuro,
   incluidos alcance de `VIEWER`, estados vacíos y teclado.
 
-Última actualización: 2026-09-17 (ALERT-002 — Alertas de Gestión organizacional)
+Última actualización: 2026-09-23 (MEM-001 — Members promovido a directorio común)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -2118,8 +2149,8 @@ las dos planillas de roles, el plan firmado, el ledger diferido y el checklist d
 primera hora). handoff-1 queda como HISTORIA: sigue siendo válido en sus
 correcciones en sitio, pero ya no es el punto de entrada.
 
-Última actualización: 2026-08-10 (DOC-HARDEN-004 — firmas, incidentes y
-correcciones de sesión)
+Última actualización: 2026-09-22 (AUTH-001 + AUTH-002 — § Credenciales y sesiones; antes
+2026-08-10, DOC-HARDEN-004)
 
 # Próximos pasos
 
