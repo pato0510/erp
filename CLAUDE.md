@@ -171,12 +171,13 @@ AUTH-001 · 2 AUTH-002 → BRAND-001 ∥ HUB-007 · 3 HUB-008 ∥ MEM-001 → GO
 acciones, Lead, reglas); S21 Configuración de empresa + áreas unificadas +
 calendario total.
 
-| Ticket   | Título corto                                                                                                                                  | Ola | Detalle                               |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------- |
-| HUB-006  | Fondo «espacio» compartido login + hub, persistente al entrar                                                                                 | 1   | § Hub — Sprint 18, subsección HUB-006 |
-| AUTH-001 | Recuperar acceso V1 (api): restablecimiento por admin con clave temporal + cambio obligatorio, cambio de contraseña propio, versión de sesión | 1   | § Credenciales y sesiones (AUTH-001)  |
+| Ticket   | Título corto                                                                                                                                  | Ola | Detalle                                   |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --- | ----------------------------------------- |
+| HUB-006  | Fondo «espacio» compartido login + hub, persistente al entrar                                                                                 | 1   | § Hub — Sprint 18, subsección HUB-006     |
+| AUTH-001 | Recuperar acceso V1 (api): restablecimiento por admin con clave temporal + cambio obligatorio, cambio de contraseña propio, versión de sesión | 1   | § Credenciales y sesiones (AUTH-001)      |
+| AUTH-002 | Recuperar acceso V1 (web): /cambiar-clave (obligatorio y voluntario) y «Restablecer acceso» con clave temporal de un solo uso en Usuarios     | 2   | § Credenciales y sesiones, AUTH-002 (web) |
 
-Última actualización: 2026-09-22 (HUB-006 + AUTH-001)
+Última actualización: 2026-09-22 (AUTH-002)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1027,6 +1028,7 @@ Puntos clave:
   `app/layout.tsx`, `app/global.css`, `lib/theme.tsx`, `app/(auth)/login/page.tsx`,
   `app/modulos/page.tsx`, `styles/tokens.css`.
 - AUTH-001 — Recuperar acceso V1, api (2026-09-22; Sprint 19, ola 1; Codex): doctrina en § Credenciales y sesiones. Archivos: prisma/schema/iam.prisma, la migración, iam/{auth.controller,auth.service,users.controller,users.service,password-policy}.ts, iam/dto/{change-password,create-user,update-user}.dto.ts, iam/strategies/{jwt,refresh}.strategy.ts, iam/guards/jwt-auth.guard.ts, el decorador AllowPendingPasswordChange, common/guards/policies.guard.ts, common/filters/sentry-exception.filter.ts y sus specs.
+- AUTH-002 — Recuperar acceso V1, web (2026-09-22; Sprint 19, ola 2): doctrina en § Credenciales y sesiones, AUTH-002 (web). Archivos: `app/(auth)/cambiar-clave/page.tsx`, `app/(auth)/AuthStageStyles.tsx`, `app/(auth)/login/page.tsx`, `app/(dashboard)/configuracion/usuarios/page.tsx`, `components/SpaceBackdrop.tsx`, `components/shared/PasswordChecklist.tsx`, `components/sidebars/SidebarChangePassword.tsx` + los siete `*Sidebar.tsx`, `hooks/useAuth.ts`, `lib/api.ts`, `lib/password-policy.ts`.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -1192,7 +1194,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-22 (HUB-006 + AUTH-001)
+Última actualización: 2026-09-22 (AUTH-002)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1759,6 +1761,8 @@ docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
 - El login compara el email recortado y sin distinguir mayúsculas.
 - Recuperación por correo (opción A): pendiente hasta que exista proveedor de email.
 - DEUDA (hardening): el trigger de auditoría copia `passwordHash` y `refreshTokenHash` de `users` a `audit_logs` en cada login y cambio de clave.
+
+**AUTH-002 (web, 2026-09-22).** `/cambiar-clave` vive en el grupo `(auth)` y entra a `SPACE_PATHS`: se pinta sobre el fondo compartido de HUB-006 y las estrellas persisten login → cambiar-clave → hub. Con `mustChangePassword` muestra «Crea tu nueva contraseña» (campo «Clave temporal», sin «volver»); en el uso voluntario, «Cambiar contraseña» (con «volver»). Checklist en vivo «10 caracteres o más» · «Una letra» · «Un número» (texto + ícono + estado para lector de pantalla, nunca solo color) que habilita el envío; «distinta de la actual» la valida SOLO el servidor. Errores del servidor en la línea `›` con `role="alert"`; el 429 se muestra como «Demasiados intentos…». Éxito → `router.replace('/modulos')`; «salir» = `logout` existente. `lib/api.ts`: un 403 con `code: 'PASSWORD_CHANGE_REQUIRED'` navega con recarga completa a `/cambiar-clave` (como el 401 → `/login`), sin bucle si ya se está ahí; `useAuth` hace lo mismo al leer `mustChangePassword` en `/auth/me`, para rutas que no hacen otra llamada. Login: tras `/auth/me`, `mustChangePassword` → `/cambiar-clave`, si no `/modulos`; «recuperar acceso» explica en la línea `›` que un administrador restablece el acceso (sin correo, sin ruta nueva). `/configuracion/usuarios`: la edición YA NO cambia contraseñas (las credenciales cambian solo por reset-access) y nunca envía el rol propio; «Restablecer acceso» = confirmación → clave temporal mostrada UNA vez, solo en el estado del diálogo (jamás storage, logs, URL ni toast), con «Copiar», borrada al cerrar; 403/404/409 dentro del diálogo. Oculta en la fila propia; las filas SUPER_ADMIN no muestran acciones a quien no es SUPER_ADMIN, y la opción SUPER_ADMIN del select solo la ve un SUPER_ADMIN. Rol y desactivación propios bloqueados con «No puedes cambiar tu propio rol ni desactivar tu cuenta.». Crear usa la misma política y checklist (`lib/password-policy.ts`, espejo del api). El rol del actor sale de `/auth/me` + la empresa actual; sin endpoint nuevo. Entradas: «Cambiar contraseña» justo antes de «Cerrar sesión» en los siete sidebars (`SidebarChangePassword`); el hub no tiene menú de usuario y no suma entrada. Las reglas `sw-*` del login pasaron VERBATIM a `app/(auth)/AuthStageStyles.tsx`, compartidas por login y cambiar-clave.
 
 ## Verificación en producción (2026-08-05, consultas read-only del fundador)
 

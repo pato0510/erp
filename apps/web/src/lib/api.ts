@@ -16,6 +16,16 @@ export class ApiError<TData = unknown> extends Error {
   }
 }
 
+/* AUTH-002 — AUTH-001's coded 403: while the account must change its password, every
+   other authenticated call answers { code: 'PASSWORD_CHANGE_REQUIRED' }. Full navigation,
+   like the 401 → /login below; no loop when the page is already /cambiar-clave. */
+function redirectIfPasswordChangeRequired(status: number, body: unknown) {
+  if (status !== 403 || typeof window === 'undefined') return;
+  if ((body as { code?: unknown } | null)?.code !== 'PASSWORD_CHANGE_REQUIRED') return;
+  if (window.location.pathname === '/cambiar-clave') return;
+  window.location.href = '/cambiar-clave';
+}
+
 class ApiClient {
   private companyId: string | null = null;
 
@@ -63,6 +73,7 @@ class ApiClient {
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: 'Request failed' }));
+      redirectIfPasswordChangeRequired(res.status, error);
       throw new ApiError(error.message || `HTTP ${res.status}`, res.status, error);
     }
 
@@ -119,6 +130,7 @@ class ApiClient {
     }
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: 'Upload failed' }));
+      redirectIfPasswordChangeRequired(res.status, error);
       throw new ApiError(error.message || `HTTP ${res.status}`, res.status, error);
     }
     return res.json();
@@ -143,6 +155,7 @@ class ApiClient {
     }
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: 'Download failed' }));
+      redirectIfPasswordChangeRequired(res.status, error);
       throw new ApiError(error.message || `HTTP ${res.status}`, res.status, error);
     }
     return res.blob();
@@ -164,7 +177,12 @@ class ApiClient {
       if (typeof window !== 'undefined') window.location.href = '/login';
       throw new Error('Unauthorized');
     }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      if (res.status === 403) {
+        redirectIfPasswordChangeRequired(403, await res.json().catch(() => null));
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
     return res.blob();
   }
 }

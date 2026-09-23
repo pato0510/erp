@@ -17,6 +17,8 @@ interface User {
   firstName: string;
   lastName: string;
   companies: Company[];
+  // AUTH-001 — true after an admin reset: only /cambiar-clave (and me/logout) work.
+  mustChangePassword?: boolean;
 }
 
 export function useAuth() {
@@ -28,6 +30,11 @@ export function useAuth() {
       .get<User>('/api/auth/me')
       .then((data) => {
         setUser(data);
+        // AUTH-002 — a route that makes no other api call would never meet the coded 403,
+        // so the flag itself bounces there too (same full navigation as api.ts).
+        if (data.mustChangePassword && window.location.pathname !== '/cambiar-clave') {
+          window.location.href = '/cambiar-clave';
+        }
         if (data.companies.length > 0 && !apiClient.getCompanyId()) {
           apiClient.setCompanyId(data.companies[0].companyId);
         }

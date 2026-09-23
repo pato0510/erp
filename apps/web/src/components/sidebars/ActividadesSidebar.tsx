@@ -14,6 +14,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { SidebarChangePassword } from './SidebarChangePassword';
 import { apiClient } from '../../lib/api';
 import { useActividadesPermissions } from '../../hooks/useActividadesPermissions';
 import { TODOS_CHANGED_EVENT } from '../actividades/TodoRowCells';
@@ -116,6 +117,7 @@ export function ActividadesSidebar() {
         <div className="tn-sidebar__email" title={user.email}>
           {user.email}
         </div>
+        <SidebarChangePassword />
         <button onClick={logout} className="tn-logout">
           <LogOut size={14} />
           Cerrar sesión

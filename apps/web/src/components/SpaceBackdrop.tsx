@@ -7,7 +7,7 @@ import { Starfield } from './Starfield';
 /* HUB-006 — the routes that share the "space" backdrop. The blocking theme script
    (lib/theme.tsx) interpolates this list, so first paint and client navigation read
    ONE source. Later tickets add paths here. */
-export const SPACE_PATHS = ['/login', '/modulos'];
+export const SPACE_PATHS = ['/login', '/cambiar-clave', '/modulos'];
 
 /* Layout effect on the client (the html class flips before paint on navigation);
    useEffect on the server, where neither runs. Same idiom as Starfield. */

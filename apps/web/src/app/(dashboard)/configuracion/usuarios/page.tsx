@@ -1,11 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Pencil, Power, PowerOff, Users, Eye, EyeOff, ArrowLeft, X } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Power,
+  PowerOff,
+  Users,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  X,
+  KeyRound,
+} from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
 import { formatRelativeDate } from '../../../../lib/formatters';
 import { Toast } from '../../../../components/shared/Toast';
+import { useAuth } from '../../../../hooks/useAuth';
+import { meetsPasswordPolicy, PASSWORD_POLICY_MESSAGE } from '../../../../lib/password-policy';
+import { PasswordChecklist } from '../../../../components/shared/PasswordChecklist';
 
 type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'ACCOUNTANT' | 'ANALYST' | 'VIEWER';
 
@@ -46,6 +60,62 @@ const ROLES: UserRole[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'ANA
 
 type ModalState = null | { mode: 'create' } | { mode: 'edit'; user: CompanyUser };
 
+/* AUTH-002 — the api rejects both (400); the UI says why before anyone tries. */
+const SELF_LOCK_HINT = 'No puedes cambiar tu propio rol ni desactivar tu cuenta.';
+
+const FOCUSABLE =
+  'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/* AUTH-002 — dialog keyboard contract: focus moves in on open, Tab cycles inside, Escape
+   closes, and focus returns to the element that opened the dialog. */
+function useDialogKeyboard(onClose: () => void) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const trigger = document.activeElement as HTMLElement | null;
+    const root = ref.current;
+    const first =
+      root?.querySelector<HTMLElement>('[data-autofocus]') ??
+      root?.querySelector<HTMLElement>(FOCUSABLE);
+    first?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab' || !ref.current) return;
+      const focusables = ref.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (focusables.length === 0) return;
+      const head = focusables[0];
+      const tail = focusables[focusables.length - 1];
+      if (
+        e.shiftKey &&
+        (document.activeElement === head || !ref.current.contains(document.activeElement))
+      ) {
+        e.preventDefault();
+        tail.focus();
+      } else if (
+        !e.shiftKey &&
+        (document.activeElement === tail || !ref.current.contains(document.activeElement))
+      ) {
+        e.preventDefault();
+        head.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if (trigger && trigger.isConnected) trigger.focus();
+    };
+  }, []);
+
+  return ref;
+}
+
 function initials(first: string, last: string) {
   const a = first.trim()[0] ?? '';
   const b = last.trim()[0] ?? '';
@@ -56,6 +126,16 @@ export default function UsuariosPage() {
   const [users, setUsers] = useState<CompanyUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [modal, setModal] = useState<ModalState>(null);
+  const [resetTarget, setResetTarget] = useState<CompanyUser | null>(null);
+
+  // AUTH-002 — the actor: id from /auth/me, role from its membership in the current company.
+  const { user: me } = useAuth();
+  const currentCompanyId = apiClient.getCompanyId();
+  const actorRole = (
+    me?.companies.find((c) => c.companyId === currentCompanyId) ?? me?.companies[0]
+  )?.role;
+  const actorIsSuperAdmin = actorRole === 'SUPER_ADMIN';
+  const roleOptions = actorIsSuperAdmin ? ROLES : ROLES.filter((r) => r !== 'SUPER_ADMIN');
   const [toast, setToast] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
@@ -90,12 +170,12 @@ export default function UsuariosPage() {
   }) => {
     try {
       if (dto.id) {
+        // AUTH-002 — credentials change only through reset-access; your own role is never sent.
         const body: Record<string, unknown> = {
           firstName: dto.firstName,
           lastName: dto.lastName,
-          role: dto.role,
         };
-        if (dto.password) body.password = dto.password;
+        if (dto.id !== me?.id) body.role = dto.role;
         await apiClient.patch(`/api/users/${dto.id}`, body);
         setToast({ message: 'Usuario actualizado', type: 'success' });
       } else {
@@ -207,6 +287,9 @@ export default function UsuariosPage() {
           <div className="divide-y divide-[var(--border-color)]">
             {users.map((u) => {
               const meta = ROLE_META[u.role];
+              const isSelf = !!me && u.id === me.id;
+              // AUTH-002 — a SUPER_ADMIN account is only touched by another SUPER_ADMIN.
+              const lockedSuperAdmin = u.role === 'SUPER_ADMIN' && !actorIsSuperAdmin;
               return (
                 <div
                   key={u.id}
@@ -256,21 +339,40 @@ export default function UsuariosPage() {
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => setModal({ mode: 'edit', user: u })}
-                    className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
-                    title="Editar"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    onClick={() => handleToggle(u)}
-                    className="p-2 rounded-md hover:bg-subtle-hover"
-                    title={u.isActive ? 'Desactivar' : 'Activar'}
-                    style={{ color: u.isActive ? '#64748B' : '#16A34A' }}
-                  >
-                    {u.isActive ? <PowerOff size={14} /> : <Power size={14} />}
-                  </button>
+                  {!lockedSuperAdmin && (
+                    <>
+                      {!isSelf && (
+                        <button
+                          onClick={() => setResetTarget(u)}
+                          className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
+                          title="Restablecer acceso"
+                          aria-label={`Restablecer acceso de ${u.firstName} ${u.lastName}`}
+                        >
+                          <KeyRound size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setModal({ mode: 'edit', user: u })}
+                        className="p-2 rounded-md hover:bg-subtle-hover text-[var(--text-secondary)]"
+                        title="Editar"
+                        aria-label={`Editar a ${u.firstName} ${u.lastName}`}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!isSelf) handleToggle(u);
+                        }}
+                        className={`p-2 rounded-md ${isSelf ? 'cursor-not-allowed opacity-40' : 'hover:bg-subtle-hover'}`}
+                        title={isSelf ? SELF_LOCK_HINT : u.isActive ? 'Desactivar' : 'Activar'}
+                        aria-label={isSelf ? SELF_LOCK_HINT : u.isActive ? 'Desactivar' : 'Activar'}
+                        aria-disabled={isSelf || undefined}
+                        style={{ color: u.isActive ? '#64748B' : '#16A34A' }}
+                      >
+                        {u.isActive ? <PowerOff size={14} /> : <Power size={14} />}
+                      </button>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -278,7 +380,19 @@ export default function UsuariosPage() {
         )}
       </div>
 
-      {modal && <UserModal modal={modal} onClose={() => setModal(null)} onSave={handleSave} />}
+      {modal && (
+        <UserModal
+          modal={modal}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+          isSelf={modal.mode === 'edit' && modal.user.id === me?.id}
+          roleOptions={roleOptions}
+        />
+      )}
+
+      {resetTarget && (
+        <ResetAccessDialog target={resetTarget} onClose={() => setResetTarget(null)} />
+      )}
 
       <style jsx global>{`
         .u-input {
@@ -308,8 +422,12 @@ function UserModal({
   modal,
   onClose,
   onSave,
+  isSelf,
+  roleOptions,
 }: {
   modal: Exclude<ModalState, null>;
+  isSelf: boolean;
+  roleOptions: UserRole[];
   onClose: () => void;
   onSave: (dto: {
     id?: string;
@@ -333,6 +451,7 @@ function UserModal({
   const [err, setErr] = useState('');
 
   const isCreate = modal.mode === 'create';
+  const dialogRef = useDialogKeyboard(onClose);
 
   const submit = async () => {
     setErr('');
@@ -344,11 +463,11 @@ function UserModal({
       setErr('Email inválido');
       return;
     }
-    // Password rules: required on create, optional on edit. When provided,
-    // must be at least 8 chars and match confirmation.
-    if (isCreate || password.length > 0) {
-      if (password.length < 8) {
-        setErr('La contraseña debe tener al menos 8 caracteres');
+    // AUTH-002 — a password exists only on create (edit changes credentials through
+    // reset-access); same policy and message as the api (AUTH-001).
+    if (isCreate) {
+      if (!meetsPasswordPolicy(password)) {
+        setErr(PASSWORD_POLICY_MESSAGE);
         return;
       }
       if (password !== confirmPassword) {
@@ -363,7 +482,7 @@ function UserModal({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim().toLowerCase(),
-        password: password || undefined,
+        password: isCreate ? password : undefined,
         role,
       });
     } finally {
@@ -373,28 +492,40 @@ function UserModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-card-solid rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-modal-title"
+        className="bg-card-solid rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)] sticky top-0 bg-card-solid">
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">
+          <h3 id="user-modal-title" className="text-base font-semibold text-[var(--text-primary)]">
             {isCreate ? 'Nuevo usuario' : 'Editar usuario'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-subtle-hover">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-subtle-hover"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Nombre" required>
+            <Field label="Nombre" required htmlFor="user-first-name">
               <input
+                id="user-first-name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className="u-input"
                 maxLength={100}
               />
             </Field>
-            <Field label="Apellido" required>
+            <Field label="Apellido" required htmlFor="user-last-name">
               <input
+                id="user-last-name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className="u-input"
@@ -403,8 +534,9 @@ function UserModal({
             </Field>
           </div>
 
-          <Field label="Email" required={isCreate}>
+          <Field label="Email" required={isCreate} htmlFor="user-email">
             <input
+              id="user-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -423,13 +555,24 @@ function UserModal({
             )}
           </Field>
 
-          <Field label="Rol" required>
+          <Field
+            label="Rol"
+            required
+            htmlFor="user-role"
+            help={isSelf ? SELF_LOCK_HINT : undefined}
+            helpId="user-role-help"
+          >
             <select
+              id="user-role"
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
               className="u-input"
+              disabled={isSelf}
+              title={isSelf ? SELF_LOCK_HINT : undefined}
+              aria-describedby={isSelf ? 'user-role-help' : undefined}
             >
-              {ROLES.map((r) => (
+              {/* A non-SUPER_ADMIN never sees the option; SUPER_ADMIN rows are hidden from them. */}
+              {(roleOptions.includes(role) ? roleOptions : [role, ...roleOptions]).map((r) => (
                 <option key={r} value={r}>
                   {ROLE_META[r].label}
                 </option>
@@ -437,50 +580,58 @@ function UserModal({
             </select>
           </Field>
 
-          <Field
-            label={isCreate ? 'Contraseña' : 'Nueva contraseña (opcional)'}
-            required={isCreate}
-            help={
-              isCreate
-                ? 'Mínimo 8 caracteres.'
-                : 'Déjalo vacío para conservar la contraseña actual.'
-            }
-          >
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="u-input pr-10"
-                placeholder="••••••••"
-                minLength={8}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
-                tabIndex={-1}
-                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              >
-                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-          </Field>
+          {isCreate && (
+            <>
+              <Field label="Contraseña" required htmlFor="user-password">
+                <div className="relative">
+                  <input
+                    id="user-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="u-input pr-10"
+                    placeholder="••••••••••"
+                    autoComplete="new-password"
+                    maxLength={100}
+                    aria-describedby="user-password-rules"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                <PasswordChecklist
+                  id="user-password-rules"
+                  password={password}
+                  className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]"
+                />
+              </Field>
 
-          {(isCreate || password.length > 0) && (
-            <Field label="Confirmar contraseña" required={isCreate}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="u-input"
-                placeholder="••••••••"
-              />
-            </Field>
+              <Field label="Confirmar contraseña" required htmlFor="user-password-confirm">
+                <input
+                  id="user-password-confirm"
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="u-input"
+                  placeholder="••••••••••"
+                  autoComplete="new-password"
+                  maxLength={100}
+                />
+              </Field>
+            </>
           )}
 
           {err && (
-            <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg border border-red-100">
+            <div
+              role="alert"
+              className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg border border-red-100"
+            >
               {err}
             </div>
           )}
@@ -516,16 +667,21 @@ function Field({
   label,
   required,
   help,
+  helpId,
+  htmlFor,
   children,
 }: {
   label: string;
   required?: boolean;
   help?: string;
+  helpId?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
       <label
+        htmlFor={htmlFor}
         className="block mb-1.5 text-[var(--text-secondary)]"
         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500, fontSize: 13 }}
       >
@@ -535,12 +691,175 @@ function Field({
       {children}
       {help && (
         <p
+          id={helpId}
           className="mt-1.5 text-xs text-[var(--text-muted)]"
           style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 300 }}
         >
           {help}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * AUTH-002 — «Restablecer acceso»: confirm, then POST /api/users/:id/reset-access and show
+ * the temporary password ONCE. It lives only in this component's state — never storage,
+ * logs, the URL or a toast — and closing the dialog unmounts it, clearing it for good.
+ * 403/404/409 messages from the api render inside the dialog.
+ */
+function ResetAccessDialog({ target, onClose }: { target: CompanyUser; onClose: () => void }) {
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const secretRef = useRef<HTMLInputElement | null>(null);
+  const close = useCallback(() => {
+    setTemporaryPassword(null);
+    onClose();
+  }, [onClose]);
+  const dialogRef = useDialogKeyboard(close);
+  const name = `${target.firstName} ${target.lastName}`.trim();
+
+  const confirmReset = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const res = await apiClient.post<{ temporaryPassword: string }>(
+        `/api/users/${target.id}/reset-access`,
+      );
+      setTemporaryPassword(res.temporaryPassword);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo restablecer el acceso.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Phase change keeps focus inside the dialog: the secret field takes it once shown.
+  useEffect(() => {
+    if (temporaryPassword) secretRef.current?.focus();
+  }, [temporaryPassword]);
+
+  const copy = async () => {
+    if (!temporaryPassword) return;
+    try {
+      await navigator.clipboard.writeText(temporaryPassword);
+      setCopyState('copied');
+    } catch {
+      secretRef.current?.select();
+      setCopyState('failed');
+    }
+  };
+
+  const buttonFont = { fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reset-access-title"
+        aria-describedby="reset-access-desc"
+        className="bg-card-solid rounded-xl shadow-xl w-full max-w-md"
+      >
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)]">
+          <h3
+            id="reset-access-title"
+            className="text-base font-semibold text-[var(--text-primary)]"
+          >
+            {temporaryPassword ? 'Clave temporal' : 'Restablecer acceso'}
+          </h3>
+          <button onClick={close} className="p-1 rounded hover:bg-subtle-hover" aria-label="Cerrar">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {temporaryPassword ? (
+            <>
+              <p id="reset-access-desc" className="text-sm text-[var(--text-secondary)]">
+                Esta clave no se volverá a mostrar. Entrégala por un canal seguro; el usuario deberá
+                cambiarla al entrar.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={secretRef}
+                  readOnly
+                  value={temporaryPassword}
+                  aria-label={`Clave temporal de ${name}`}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="u-input"
+                  style={{
+                    fontFamily: 'var(--font-jetbrains-mono), monospace',
+                    letterSpacing: '0.08em',
+                  }}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  onClick={copy}
+                  className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover flex-shrink-0"
+                  style={buttonFont}
+                >
+                  Copiar
+                </button>
+              </div>
+              <p role="status" className="text-xs text-[var(--text-secondary)] min-h-[1rem]">
+                {copyState === 'copied' && 'Clave copiada al portapapeles.'}
+                {copyState === 'failed' &&
+                  'No se pudo copiar automáticamente: la clave quedó seleccionada, cópiala manualmente.'}
+              </p>
+            </>
+          ) : (
+            <p id="reset-access-desc" className="text-sm text-[var(--text-primary)]">
+              ¿Restablecer el acceso de {name}? Se cerrarán todas sus sesiones y deberá crear una
+              contraseña nueva al entrar.
+            </p>
+          )}
+
+          {error && (
+            <div
+              role="alert"
+              className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg border border-red-100"
+            >
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--border-color)]">
+          {temporaryPassword ? (
+            <button
+              onClick={close}
+              className="px-4 py-2 text-sm text-white rounded-full"
+              style={{ background: 'var(--color-dark)', ...buttonFont }}
+            >
+              Listo
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={close}
+                data-autofocus
+                className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover"
+                style={buttonFont}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmReset}
+                disabled={submitting}
+                className="px-4 py-2 text-sm text-white rounded-full bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                style={buttonFont}
+              >
+                {submitting ? 'Restableciendo...' : 'Restablecer'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

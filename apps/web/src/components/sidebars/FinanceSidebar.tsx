@@ -21,6 +21,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { SidebarChangePassword } from './SidebarChangePassword';
 import { apiClient } from '../../lib/api';
 import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
@@ -101,6 +102,7 @@ export function FinanceSidebar() {
         <div className="tn-sidebar__email" title={user.email}>
           {user.email}
         </div>
+        <SidebarChangePassword />
         <button onClick={logout} className="tn-logout">
           <LogOut size={14} />
           Cerrar sesión
