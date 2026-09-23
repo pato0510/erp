@@ -4,11 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Activity, CommercialActivityStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
+import {
+  parseSantiagoActionDate,
+  santiagoDateOf,
+  todayInSantiago,
+} from '../../common/santiago-date';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
+import { UpdateActivityStatusDto } from './dto/update-activity-status.dto';
+import { ACTIVITY_TYPE_LABELS, writeSystemActivity } from './system-activity';
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 200;
@@ -25,21 +32,25 @@ export class ActivitiesService {
    * ones derive/keep it), so a plain accountId filter already covers them. DESC. */
   async findAllByAccount(companyId: string, accountId: string, limit?: number) {
     await this.assertAccountInCompany(accountId, companyId);
-    return this.prisma.activity.findMany({
+    const rows = await this.prisma.activity.findMany({
       where: { companyId, accountId },
       orderBy: [{ activityDate: 'desc' }],
       take: this.clampLimit(limit),
     });
+    const today = todayInSantiago();
+    return rows.map((row) => this.withOverdue(row, today));
   }
 
   /** Rule 3b — the opportunity timeline: only that opportunity's activities. DESC. */
   async findAllByOpportunity(companyId: string, opportunityId: string, limit?: number) {
     await this.assertOpportunityInCompany(opportunityId, companyId);
-    return this.prisma.activity.findMany({
+    const rows = await this.prisma.activity.findMany({
       where: { companyId, opportunityId },
       orderBy: [{ activityDate: 'desc' }],
       take: this.clampLimit(limit),
     });
+    const today = todayInSantiago();
+    return rows.map((row) => this.withOverdue(row, today));
   }
 
   /** Rule 1 — CREATE a manual activity. The account is identified directly
@@ -66,6 +77,7 @@ export class ActivitiesService {
     await this.assertAccountInCompany(accountId, companyId);
 
     const resolvedAccountId = accountId;
+    const activityDate = dto.activityDate ? parseSantiagoActionDate(dto.activityDate) : new Date();
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       return tx.activity.create({
         data: {
@@ -76,8 +88,11 @@ export class ActivitiesService {
           type: dto.type,
           subject: dto.subject,
           detail: dto.detail ?? null,
-          activityDate: dto.activityDate ? new Date(dto.activityDate) : new Date(),
+          activityDate,
           isSystemGenerated: false, // NEVER from input — manual activities only in COM-008
+          status: dto.status ?? CommercialActivityStatus.HECHA,
+          statusChangedAt: null,
+          systemEvent: null,
         },
       });
     });
@@ -85,7 +100,7 @@ export class ActivitiesService {
 
   /** Rule 2 — UPDATE editable fields (type, subject, detail, activityDate,
    * opportunityId). accountId is NOT editable. A system-generated activity cannot be
-   * updated at all (the guard exists NOW even though none can be created yet). A
+   * updated at all. A
    * (re)linked opportunity is revalidated against the activity's FIXED account;
    * opportunityId=null unlinks. */
   async update(companyId: string, userId: string, id: string, dto: UpdateActivityDto) {
@@ -107,7 +122,8 @@ export class ActivitiesService {
     if (dto.type !== undefined) data.type = dto.type;
     if (dto.subject !== undefined) data.subject = dto.subject;
     if (dto.detail !== undefined) data.detail = dto.detail;
-    if (dto.activityDate !== undefined) data.activityDate = new Date(dto.activityDate);
+    if (dto.activityDate !== undefined)
+      data.activityDate = parseSantiagoActionDate(dto.activityDate);
     if (dto.opportunityId !== undefined) data.opportunityId = dto.opportunityId; // null = unlink
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
@@ -115,18 +131,55 @@ export class ActivitiesService {
     });
   }
 
-  /** Rule 2 — DELETE a manual activity. System-generated rows are immutable. */
+  /** COM-022 — only this path transitions manual actions after creation. */
+  async updateStatus(companyId: string, userId: string, id: string, dto: UpdateActivityStatusDto) {
+    const existing = await this.findActivity(id, companyId);
+    this.assertMutable(existing);
+    if (existing.status === dto.status) return this.withOverdue(existing);
+    const updated = await this.rlsService.executeWithRls(companyId, userId, (tx) =>
+      tx.activity.update({
+        where: { id },
+        data: { status: dto.status, statusChangedAt: new Date() },
+      }),
+    );
+    return this.withOverdue(updated);
+  }
+
+  /** Rule 2 — DELETE a manual activity; preserve opportunity history atomically. */
   async remove(companyId: string, userId: string, id: string) {
     const existing = await this.findActivity(id, companyId);
     this.assertMutable(existing);
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
-      return tx.activity.delete({ where: { id } });
+      const deleted = await tx.activity.delete({ where: { id } });
+      if (existing.opportunityId) {
+        const subject = `Acción eliminada: ${existing.subject}`;
+        const day = santiagoDateOf(existing.activityDate).split('-').reverse().join('-');
+        const status =
+          existing.status === CommercialActivityStatus.PENDIENTE ? 'Pendiente' : 'Hecha';
+        await writeSystemActivity(tx, {
+          companyId,
+          accountId: existing.accountId,
+          opportunityId: existing.opportunityId,
+          userId,
+          event: 'ACCION_ELIMINADA',
+          subject: subject.length > 200 ? `${subject.slice(0, 199)}…` : subject,
+          detail: `${ACTIVITY_TYPE_LABELS[existing.type]} · ${day} · ${status}`,
+        });
+      }
+      return deleted;
     });
   }
 
-  /** COM-009 guard, live NOW: system-generated activities are a historical record and
-   * cannot be edited or deleted. No system activity can be created yet, but the guard
-   * is enforced so COM-009 can rely on it. */
+  private withOverdue(activity: Activity, today = todayInSantiago()) {
+    return {
+      ...activity,
+      overdue:
+        activity.status === CommercialActivityStatus.PENDIENTE &&
+        santiagoDateOf(activity.activityDate) < today,
+    };
+  }
+
+  /** System-generated activities are immutable historical records. */
   private assertMutable(activity: { isSystemGenerated: boolean }) {
     if (activity.isSystemGenerated) {
       throw new ConflictException(

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OpportunityStage, QuoteStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { todayInSantiago } from '../../common/santiago-date';
 import { OpportunitiesService } from '../opportunities/opportunities.service';
 
 /* ALERT-001 — the Comercial alerts panel (CRM-6): what needs attention, DERIVED LIVE on
@@ -33,19 +34,6 @@ export const ALERT_OPEN_STAGES: OpportunityStage[] = [
   OpportunityStage.NEGOCIACION,
 ];
 
-/* CAL-008b — "hoy" is the CHILEAN calendar date (en-CA yields ISO order). Module-local
-   like the actividades helpers (no shared export exists yet). */
-function santiagoDateOf(instant: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Santiago',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(instant);
-}
-export function todayInSantiago(): string {
-  return santiagoDateOf(new Date());
-}
 const utcDayOf = (iso: string): Date => new Date(`${iso}T00:00:00.000Z`);
 const dayDiff = (later: Date, earlier: Date): number =>
   Math.floor((later.getTime() - earlier.getTime()) / DAY_MS);

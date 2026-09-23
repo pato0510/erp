@@ -246,6 +246,25 @@ Pendiente sin sprint: recuperación de acceso por correo (opción A), cuando exi
 
 ═══════════════════════════════════════════════════════════════════
 
+# SPRINT 20 — PIPELINE: VISTA TABLA, ACCIONES, LEAD Y REGLAS (2026-09-23 → )
+
+Plan aprobado por el fundador: ola 1, COM-022 → COM-023 → COM-024 por Codex ∥
+COM-025 web por CC; ola 2, las 10 columnas con edición en celda, panel de acciones,
+fichas de Lead, pantalla de probabilidades y motivos. T16 Novandino comienza con
+inventario de solo lectura; el borrado requiere confirmación del fundador. Cierre:
+DOC-S20-CLOSE.
+
+| Ticket  | Título corto                                                                       | SHA       | Ola |
+| ------- | ---------------------------------------------------------------------------------- | --------- | --- |
+| COM-022 | Acciones Pendiente/Hecha, Actualización en vivo y registros de cambios comerciales | pendiente | 1   |
+
+Deuda: helper de fecha Santiago — Comercial ya usa common/santiago-date.ts (COM-022);
+quedan actividades, todos, hsec y hub.
+
+Última actualización: 2026-09-23 (COM-022)
+
+═══════════════════════════════════════════════════════════════════
+
 # MÓDULO FINANZAS (V1 COMPLETO EN PRODUCCIÓN)
 
 ═══════════════════════════════════════════════════════════════════
@@ -1293,6 +1312,7 @@ Opportunity && read Account` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT).
   movimiento (relativo + absoluto en hover) · Cierre esperado
   (`expectedCloseDate` existe); NO hay "Próxima actividad" (`activityDate` es
   cuándo OCURRIÓ la interacción; no existe concepto de actividad programada).
+  (revertido por COM-022: una acción PENDIENTE tiene fecha futura)
   CAMBIO DE ETAPA INLINE: la pill es un `<select>` nativo para writers que
   llama al MISMO `attemptMove` del kanban → GANADA confirm liviano, PERDIDA
   `LostReasonModal`, resto PATCH `/:id/stage` canónico, optimista + revert +
@@ -1338,8 +1358,49 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   refetch al montar y al cambiar de ruta) y página `/comercial/alertas` de
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
+- COM-022 — ACCIONES COMERCIALES (2026-09-23; Sprint 20, ola 1; api): acciones =
+  Activity + status, sin tabla nueva. Enums propios `CommercialActivityStatus`
+  (PENDIENTE/HECHA) y `CommercialActivityEvent`, sin reutilizar ni extender
+  ActivityStatus/ActivityKind del calendario: las máquinas siguen separadas.
+  Migración `20260923180000_add_commercial_activity_status`: columnas nullable
+  status/statusChangedAt/systemEvent, sin índices nuevos. CHECK
+  `activities_status_origin_check`: sistema ⇒ status y statusChangedAt NULL;
+  manual ⇒ status NOT NULL y systemEvent NULL. `systemEvent` identifica el evento
+  de sistema; backfill por los siete asuntos de COM-009 (sin coincidencia ⇒ NULL
+  defensivo); manuales existentes ⇒ HECHA. Los UPDATE disparan audit_activities
+  con actor NULL como rastro forense. RLS, GRANT y trigger existentes intactos.
+  `statusChangedAt` registra la última transición posterior a la creación; NULL
+  significa que nunca cambió. Crear sin status ⇒ HECHA; PATCH
+  `/comercial/activities/:id/status` es la única vía de cambio de estado, con
+  `update ActivitySubject`; mismo estado no escribe. Las filas de sistema siguen
+  inmutables (409) y ningún DTO admite isSystemGenerated/systemEvent/statusChangedAt;
+  la edición general tampoco admite status. Fecha sola YYYY-MM-DD ⇒ 15:00Z del
+  mismo día civil Santiago (11:00 CLT / 12:00 CLST); fecha imposible ⇒ 400 en español;
+  los instantes ISO conservan su significado. Helper `common/santiago-date.ts`
+  compartido por acciones, oportunidades y alertas; sin cambiar los umbrales.
+  `overdue` se deriva al leer ambas listas: PENDIENTE y fecha Santiago anterior a
+  hoy. `pendingActions`/`overdueActions` por oportunidad se calculan en memoria con
+  UNA activity.findMany de pendientes para los ids de la lista, sin N+1.
+  `lastUpdate { at, kind }` se deriva EN VIVO de createdAt de toda acción (sistema:
+  systemEvent o SISTEMA; manual: ACCION_AGREGADA) y del statusChangedAt manual
+  (HECHA: ACCION_COMPLETADA; PENDIENTE: ACCION_REABIERTA). Desempates: fecha DESC,
+  transición antes de creación, kind ASC; sin acciones ⇒ createdAt de la oportunidad
+  - CREACION. Notas, documentos y updatedAt propio no alimentan lastUpdate. UNA
+    sola query raw por llamada obtiene lastMovementAt y lastUpdate; conserva companyId
+    explícito y ANY($2::uuid[]), la definición de lastMovementAt y la firma pública
+    `lastMovementByOpportunity` usada por ALERT-001, sobre un método privado común.
+    Escritor único `activities/system-activity.ts`, siempre en la transacción de la
+    mutación: los asuntos existentes permanecen idénticos. DELETE registra
+    ACCION_ELIMINADA solo si la acción está vinculada a una oportunidad (asunto hasta
+    200 caracteres, detalle tipo/fecha Santiago/estado); sin vínculo solo borra.
+    update de oportunidad registra VALOR_ESTIMADO / FECHA_CIERRE / PROBABILIDAD solo
+    con cambio real (Decimal / día civil / número); nombre, responsable, notas y
+    cuenta no generan registro. Valor derivado por bundle sin registro, decisión del
+    director; COM-023 lo revisita. Dashboard cuenta únicamente manuales creadas en
+    rango, en ambos estados; mapa único de etiquetas: Correo / Visita técnica
+    (ActivityType intacto). LEAD queda declarado para COM-024, sin implementar Lead.
 
-Última actualización: 2026-09-23 (DOC-S19-CLOSE)
+Última actualización: 2026-09-23 (COM-022)
 
 ═══════════════════════════════════════════════════════════════════
 

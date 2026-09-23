@@ -266,8 +266,8 @@ model OpportunityService {
   @@map("opportunity_services")
 }
 
-/* COM-008 — activity types (the CRM interaction log). ASCII members; display labels
-   live in the UI (VISITA_FAENA → "Visita a faena"). */
+/* COM-022 — commercial action types. ASCII members stay intact; display labels:
+   EMAIL → "Correo", VISITA_FAENA → "Visita técnica" (Sprint 19 decision). */
 enum ActivityType {
   LLAMADA
   REUNION
@@ -276,16 +276,35 @@ enum ActivityType {
   NOTA
 }
 
-/* COM-008 — activities: the CRM interaction timeline (calls, meetings, emails, faena
-   visits, notes). An activity ALWAYS belongs to an account (FK ON DELETE CASCADE —
-   activities ARE the account's history) and OPTIONALLY references one of that
-   account's opportunities (FK ON DELETE SET NULL — deleting an open opportunity must
-   NOT erase the account's real history, only unlink it). `activityDate` is WHEN the
-   interaction happened (distinct from createdAt, when it was logged). This ticket
-   creates MANUAL activities only; `isSystemGenerated` is the prepared flag for the
-   COM-009 system-generated entries (stage changes etc.) — the API forces it false on
-   every create here and the service refuses to update/delete a row where it is true.
-   Platform invariant (RLS + audit + GRANT) is in migration 20260706120000_add_activities. */
+// Separate from the calendar's ActivityStatus / ActivityKind: independent machines.
+enum CommercialActivityStatus {
+  PENDIENTE
+  HECHA
+}
+
+enum CommercialActivityEvent {
+  CREACION
+  CAMBIO_ETAPA
+  PAUSA
+  REANUDACION
+  GANADA
+  PERDIDA
+  REAPERTURA
+  VALOR_ESTIMADO
+  FECHA_CIERRE
+  PROBABILIDAD
+  LEAD
+  ACCION_ELIMINADA
+}
+
+/* COM-022 — an activity is an acción. activityDate is its action date: when it
+   happened (HECHA) or when it is due (PENDIENTE), explicitly reversing COM-020's
+   "no scheduled activity" rule. createdAt is when it was logged. Always belongs to
+   an account (CASCADE); optionally linked to an opportunity (SET NULL, preserving
+   the account's history). Manual rows have status; system rows carry systemEvent
+   plus a human subject and remain immutable. statusChangedAt is the last transition
+   AFTER creation (null = never transitioned). Origin CHECK in COM-022 migration;
+   RLS + audit + GRANT remain in 20260706120000_add_activities. */
 model Activity {
   id                String       @id @default(uuid()) @db.Uuid
   companyId         String       @db.Uuid
@@ -294,8 +313,11 @@ model Activity {
   type              ActivityType
   subject           String
   detail            String?
-  activityDate      DateTime     @default(now()) // WHEN it happened (distinct from createdAt)
-  isSystemGenerated Boolean      @default(false) // COM-009 hook; forced false on manual create
+  activityDate      DateTime     @default(now()) // Happened (HECHA) or due (PENDIENTE)
+  isSystemGenerated Boolean      @default(false) // Forced false on manual create
+  status            CommercialActivityStatus?
+  statusChangedAt   DateTime?
+  systemEvent       CommercialActivityEvent?
   createdBy         String       @db.Uuid
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt

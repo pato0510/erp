@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
+import { UpdateActivityStatusDto } from './dto/update-activity-status.dto';
 
 /* COM-008 — activities CRUD (the CRM interaction timeline). EVERY endpoint declares
  * @CheckPolicies on ActivitySubject (PoliciesGuard fails OPEN). READ:
@@ -53,6 +54,17 @@ export class ActivitiesController {
     @Body() dto: CreateActivityDto,
   ) {
     return this.service.create(companyId, user.id, dto);
+  }
+
+  @Patch(':id/status')
+  @CheckPolicies((ability) => ability.can('update', ActivitySubject))
+  updateStatus(
+    @Param('id') id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateActivityStatusDto,
+  ) {
+    return this.service.updateStatus(companyId, user.id, id, dto);
   }
 
   @Patch(':id')

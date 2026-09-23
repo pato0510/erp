@@ -1,4 +1,4 @@
-import { ActivityType } from '@prisma/client';
+import { ActivityType, CommercialActivityStatus } from '@prisma/client';
 import {
   IsDateString,
   IsEnum,
@@ -39,7 +39,11 @@ export class CreateActivityDto {
   @MaxLength(4000)
   detail?: string;
 
-  // WHEN the interaction happened (ISO). Defaults to now in the service when omitted.
+  @IsOptional()
+  @IsEnum(CommercialActivityStatus)
+  status?: CommercialActivityStatus;
+
+  // Happened (HECHA, the default) or due (PENDIENTE). Date-only uses Santiago's day.
   @IsOptional()
   @IsDateString()
   activityDate?: string;

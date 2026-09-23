@@ -5,9 +5,17 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, LostReason, OpportunityStage, Prisma, QuoteStatus } from '@prisma/client';
+import {
+  CommercialActivityEvent,
+  LostReason,
+  OpportunityStage,
+  Prisma,
+  QuoteStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RlsService } from '../../common/rls/rls.service';
+import { santiagoDateOf, todayInSantiago } from '../../common/santiago-date';
+import { formatCLP, formatDateOnly, writeSystemActivity } from '../activities/system-activity';
 import { DomainEventsService } from '../../operations/events/domain-events.service';
 import { ChangeStageDto } from './dto/change-stage.dto';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
@@ -56,10 +64,19 @@ interface ListFilters {
   includeClosed?: boolean;
 }
 
-/* COM-020 — the shape of the page-scoped raw "last movement" query (per opportunity). */
-interface LastMovementRow {
+export type LastUpdateKind =
+  | CommercialActivityEvent
+  | 'ACCION_AGREGADA'
+  | 'ACCION_COMPLETADA'
+  | 'ACCION_REABIERTA'
+  | 'SISTEMA';
+
+/* COM-022 — both live timestamps share ONE page-scoped raw query. */
+interface OpportunityActivitySummary {
   id: string;
   lastMovementAt: Date | null;
+  lastUpdateAt: Date;
+  lastUpdateKind: LastUpdateKind;
 }
 
 // COM-020 — reuses the file's existing CLOSED_STAGES (GANADA/PERDIDA).
@@ -122,14 +139,42 @@ export class OpportunitiesService {
         },
       },
     });
-    const lastMovement = await this.lastMovementByOpportunity(
-      companyId,
-      rows.map((r) => r.id),
-    );
-    return rows.map((r) => ({
-      ...r,
-      lastMovementAt: lastMovement.get(r.id)?.toISOString() ?? null,
-    }));
+    const ids = rows.map((r) => r.id);
+    if (ids.length === 0) return [];
+    const [summaries, pending] = await Promise.all([
+      this.activitySummaryByOpportunity(companyId, ids),
+      this.prisma.activity.findMany({
+        where: {
+          companyId,
+          opportunityId: { in: ids },
+          status: 'PENDIENTE',
+          isSystemGenerated: false,
+        },
+        select: { opportunityId: true, activityDate: true },
+      }),
+    ]);
+    const byId = new Map(summaries.map((row) => [row.id, row]));
+    const counts = new Map<string, { pendingActions: number; overdueActions: number }>();
+    const today = todayInSantiago();
+    for (const action of pending) {
+      if (!action.opportunityId) continue;
+      const count = counts.get(action.opportunityId) ?? { pendingActions: 0, overdueActions: 0 };
+      count.pendingActions += 1;
+      if (santiagoDateOf(action.activityDate) < today) count.overdueActions += 1;
+      counts.set(action.opportunityId, count);
+    }
+    return rows.map((r) => {
+      const summary = byId.get(r.id);
+      return {
+        ...r,
+        lastMovementAt: summary?.lastMovementAt?.toISOString() ?? null,
+        ...(counts.get(r.id) ?? { pendingActions: 0, overdueActions: 0 }),
+        lastUpdate: {
+          at: (summary?.lastUpdateAt ?? r.createdAt).toISOString(),
+          kind: summary?.lastUpdateKind ?? ('CREACION' satisfies LastUpdateKind),
+        },
+      };
+    });
   }
 
   /** COM-020 — "Último movimiento" per opportunity, DERIVED at read time (never stored,
@@ -144,18 +189,39 @@ export class OpportunitiesService {
   ): Promise<Map<string, Date>> {
     const result = new Map<string, Date>();
     if (opportunityIds.length === 0) return result;
-    const rows = await this.prisma.$queryRaw<LastMovementRow[]>(Prisma.sql`
-      SELECT o.id, GREATEST(o."updatedAt", act.last, n.last, d.last) AS "lastMovementAt"
-      FROM opportunities o
-      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM activities WHERE "opportunityId" = o.id) act ON true
-      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM opportunity_notes WHERE "opportunityId" = o.id) n ON true
-      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM opportunity_documents WHERE "opportunityId" = o.id AND "deletedAt" IS NULL) d ON true
-      WHERE o."companyId" = ${companyId}::uuid AND o.id = ANY(${opportunityIds}::uuid[])
-    `);
+    const rows = await this.activitySummaryByOpportunity(companyId, opportunityIds);
     for (const row of rows) {
       if (row.lastMovementAt) result.set(row.id, new Date(row.lastMovementAt));
     }
     return result;
+  }
+
+  private async activitySummaryByOpportunity(companyId: string, opportunityIds: string[]) {
+    return this.prisma.$queryRaw<OpportunityActivitySummary[]>(Prisma.sql`
+      SELECT o.id, GREATEST(o."updatedAt", act.last, n.last, d.last) AS "lastMovementAt",
+             COALESCE(upd.at, o."createdAt") AS "lastUpdateAt",
+             COALESCE(upd.kind, 'CREACION') AS "lastUpdateKind"
+      FROM opportunities o
+      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM activities WHERE "opportunityId" = o.id) act ON true
+      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM opportunity_notes WHERE "opportunityId" = o.id) n ON true
+      LEFT JOIN LATERAL (SELECT max("createdAt") AS last FROM opportunity_documents WHERE "opportunityId" = o.id AND "deletedAt" IS NULL) d ON true
+      LEFT JOIN LATERAL (
+        SELECT ev.at, ev.kind FROM (
+          SELECT a."createdAt" AS at,
+                 CASE WHEN a."isSystemGenerated" THEN COALESCE(a."systemEvent"::text, 'SISTEMA')
+                      ELSE 'ACCION_AGREGADA' END AS kind,
+                 0 AS pri
+            FROM activities a WHERE a."opportunityId" = o.id
+          UNION ALL
+          SELECT a."statusChangedAt",
+                 CASE WHEN a."status" = 'HECHA' THEN 'ACCION_COMPLETADA' ELSE 'ACCION_REABIERTA' END,
+                 1
+            FROM activities a WHERE a."opportunityId" = o.id
+              AND a."isSystemGenerated" = false AND a."statusChangedAt" IS NOT NULL
+        ) ev ORDER BY ev.at DESC, ev.pri DESC, ev.kind LIMIT 1
+      ) upd ON true
+      WHERE o."companyId" = ${companyId}::uuid AND o.id = ANY(${opportunityIds}::uuid[])
+    `);
   }
 
   async findOne(id: string, companyId: string) {
@@ -183,11 +249,12 @@ export class OpportunitiesService {
         },
       });
       // COM-009 — the create event, in the SAME transaction as the insert.
-      await this.writeSystemActivity(tx, {
+      await writeSystemActivity(tx, {
         companyId,
         accountId: dto.accountId,
         opportunityId: created.id,
         userId,
+        event: 'CREACION',
         subject: 'Oportunidad creada',
       });
       return created;
@@ -197,7 +264,7 @@ export class OpportunitiesService {
   /** General-field update. Stage edits are REJECTED here — they must go through
    * changeStage() so the transition rules are the only path. */
   async update(id: string, companyId: string, userId: string, dto: UpdateOpportunityDto) {
-    await this.findOne(id, companyId);
+    const existing = await this.findOne(id, companyId);
     if (dto.stage !== undefined) {
       throw new BadRequestException(
         'Los cambios de etapa se realizan vía PATCH /:id/stage, no en la edición general.',
@@ -235,8 +302,71 @@ export class OpportunitiesService {
     if (dto.ownerId !== undefined) data.ownerId = dto.ownerId;
     if (dto.notes !== undefined) data.notes = dto.notes;
 
+    const changes: { event: CommercialActivityEvent; subject: string }[] = [];
+    const recordChange = (
+      event: CommercialActivityEvent,
+      label: string,
+      ending: 'definido' | 'definida',
+      before: string | null,
+      after: string | null,
+    ) => {
+      const subject =
+        before === null
+          ? `${label} ${ending}: ${after}`
+          : after === null
+            ? `${label} ${ending === 'definido' ? 'eliminado' : 'eliminada'} (era ${before})`
+            : `${label}: ${before} → ${after}`;
+      changes.push({ event, subject });
+    };
+    if (dto.estimatedValue !== undefined) {
+      const before = existing.estimatedValue;
+      const after = dto.estimatedValue === null ? null : new Prisma.Decimal(dto.estimatedValue);
+      const equal = before == null ? after === null : after !== null && before.equals(after);
+      if (!equal)
+        recordChange(
+          'VALOR_ESTIMADO',
+          'Valor estimado',
+          'definido',
+          before == null ? null : formatCLP(before),
+          after === null ? null : formatCLP(after),
+        );
+    }
+    if (dto.expectedCloseDate !== undefined) {
+      const before = existing.expectedCloseDate;
+      const after = dto.expectedCloseDate ? this.toDateOnly(dto.expectedCloseDate) : null;
+      if (
+        (before?.toISOString().slice(0, 10) ?? null) !== (after?.toISOString().slice(0, 10) ?? null)
+      ) {
+        recordChange(
+          'FECHA_CIERRE',
+          'Fecha de cierre',
+          'definida',
+          before == null ? null : formatDateOnly(before),
+          after === null ? null : formatDateOnly(after),
+        );
+      }
+    }
+    if (dto.probability !== undefined && (existing.probability ?? null) !== dto.probability) {
+      recordChange(
+        'PROBABILIDAD',
+        'Probabilidad',
+        'definida',
+        existing.probability == null ? null : `${existing.probability}%`,
+        dto.probability === null ? null : `${dto.probability}%`,
+      );
+    }
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
-      return tx.opportunity.update({ where: { id }, data });
+      const updated = await tx.opportunity.update({ where: { id }, data });
+      for (const change of changes) {
+        await writeSystemActivity(tx, {
+          companyId,
+          accountId: updated.accountId,
+          opportunityId: id,
+          userId,
+          ...change,
+        });
+      }
+      return updated;
     });
   }
 
@@ -257,6 +387,7 @@ export class OpportunitiesService {
     // COM-009 — the timeline text for this movement (Spanish display labels). Computed
     // alongside `data`; written in the SAME transaction as the update below.
     let subject: string;
+    let event: CommercialActivityEvent;
 
     if (to === OpportunityStage.PERDIDA) {
       // Rule 2 — losing requires a categorized reason; OTRO also requires detail.
@@ -273,12 +404,14 @@ export class OpportunitiesService {
       data.lostReasonDetail = detail;
       data.closedAt = new Date();
       data.previousStage = null;
+      event = 'PERDIDA';
       subject = `Oportunidad perdida — ${LOST_REASON_LABELS[dto.lostReason]}`;
       if (dto.lostReason === LostReason.OTRO && detail) subject += `: ${detail}`;
     } else if (to === OpportunityStage.GANADA) {
       // Rule 2 — GANADA needs nothing extra here (COM-013 handoff prereqs come later).
       data.closedAt = new Date();
       data.previousStage = null;
+      event = 'GANADA';
       subject = 'Oportunidad ganada';
     } else if (to === OpportunityStage.EN_PAUSA) {
       // Rule 4 — pause only FROM an active stage; remember where it was.
@@ -286,6 +419,7 @@ export class OpportunitiesService {
         throw new BadRequestException('Solo puedes pausar una oportunidad en una etapa activa.');
       }
       data.previousStage = from;
+      event = 'PAUSA';
       subject = 'Oportunidad en pausa';
       // closedAt untouched by a pause
     } else {
@@ -294,19 +428,22 @@ export class OpportunitiesService {
       // pause context (that movement reads as a resume, not a plain stage change).
       if (from === OpportunityStage.EN_PAUSA) {
         data.previousStage = null;
+        event = 'REANUDACION';
         subject = `Oportunidad reanudada (a ${STAGE_LABELS[to]})`;
       } else {
+        event = 'CAMBIO_ETAPA';
         subject = `Etapa: ${STAGE_LABELS[from]} → ${STAGE_LABELS[to]}`;
       }
     }
 
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
       const updated = await tx.opportunity.update({ where: { id }, data });
-      await this.writeSystemActivity(tx, {
+      await writeSystemActivity(tx, {
         companyId,
         accountId: opp.accountId,
         opportunityId: id,
         userId,
+        event,
         subject,
       });
       return updated;
@@ -325,11 +462,12 @@ export class OpportunitiesService {
         where: { id },
         data: { stage: target, previousStage: null },
       });
-      await this.writeSystemActivity(tx, {
+      await writeSystemActivity(tx, {
         companyId,
         accountId: opp.accountId,
         opportunityId: id,
         userId,
+        event: 'REANUDACION',
         subject: `Oportunidad reanudada (a ${STAGE_LABELS[target]})`,
       });
       return updated;
@@ -349,11 +487,12 @@ export class OpportunitiesService {
         // lostReason / lostReasonDetail intentionally preserved (historical record).
         data: { stage: OpportunityStage.NEGOCIACION, closedAt: null },
       });
-      await this.writeSystemActivity(tx, {
+      await writeSystemActivity(tx, {
         companyId,
         accountId: opp.accountId,
         opportunityId: id,
         userId,
+        event: 'REAPERTURA',
         subject: 'Oportunidad reabierta',
       });
       return updated;
@@ -482,37 +621,5 @@ export class OpportunitiesService {
     if (!account) {
       throw new BadRequestException('Cuenta no encontrada en esta empresa.');
     }
-  }
-
-  /** COM-009 — write a SYSTEM activity (type NOTA, isSystemGenerated=true) recording a
-   * pipeline event, in the SAME transaction as the stage mutation (the `tx` passed by
-   * executeWithRls). This deliberately bypasses the public ActivitiesService.create,
-   * which forces isSystemGenerated=false — so the public API still cannot mint system
-   * entries, while the machine's own history is atomic with the movement it records.
-   * Only the COM-005 events call this; bundle mutations / estimatedValue recomputes
-   * (COM-006) never do. detail stays null — the subject carries the message. */
-  private async writeSystemActivity(
-    tx: Prisma.TransactionClient,
-    params: {
-      companyId: string;
-      accountId: string;
-      opportunityId: string;
-      userId: string;
-      subject: string;
-    },
-  ) {
-    await tx.activity.create({
-      data: {
-        companyId: params.companyId,
-        createdBy: params.userId,
-        accountId: params.accountId,
-        opportunityId: params.opportunityId,
-        type: ActivityType.NOTA,
-        subject: params.subject,
-        detail: null,
-        isSystemGenerated: true,
-        activityDate: new Date(),
-      },
-    });
   }
 }

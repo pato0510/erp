@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { OpportunityStage, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ACTIVITY_TYPE_LABELS } from '../activities/system-activity';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 
 /* COM-019 — the Comercial dashboard (CRM-4): win rate, KPIs, pipeline by stage, lost
@@ -39,14 +40,6 @@ const LOST_REASON_LABELS: Record<string, string> = {
   PROYECTO_CANCELADO: 'Canceló el proyecto',
   OTRO: 'Otro',
 };
-const ACTIVITY_TYPE_LABELS: Record<string, string> = {
-  LLAMADA: 'Llamada',
-  REUNION: 'Reunión',
-  EMAIL: 'Email',
-  VISITA_FAENA: 'Visita a faena',
-  NOTA: 'Nota',
-};
-
 export interface DashboardRange {
   from: string;
   to: string;
@@ -120,7 +113,7 @@ export class DashboardService {
       }),
       this.prisma.activity.groupBy({
         by: ['type'],
-        where: { companyId, createdAt: inRange },
+        where: { companyId, createdAt: inRange, isSystemGenerated: false },
         _count: { _all: true },
       }),
     ]);
@@ -230,7 +223,7 @@ export class DashboardService {
     const activitiesByType = activityGroups
       .map((g) => ({
         type: g.type as string,
-        label: ACTIVITY_TYPE_LABELS[g.type as string] ?? (g.type as string),
+        label: ACTIVITY_TYPE_LABELS[g.type],
         count: g._count._all,
       }))
       .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type));

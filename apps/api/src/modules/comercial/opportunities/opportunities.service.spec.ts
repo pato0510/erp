@@ -7,7 +7,7 @@
  * on the tx (this.prisma has no write methods) and a single executeWithRls call proves
  * the activity is atomic with the stage mutation — not a separate transaction. */
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { LostReason, OpportunityStage } from '@prisma/client';
+import { LostReason, OpportunityStage, Prisma } from '@prisma/client';
 import { OpportunitiesService } from './opportunities.service';
 
 type Any = Record<string, unknown>;
@@ -57,6 +57,9 @@ const opp = (stage: OpportunityStage, extra: Any = {}) => ({
   accountId: 'acc1',
   stage,
   previousStage: null,
+  estimatedValue: null,
+  expectedCloseDate: null,
+  probability: null,
   ...extra,
 });
 const lastData = (fn: jest.Mock) => (fn.mock.calls[0][0] as Any).data as Any;
@@ -211,6 +214,9 @@ describe('OpportunitiesService — COM-009 system-generated timeline entries', (
     expect(activityCreate).toHaveBeenCalledTimes(1);
     const a = sysActivity(activityCreate);
     expect(a.subject).toBe('Oportunidad creada');
+    expect(a.systemEvent).toBe('CREACION');
+    expect(a.status).toBeNull();
+    expect(a.statusChangedAt).toBeNull();
     expect(a.isSystemGenerated).toBe(true);
     expect(a.type).toBe('NOTA');
     expect(a.accountId).toBe('acc1');
@@ -223,18 +229,21 @@ describe('OpportunitiesService — COM-009 system-generated timeline entries', (
     const { svc, activityCreate } = makeService(opp(S.PROSPECTO));
     await svc.changeStage('o1', 'c1', 'u1', { stage: S.NEGOCIACION });
     expect(sysActivity(activityCreate).subject).toBe('Etapa: Prospecto → Negociación');
+    expect(sysActivity(activityCreate).systemEvent).toBe('CAMBIO_ETAPA');
   });
 
   it('→GANADA writes "Oportunidad ganada"', async () => {
     const { svc, activityCreate } = makeService(opp(S.NEGOCIACION));
     await svc.changeStage('o1', 'c1', 'u1', { stage: S.GANADA });
     expect(sysActivity(activityCreate).subject).toBe('Oportunidad ganada');
+    expect(sysActivity(activityCreate).systemEvent).toBe('GANADA');
   });
 
   it('→PERDIDA (PRECIO) writes "Oportunidad perdida — Precio"', async () => {
     const { svc, activityCreate } = makeService(opp(S.NEGOCIACION));
     await svc.changeStage('o1', 'c1', 'u1', { stage: S.PERDIDA, lostReason: LostReason.PRECIO });
     expect(sysActivity(activityCreate).subject).toBe('Oportunidad perdida — Precio');
+    expect(sysActivity(activityCreate).systemEvent).toBe('PERDIDA');
   });
 
   it('→PERDIDA (OTRO + detail) appends the detail — "Oportunidad perdida — Otro: {detail}"', async () => {
@@ -247,30 +256,35 @@ describe('OpportunitiesService — COM-009 system-generated timeline entries', (
     expect(sysActivity(activityCreate).subject).toBe(
       'Oportunidad perdida — Otro: se fueron con la competencia interna',
     );
+    expect(sysActivity(activityCreate).systemEvent).toBe('PERDIDA');
   });
 
   it('→EN_PAUSA writes "Oportunidad en pausa"', async () => {
     const { svc, activityCreate } = makeService(opp(S.COTIZACION));
     await svc.changeStage('o1', 'c1', 'u1', { stage: S.EN_PAUSA });
     expect(sysActivity(activityCreate).subject).toBe('Oportunidad en pausa');
+    expect(sysActivity(activityCreate).systemEvent).toBe('PAUSA');
   });
 
   it('resume writes "Oportunidad reanudada (a {stage})"', async () => {
     const { svc, activityCreate } = makeService(opp(S.EN_PAUSA, { previousStage: S.COTIZACION }));
     await svc.resume('o1', 'c1', 'u1');
     expect(sysActivity(activityCreate).subject).toBe('Oportunidad reanudada (a Cotización)');
+    expect(sysActivity(activityCreate).systemEvent).toBe('REANUDACION');
   });
 
   it('direct EN_PAUSA→active (resume-elsewhere) also reads as reanudada', async () => {
     const { svc, activityCreate } = makeService(opp(S.EN_PAUSA, { previousStage: S.COTIZACION }));
     await svc.changeStage('o1', 'c1', 'u1', { stage: S.PROSPECTO });
     expect(sysActivity(activityCreate).subject).toBe('Oportunidad reanudada (a Prospecto)');
+    expect(sysActivity(activityCreate).systemEvent).toBe('REANUDACION');
   });
 
   it('reopen writes "Oportunidad reabierta"', async () => {
     const { svc, activityCreate } = makeService(opp(S.GANADA, { closedAt: new Date() }));
     await svc.reopen('o1', 'c1', 'u1');
     expect(sysActivity(activityCreate).subject).toBe('Oportunidad reabierta');
+    expect(sysActivity(activityCreate).systemEvent).toBe('REAPERTURA');
   });
 
   it('a REJECTED transition (PERDIDA without reason) writes NO activity', async () => {
@@ -398,18 +412,29 @@ describe('OpportunitiesService — COM-020 list filters + lastMovementAt', () =>
     if (w.AND && !(w.AND as Row[]).every((o) => matches(r, o))) return false;
     return true;
   };
-  function makeListService(lastMovement: Row[] = []) {
+  function makeListService(lastMovement: Row[] = [], pending: Row[] = []) {
     const findMany = jest.fn((args: Row) =>
-      Promise.resolve(rows.filter((r) => matches(r, args.where as Row))),
+      Promise.resolve(
+        rows
+          .filter((r) => matches(r, args.where as Row))
+          .map((r) => ({ ...r, createdAt: new Date('2026-09-01T12:00:00Z') })),
+      ),
     );
     const queryRaw = jest.fn(() => Promise.resolve(lastMovement));
+    const activityFindMany = jest.fn(() => Promise.resolve(pending));
     const prisma = {
       opportunity: { findMany },
       $queryRaw: queryRaw,
+      activity: { findMany: activityFindMany },
     } as unknown as ConstructorParameters<typeof OpportunitiesService>[0];
     const rls = {} as unknown as ConstructorParameters<typeof OpportunitiesService>[1];
     const domainEvents = {} as unknown as ConstructorParameters<typeof OpportunitiesService>[2];
-    return { svc: new OpportunitiesService(prisma, rls, domainEvents), findMany, queryRaw };
+    return {
+      svc: new OpportunitiesService(prisma, rls, domainEvents),
+      findMany,
+      queryRaw,
+      activityFindMany,
+    };
   }
   const ids = (list: Row[]) => list.map((r) => r.id);
 
@@ -484,9 +509,204 @@ describe('OpportunitiesService — COM-020 list filters + lastMovementAt', () =>
     expect(sql.values).toEqual(['c1', ['p1', 'n1']]);
   });
 
-  it('an empty list skips the raw query', async () => {
-    const { svc, queryRaw } = makeListService();
-    expect(await svc.findAll('c1', { ownerId: 'nobody' })).toEqual([]);
+  it('COM-022 list combines counts and latest update with one raw and one pending read', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-24T02:30:00Z'));
+    try {
+      const when = new Date('2026-09-23T20:00:00Z');
+      const { svc, queryRaw, activityFindMany } = makeListService(
+        [
+          {
+            id: 'n1',
+            lastMovementAt: when,
+            lastUpdateAt: when,
+            lastUpdateKind: 'ACCION_COMPLETADA',
+          },
+        ],
+        [
+          { opportunityId: 'n1', activityDate: new Date('2026-09-23T15:00:00Z') },
+          { opportunityId: 'n1', activityDate: new Date('2026-09-22T15:00:00Z') },
+          { opportunityId: 'p1', activityDate: new Date('2026-09-25T15:00:00Z') },
+        ],
+      );
+      const list = await svc.findAll('c1', { includeClosed: false });
+      expect(list[1]).toMatchObject({
+        pendingActions: 2,
+        overdueActions: 1,
+        lastUpdate: { at: when.toISOString(), kind: 'ACCION_COMPLETADA' },
+      });
+      expect(list[0]).toMatchObject({
+        pendingActions: 1,
+        overdueActions: 0,
+        lastUpdate: { at: '2026-09-01T12:00:00.000Z', kind: 'CREACION' },
+      });
+      expect(queryRaw).toHaveBeenCalledTimes(1);
+      expect(activityFindMany).toHaveBeenCalledTimes(1);
+      expect(activityFindMany).toHaveBeenCalledWith({
+        where: {
+          companyId: 'c1',
+          opportunityId: { in: ['p1', 'n1'] },
+          status: 'PENDIENTE',
+          isSystemGenerated: false,
+        },
+        select: { opportunityId: true, activityDate: true },
+      });
+      jest.setSystemTime(new Date('2026-09-24T03:30:00Z'));
+      expect((await svc.findAll('c1', { includeClosed: false }))[1].overdueActions).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('COM-022 no activity has zero counts and the opportunity creation fallback', async () => {
+    const { svc } = makeListService();
+    for (const row of await svc.findAll('c1'))
+      expect(row).toMatchObject({
+        pendingActions: 0,
+        overdueActions: 0,
+        lastUpdate: { at: '2026-09-01T12:00:00.000Z', kind: 'CREACION' },
+      });
+  });
+
+  it('ALERT-001 helper keeps its Map<string, Date> signature, filtering empty values and skipping empty ids', async () => {
+    const when = new Date('2026-09-23T20:00:00Z');
+    const { svc, queryRaw, activityFindMany } = makeListService([
+      { id: 'n1', lastMovementAt: when },
+      { id: 'p1', lastMovementAt: null },
+    ]);
+    expect(await svc.lastMovementByOpportunity('c1', [])).toEqual(new Map());
     expect(queryRaw).not.toHaveBeenCalled();
+    expect(await svc.lastMovementByOpportunity('c1', ['p1', 'n1'])).toEqual(
+      new Map([['n1', when]]),
+    );
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(activityFindMany).not.toHaveBeenCalled();
+  });
+
+  it('an empty list skips the raw query', async () => {
+    const { svc, queryRaw, activityFindMany } = makeListService();
+    expect(await svc.findAll('c1', { ownerId: 'nobody' })).toEqual([]);
+    expect(activityFindMany).not.toHaveBeenCalled();
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('OpportunitiesService — COM-022 real field edits', () => {
+  const S = OpportunityStage;
+  const cases = [
+    {
+      before: {},
+      dto: { estimatedValue: 19266400, expectedCloseDate: '2026-09-23', probability: 40 },
+      subjects: [
+        'Valor estimado definido: $19.266.400',
+        'Fecha de cierre definida: 23-09-2026',
+        'Probabilidad definida: 40%',
+      ],
+    },
+    {
+      before: {
+        estimatedValue: new Prisma.Decimal(19266400),
+        expectedCloseDate: new Date('2026-09-23T00:00:00Z'),
+        probability: 40,
+      },
+      dto: { estimatedValue: 20000000, expectedCloseDate: '2026-10-01', probability: 60 },
+      subjects: [
+        'Valor estimado: $19.266.400 → $20.000.000',
+        'Fecha de cierre: 23-09-2026 → 01-10-2026',
+        'Probabilidad: 40% → 60%',
+      ],
+    },
+    {
+      before: {
+        estimatedValue: new Prisma.Decimal(19266400),
+        expectedCloseDate: new Date('2026-09-23T00:00:00Z'),
+        probability: 40,
+      },
+      dto: { estimatedValue: null, expectedCloseDate: null, probability: null },
+      subjects: [
+        'Valor estimado eliminado (era $19.266.400)',
+        'Fecha de cierre eliminada (era 23-09-2026)',
+        'Probabilidad eliminada (era 40%)',
+      ],
+    },
+  ];
+  it.each(cases)(
+    'writes exact defined/changed/removed subjects: $subjects',
+    async ({ before, dto, subjects }) => {
+      const { svc, activityCreate, oppUpdate, executeWithRls } = makeService(
+        opp(S.PROSPECTO, before),
+      );
+      await svc.update('o1', 'c1', 'u1', dto as never);
+      expect(executeWithRls).toHaveBeenCalledTimes(1);
+      expect(oppUpdate).toHaveBeenCalledTimes(1);
+      expect(activityCreate).toHaveBeenCalledTimes(3);
+      const events = ['VALOR_ESTIMADO', 'FECHA_CIERRE', 'PROBABILIDAD'];
+      activityCreate.mock.calls.forEach(([arg], i) =>
+        expect(arg.data).toMatchObject({
+          subject: subjects[i],
+          systemEvent: events[i],
+          isSystemGenerated: true,
+          status: null,
+          statusChangedAt: null,
+          type: 'NOTA',
+          companyId: 'c1',
+          accountId: 'acc1',
+          opportunityId: 'o1',
+          createdBy: 'u1',
+        }),
+      );
+    },
+  );
+
+  it('Decimal equality, civil-day equality and unchanged probability write nothing', async () => {
+    const { svc, activityCreate, executeWithRls } = makeService(
+      opp(S.PROSPECTO, {
+        estimatedValue: new Prisma.Decimal('19266400.00'),
+        expectedCloseDate: new Date('2026-09-23T00:00:00Z'),
+        probability: 40,
+      }),
+    );
+    await svc.update('o1', 'c1', 'u1', {
+      estimatedValue: 19266400,
+      expectedCloseDate: '2026-09-23T15:00:00Z',
+      probability: 40,
+    });
+    expect(activityCreate).not.toHaveBeenCalled();
+    expect(executeWithRls).toHaveBeenCalledTimes(1);
+  });
+
+  it('clearing fields already null and editing name/owner/notes/account write nothing', async () => {
+    const { svc, activityCreate } = makeService(opp(S.PROSPECTO));
+    await svc.update('o1', 'c1', 'u1', {
+      name: 'Renombrada',
+      notes: 'Nota',
+      ownerId: 'u2',
+      accountId: 'acc1',
+      estimatedValue: null,
+      expectedCloseDate: null,
+      probability: null,
+    } as never);
+    expect(activityCreate).not.toHaveBeenCalled();
+  });
+
+  it('logs only the changed field; zero is a defined value', async () => {
+    const { svc, activityCreate } = makeService(opp(S.PROSPECTO, { probability: 40 }));
+    await svc.update('o1', 'c1', 'u1', { estimatedValue: 0, probability: 40 });
+    expect(activityCreate).toHaveBeenCalledTimes(1);
+    expect(sysActivity(activityCreate)).toMatchObject({
+      systemEvent: 'VALOR_ESTIMADO',
+      subject: 'Valor estimado definido: $0',
+    });
+  });
+
+  it('probability zero is defined, and Decimal changes below a formatted peso still count', async () => {
+    const { svc, activityCreate } = makeService(
+      opp(S.PROSPECTO, { estimatedValue: new Prisma.Decimal('1.01') }),
+    );
+    await svc.update('o1', 'c1', 'u1', { estimatedValue: 1.02, probability: 0 });
+    expect(activityCreate).toHaveBeenCalledTimes(2);
+    expect(activityCreate.mock.calls.map(([a]) => (a.data as Any).subject)).toEqual([
+      'Valor estimado: $1 → $1',
+      'Probabilidad definida: 0%',
+    ]);
   });
 });

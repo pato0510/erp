@@ -27,7 +27,13 @@ interface Opp {
 
 function makeService(
   opps: Opp[],
-  activities: { companyId: string; type: string; createdAt: string }[] = [],
+  activities: {
+    companyId: string;
+    type: string;
+    createdAt: string;
+    isSystemGenerated?: boolean;
+    status?: string;
+  }[] = [],
 ) {
   const calls: Any[] = [];
   const inRange = (iso: string | null, r: Any | undefined) => {
@@ -79,6 +85,11 @@ function makeService(
       const counts = new Map<string, number>();
       for (const a of activities) {
         if (a.companyId !== w.companyId) continue;
+        if (
+          w.isSystemGenerated !== undefined &&
+          (a.isSystemGenerated ?? false) !== w.isSystemGenerated
+        )
+          continue;
         if (!inRange(a.createdAt, w.createdAt as Any)) continue;
         counts.set(a.type, (counts.get(a.type) ?? 0) + 1);
       }
@@ -396,5 +407,34 @@ describe('DashboardService — tenant discipline', () => {
     await svc.getDashboard('c1', RANGE);
     expect(calls).toHaveLength(5);
     for (const c of calls) expect((c.where as Any).companyId).toBe('c1');
+  });
+});
+
+describe('DashboardService — COM-022 manual actions', () => {
+  it('counts both states created in range, excludes system rows and shares Correo / Visita técnica labels', async () => {
+    const base = { companyId: 'c1', createdAt: '2026-03-10T12:00:00Z' };
+    const { svc, calls } = makeService(
+      [],
+      [
+        { ...base, type: 'EMAIL', status: 'PENDIENTE' },
+        { ...base, type: 'EMAIL', status: 'HECHA' },
+        { ...base, type: 'VISITA_FAENA', status: 'HECHA' },
+        { ...base, type: 'NOTA', isSystemGenerated: true },
+        { ...base, type: 'EMAIL', createdAt: '2026-04-01T00:00:00Z' },
+        { ...base, type: 'EMAIL', companyId: 'other' },
+      ],
+    );
+    expect((await svc.getDashboard('c1', RANGE)).activitiesByType).toEqual([
+      { type: 'EMAIL', label: 'Correo', count: 2 },
+      { type: 'VISITA_FAENA', label: 'Visita técnica', count: 1 },
+    ]);
+    expect(calls.find((c) => c.model === 'activity.groupBy')?.where).toMatchObject({
+      companyId: 'c1',
+      isSystemGenerated: false,
+      createdAt: {
+        gte: new Date('2026-03-01T00:00:00.000Z'),
+        lte: new Date('2026-03-31T23:59:59.999Z'),
+      },
+    });
   });
 });
