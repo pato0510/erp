@@ -5,13 +5,21 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Todo } from '@prisma/client';
+import { Prisma, Todo, TodoStatus } from '@prisma/client';
 import { AppAbility, TodoSubject } from '../../common/casl/casl-ability.factory';
 import { RlsService } from '../../common/rls/rls.service';
 import { NotificationService } from '../../operations/notifications/notification.service';
 import { CreateTodoDto, FilterTodoAlertsDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
+import { OPEN_TODO_STATUSES } from './todo-status';
 
 const NAME_SELECT = { id: true, firstName: true, lastName: true, email: true } as const;
+const SANTIAGO_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Santiago',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const STATUS_CONFLICT = 'El to-do cambió mientras lo editabas; recarga e inténtalo de nuevo.';
 
 @Injectable()
 export class TodosService {
@@ -40,11 +48,18 @@ export class TodosService {
     return this.rls.executeWithRls(companyId, userId, async (tx) => {
       const where = this.scopeWhere(companyId, userId, ability, filters.scope);
       if (!where.assigneeId && filters.assigneeId) where.assigneeId = filters.assigneeId;
-      if (filters.status !== 'ALL') where.status = filters.status ?? 'PENDING';
+      const status = filters.status ?? 'OPEN';
+      if (status !== 'ALL') where.status = status === 'OPEN' ? { in: OPEN_TODO_STATUSES } : status;
       if (filters.dueBefore) where.dueDate = { lt: this.dateOnly(filters.dueBefore) };
+      if (filters.completedAfter)
+        where.OR = [
+          { status: { in: OPEN_TODO_STATUSES } },
+          { status: 'DONE', completedAt: { gte: this.startOfSantiagoDay(filters.completedAfter) } },
+        ];
       const rows = await tx.todo.findMany({
         where,
         orderBy: [
+          // PostgreSQL enum order follows the board columns; DONE remains last.
           { status: 'asc' },
           { dueDate: { sort: 'asc', nulls: 'last' } },
           { createdAt: 'desc' },
@@ -68,12 +83,21 @@ export class TodosService {
   }
 
   private todayInSantiago(): string {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Santiago',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    return SANTIAGO_DATE.format(new Date());
+  }
+
+  private startOfSantiagoDay(value: string): Date {
+    const utc = this.dateOnly(value, 'completedAfter no es una fecha válida.').getTime();
+    // completedAt is an instant, unlike @db.Date dueDate. Find the first instant
+    // of the civil day, including Santiago's skipped/repeated midnight at DST.
+    let low = utc - 86_400_000;
+    let high = utc + 86_400_000;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (SANTIAGO_DATE.format(new Date(middle)) < value) low = middle + 1;
+      else high = middle;
+    }
+    return new Date(low);
   }
 
   private async resolveRows(
@@ -97,10 +121,14 @@ export class TodosService {
           : null,
         createdByName: creator ? `${creator.firstName} ${creator.lastName}`.trim() : null,
         overdue:
-          row.status === 'PENDING' &&
+          OPEN_TODO_STATUSES.includes(row.status) &&
           row.dueDate !== null &&
           row.dueDate.toISOString().slice(0, 10) < today,
-        canComplete: row.status === 'PENDING' && this.canComplete(row, userId, ability),
+        canComplete:
+          OPEN_TODO_STATUSES.includes(row.status) && this.canComplete(row, userId, ability),
+        canChangeStatus: OPEN_TODO_STATUSES.includes(row.status)
+          ? this.canComplete(row, userId, ability)
+          : ability.can('update', TodoSubject),
         // Row ownership is computed from CASL, so ADMIN can delete others' rows without FE roles.
         canDelete:
           ability.can('delete', TodoSubject) &&
@@ -118,7 +146,7 @@ export class TodosService {
       tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
       const where: Prisma.TodoWhereInput = {
         ...this.scopeWhere(companyId, userId, ability, filters.scope),
-        status: 'PENDING',
+        status: { in: OPEN_TODO_STATUSES },
       };
       if (filters.summary) {
         const [overdue, dueSoon] = await Promise.all([
@@ -158,14 +186,14 @@ export class TodosService {
     return row;
   }
 
-  private dateOnly(value: string): Date {
+  private dateOnly(value: string, message = 'La fecha límite no es válida.'): Date {
     const date = new Date(`${value}T00:00:00.000Z`);
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
       Number.isNaN(date.getTime()) ||
       date.toISOString().slice(0, 10) !== value
     ) {
-      throw new BadRequestException('La fecha límite no es válida.');
+      throw new BadRequestException(message);
     }
     return date;
   }
@@ -225,13 +253,13 @@ export class TodosService {
     const data = this.fields(dto);
     const result = await this.rls.executeWithRls(companyId, userId, async (tx) => {
       const row = await this.getOrThrow(tx, companyId, id);
-      if (row.status === 'DONE')
+      if (!OPEN_TODO_STATUSES.includes(row.status))
         throw new BadRequestException('Reabre el to-do antes de editarlo.');
       const reassigned = dto.assigneeId !== undefined && dto.assigneeId !== row.assigneeId;
       if (reassigned) await this.memberOrThrow(tx, companyId, dto.assigneeId as string);
       // Compare-and-set prevents an edit from racing a completion or another edit.
       const changed = await tx.todo.updateMany({
-        where: { id, companyId, status: 'PENDING', updatedAt: row.updatedAt },
+        where: { id, companyId, status: { in: OPEN_TODO_STATUSES }, updatedAt: row.updatedAt },
         data,
       });
       if (!changed.count)
@@ -252,40 +280,57 @@ export class TodosService {
   }
 
   complete(id: string, companyId: string, userId: string, ability: AppAbility) {
-    return this.rls.executeWithRls(companyId, userId, async (tx) => {
-      const row = await this.getOrThrow(tx, companyId, id);
-      this.assertCanComplete(row, userId, ability);
-      if (row.status === 'DONE') return row;
-      const changed = await tx.todo.updateMany({
-        where: {
-          id,
-          companyId,
-          status: 'PENDING',
-          assigneeId: row.assigneeId,
-          updatedAt: row.updatedAt,
-        },
-        data: { status: 'DONE', completedAt: new Date(), completedBy: userId },
-      });
-      const fresh = await this.getOrThrow(tx, companyId, id);
-      this.assertCanComplete(fresh, userId, ability);
-      if (!changed.count && fresh.status !== 'DONE')
-        throw new ConflictException('El to-do cambió. Actualiza la lista e inténtalo de nuevo.');
-      return fresh;
-    });
+    return this.transition(id, companyId, userId, ability, 'DONE');
   }
 
   async reopen(id: string, companyId: string, userId: string, ability: AppAbility) {
     if (!ability.can('update', TodoSubject))
       throw new ForbiddenException('No tienes permiso para reabrir to-dos.');
+    return this.transition(id, companyId, userId, ability, 'PENDING', true);
+  }
+
+  changeStatus(
+    id: string,
+    companyId: string,
+    userId: string,
+    ability: AppAbility,
+    status: TodoStatus,
+  ) {
+    return this.transition(id, companyId, userId, ability, status);
+  }
+
+  private transition(
+    id: string,
+    companyId: string,
+    userId: string,
+    ability: AppAbility,
+    status: TodoStatus,
+    reopenOnly = false,
+  ) {
     return this.rls.executeWithRls(companyId, userId, async (tx) => {
       const row = await this.getOrThrow(tx, companyId, id);
-      if (row.status === 'PENDING') return row;
+      if (row.status === 'DONE' && status !== 'DONE') {
+        if (!ability.can('update', TodoSubject))
+          throw new ForbiddenException('No tienes permiso para reabrir to-dos.');
+      } else this.assertCanComplete(row, userId, ability);
+      // Authorize even no-ops; /reopen never resets work that is already open.
+      if (row.status === status || (reopenOnly && OPEN_TODO_STATUSES.includes(row.status)))
+        return row;
       const changed = await tx.todo.updateMany({
-        where: { id, companyId, status: 'DONE', updatedAt: row.updatedAt },
-        data: { status: 'PENDING', completedAt: null, completedBy: null },
+        where: {
+          id,
+          companyId,
+          status: row.status,
+          assigneeId: row.assigneeId,
+          updatedAt: row.updatedAt,
+        },
+        data: {
+          status,
+          completedAt: status === 'DONE' ? new Date() : null,
+          completedBy: status === 'DONE' ? userId : null,
+        },
       });
-      if (!changed.count)
-        throw new ConflictException('El to-do cambió. Actualiza la lista e inténtalo de nuevo.');
+      if (!changed.count) throw new ConflictException(STATUS_CONFLICT);
       return this.getOrThrow(tx, companyId, id);
     });
   }

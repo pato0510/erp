@@ -1,6 +1,7 @@
 import { AbilityBuilder, createMongoAbility } from '@casl/ability';
 import { Logger } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { TodosService } from '../actividades/todos/todos.service';
 import {
   AlertRuleSubject,
   AppAbility,
@@ -182,6 +183,46 @@ describe('HUB-003a live status', () => {
     expect(await service.getStatus(COMPANY, USER, reads(TodoSubject))).toEqual({
       lines: [{ moduleKey: 'gestion', kind: 'atencion', message }],
     });
+  });
+
+  it('GO-003: counts all open states through the real todo alerts service, excluding DONE', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-16T15:00:00Z'));
+    const rows = ['PENDING', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'DONE'].flatMap((status) => [
+      { companyId: COMPANY, assigneeId: USER, status, dueDate: new Date('2026-09-15') },
+      { companyId: COMPANY, assigneeId: USER, status, dueDate: new Date('2026-09-16') },
+      { companyId: COMPANY, assigneeId: 'other', status, dueDate: new Date('2026-09-15') },
+      { companyId: 'foreign', assigneeId: USER, status, dueDate: new Date('2026-09-16') },
+    ]);
+    const count = jest.fn(
+      async ({ where }) =>
+        rows.filter(
+          (row) =>
+            row.companyId === where.companyId &&
+            row.assigneeId === where.assigneeId &&
+            where.status.in.includes(row.status) &&
+            (!where.dueDate.lt || row.dueDate < where.dueDate.lt) &&
+            (!where.dueDate.gte || row.dueDate >= where.dueDate.gte) &&
+            (!where.dueDate.lte || row.dueDate <= where.dueDate.lte),
+        ).length,
+    );
+    const rls = {
+      executeWithRls: jest.fn(async (company, user, fn) => {
+        expect([company, user]).toEqual([COMPANY, USER]);
+        return fn({ todo: { count } });
+      }),
+    };
+    const todos = new TodosService(rls as never, {} as never);
+    const service = new HubService(rls as never, {} as never, todos, {} as never);
+    expect(await service.getStatus(COMPANY, USER, reads(TodoSubject))).toEqual({
+      lines: [
+        {
+          moduleKey: 'gestion',
+          kind: 'atencion',
+          message: '4 tareas vencidas · 4 vencen hoy o mañana',
+        },
+      ],
+    });
+    expect(count).toHaveBeenCalledTimes(2);
   });
 
   it('omits the critical suffix when there are no critical alerts', async () => {

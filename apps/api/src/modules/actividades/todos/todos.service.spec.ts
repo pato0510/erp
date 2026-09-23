@@ -3,12 +3,20 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  ValidationPipe,
 } from '@nestjs/common';
-import { Todo, UserRole } from '@prisma/client';
+import { Todo, TodoStatus, UserRole } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CaslAbilityFactory } from '../../common/casl/casl-ability.factory';
-import { CreateTodoDto, FilterTodoAlertsDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
+import {
+  ChangeTodoStatusDto,
+  CreateTodoDto,
+  FilterTodoAlertsDto,
+  FilterTodosDto,
+  UpdateTodoDto,
+} from './dto/todo.dto';
+import { OPEN_TODO_STATUSES } from './todo-status';
 import { TodosController } from './todos.controller';
 import { TodosService } from './todos.service';
 
@@ -84,10 +92,13 @@ function setup(initial: Todo[] = []) {
     expect(inRls).toBe(true);
     expect(where.companyId).toBe('c1');
   };
-  const matches = (row: Todo, where: Any) =>
+  const matches = (row: Todo, where: Any): boolean =>
     Object.entries(where).every(([key, value]) => {
+      if (key === 'OR') return (value as Any[]).some((part) => matches(row, part));
       const actual = row[key as keyof Todo];
-      if (key === 'dueDate') {
+      if (key === 'status' && typeof value === 'object')
+        return (value as { in: TodoStatus[] }).in.includes(row.status);
+      if (key === 'dueDate' || key === 'completedAt') {
         const range = value as { lt?: Date; lte?: Date; gte?: Date };
         return (
           actual instanceof Date &&
@@ -103,7 +114,8 @@ function setup(initial: Todo[] = []) {
   const todo = {
     findFirst: jest.fn(async ({ where }: { where: Any }) => {
       scoped(where);
-      return rows.find((row) => matches(row, where)) ?? null;
+      const row = rows.find((row) => matches(row, where));
+      return row ? { ...row } : null;
     }),
     findMany: jest.fn(async ({ where, orderBy }: { where: Any; orderBy: unknown }) => {
       scoped(where);
@@ -116,7 +128,11 @@ function setup(initial: Todo[] = []) {
       return rows
         .filter((row) => matches(row, where))
         .sort((a, b) => {
-          if (!alertOrder && a.status !== b.status) return a.status === 'PENDING' ? -1 : 1;
+          if (!alertOrder && a.status !== b.status)
+            return (
+              Object.values(TodoStatus).indexOf(a.status) -
+              Object.values(TodoStatus).indexOf(b.status)
+            );
           const due = (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity);
           const priorities = { LOW: 0, MEDIUM: 1, HIGH: 2 };
           return (
@@ -396,7 +412,7 @@ describe('GO-001 TodosService', () => {
     todo.updateMany.mockResolvedValueOnce({ count: 0 });
     await expect(svc.reopen('t1', 'c1', 'u1', manager)).rejects.toBeInstanceOf(ConflictException);
     expect(todo.updateMany).toHaveBeenCalledWith({
-      where: { id: 't1', companyId: 'c1', status: 'DONE', updatedAt: NOW },
+      where: { id: 't1', companyId: 'c1', status: 'DONE', assigneeId: 'u2', updatedAt: NOW },
       data: { status: 'PENDING', completedAt: null, completedBy: null },
     });
     expect(rows[0]).toMatchObject({ status: 'DONE', completedAt: NOW, completedBy: 'u2' });
@@ -417,6 +433,9 @@ describe('GO-001 TodosService', () => {
       await expect(svc.complete(id, 'c1', 'u1', manager)).rejects.toBeInstanceOf(NotFoundException);
       await expect(svc.reopen(id, 'c1', 'u1', manager)).rejects.toBeInstanceOf(NotFoundException);
       await expect(svc.remove(id, 'c1', 'u1', manager)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(svc.changeStatus(id, 'c1', 'u1', manager, 'IN_PROGRESS')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     }
   });
   it('uses date-only values and Santiago today for overdue (due today is not late)', async () => {
@@ -438,6 +457,245 @@ describe('GO-001 TodosService', () => {
       await svc.update(row.id, 'c1', 'u1', { dueDate: null, description: null }),
     ).toMatchObject({ dueDate: null, description: null });
   });
+});
+
+const BOARD_STATUSES: TodoStatus[] = ['PENDING', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'DONE'];
+const OPEN_STATUSES = BOARD_STATUSES.slice(0, 4);
+
+describe('GO-003 board states', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(NOW);
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('exposes all five enum values in board order and exactly four open states', () => {
+    expect(Object.values(TodoStatus)).toEqual(BOARD_STATUSES);
+    expect(OPEN_TODO_STATUSES).toEqual(OPEN_STATUSES);
+  });
+
+  it('defaults to OPEN, keeps each explicit status exact, and sorts ALL with DONE last', async () => {
+    const { svc } = setup(
+      [...BOARD_STATUSES].reverse().map((status) => seed({ id: status, status })),
+    );
+    expect(new FilterTodosDto().status).toBe('OPEN');
+    for (const status of [undefined, 'OPEN', 'ALL', ...BOARD_STATUSES] as const) {
+      const rows = await svc.findAll('c1', 'u2', viewer, filters({ status }));
+      expect(rows.map((row) => row.status)).toEqual(
+        status === undefined || status === 'OPEN'
+          ? OPEN_STATUSES
+          : status === 'ALL'
+            ? BOARD_STATUSES
+            : [status],
+      );
+    }
+  });
+
+  it.each([
+    ['2026-01-15', '2026-01-15T03:00:00.000Z'],
+    ['2026-07-15', '2026-07-15T04:00:00.000Z'],
+    ['2026-04-05', '2026-04-05T04:00:00.000Z'],
+    ['2026-09-06', '2026-09-06T04:00:00.000Z'],
+  ])(
+    'bounds only DONE by the first Santiago instant of %s (including DST)',
+    async (completedAfter, start) => {
+      const boundary = new Date(start);
+      const { svc } = setup([
+        ...OPEN_STATUSES.map((status) => seed({ id: status, status })),
+        seed({ id: 'old', status: 'DONE', completedAt: new Date(boundary.getTime() - 1) }),
+        seed({ id: 'boundary', status: 'DONE', completedAt: boundary }),
+        seed({ id: 'later', status: 'DONE', completedAt: new Date(boundary.getTime() + 1) }),
+        seed({ id: 'unknown', status: 'DONE', completedAt: null }),
+        seed({ id: 'foreign', companyId: 'other', status: 'DONE', completedAt: boundary }),
+        seed({ id: 'other-assignee', assigneeId: 'u3', status: 'DONE', completedAt: boundary }),
+      ]);
+      for (const status of ['ALL', 'OPEN', 'DONE', 'IN_PROGRESS'] as const) {
+        const rows = await svc.findAll('c1', 'u2', viewer, filters({ status, completedAfter }));
+        expect(rows.map((row) => row.id)).toEqual(
+          status === 'ALL'
+            ? [...OPEN_STATUSES, 'boundary', 'later']
+            : status === 'OPEN'
+              ? OPEN_STATUSES
+              : status === 'DONE'
+                ? ['boundary', 'later']
+                : ['IN_PROGRESS'],
+        );
+      }
+    },
+  );
+
+  it.each(Object.values(UserRole))(
+    'computes flags and overdue for every state for %s',
+    async (role) => {
+      const { svc } = setup(
+        BOARD_STATUSES.map((status) =>
+          seed({ id: status, status, dueDate: new Date('2026-09-15') }),
+        ),
+      );
+      const rows = await svc.findAll('c1', 'u2', ability(role), filters({ status: 'ALL' }));
+      const editor = [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(
+        role as never,
+      );
+      for (const row of rows) {
+        expect(row.overdue).toBe(row.status !== 'DONE');
+        expect(row.canComplete).toBe(row.status !== 'DONE');
+        expect(row.canChangeStatus).toBe(row.status !== 'DONE' || editor);
+        expect(row.canDelete).toBe(role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN);
+      }
+    },
+  );
+
+  const transitions = Object.values(UserRole).flatMap((role) =>
+    [true, false].flatMap((owns) =>
+      BOARD_STATUSES.flatMap((from) => BOARD_STATUSES.map((to) => ({ role, owns, from, to }))),
+    ),
+  );
+  it.each(transitions)('$role owns=$owns: $from → $to', async ({ role, owns, from, to }) => {
+    const original = seed({
+      status: from,
+      completedAt: from === 'DONE' ? NOW : null,
+      completedBy: from === 'DONE' ? 'u2' : null,
+    });
+    const { svc, todo, notifications } = setup([original]);
+    const actor = owns ? 'u2' : 'u3';
+    const editor =
+      role === UserRole.MANAGER || role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+    const allowed = editor || (owns && (from !== 'DONE' || to === 'DONE'));
+    const result = svc.changeStatus('t1', 'c1', actor, ability(role), to);
+    if (!allowed) {
+      await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+      expect(todo.updateMany).not.toHaveBeenCalled();
+    } else {
+      const row = await result;
+      expect(row.status).toBe(to);
+      if (from === to) {
+        expect(row).toEqual(original);
+        expect(todo.updateMany).not.toHaveBeenCalled();
+      } else {
+        expect(row.completedAt).toEqual(to === 'DONE' ? NOW : null);
+        expect(row.completedBy).toBe(to === 'DONE' ? actor : null);
+        expect(todo.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 't1', companyId: 'c1', status: from, assigneeId: 'u2', updatedAt: NOW },
+          }),
+        );
+      }
+    }
+    expect(notifications.createGeneric).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { status: 'BLOCKED' as const },
+    { status: 'DONE' as const },
+    { assigneeId: 'u3' },
+    { updatedAt: new Date(NOW.getTime() + 1) },
+  ])(
+    'rejects lost CAS without overwriting %j, even when the race also completes',
+    async (concurrent) => {
+      const { svc, todo, rows } = setup([seed({ status: 'IN_PROGRESS' })]);
+      const write = todo.updateMany.getMockImplementation();
+      if (!write) throw new Error('Missing compare-and-set mock');
+      todo.updateMany.mockImplementationOnce((args) => {
+        Object.assign(rows[0], concurrent);
+        return write(args);
+      });
+      await expect(svc.changeStatus('t1', 'c1', 'u2', viewer, 'DONE')).rejects.toMatchObject({
+        status: 409,
+        message: 'El to-do cambió mientras lo editabas; recarga e inténtalo de nuevo.',
+      });
+      expect(rows[0]).toMatchObject(concurrent);
+    },
+  );
+
+  it.each(OPEN_STATUSES)(
+    'complete handles %s and reopen preserves already-open work',
+    async (status) => {
+      const { svc, todo } = setup([seed({ status })]);
+      expect(await svc.reopen('t1', 'c1', 'u1', manager)).toMatchObject({ status });
+      expect(todo.updateMany).not.toHaveBeenCalled();
+      expect(await svc.complete('t1', 'c1', 'u2', viewer)).toMatchObject({
+        status: 'DONE',
+        completedBy: 'u2',
+        completedAt: NOW,
+      });
+      expect(await svc.reopen('t1', 'c1', 'u1', manager)).toMatchObject({
+        status: 'PENDING',
+        completedBy: null,
+        completedAt: null,
+      });
+    },
+  );
+
+  it('edits IN_PROGRESS using open-state and updatedAt CAS', async () => {
+    const { svc, todo } = setup([seed({ status: 'IN_PROGRESS' })]);
+    expect(await svc.update('t1', 'c1', 'u1', { title: 'En marcha' })).toMatchObject({
+      title: 'En marcha',
+      status: 'IN_PROGRESS',
+    });
+    expect(todo.updateMany).toHaveBeenCalledWith({
+      where: { id: 't1', companyId: 'c1', status: { in: OPEN_STATUSES }, updatedAt: NOW },
+      data: { title: 'En marcha' },
+    });
+  });
+
+  it('forwards status changes using the authenticated actor and company', async () => {
+    const { svc } = setup([seed()]);
+    const controller = new TodosController(svc);
+    expect(
+      await controller.changeStatus('t1', 'c1', { id: 'u2' }, viewer, { status: 'IN_REVIEW' }),
+    ).toMatchObject({ status: 'IN_REVIEW' });
+  });
+
+  it('includes all open states in overdue/dueSoon rows and summary, excluding DONE', async () => {
+    const { svc } = setup(
+      BOARD_STATUSES.flatMap((status) => [
+        seed({ id: `late-${status}`, status, dueDate: new Date('2026-09-15') }),
+        seed({ id: `today-${status}`, status, dueDate: new Date('2026-09-16') }),
+        seed({ id: `tomorrow-${status}`, status, dueDate: new Date('2026-09-17') }),
+      ]),
+    );
+    const full = await svc.alerts('c1', 'u2', viewer, alertFilters());
+    expect(full.counts).toEqual({ overdue: 4, dueSoon: 8, total: 12 });
+    expect(full.overdue?.map((row) => row.status).sort()).toEqual([...OPEN_STATUSES].sort());
+    expect(
+      full.dueSoon?.every((row) => row.status !== 'DONE' && row.canComplete && row.canChangeStatus),
+    ).toBe(true);
+    expect(await svc.alerts('c1', 'u2', viewer, alertFilters({ summary: true }))).toEqual({
+      counts: full.counts,
+    });
+  });
+
+  it.each([...BOARD_STATUSES, 'OPEN', 'ALL'])('accepts list status %s', async (status) => {
+    expect(await validate(plainToInstance(FilterTodosDto, { status }))).toEqual([]);
+  });
+
+  it.each(BOARD_STATUSES)('accepts transition status %s', async (status) => {
+    expect(await validate(plainToInstance(ChangeTodoStatusDto, { status }))).toEqual([]);
+  });
+
+  it.each([undefined, null, '', 'OPEN', 'ALL', 'CANCELLED'])(
+    'returns 400 for invalid transition status %s',
+    async (status) => {
+      await expect(
+        new ValidationPipe({ transform: true }).transform(
+          { status },
+          { type: 'body', metatype: ChangeTodoStatusDto },
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+    },
+  );
+
+  it.each(['2026-02-30', '2026-09-16T00:00:00Z', 'bad'])(
+    'returns 400 for completedAfter=%s',
+    async (completedAfter) => {
+      await expect(
+        new ValidationPipe({ transform: true }).transform(
+          { completedAfter },
+          { type: 'query', metatype: FilterTodosDto },
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+    },
+  );
 });
 
 describe('GO-001 DTO validation', () => {

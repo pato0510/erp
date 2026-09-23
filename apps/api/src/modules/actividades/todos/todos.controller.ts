@@ -17,7 +17,13 @@ import { CurrentCompany } from '../../common/decorators/current-company.decorato
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PoliciesGuard } from '../../common/guards/policies.guard';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
-import { CreateTodoDto, FilterTodoAlertsDto, FilterTodosDto, UpdateTodoDto } from './dto/todo.dto';
+import {
+  ChangeTodoStatusDto,
+  CreateTodoDto,
+  FilterTodoAlertsDto,
+  FilterTodosDto,
+  UpdateTodoDto,
+} from './dto/todo.dto';
 import { TodosService } from './todos.service';
 
 // GO-001 — every route declares a policy, including the assignee's complete action.
@@ -73,6 +79,18 @@ export class TodosController {
     @Body() dto: UpdateTodoDto,
   ) {
     return this.service.update(id, companyId, user.id, dto);
+  }
+
+  @Patch(':id/status')
+  @CheckPolicies((ability) => ability.can('read', TodoSubject))
+  changeStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentCompany() companyId: string,
+    @CurrentUser() user: { id: string },
+    @CurrentAbility() ability: AppAbility,
+    @Body() dto: ChangeTodoStatusDto,
+  ) {
+    return this.service.changeStatus(id, companyId, user.id, ability, dto.status);
   }
 
   @Patch(':id/complete')

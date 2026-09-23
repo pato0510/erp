@@ -21,6 +21,7 @@ const endpoints = [
   ['assignees', 'create'],
   ['create', 'create'],
   ['update', 'update'],
+  ['changeStatus', 'read'],
   ['complete', 'read'],
   ['reopen', 'update'],
   ['remove', 'delete'],

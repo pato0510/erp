@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { TodoPriority } from '@prisma/client';
+import { TodoPriority, TodoStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
@@ -42,12 +42,17 @@ export class CreateTodoDto {
 
 export class UpdateTodoDto extends PartialType(CreateTodoDto, { skipNullProperties: false }) {}
 
+export class ChangeTodoStatusDto {
+  @IsEnum(TodoStatus, { message: 'El estado del to-do no es válido.' })
+  status: TodoStatus;
+}
+
 export class FilterTodosDto {
   @IsIn(['mine', 'all'])
   scope: 'mine' | 'all' = 'mine';
 
-  @IsIn(['PENDING', 'DONE', 'ALL'])
-  status: 'PENDING' | 'DONE' | 'ALL' = 'PENDING';
+  @IsIn(['OPEN', 'ALL', ...Object.values(TodoStatus)])
+  status: 'OPEN' | 'ALL' | TodoStatus = 'OPEN';
 
   @IsOptional()
   @IsUUID()
@@ -57,6 +62,11 @@ export class FilterTodosDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @IsDateString({ strict: true })
   dueBefore?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'completedAfter debe tener el formato YYYY-MM-DD.' })
+  @IsDateString({ strict: true }, { message: 'completedAfter no es una fecha válida.' })
+  completedAfter?: string;
 }
 
 // ALERT-002 — transform explicitly: Boolean('false') would incorrectly enable summary.

@@ -100,6 +100,9 @@ model CalendarActivityNote {
 // GO-001 — Organizational to-dos. Actor UUIDs follow the calendar convention (no user FK).
 enum TodoStatus {
   PENDING
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
   DONE
 }
 
