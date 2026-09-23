@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../hooks/useMembers';
+
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -56,15 +58,6 @@ interface LocationOption {
   code?: string | null;
 }
 
-interface UserOption {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-  isActive: boolean;
-}
-
 interface TeamMember {
   /* Local-only id used as the React key. */
   rowId: string;
@@ -105,7 +98,7 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
   const [permitTypes, setPermitTypes] = useState<WorkPermitTypeOption[]>([]);
   const [assets, setAssets] = useState<AssetOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
-  const [users, setUsers] = useState<UserOption[]>([]);
+  const { members, isLoading: membersLoading } = useMembers('active');
   const [catalogsLoaded, setCatalogsLoaded] = useState(false);
 
   const [permitTypeId, setPermitTypeId] = useState('');
@@ -127,27 +120,22 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
   const [submitting, setSubmitting] = useState<false | 'draft' | 'review'>(false);
   const [error, setError] = useState<string | null>(null);
 
-  /* Load catalogs once. Failures swallow into empty selectors so the
-     modal still renders. */
+  // Each catalog settles independently; one failure cannot discard the others.
   useEffect(() => {
     let alive = true;
-    Promise.all([
-      apiClient.get<WorkPermitTypeOption[]>('/api/operations/work-permit-types'),
-      apiClient.get<{ data: AssetOption[] }>('/api/operations/assets?limit=100'),
-      apiClient.get<LocationOption[]>('/api/operations/locations'),
-      apiClient.get<UserOption[]>('/api/users'),
-    ])
-      .then(([t, a, l, u]) => {
-        if (!alive) return;
-        setPermitTypes(t.filter((x) => x.isActive));
-        setAssets(a.data ?? []);
-        setLocations(l ?? []);
-        setUsers(u.filter((x) => x.isActive));
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (alive) setCatalogsLoaded(true);
-      });
+    Promise.allSettled([
+      apiClient.get<WorkPermitTypeOption[]>('/api/operations/work-permit-types').then((rows) => {
+        if (alive) setPermitTypes(rows.filter((row) => row.isActive));
+      }),
+      apiClient.get<{ data: AssetOption[] }>('/api/operations/assets?limit=100').then((rows) => {
+        if (alive) setAssets(rows.data ?? []);
+      }),
+      apiClient.get<LocationOption[]>('/api/operations/locations').then((rows) => {
+        if (alive) setLocations(rows ?? []);
+      }),
+    ]).finally(() => {
+      if (alive) setCatalogsLoaded(true);
+    });
     return () => {
       alive = false;
     };
@@ -406,14 +394,23 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
           <Section title="4. Equipo de trabajo" icon={ShieldCheck}>
             <Field label="Supervisor responsable" required>
               <select
+                aria-label="Supervisor responsable"
+                aria-busy={membersLoading}
+                disabled={membersLoading}
                 value={supervisorId}
                 onChange={(e) => setSupervisorId(e.target.value)}
                 className="cp-input"
               >
-                <option value="">— Selecciona un usuario —</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.firstName} {u.lastName} · {u.email}
+                <option value="">
+                  {membersLoading
+                    ? 'Cargando miembros…'
+                    : members.length
+                      ? '— Selecciona un usuario —'
+                      : 'Sin miembros disponibles'}
+                </option>
+                {members.map((u) => (
+                  <option key={u.userId} value={u.userId}>
+                    {u.displayName}
                   </option>
                 ))}
               </select>
@@ -428,20 +425,23 @@ export function WorkPermitFormModal({ defaultAssetId, onClose, onCreated }: Prop
                   <div style={{ flex: '1 1 200px' }}>
                     {m.isInternal ? (
                       <select
+                        aria-label="Integrante interno"
+                        aria-busy={membersLoading}
+                        disabled={membersLoading}
                         value={m.userId ?? ''}
                         onChange={(e) => {
-                          const u = users.find((x) => x.id === e.target.value);
+                          const u = members.find((x) => x.userId === e.target.value);
                           updateTeamRow(m.rowId, {
-                            userId: u?.id,
-                            name: u ? `${u.firstName} ${u.lastName}` : m.name,
+                            userId: u?.userId,
+                            name: u?.displayName ?? '',
                           });
                         }}
                         className="cp-input"
                       >
                         <option value="">— Selecciona usuario —</option>
-                        {users.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.firstName} {u.lastName}
+                        {members.map((u) => (
+                          <option key={u.userId} value={u.userId}>
+                            {u.displayName}
                           </option>
                         ))}
                       </select>

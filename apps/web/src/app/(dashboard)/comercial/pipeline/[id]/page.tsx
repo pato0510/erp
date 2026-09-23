@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../../../../hooks/useMembers';
+
 /* COM-007b — the opportunity detail: the deal's operating center. Header + stage
  * actions (Pausar/Reanudar/Reabrir, canonical COM-005 endpoints), the read-only
  * fields, the "Servicios" bundle editor (COM-006), the Actividad timeline (COM-008),
@@ -45,11 +47,6 @@ interface Opportunity {
   createdAt: string;
   updatedAt: string;
 }
-interface UserOption {
-  id: string;
-  firstName: string;
-  lastName: string;
-}
 
 export default function OpportunityDetailPage() {
   const params = useParams();
@@ -63,7 +60,8 @@ export default function OpportunityDetailPage() {
 
   const [opp, setOpp] = useState<Opportunity | null>(null);
   const [accountName, setAccountName] = useState<string | null>(null);
-  const [ownerName, setOwnerName] = useState<string | null>(null);
+  const { nameOf } = useMembers('all');
+  const ownerName = opp?.ownerId ? (nameOf(opp.ownerId) ?? 'Usuario desconocido') : null;
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -96,15 +94,6 @@ export default function OpportunityDetailPage() {
           .get<{ name: string }>(`/api/comercial/accounts/${data.accountId}`)
           .then((a) => setAccountName(a.name))
           .catch(() => setAccountName(null));
-        if (data.ownerId) {
-          apiClient
-            .get<UserOption[]>('/api/users')
-            .then((us) => {
-              const u = us.find((x) => x.id === data.ownerId);
-              setOwnerName(u ? `${u.firstName} ${u.lastName}` : data.ownerId!.slice(0, 8));
-            })
-            .catch(() => setOwnerName(data.ownerId!.slice(0, 8)));
-        }
       })
       .catch((e) => {
         if (e instanceof ApiError && e.status === 403) setForbidden(true);

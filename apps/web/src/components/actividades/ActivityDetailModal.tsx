@@ -1,16 +1,12 @@
 'use client';
 
+import { useMembers } from '../../hooks/useMembers';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Pencil, Play, RotateCcw, Send, Trash2, X, XCircle } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { STATUS_LABEL, STATUS_STYLE } from './statusMachine';
-import type {
-  ActivityArea,
-  ActivityNote,
-  ActivityStatus,
-  CalendarActivity,
-  MemberOption,
-} from './activityTypes';
+import type { ActivityArea, ActivityNote, ActivityStatus, CalendarActivity } from './activityTypes';
 
 /* CAL-005 — activity detail + curated status actions. Every write affordance is conditional on
    `canWrite` (a real conditional render, not a hidden handler) — a VIEWER/ANALYST/ACCOUNTANT
@@ -31,7 +27,6 @@ function formatDate(iso: string): string {
 export function ActivityDetailModal({
   activity,
   area,
-  members,
   canWrite,
   onClose,
   onChanged,
@@ -39,17 +34,17 @@ export function ActivityDetailModal({
 }: {
   activity: CalendarActivity;
   area: ActivityArea | undefined;
-  members: MemberOption[];
   canWrite: boolean;
   onClose: () => void;
   onChanged: () => void;
   onEdit: (a: CalendarActivity) => void;
 }) {
+  const { nameOf } = useMembers('all');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const memberName = (userId: string | null): string | null =>
-    userId ? (members.find((m) => m.userId === userId)?.displayName ?? '—') : null;
+    userId ? (nameOf(userId) ?? 'Usuario desconocido') : null;
   const responsable = memberName(activity.assigneeId);
 
   const changeStatus = async (status: ActivityStatus) => {
@@ -135,7 +130,7 @@ export function ActivityDetailModal({
           {err && <p className="text-sm text-red-600">{err}</p>}
         </div>
 
-        <BitacoraSection activityId={activity.id} members={members} canWrite={canWrite} />
+        <BitacoraSection activityId={activity.id} canWrite={canWrite} />
 
         {canWrite && (
           <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border-color)] px-5 py-4">
@@ -234,7 +229,7 @@ function ActionBtn({
 }
 
 /* CAL-009 / CAL-012 — the bitácora: entries newest-first (by createdAt), author resolved via the
-   members map (fetched once per page). Append box for writers. CAL-012 — the founder reversed the
+   shared company members directory (scope=all). Append box for writers. CAL-012 — the founder reversed the
    signed immutability (2026-07-22): each entry now carries a pencil (edit, PREFILLED) and a trash
    (delete) for writers; an edited entry shows a "· editada" marker. Readers see the marker, zero
    controls. Backend 400s (empty text) surface verbatim; the audit trigger keeps prior content. */
@@ -248,23 +243,15 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function BitacoraSection({
-  activityId,
-  members,
-  canWrite,
-}: {
-  activityId: string;
-  members: MemberOption[];
-  canWrite: boolean;
-}) {
+function BitacoraSection({ activityId, canWrite }: { activityId: string; canWrite: boolean }) {
+  const { nameOf } = useMembers('all');
   const [notes, setNotes] = useState<ActivityNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [posting, setPosting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const authorName = (userId: string): string =>
-    members.find((m) => m.userId === userId)?.displayName ?? 'Usuario';
+  const authorName = (userId: string): string => nameOf(userId) ?? 'Usuario desconocido';
 
   const load = useCallback(() => {
     setLoading(true);

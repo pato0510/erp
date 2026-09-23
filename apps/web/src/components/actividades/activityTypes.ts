@@ -36,7 +36,7 @@ export interface ActivityArea {
 }
 
 /* CAL-008 — a company member option for the Responsable select + author-name resolution
-   (GET /actividades/members). Structurally { userId, displayName } only. */
+   (GET /api/members via useMembers). Structurally { userId, displayName } only. */
 export interface MemberOption {
   userId: string;
   displayName: string;

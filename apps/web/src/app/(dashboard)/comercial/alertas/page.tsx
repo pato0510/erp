@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../../../hooks/useMembers';
+
 /* ALERT-001 — Comercial alerts panel (CRM-6): what needs attention, DERIVED LIVE by the
  * API on every read (GET comercial/alerts). A PANEL, NOT A NOTIFIER — nothing is stored,
  * scheduled or dismissed. Three sections in the dashboard/table patterns: quotes sent and
@@ -59,6 +61,7 @@ const TD = 'px-4 py-3 text-[var(--text-secondary)]';
 const days = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`;
 
 export default function ComercialAlertasPage() {
+  const { nameOf } = useMembers('all');
   const perms = useComercialPermissions();
   const canRead = perms?.opportunity.read ?? false;
   const [data, setData] = useState<AlertsData | null>(null);
@@ -199,8 +202,11 @@ export default function ComercialAlertasPage() {
             </td>
             <td className={TD}>
               {o.ownerId ? (
-                <span className="font-mono text-[11px]" title={o.ownerId}>
-                  {o.ownerId.slice(0, 8)}
+                <span
+                  className="font-mono text-[11px]"
+                  title={nameOf(o.ownerId) ?? 'Usuario desconocido'}
+                >
+                  {nameOf(o.ownerId) ?? 'Usuario desconocido'}
                 </span>
               ) : (
                 '—'
@@ -240,8 +246,11 @@ export default function ComercialAlertasPage() {
             </td>
             <td className={TD}>
               {o.ownerId ? (
-                <span className="font-mono text-[11px]" title={o.ownerId}>
-                  {o.ownerId.slice(0, 8)}
+                <span
+                  className="font-mono text-[11px]"
+                  title={nameOf(o.ownerId) ?? 'Usuario desconocido'}
+                >
+                  {nameOf(o.ownerId) ?? 'Usuario desconocido'}
                 </span>
               ) : (
                 '—'

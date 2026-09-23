@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../../../hooks/useMembers';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -67,7 +69,6 @@ import type {
   CalendarActivity,
   CampaignCalendarEntry,
   CierreCalendarEntry,
-  MemberOption,
   ServicioCalendarEntry,
   VencimientoCalendarEntry,
 } from '../../../../components/actividades/activityTypes';
@@ -147,7 +148,7 @@ export default function ActividadesCalendarioPage() {
   const [focusedDate, setFocusedDate] = useState<Date>(new Date());
 
   const [areas, setAreas] = useState<ActivityArea[]>([]);
-  const [members, setMembers] = useState<MemberOption[]>([]);
+  const { members } = useMembers('active');
   const [activities, setActivities] = useState<CalendarActivity[]>([]);
   const [birthdays, setBirthdays] = useState<BirthdayEntry[]>([]);
   // CAL-016 — the two Operaciones collections folded into the same feed.
@@ -196,17 +197,12 @@ export default function ActividadesCalendarioPage() {
 
   const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
 
-  /* Areas + members: one fetch each on mount (the members map — CAL-008/009 — resolves
-     responsable + bitácora author names; fetched ONCE per page, not per entry). */
+  // Area catalog; member names and picker options use the shared company directory.
   useEffect(() => {
     apiClient
       .get<ActivityArea[]>('/api/actividades/areas')
       .then(setAreas)
       .catch(() => setAreas([]));
-    apiClient
-      .get<MemberOption[]>('/api/actividades/members')
-      .then(setMembers)
-      .catch(() => setMembers([]));
   }, []);
 
   /* Feed: fetch EVERY month the visible grid touches and merge. Activities dedupe by id (a
@@ -743,7 +739,6 @@ export default function ActividadesCalendarioPage() {
         <ActivityDetailModal
           activity={selected}
           area={areaById.get(selected.areaId)}
-          members={members}
           canWrite={canWrite}
           onClose={() => setSelected(null)}
           onChanged={() => {

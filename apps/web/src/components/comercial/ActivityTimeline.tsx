@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../hooks/useMembers';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
@@ -33,11 +35,6 @@ interface Activity {
   createdBy: string;
   createdAt: string;
 }
-interface UserOpt {
-  id: string;
-  firstName: string;
-  lastName: string;
-}
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('es-CL', {
@@ -61,7 +58,7 @@ export function ActivityTimeline({
   const [state, setState] = useState<'loading' | 'ok' | 'forbidden' | 'error'>('loading');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [opportunities, setOpportunities] = useState<OpportunityOption[]>([]);
-  const [users, setUsers] = useState<UserOpt[]>([]);
+  const { nameOf } = useMembers('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ActivityForForm | null>(null);
@@ -92,19 +89,6 @@ export function ActivityTimeline({
       .catch(() => setOpportunities([]));
   }, [scope, scopeId]);
 
-  // Resolve who logged each entry (degrades to a short UUID for non-admins).
-  useEffect(() => {
-    apiClient
-      .get<UserOpt[]>('/api/users')
-      .then(setUsers)
-      .catch(() => setUsers([]));
-  }, []);
-
-  const usersById = useMemo(() => {
-    const m = new Map<string, string>();
-    users.forEach((u) => m.set(u.id, `${u.firstName} ${u.lastName}`.trim()));
-    return m;
-  }, [users]);
   const oppsById = useMemo(() => {
     const m = new Map<string, string>();
     opportunities.forEach((o) => m.set(o.id, o.name));
@@ -175,7 +159,7 @@ export function ActivityTimeline({
           {activities.map((a) => {
             const long = (a.detail?.length ?? 0) > 140;
             const isOpen = expanded.has(a.id);
-            const who = usersById.get(a.createdBy) ?? a.createdBy.slice(0, 8);
+            const who = nameOf(a.createdBy) ?? 'Usuario desconocido';
             const linkedName = a.opportunityId ? oppsById.get(a.opportunityId) : null;
             return (
               <div

@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../../../hooks/useMembers';
+
 /* COM-004b — Cuentas (accounts) list. Self-contained: filters + table + create/
  * edit modal + soft-deactivate. Clones the RRHH cargos table markup and the
  * standard modal overlay. Write controls are role-gated (useCanWrite); ANALYST/
@@ -69,6 +71,7 @@ export default function CuentasPage() {
 }
 
 function CuentasContent() {
+  const { nameOf } = useMembers('all');
   const searchParams = useSearchParams();
   const canWrite = useCanWrite();
   // COM-018 — the accordion's timeline gates Registrar/Editar/Eliminar on the activity flags.
@@ -314,8 +317,11 @@ function CuentasContent() {
                       </td>
                       <td className="px-4 py-3 text-[var(--text-secondary)]">
                         {a.ownerId ? (
-                          <span className="font-mono text-[11px]" title={a.ownerId}>
-                            {a.ownerId.slice(0, 8)}
+                          <span
+                            className="font-mono text-[11px]"
+                            title={nameOf(a.ownerId) ?? 'Usuario desconocido'}
+                          >
+                            {nameOf(a.ownerId) ?? 'Usuario desconocido'}
                           </span>
                         ) : (
                           '—'

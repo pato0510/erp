@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../../../../hooks/useMembers';
+
 import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -99,14 +101,6 @@ interface Procedure {
   }>;
 }
 
-interface UserSummary {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-}
-
 interface AssetSummary {
   id: string;
   code: string;
@@ -155,12 +149,17 @@ const CATEGORY_META: Record<
 export default function ProcedureDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = use(props.params);
   const { user } = useAuth();
-  const role = (user as { role?: string } | null)?.role;
+  const companyId = apiClient.getCompanyId();
+  const role = (
+    companyId
+      ? user?.companies.find((company) => company.companyId === companyId)
+      : user?.companies[0]
+  )?.role;
   const isAdminOrManager = role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'MANAGER';
   const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
 
   const [procedure, setProcedure] = useState<Procedure | null>(null);
-  const [users, setUsers] = useState<UserSummary[]>([]);
+  const { nameOf } = useMembers('all');
   const [assets, setAssets] = useState<AssetSummary[]>([]);
   const [assetTypes, setAssetTypes] = useState<AssetTypeSummary[]>([]);
   const [locations, setLocations] = useState<LocationSummary[]>([]);
@@ -184,9 +183,8 @@ export default function ProcedureDetailPage(props: { params: Promise<{ id: strin
     setLoading(true);
     setError(null);
     try {
-      const [p, u, a, t, l] = await Promise.all([
+      const [p, a, t, l] = await Promise.all([
         apiClient.get<Procedure>(`/api/operations/procedures/${id}`),
-        apiClient.get<UserSummary[]>('/api/users').catch(() => [] as UserSummary[]),
         apiClient
           .get<{ data: AssetSummary[] }>('/api/operations/assets?limit=200')
           .catch(() => ({ data: [] as AssetSummary[] })),
@@ -198,7 +196,6 @@ export default function ProcedureDetailPage(props: { params: Promise<{ id: strin
           .catch(() => [] as LocationSummary[]),
       ]);
       setProcedure(p);
-      setUsers(u);
       setAssets(a.data ?? []);
       setAssetTypes(t);
       setLocations(l);
@@ -234,8 +231,6 @@ export default function ProcedureDetailPage(props: { params: Promise<{ id: strin
       if (url) URL.revokeObjectURL(url);
     };
   }, [id, procedure?.id, procedure?.updatedAt]);
-
-  const userById = (uid: string | null) => (uid ? (users.find((u) => u.id === uid) ?? null) : null);
 
   const callWorkflow = async (path: string, payload?: unknown) => {
     setWorking(true);
@@ -636,7 +631,6 @@ export default function ProcedureDetailPage(props: { params: Promise<{ id: strin
           <Card title="Historial de revisiones" icon={History}>
             <ProcedureRevisionsTimeline
               procedureId={procedure.id}
-              users={users}
               refreshKey={procedure.updatedAt as unknown as number}
             />
           </Card>
@@ -718,21 +712,22 @@ export default function ProcedureDetailPage(props: { params: Promise<{ id: strin
 
           <Card title="Autoría" icon={Edit}>
             <DescTerm label="Autor">
-              {formatUser(userById(procedure.authoredBy))} · {formatDateTime(procedure.createdAt)}
+              {nameOf(procedure.authoredBy) ?? 'Usuario desconocido'} ·{' '}
+              {formatDateTime(procedure.createdAt)}
             </DescTerm>
             <DescTerm label="Revisor">
               {procedure.reviewedBy
-                ? `${formatUser(userById(procedure.reviewedBy))} · ${formatDateTime(procedure.reviewedAt)}`
+                ? `${nameOf(procedure.reviewedBy) ?? 'Usuario desconocido'} · ${formatDateTime(procedure.reviewedAt)}`
                 : '—'}
             </DescTerm>
             <DescTerm label="Publicador">
               {procedure.publishedBy
-                ? `${formatUser(userById(procedure.publishedBy))} · ${formatDateTime(procedure.publishedAt)}`
+                ? `${nameOf(procedure.publishedBy) ?? 'Usuario desconocido'} · ${formatDateTime(procedure.publishedAt)}`
                 : '—'}
             </DescTerm>
             {procedure.deprecatedBy && (
               <DescTerm label="Deprecado por">
-                {formatUser(userById(procedure.deprecatedBy))} ·{' '}
+                {nameOf(procedure.deprecatedBy) ?? 'Usuario desconocido'} ·{' '}
                 {formatDateTime(procedure.deprecatedAt)}
               </DescTerm>
             )}
@@ -1033,9 +1028,4 @@ function formatDateTime(iso?: string | null): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return new Intl.DateTimeFormat('es-CL', { dateStyle: 'short', timeStyle: 'short' }).format(d);
-}
-
-function formatUser(u: UserSummary | null): string {
-  if (!u) return '—';
-  return `${u.firstName} ${u.lastName}`.trim() || u.email;
 }

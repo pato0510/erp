@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../../../../../hooks/useMembers';
+
 import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -136,14 +138,6 @@ interface WorkPermitDetail {
   location?: { id: string; name: string; code?: string | null } | null;
 }
 
-interface UserSummary {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-}
-
 const STATUS_LABELS: Record<WorkPermitStatus, string> = {
   DRAFT: 'Borrador',
   PENDING_AUTHORIZATION: 'Pendiente autorización',
@@ -171,7 +165,7 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
   const router = useRouter();
   const { user } = useAuth();
   const [permit, setPermit] = useState<WorkPermitDetail | null>(null);
-  const [users, setUsers] = useState<UserSummary[]>([]);
+  const { nameOf } = useMembers('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{
@@ -191,12 +185,8 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
     setLoading(true);
     setError(null);
     try {
-      const [p, u] = await Promise.all([
-        apiClient.get<WorkPermitDetail>(`/api/operations/work-permits/${id}`),
-        apiClient.get<UserSummary[]>('/api/users').catch(() => [] as UserSummary[]),
-      ]);
+      const p = await apiClient.get<WorkPermitDetail>(`/api/operations/work-permits/${id}`);
       setPermit(p);
-      setUsers(u);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cargar el permiso.');
     } finally {
@@ -207,11 +197,6 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
   useEffect(() => {
     load();
   }, [load]);
-
-  const userById = useCallback(
-    (uid?: string | null) => (uid ? (users.find((u) => u.id === uid) ?? null) : null),
-    [users],
-  );
 
   const handleSimpleAction = async (action: 'submit' | 'start' | 'resume') => {
     try {
@@ -251,7 +236,12 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
   const meta = STATUS_META[permit.status];
   const isSupervisor = permit.supervisorId === user?.id;
   const isRequester = permit.requestedBy === user?.id;
-  const role = (user as { role?: string } | null)?.role;
+  const companyId = apiClient.getCompanyId();
+  const role = (
+    companyId
+      ? user?.companies.find((company) => company.companyId === companyId)
+      : user?.companies[0]
+  )?.role;
   const isAdminOrManager = role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'MANAGER';
   const canAuthorize =
     permit.status === 'PENDING_AUTHORIZATION' &&
@@ -446,7 +436,9 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
             ) : (
               <ul className="space-y-1">
                 {permit.workTeam.map((m, idx) => {
-                  const internal = m.userId ? userById(m.userId) : null;
+                  const memberName = m.userId
+                    ? (nameOf(m.userId) ?? 'Usuario desconocido')
+                    : m.name;
                   return (
                     <li
                       key={idx}
@@ -455,12 +447,7 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
                       <span
                         style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
                       >
-                        {m.name}
-                        {internal && (
-                          <span className="ml-2 text-xs text-[var(--text-muted)]">
-                            ({internal.email})
-                          </span>
-                        )}
+                        {memberName}
                       </span>
                       <span className="text-xs text-[var(--text-secondary)]">{m.role ?? '—'}</span>
                     </li>
@@ -518,13 +505,12 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
             <PermitApprovalTimeline
               permitId={permit.id}
               kind="work-permit"
-              users={users}
               refreshKey={(permit.currentApprovalStep ?? 0) + (permit.isFullyApproved ? 1000 : 0)}
             />
           </Card>
 
           <Card title="Estado y fechas" icon={Clock}>
-            <Timeline permit={permit} userById={userById} />
+            <Timeline permit={permit} nameOf={nameOf} />
           </Card>
 
           <Card title="Programación vs ejecución" icon={Clock}>
@@ -542,11 +528,15 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
           </Card>
 
           <Card title="Personas" icon={ShieldCheck}>
-            <DescTerm label="Solicitante">{formatUser(userById(permit.requestedBy))}</DescTerm>
-            <DescTerm label="Supervisor">{formatUser(userById(permit.supervisorId))}</DescTerm>
+            <DescTerm label="Solicitante">
+              {nameOf(permit.requestedBy) ?? 'Usuario desconocido'}
+            </DescTerm>
+            <DescTerm label="Supervisor">
+              {nameOf(permit.supervisorId) ?? 'Usuario desconocido'}
+            </DescTerm>
             <DescTerm label="Autorizado por">
               {permit.authorizedBy
-                ? `${formatUser(userById(permit.authorizedBy))} · ${formatDateTime(permit.authorizedAt)}`
+                ? `${nameOf(permit.authorizedBy) ?? 'Usuario desconocido'} · ${formatDateTime(permit.authorizedAt)}`
                 : '—'}
             </DescTerm>
             {permit.authorizationNotes && (
@@ -556,7 +546,7 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
             )}
             <DescTerm label="Cerrado por">
               {permit.closedBy
-                ? `${formatUser(userById(permit.closedBy))} · ${formatDateTime(permit.closedAt)}`
+                ? `${nameOf(permit.closedBy) ?? 'Usuario desconocido'} · ${formatDateTime(permit.closedAt)}`
                 : '—'}
             </DescTerm>
           </Card>
@@ -565,7 +555,7 @@ export default function WorkPermitDetailPage(props: { params: Promise<{ id: stri
             <Card title="Mediciones de gases" icon={Gauge}>
               <GasMeasurementsCard
                 measurements={permit.gasMeasurements ?? []}
-                userById={userById}
+                nameOf={nameOf}
                 onAdd={() => setGasOpen(true)}
                 disabled={
                   !['DRAFT', 'PENDING_AUTHORIZATION', 'AUTHORIZED', 'IN_EXECUTION'].includes(
@@ -790,23 +780,23 @@ function ActionBtn({
 
 function Timeline({
   permit,
-  userById,
+  nameOf,
 }: {
   permit: WorkPermitDetail;
-  userById: (uid?: string | null) => UserSummary | null;
+  nameOf: (uid?: string | null) => string | null;
 }) {
   const events: Array<{ label: string; date: string | null; user?: string | null; color: string }> =
     [
       {
         label: 'Solicitado',
         date: permit.createdAt,
-        user: formatUser(userById(permit.requestedBy)),
+        user: nameOf(permit.requestedBy) ?? 'Usuario desconocido',
         color: '#94A3B8',
       },
       {
         label: 'Autorizado',
         date: permit.authorizedAt ?? null,
-        user: permit.authorizedBy ? formatUser(userById(permit.authorizedBy)) : null,
+        user: permit.authorizedBy ? (nameOf(permit.authorizedBy) ?? 'Usuario desconocido') : null,
         color: '#1d4ed8',
       },
       {
@@ -817,7 +807,7 @@ function Timeline({
       {
         label: 'Cierre',
         date: permit.closedAt ?? null,
-        user: permit.closedBy ? formatUser(userById(permit.closedBy)) : null,
+        user: permit.closedBy ? (nameOf(permit.closedBy) ?? 'Usuario desconocido') : null,
         color: '#15803D',
       },
     ];
@@ -976,12 +966,12 @@ function AttachmentsCard({
 
 function GasMeasurementsCard({
   measurements,
-  userById,
+  nameOf,
   onAdd,
   disabled,
 }: {
   measurements: GasMeasurement[];
-  userById: (uid?: string | null) => UserSummary | null;
+  nameOf: (uid?: string | null) => string | null;
   onAdd: () => void;
   disabled: boolean;
 }) {
@@ -997,7 +987,7 @@ function GasMeasurementsCard({
                 {m.gas}: {m.value} {m.unit}
               </span>
               <span className="text-xs text-[var(--text-muted)]">
-                {formatDateTime(m.measuredAt)} · {formatUser(userById(m.recordedBy))}
+                {formatDateTime(m.measuredAt)} · {nameOf(m.recordedBy) ?? 'Usuario desconocido'}
               </span>
             </li>
           ))}
@@ -1320,9 +1310,4 @@ function formatDateTime(iso?: string | null): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return new Intl.DateTimeFormat('es-CL', { dateStyle: 'short', timeStyle: 'short' }).format(d);
-}
-
-function formatUser(u: UserSummary | null): string {
-  if (!u) return '—';
-  return `${u.firstName} ${u.lastName}`.trim() || u.email;
 }

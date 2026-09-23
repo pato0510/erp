@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../hooks/useMembers';
+
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, Clock, Minus, ShieldAlert, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -31,22 +33,12 @@ interface ApprovalRow {
 
 export type PermitTargetKind = 'work-permit' | 'external-permit';
 
-interface UserSummary {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-}
-
 interface Props {
   permitId: string;
   kind: PermitTargetKind;
   /* Bumped by the parent after a successful approve/reject so the
      timeline refetches without remounting. */
   refreshKey?: number;
-  /* Optional pre-fetched user list — avoids duplicate `/api/users`
-     calls when the parent already has the data. */
-  users?: UserSummary[];
 }
 
 const STATUS_META: Record<
@@ -84,11 +76,11 @@ const STATUS_META: Record<
    /api/operations/permit-approvals/permit/:id, which also returns
    the step definition so we can render gaps when a chain hasn't been
    initialised yet (e.g., DRAFT permits). */
-export function PermitApprovalTimeline({ permitId, kind, refreshKey, users }: Props) {
+export function PermitApprovalTimeline({ permitId, kind, refreshKey }: Props) {
   const [rows, setRows] = useState<ApprovalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [resolvedUsers, setResolvedUsers] = useState<UserSummary[]>(users ?? []);
+  const { nameOf } = useMembers('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,23 +100,6 @@ export function PermitApprovalTimeline({ permitId, kind, refreshKey, users }: Pr
   useEffect(() => {
     load();
   }, [load, refreshKey]);
-
-  /* Lazy load users only when the parent didn't supply them. */
-  useEffect(() => {
-    if (users && users.length > 0) {
-      setResolvedUsers(users);
-      return;
-    }
-    apiClient
-      .get<UserSummary[]>('/api/users')
-      .then((u) => setResolvedUsers(u))
-      .catch(() => undefined);
-  }, [users]);
-
-  const userById = useCallback(
-    (id: string | null) => (id ? (resolvedUsers.find((u) => u.id === id) ?? null) : null),
-    [resolvedUsers],
-  );
 
   if (loading) {
     return <p className="text-sm text-[var(--text-muted)]">Cargando cadena de aprobación...</p>;
@@ -146,7 +121,7 @@ export function PermitApprovalTimeline({ permitId, kind, refreshKey, users }: Pr
       {rows.map((row, idx) => {
         const meta = STATUS_META[row.status];
         const Icon = meta.icon;
-        const approver = userById(row.approvedBy ?? row.rejectedBy);
+        const approver = nameOf(row.approvedBy ?? row.rejectedBy) ?? 'Usuario desconocido';
         return (
           <li key={row.id} className="flex items-stretch gap-3">
             {/* Connector + dot */}
@@ -218,11 +193,9 @@ export function PermitApprovalTimeline({ permitId, kind, refreshKey, users }: Pr
                 )}
               </div>
 
-              {row.status === 'APPROVED' && approver && row.approvedAt && (
+              {row.status === 'APPROVED' && row.approvedAt && (
                 <div className="mt-2 text-xs">
-                  <span className="text-[var(--text-secondary)]">
-                    {approver.firstName} {approver.lastName}
-                  </span>
+                  <span className="text-[var(--text-secondary)]">{approver}</span>
                   <span className="text-[var(--text-muted)] ml-1">
                     · {formatDateTime(row.approvedAt)}
                   </span>
@@ -232,11 +205,9 @@ export function PermitApprovalTimeline({ permitId, kind, refreshKey, users }: Pr
                 </div>
               )}
 
-              {row.status === 'REJECTED' && approver && row.rejectedAt && (
+              {row.status === 'REJECTED' && row.rejectedAt && (
                 <div className="mt-2 text-xs">
-                  <span className="text-[var(--text-secondary)]">
-                    {approver.firstName} {approver.lastName}
-                  </span>
+                  <span className="text-[var(--text-secondary)]">{approver}</span>
                   <span className="text-[var(--text-muted)] ml-1">
                     · {formatDateTime(row.rejectedAt)}
                   </span>

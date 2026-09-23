@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMembers } from '../../../../../hooks/useMembers';
+
+import { useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -25,11 +27,6 @@ interface OpportunityNote {
   createdAt: string;
   updatedAt: string;
 }
-interface UserOpt {
-  id: string;
-  firstName: string;
-  lastName: string;
-}
 
 const MAX_BODY_LENGTH = 5000;
 const INPUT =
@@ -48,7 +45,7 @@ function formatDateTime(iso: string): string {
 export default function OpportunityNotes({ opportunityId }: { opportunityId: string }) {
   const [state, setState] = useState<'loading' | 'ok' | 'forbidden' | 'error'>('loading');
   const [notes, setNotes] = useState<OpportunityNote[]>([]);
-  const [users, setUsers] = useState<UserOpt[]>([]);
+  const { nameOf } = useMembers('all');
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -82,21 +79,6 @@ export default function OpportunityNotes({ opportunityId }: { opportunityId: str
   useEffect(() => {
     load();
   }, [load]);
-
-  // Resolve who wrote each note (degrades to a short UUID for non-admins) — same
-  // helper path as ActivityTimeline.
-  useEffect(() => {
-    apiClient
-      .get<UserOpt[]>('/api/users')
-      .then(setUsers)
-      .catch(() => setUsers([]));
-  }, []);
-
-  const usersById = useMemo(() => {
-    const m = new Map<string, string>();
-    users.forEach((u) => m.set(u.id, `${u.firstName} ${u.lastName}`.trim()));
-    return m;
-  }, [users]);
 
   const trimmedDraft = draft.trim();
   const canSubmit = canCreate && trimmedDraft.length > 0 && !submitting;
@@ -223,7 +205,7 @@ export default function OpportunityNotes({ opportunityId }: { opportunityId: str
             const showEdit = canUpdate && isOwn;
             const showDelete = canDelete && (isOwn || manageAny);
             const isEditing = editingId === n.id;
-            const who = usersById.get(n.createdBy) ?? n.createdBy.slice(0, 8);
+            const who = nameOf(n.createdBy) ?? 'Usuario desconocido';
             const edited = n.updatedAt !== n.createdAt;
             return (
               <div

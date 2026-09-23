@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../../../hooks/useMembers';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Maximize2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
@@ -111,7 +113,8 @@ export default function ActividadesGestionPage() {
 
   const [activities, setActivities] = useState<CalendarActivity[]>([]);
   const [areas, setAreas] = useState<ActivityArea[]>([]);
-  const [members, setMembers] = useState<MemberOption[]>([]);
+  const { members } = useMembers('active');
+  const { nameOf } = useMembers('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -137,9 +140,8 @@ export default function ActividadesGestionPage() {
   const activityById = useMemo(() => new Map(activities.map((a) => [a.id, a])), [activities]);
   const activeAreas = useMemo(() => areas.filter((a) => a.active), [areas]);
   const memberName = useCallback(
-    (userId: string | null) =>
-      userId ? (members.find((m) => m.userId === userId)?.displayName ?? '—') : '—',
-    [members],
+    (userId: string | null) => (userId ? (nameOf(userId) ?? 'Usuario desconocido') : '—'),
+    [nameOf],
   );
 
   const fetchList = useCallback((silent = false) => {
@@ -159,10 +161,6 @@ export default function ActividadesGestionPage() {
       .get<ActivityArea[]>('/api/actividades/areas')
       .then(setAreas)
       .catch(() => setAreas([]));
-    apiClient
-      .get<MemberOption[]>('/api/actividades/members')
-      .then(setMembers)
-      .catch(() => setMembers([]));
   }, []);
   useEffect(() => {
     fetchList();
@@ -645,7 +643,6 @@ export default function ActividadesGestionPage() {
         <ActivityDetailModal
           activity={selected}
           area={areaById.get(selected.areaId)}
-          members={members}
           canWrite={canWrite}
           onClose={() => setSelected(null)}
           onChanged={() => {
@@ -861,6 +858,7 @@ function EditRow({
   onDeleted: (id: string) => void;
   onOpenDetail: (a: CalendarActivity) => void;
 }) {
+  const { nameOf } = useMembers('all');
   const currentCierre = () => (activity.dueDate ?? activity.startDate).slice(0, 10);
   const [title, setTitle] = useState(activity.title);
   const [areaId, setAreaId] = useState(activity.areaId);
@@ -945,6 +943,7 @@ function EditRow({
         </td>
         <td className="px-3 py-1.5">
           <select
+            aria-label="Responsable"
             data-cell={`${activity.id}:assignee`}
             value={assigneeId}
             onChange={(e) => setAssigneeId(e.target.value)}
@@ -952,6 +951,11 @@ function EditRow({
             className={CELL_INPUT}
           >
             <option value="">Sin responsable</option>
+            {assigneeId && !members.some((m) => m.userId === assigneeId) && (
+              <option value={assigneeId} disabled>
+                {nameOf(assigneeId) ?? 'Usuario desconocido'}
+              </option>
+            )}
             {members.map((m) => (
               <option key={m.userId} value={m.userId}>
                 {m.displayName}

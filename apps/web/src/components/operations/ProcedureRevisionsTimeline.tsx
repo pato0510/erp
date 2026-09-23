@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../hooks/useMembers';
+
 import { useCallback, useEffect, useState } from 'react';
 import { Archive, ArrowRight, CheckCircle2, Edit, Eye, Plus, Undo2 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -21,13 +23,6 @@ interface Revision {
   previousData: unknown;
   newData: unknown;
   createdAt: string;
-}
-
-interface UserSummary {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
 }
 
 const META: Record<RevisionType, { label: string; color: string; bg: string; icon: typeof Plus }> =
@@ -81,16 +76,15 @@ interface Props {
   /* Bumped by the parent after a successful workflow action so the
      timeline refetches without a full remount. */
   refreshKey?: number;
-  users?: UserSummary[];
 }
 
 /* OPS-027 — vertical timeline of every ProcedureRevision row for a
    given procedure. Designed for the bottom of the detail page. */
-export function ProcedureRevisionsTimeline({ procedureId, refreshKey, users }: Props) {
+export function ProcedureRevisionsTimeline({ procedureId, refreshKey }: Props) {
   const [rows, setRows] = useState<Revision[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [resolved, setResolved] = useState<UserSummary[]>(users ?? []);
+  const { nameOf } = useMembers('all');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
@@ -111,17 +105,6 @@ export function ProcedureRevisionsTimeline({ procedureId, refreshKey, users }: P
   useEffect(() => {
     load();
   }, [load, refreshKey]);
-
-  useEffect(() => {
-    if (users && users.length > 0) {
-      setResolved(users);
-      return;
-    }
-    apiClient
-      .get<UserSummary[]>('/api/users')
-      .then((u) => setResolved(u))
-      .catch(() => undefined);
-  }, [users]);
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -150,7 +133,7 @@ export function ProcedureRevisionsTimeline({ procedureId, refreshKey, users }: P
       {rows.map((row, idx) => {
         const meta = META[row.revisionType];
         const Icon = meta.icon;
-        const author = resolved.find((u) => u.id === row.changedBy);
+        const author = nameOf(row.changedBy) ?? 'Usuario desconocido';
         const isExpanded = expanded.has(row.id);
         const hasDetails = Boolean(row.previousData) || Boolean(row.newData);
         return (
@@ -200,9 +183,7 @@ export function ProcedureRevisionsTimeline({ procedureId, refreshKey, users }: P
                   {formatDateTime(row.createdAt)}
                 </span>
               </div>
-              <div className="text-xs text-[var(--text-secondary)] mt-1">
-                {author ? `${author.firstName} ${author.lastName}` : row.changedBy}
-              </div>
+              <div className="text-xs text-[var(--text-secondary)] mt-1">{author}</div>
               {row.changeNotes && (
                 <p className="mt-2 text-sm italic text-[var(--text-primary)]">
                   "{row.changeNotes}"

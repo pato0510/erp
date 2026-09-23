@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMembers } from '../../../../../hooks/useMembers';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Trash2, Upload } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -25,11 +27,6 @@ interface OpportunityDocument {
   sizeBytes: number;
   createdBy: string;
   createdAt: string;
-}
-interface UserOpt {
-  id: string;
-  firstName: string;
-  lastName: string;
 }
 
 const KIND_LABELS: Record<OpportunityDocument['kind'], string> = {
@@ -86,7 +83,7 @@ function errMessage(e: unknown, fallback: string): string {
 export default function OpportunityDocuments({ opportunityId }: { opportunityId: string }) {
   const [state, setState] = useState<'loading' | 'ok' | 'forbidden' | 'error'>('loading');
   const [documents, setDocuments] = useState<OpportunityDocument[]>([]);
-  const [users, setUsers] = useState<UserOpt[]>([]);
+  const { nameOf } = useMembers('all');
   const [kind, setKind] = useState<OpportunityDocument['kind'] | ''>('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -118,21 +115,6 @@ export default function OpportunityDocuments({ opportunityId }: { opportunityId:
   useEffect(() => {
     load();
   }, [load]);
-
-  // Resolve who uploaded each file (degrades to a short UUID for non-admins) — same
-  // helper path as ActivityTimeline / opportunity-notes.
-  useEffect(() => {
-    apiClient
-      .get<UserOpt[]>('/api/users')
-      .then(setUsers)
-      .catch(() => setUsers([]));
-  }, []);
-
-  const usersById = useMemo(() => {
-    const m = new Map<string, string>();
-    users.forEach((u) => m.set(u.id, `${u.firstName} ${u.lastName}`.trim()));
-    return m;
-  }, [users]);
 
   const canSubmit = canCreate && kind !== '' && file !== null && !uploading;
 
@@ -280,7 +262,7 @@ export default function OpportunityDocuments({ opportunityId }: { opportunityId:
           {documents.map((d) => {
             const isOwn = currentUserId !== null && d.createdBy === currentUserId;
             const showDelete = canDelete && (isOwn || manageAny);
-            const who = usersById.get(d.createdBy) ?? d.createdBy.slice(0, 8);
+            const who = nameOf(d.createdBy) ?? 'Usuario desconocido';
             return (
               <div
                 key={d.id}

@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMembers } from '../../../hooks/useMembers';
+
+import { useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
 
@@ -24,13 +26,6 @@ interface Props {
   initialSteps: ChainStepRow[];
   onClose: () => void;
   onSaved: () => void;
-}
-
-interface UserOption {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
 }
 
 const ROLE_OPTIONS = [
@@ -59,16 +54,10 @@ export function ApprovalChainEditorModal({
       .map((s) => ({ ...s, requiredRoles: [...s.requiredRoles] }))
       .sort((a, b) => a.stepOrder - b.stepOrder),
   );
-  const [users, setUsers] = useState<UserOption[]>([]);
+  const { members, isLoading: membersLoading } = useMembers('active');
+  const { nameOf } = useMembers('all');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<UserOption[]>('/api/users')
-      .then(setUsers)
-      .catch(() => setUsers([]));
-  }, []);
 
   const updateStep = (idx: number, patch: Partial<ChainStepRow>) => {
     setSteps((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
@@ -266,6 +255,8 @@ export function ApprovalChainEditorModal({
                 Usuario específico (opcional)
               </div>
               <select
+                aria-label="Usuario específico"
+                aria-busy={membersLoading}
                 value={s.requiresSpecificUserId ?? ''}
                 onChange={(e) =>
                   updateStep(idx, { requiresSpecificUserId: e.target.value || null })
@@ -273,9 +264,15 @@ export function ApprovalChainEditorModal({
                 className="cp-input mb-2"
               >
                 <option value="">— Sin usuario específico —</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.firstName} {u.lastName} · {u.email}
+                {s.requiresSpecificUserId &&
+                  !members.some((m) => m.userId === s.requiresSpecificUserId) && (
+                    <option value={s.requiresSpecificUserId} disabled>
+                      {nameOf(s.requiresSpecificUserId) ?? 'Usuario desconocido'}
+                    </option>
+                  )}
+                {members.map((u) => (
+                  <option key={u.userId} value={u.userId}>
+                    {u.displayName}
                   </option>
                 ))}
               </select>

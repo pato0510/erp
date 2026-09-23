@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../hooks/useMembers';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Upload, X } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -101,6 +103,8 @@ export function AssetFormModal({
   onClose,
   onSave,
 }: Props) {
+  const { members, isLoading: membersLoading } = useMembers('active');
+  const { nameOf } = useMembers('all');
   const [code, setCode] = useState(asset?.code ?? '');
   const [name, setName] = useState(asset?.name ?? '');
   const [description, setDescription] = useState(asset?.description ?? '');
@@ -365,14 +369,28 @@ export function AssetFormModal({
                 </select>
               </Field>
             </Grid>
-            <Field label="Asignado a (User ID)">
-              <input
+            <Field label="Asignado a">
+              <select
+                aria-label="Asignado a"
+                aria-busy={membersLoading}
                 value={assignedToUserId}
                 onChange={(e) => setAssignedToUserId(e.target.value)}
-                placeholder="UUID del responsable (opcional)"
                 className="cp-input"
-                style={{ fontFamily: 'var(--font-jetbrains-mono), monospace', fontSize: 12 }}
-              />
+              >
+                <option value="">
+                  {membersLoading ? 'Cargando miembros…' : 'Sin responsable'}
+                </option>
+                {assignedToUserId && !members.some((m) => m.userId === assignedToUserId) && (
+                  <option value={assignedToUserId} disabled>
+                    {nameOf(assignedToUserId) ?? 'Usuario desconocido'}
+                  </option>
+                )}
+                {members.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.displayName}
+                  </option>
+                ))}
+              </select>
             </Field>
           </Section>
 

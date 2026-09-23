@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../hooks/useMembers';
+
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -14,26 +16,20 @@ export interface AccountOption {
   id: string;
   name: string;
 }
-export interface UserOption {
-  id: string;
-  firstName: string;
-  lastName: string;
-}
 
 const INPUT =
   'w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]';
 
 export function NewOpportunityModal({
   accounts,
-  users,
   onClose,
   onCreated,
 }: {
   accounts: AccountOption[];
-  users: UserOption[];
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { members, isLoading: membersLoading } = useMembers('active');
   const [name, setName] = useState('');
   const [accountId, setAccountId] = useState('');
   const [estimatedValue, setEstimatedValue] = useState('');
@@ -151,14 +147,16 @@ export function NewOpportunityModal({
             </Field>
             <Field label="Responsable">
               <select
+                aria-label="Responsable"
+                aria-busy={membersLoading}
                 value={ownerId}
                 onChange={(e) => setOwnerId(e.target.value)}
                 className={INPUT}
               >
                 <option value="">Sin asignar</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.firstName} {u.lastName}
+                {members.map((u) => (
+                  <option key={u.userId} value={u.userId}>
+                    {u.displayName}
                   </option>
                 ))}
               </select>

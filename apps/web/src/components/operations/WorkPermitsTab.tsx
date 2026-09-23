@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMembers } from '../../hooks/useMembers';
+
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -38,13 +40,6 @@ interface WorkPermitTypeOption {
   category: string;
   color?: string | null;
   isActive: boolean;
-}
-
-interface UserOption {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
 }
 
 interface WorkPermitRow {
@@ -124,7 +119,8 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
   const [counts, setCounts] = useState<ActiveCounts | null>(null);
   const [permits, setPermits] = useState<Paginated<WorkPermitRow> | null>(null);
   const [permitTypes, setPermitTypes] = useState<WorkPermitTypeOption[]>([]);
-  const [users, setUsers] = useState<UserOption[]>([]);
+  const { nameOf } = useMembers('all');
+  const { members: supervisors, isLoading: membersLoading } = useMembers('active');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
@@ -145,16 +141,12 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
   /* Catalogs once. */
   useEffect(() => {
     let alive = true;
-    Promise.all([
-      apiClient
-        .get<WorkPermitTypeOption[]>('/api/operations/work-permit-types')
-        .catch(() => [] as WorkPermitTypeOption[]),
-      apiClient.get<UserOption[]>('/api/users').catch(() => [] as UserOption[]),
-    ]).then(([t, u]) => {
-      if (!alive) return;
-      setPermitTypes(t.filter((x) => x.isActive));
-      setUsers(u);
-    });
+    apiClient
+      .get<WorkPermitTypeOption[]>('/api/operations/work-permit-types')
+      .then((rows) => {
+        if (alive) setPermitTypes(rows.filter((row) => row.isActive));
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -222,8 +214,6 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
   useEffect(() => {
     load();
   }, [load]);
-
-  const supervisors = useMemo(() => users, [users]);
 
   const handleAction = async (id: string, action: 'submit' | 'start' | 'resume') => {
     try {
@@ -349,6 +339,8 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
         <div style={{ minWidth: 160 }}>
           <label className="text-xs text-[var(--text-secondary)]">Supervisor</label>
           <select
+            aria-label="Supervisor"
+            aria-busy={membersLoading}
             value={supervisorFilter}
             onChange={(e) => {
               setSupervisorFilter(e.target.value);
@@ -358,8 +350,8 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
           >
             <option value="">Todos</option>
             {supervisors.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.firstName} {u.lastName}
+              <option key={u.userId} value={u.userId}>
+                {u.displayName}
               </option>
             ))}
           </select>
@@ -433,7 +425,7 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
               </thead>
               <tbody>
                 {permits.data.map((p) => {
-                  const supervisor = users.find((u) => u.id === p.supervisorId);
+                  const supervisor = nameOf(p.supervisorId) ?? 'Usuario desconocido';
                   return (
                     <tr key={p.id} style={{ borderTop: '1px solid var(--border-color)' }}>
                       <Td>
@@ -470,7 +462,7 @@ export function WorkPermitsTab({ currentUserId }: { currentUserId: string }) {
                           <div className="text-xs text-[var(--text-muted)]">{p.workLocation}</div>
                         )}
                       </Td>
-                      <Td>{supervisor ? `${supervisor.firstName} ${supervisor.lastName}` : '—'}</Td>
+                      <Td>{supervisor}</Td>
                       <Td>
                         <div style={{ fontSize: 12 }}>{formatDateTime(p.plannedStart)}</div>
                         <div className="text-xs text-[var(--text-muted)]">

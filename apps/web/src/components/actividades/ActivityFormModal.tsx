@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../hooks/useMembers';
+
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
@@ -37,6 +39,7 @@ export function ActivityFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { nameOf } = useMembers('all');
   const [title, setTitle] = useState(editing?.title ?? '');
   const [kind, setKind] = useState<ActivityKind>(editing?.kind ?? 'ACTIVIDAD');
   const [areaId, setAreaId] = useState(editing?.areaId ?? '');
@@ -147,11 +150,17 @@ export function ActivityFormModal({
 
           <Field label="Responsable (opcional)">
             <select
+              aria-label="Responsable"
               value={assigneeId}
               onChange={(e) => setAssigneeId(e.target.value)}
               className={INPUT}
             >
               <option value="">Sin responsable</option>
+              {assigneeId && !members.some((m) => m.userId === assigneeId) && (
+                <option value={assigneeId} disabled>
+                  {nameOf(assigneeId) ?? 'Usuario desconocido'}
+                </option>
+              )}
               {members.map((m) => (
                 <option key={m.userId} value={m.userId}>
                   {m.displayName}

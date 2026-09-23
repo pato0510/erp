@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '../../../hooks/useMembers';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, Eye, RefreshCw, X } from 'lucide-react';
 import { apiClient, ApiError } from '../../../lib/api';
@@ -169,6 +171,7 @@ interface PreviewResponse {
 }
 
 export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProps) {
+  const { members, isLoading: membersLoading } = useMembers('active');
   const [filters, setFilters] = useState<FilterState>(() =>
     defaultFilters(reportKind ?? 'asset-compliance'),
   );
@@ -584,14 +587,23 @@ export function ReportFilterModal({ reportKind, onClose }: ReportFilterModalProp
                   ))}
                 </select>
               </Field>
-              <Field label="Supervisor (UUID)">
-                <input
-                  type="text"
-                  placeholder="Opcional — UUID del supervisor"
+              <Field label="Supervisor">
+                <select
+                  aria-label="Supervisor"
+                  aria-busy={membersLoading}
                   value={filters.supervisorId}
                   onChange={(e) => update('supervisorId', e.target.value)}
                   className="w-full rounded-md border border-[var(--border-color)] bg-card-solid px-2 py-1.5 text-sm text-[var(--text-primary)]"
-                />
+                >
+                  <option value="">
+                    {membersLoading ? 'Cargando miembros…' : 'Todos los supervisores'}
+                  </option>
+                  {members.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.displayName}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Tipo de permiso (UUID)">
                 <input

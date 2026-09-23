@@ -1,5 +1,8 @@
 'use client';
 
+import { MemberAvatar } from '../../../../components/shared/MemberAvatar';
+import { useMembers } from '../../../../hooks/useMembers';
+
 /* COM-007 — Pipeline kanban: the Comercial module's flagship screen. It VISUALIZES
  * the COM-005 stage machine; it never re-implements the rules. Every move calls the
  * canonical endpoint (PATCH /:id/stage, POST /:id/reopen, POST /:id/resume) and
@@ -25,7 +28,7 @@
  * and rendering are untouched. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { KanbanSquare, LayoutList, Play, Plus, RotateCcw, User as UserIcon } from 'lucide-react';
+import { KanbanSquare, LayoutList, Play, Plus, RotateCcw } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../lib/api';
 import { formatCLP, formatDate } from '../../../../lib/formatters';
 import { useComercialPermissions } from '../../../../hooks/useCanWrite';
@@ -41,7 +44,6 @@ import {
 import {
   NewOpportunityModal,
   type AccountOption,
-  type UserOption,
 } from '../../../../components/comercial/NewOpportunityModal';
 import { LostReasonModal } from '../../../../components/comercial/LostReasonModal';
 import { CardMoveMenu } from '../../../../components/comercial/CardMoveMenu';
@@ -85,7 +87,8 @@ export default function PipelinePage() {
 
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
-  const [users, setUsers] = useState<UserOption[]>([]);
+  const { nameOf } = useMembers('all');
+  const { members: activeMembers } = useMembers('active');
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,18 +165,12 @@ export default function PipelinePage() {
     if (v !== 0 && rafRef.current === null) rafRef.current = requestAnimationFrame(stepAutoScroll);
   };
 
-  /* Directory maps for card display + filters. /api/users degrades to [] for
-     non-admins (owners then fall back to a short UUID), consistent with the rest
-     of the app. Both load once — they don't depend on the opp filters. */
+  // Account names are independent of the shared members directory.
   useEffect(() => {
     apiClient
       .get<AccountRow[]>('/api/comercial/accounts')
       .then(setAccounts)
       .catch(() => setAccounts([]));
-    apiClient
-      .get<UserOption[]>('/api/users')
-      .then(setUsers)
-      .catch(() => setUsers([]));
   }, []);
 
   const fetchOpps = useCallback(() => {
@@ -236,20 +233,10 @@ export default function PipelinePage() {
     accounts.forEach((a) => m.set(a.id, a));
     return m;
   }, [accounts]);
-  const usersById = useMemo(() => {
-    const m = new Map<string, string>();
-    users.forEach((u) => m.set(u.id, `${u.firstName} ${u.lastName}`.trim()));
-    return m;
-  }, [users]);
-
-  // Owner filter options: the user directory when available, else the distinct
-  // ownerIds present on the board (short UUIDs), so the filter is always usable.
-  const ownerOptions = useMemo(() => {
-    if (users.length)
-      return users.map((u) => ({ id: u.id, label: `${u.firstName} ${u.lastName}` }));
-    const ids = Array.from(new Set(opps.map((o) => o.ownerId).filter(Boolean))) as string[];
-    return ids.map((id) => ({ id, label: id.slice(0, 8) }));
-  }, [users, opps]);
+  const ownerOptions = activeMembers.map((member) => ({
+    id: member.userId,
+    label: member.displayName,
+  }));
 
   const byStage = (stage: string) => opps.filter((o) => o.stage === stage);
   const columnSum = (stage: string) =>
@@ -446,7 +433,7 @@ export default function PipelinePage() {
           filters={tableFilters}
           onFiltersChange={setTableFilters}
           ownerOptions={ownerOptions}
-          ownerLabel={(id) => (id ? (usersById.get(id) ?? id.slice(0, 8)) : '—')}
+          ownerLabel={(id) => (id ? (nameOf(id) ?? 'Usuario desconocido') : '—')}
           onChangeStage={(row, stage) => {
             const opp = opps.find((o) => o.id === row.id);
             if (opp) attemptMove(opp, stage);
@@ -558,7 +545,7 @@ export default function PipelinePage() {
                       cards.map((o) => {
                         const account = accountsById.get(o.accountId);
                         const ownerName = o.ownerId
-                          ? (usersById.get(o.ownerId) ?? o.ownerId.slice(0, 8))
+                          ? (nameOf(o.ownerId) ?? 'Usuario desconocido')
                           : null;
                         const draggable = canWrite && !isClosedStage(o.stage);
                         return (
@@ -616,7 +603,7 @@ export default function PipelinePage() {
 
                             {ownerName && (
                               <div className="mt-2 flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
-                                <UserIcon size={11} />
+                                <MemberAvatar displayName={nameOf(o.ownerId)} size="sm" />
                                 <span className="truncate">{ownerName}</span>
                               </div>
                             )}
@@ -657,7 +644,6 @@ export default function PipelinePage() {
       {newModal && (
         <NewOpportunityModal
           accounts={accounts as AccountOption[]}
-          users={users}
           onClose={() => setNewModal(false)}
           onCreated={() => {
             setNewModal(false);
