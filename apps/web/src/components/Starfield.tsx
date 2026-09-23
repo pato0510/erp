@@ -53,6 +53,9 @@ export function Starfield({
     let { w, h } = measure();
     let dpr = window.devicePixelRatio || 1;
     let stars: Star[] = [];
+    // HUB-008 — prefers-reduced-motion: ONE static frame, no rAF loop, no twinkle;
+    // re-evaluated when the preference changes at runtime.
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     const buildStars = () => {
       const count = Math.floor((w * h) / density);
@@ -99,20 +102,12 @@ export function Starfield({
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
       buildStars();
+      // Setting the canvas size cleared it; the static frame has no loop to repaint it.
+      if (reducedMotion.matches) paint(0);
     };
 
-    resize();
-
-    const start = performance.now();
-    let raf = 0;
-    let ro: ResizeObserver | null = null;
-    if (position === 'absolute' && canvas.parentElement && 'ResizeObserver' in window) {
-      ro = new ResizeObserver(() => resize());
-      ro.observe(canvas.parentElement);
-    }
-
-    const draw = (now: number) => {
-      const t = (now - start) / 1000;
+    // t = seconds since mount; t = 0 is the static reduced-motion frame.
+    const paint = (t: number) => {
       ctx.clearRect(0, 0, w, h);
 
       const g1 = ctx.createRadialGradient(w * 0.85, h * 0.2, 0, w * 0.85, h * 0.2, w * 0.55);
@@ -152,14 +147,40 @@ export function Starfield({
       }
 
       ctx.globalAlpha = 1;
+    };
+
+    resize();
+
+    const start = performance.now();
+    let raf = 0;
+    let ro: ResizeObserver | null = null;
+    if (position === 'absolute' && canvas.parentElement && 'ResizeObserver' in window) {
+      ro = new ResizeObserver(() => resize());
+      ro.observe(canvas.parentElement);
+    }
+
+    const draw = (now: number) => {
+      paint((now - start) / 1000);
       raf = requestAnimationFrame(draw);
     };
 
-    raf = requestAnimationFrame(draw);
+    const applyMotionPreference = () => {
+      if (reducedMotion.matches) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+        paint(0);
+      } else if (raf === 0) {
+        raf = requestAnimationFrame(draw);
+      }
+    };
+
+    applyMotionPreference();
+    reducedMotion.addEventListener('change', applyMotionPreference);
     window.addEventListener('resize', resize);
 
     return () => {
       cancelAnimationFrame(raf);
+      reducedMotion.removeEventListener('change', applyMotionPreference);
       window.removeEventListener('resize', resize);
       if (ro) ro.disconnect();
     };

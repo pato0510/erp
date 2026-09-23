@@ -97,6 +97,12 @@ html:not(.dark) .space-vignette {
 .space-backdrop canvas {
   animation: sw-stars-in 500ms ease-out both;
 }
+/* HUB-008 — reduced motion: the (static) starfield appears without its fade-in. */
+@media (prefers-reduced-motion: reduce) {
+  .space-backdrop canvas {
+    animation: none;
+  }
+}
 
 /* UI-002: one entrance per card mount. HUB-001 removed the hover lift, so the
    final offset is plain zero (no --module-card-y). */

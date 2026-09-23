@@ -65,6 +65,22 @@
   --hub-shadow: 0 5px 13px #030c1729;
   --hub-highlight: inset 0 1px 0 #ffffff0c;
   --hub-veil: linear-gradient(0deg, #06111b38, transparent 70%);
+  /* HUB-008 — the active card's slight brightness (a layer above the gradient/glow,
+     below the scene and text) and the mobile fades behind the fixed header/footer.
+     Theme-neutral like the rest of the hub block. */
+  --hub-shine: linear-gradient(150deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  --hub-bar-fade-top: linear-gradient(
+    180deg,
+    rgba(3, 12, 23, 0.82) 0%,
+    rgba(3, 12, 23, 0.55) 70%,
+    transparent 100%
+  );
+  --hub-bar-fade-bottom: linear-gradient(
+    0deg,
+    rgba(3, 12, 23, 0.82) 0%,
+    rgba(3, 12, 23, 0.55) 70%,
+    transparent 100%
+  );
 
   --hub-finanzas-from: #2461bc;
   --hub-finanzas-to: #17488f;

@@ -176,7 +176,7 @@ export default function ModulosPage() {
         </div>
       </header>
 
-      {/* Body — gated on auth, fades in via .modulos-content critical CSS */}
+      {/* Body — gated on auth; the cards own the entrance (module-card-enter, UI-002). */}
       {isReady && (
         <main className="mod-stage">
           <div className="mod-container">
@@ -190,65 +190,88 @@ export default function ModulosPage() {
               {MODULES.map((mod, index) => {
                 const isActive = mod.active;
                 const line = lines.find((item) => item.moduleKey === mod.hubKey);
+                // HUB-008 — ONE state source: the active look (ink border, brackets, shine)
+                // follows the same activeKey that plays the scene, never CSS :hover/:focus.
+                const isCurrent = isActive && activeKey === mod.hubKey;
                 return (
                   <div
                     key={mod.key}
-                    className={`module-card${isActive ? ' module-card--active' : ''}`}
-                    onClick={() => handleSelect(mod)}
-                    onFocus={() => {
-                      if (!isActive) return;
-                      setFocusedKey(mod.hubKey);
-                      setActiveKey(mod.hubKey);
-                    }}
-                    onBlur={() => {
-                      setFocusedKey(null);
-                      setActiveKey(null);
-                    }}
-                    onMouseEnter={() => {
-                      if (isActive && focusedKey === null) setActiveKey(mod.hubKey);
-                    }}
-                    onMouseLeave={() => {
-                      if (focusedKey === null) setActiveKey(null);
-                    }}
-                    role={isActive ? 'button' : undefined}
-                    tabIndex={isActive ? 0 : -1}
-                    onKeyDown={(e) => {
-                      if (!isActive) return;
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSelect(mod);
-                      }
-                    }}
-                    aria-disabled={!isActive}
+                    className="module-slot"
                     style={
                       {
-                        // HUB-001 — per-card variables so ONE stylesheet rule serves all cards.
-                        '--card-from': `var(--hub-${mod.hubKey}-from)`,
-                        '--card-to': `var(--hub-${mod.hubKey}-to)`,
-                        '--card-border': `var(--hub-${mod.hubKey}-border)`,
                         '--card-ink': `var(--hub-${mod.hubKey}-ink)`,
-                        '--card-glow': `var(--hub-${mod.hubKey}-glow)`,
-                        '--i': index,
                       } as CSSProperties
                     }
                   >
-                    <div className="module-card__svg">
-                      <HubScene moduleKey={mod.hubKey} playing={activeKey === mod.hubKey} />
-                    </div>
-                    <div className="module-card__shade" aria-hidden="true" />
-                    {!isActive && <div className="module-card__badge">PRÓXIMAMENTE</div>}
-                    {isActive && (
-                      <span className="module-card__arrow" aria-hidden="true">
-                        <ArrowRight size={14} strokeWidth={2.5} />
-                      </span>
-                    )}
-                    <div className="module-card__content">
-                      <h3 className="module-card__title">{mod.name}</h3>
-                      <p className="module-card__desc">{mod.description}</p>
-                      <div className="module-card__status">
-                        {line && <HubStatusLine kind={line.kind} message={line.message} />}
+                    <div
+                      className={`module-card${isActive ? ' module-card--active' : ''}`}
+                      data-active={isCurrent ? 'true' : undefined}
+                      onClick={() => handleSelect(mod)}
+                      onFocus={() => {
+                        if (!isActive) return;
+                        setFocusedKey(mod.hubKey);
+                        setActiveKey(mod.hubKey);
+                      }}
+                      onBlur={() => {
+                        setFocusedKey(null);
+                        setActiveKey(null);
+                      }}
+                      onMouseEnter={() => {
+                        if (isActive && focusedKey === null) setActiveKey(mod.hubKey);
+                      }}
+                      onMouseLeave={() => {
+                        if (focusedKey === null) setActiveKey(null);
+                      }}
+                      role={isActive ? 'button' : undefined}
+                      tabIndex={isActive ? 0 : -1}
+                      onKeyDown={(e) => {
+                        if (!isActive) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelect(mod);
+                        }
+                      }}
+                      aria-disabled={!isActive}
+                      style={
+                        {
+                          // HUB-001 — per-card variables so ONE stylesheet rule serves all cards.
+                          '--card-from': `var(--hub-${mod.hubKey}-from)`,
+                          '--card-to': `var(--hub-${mod.hubKey}-to)`,
+                          '--card-border': `var(--hub-${mod.hubKey}-border)`,
+                          '--card-ink': `var(--hub-${mod.hubKey}-ink)`,
+                          '--card-glow': `var(--hub-${mod.hubKey}-glow)`,
+                          '--i': index,
+                        } as CSSProperties
+                      }
+                    >
+                      {/* HUB-008 — slight brightness: above the gradient/glow, below scene and text. */}
+                      <div className="module-card__shine" aria-hidden="true" />
+                      <div className="module-card__svg">
+                        <HubScene moduleKey={mod.hubKey} playing={activeKey === mod.hubKey} />
+                      </div>
+                      <div className="module-card__shade" aria-hidden="true" />
+                      {!isActive && <div className="module-card__badge">PRÓXIMAMENTE</div>}
+                      {isActive && (
+                        <span className="module-card__arrow" aria-hidden="true">
+                          <ArrowRight size={14} strokeWidth={2.5} />
+                        </span>
+                      )}
+                      <div className="module-card__content">
+                        <h3 className="module-card__title">{mod.name}</h3>
+                        <p className="module-card__desc">{mod.description}</p>
+                        <div className="module-card__status">
+                          {line && <HubStatusLine kind={line.kind} message={line.message} />}
+                        </div>
                       </div>
                     </div>
+                    {/* HUB-008 — viewfinder corners OUTSIDE the card (it clips its content and
+                      the top-right corner would meet the arrow badge). */}
+                    <span className="module-frame" aria-hidden="true">
+                      <span className="module-frame__corner module-frame__corner--tl" />
+                      <span className="module-frame__corner module-frame__corner--tr" />
+                      <span className="module-frame__corner module-frame__corner--bl" />
+                      <span className="module-frame__corner module-frame__corner--br" />
+                    </span>
                   </div>
                 );
               })}
@@ -564,14 +587,80 @@ export default function ModulosPage() {
           cursor: pointer;
         }
         /* HUB-001 — active state is the border turning to the module's ink; the UI-002
-           lift (translateY) is REMOVED: no transform, scale, rotate or tilt. */
-        .module-card--active:hover,
-        .module-card--active:focus-visible {
+           lift (translateY) is REMOVED: no transform, scale, rotate or tilt.
+           HUB-008 — driven by data-active (the scene's activeKey), not :hover/:focus-visible.
+           The ink border + the corners ARE the focus indicator: no separate outline. */
+        .module-card[data-active='true'] {
           border-color: var(--card-ink);
         }
-        .module-card--active:focus-visible {
-          outline: 2px solid var(--card-ink);
-          outline-offset: 3px;
+        .module-card--active:focus {
+          outline: none;
+        }
+        .module-slot {
+          position: relative;
+        }
+        /* HUB-008 — the shine sits after ::before (glow) and before the scene in tree order. */
+        .module-card__shine {
+          position: absolute;
+          inset: 0;
+          background: var(--hub-shine);
+          opacity: 0;
+          transition: opacity 180ms ease-out;
+          pointer-events: none;
+        }
+        .module-card[data-active='true'] .module-card__shine {
+          opacity: 1;
+        }
+        /* HUB-008 — viewfinder corners: 14 px arms, 2 px stroke, square, in the module's ink.
+           Frame box = card + 6 px; at rest each corner sits 6 px further out (12 px from the
+           card) and invisible; active: 6 px out, opaque, 180 ms ease-out like the border.
+           The grid gap is 24 px, so two facing corners (2 × 8 px) never touch. */
+        .module-frame {
+          position: absolute;
+          inset: -6px;
+          pointer-events: none;
+        }
+        .module-frame__corner {
+          position: absolute;
+          width: 14px;
+          height: 14px;
+          border: 0 solid var(--card-ink);
+          opacity: 0;
+          transition:
+            opacity 180ms ease-out,
+            transform 180ms ease-out;
+        }
+        .module-frame__corner--tl {
+          top: 0;
+          left: 0;
+          border-top-width: 2px;
+          border-left-width: 2px;
+          transform: translate(-6px, -6px);
+        }
+        .module-frame__corner--tr {
+          top: 0;
+          right: 0;
+          border-top-width: 2px;
+          border-right-width: 2px;
+          transform: translate(6px, -6px);
+        }
+        .module-frame__corner--bl {
+          bottom: 0;
+          left: 0;
+          border-bottom-width: 2px;
+          border-left-width: 2px;
+          transform: translate(-6px, 6px);
+        }
+        .module-frame__corner--br {
+          bottom: 0;
+          right: 0;
+          border-bottom-width: 2px;
+          border-right-width: 2px;
+          transform: translate(6px, 6px);
+        }
+        .module-card[data-active='true'] + .module-frame .module-frame__corner {
+          opacity: 1;
+          transform: none;
         }
         .module-card__svg {
           position: absolute;
@@ -671,8 +760,30 @@ export default function ModulosPage() {
             grid-column: 1 / -1;
             grid-row: 2;
           }
+          /* HUB-008 — reserve the fixed bars' heights (topbar 72 px, two-row footer
+             ≈ 81 px, measured at 390 px) plus air, so at rest no card sits under them;
+             content scrolled beneath them reads through a token-based fade. */
           .mod-stage {
-            padding: 110px 18px 90px;
+            padding: 110px 18px 112px;
+          }
+          .mod-topbar::before,
+          .mod-bottombar::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            z-index: -1;
+            pointer-events: none;
+          }
+          .mod-topbar::before {
+            top: 0;
+            bottom: -16px;
+            background: var(--hub-bar-fade-top);
+          }
+          .mod-bottombar::before {
+            top: -16px;
+            bottom: 0;
+            background: var(--hub-bar-fade-bottom);
           }
           .mod-title {
             font-size: 22px;
@@ -687,6 +798,11 @@ export default function ModulosPage() {
           .module-card * {
             animation: none;
             transition: none;
+          }
+          /* HUB-008 — corners and shine appear/disappear with no movement or transition. */
+          .module-frame__corner {
+            transition: none;
+            transform: none;
           }
           .mod-ind__dot--pulse {
             animation: none;

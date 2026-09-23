@@ -178,8 +178,10 @@ calendario total.
 | BRAND-001 | Lockup apilado del login (isotipo + logotipo del kit, aire del horizontal del diseñador)                                                      | 2   | § Marca, Lockup apilado (BRAND-001)       |
 | HUB-007   | Escenas C · Barrido redibujadas desde el prototipo: SVG fijo 96×52 a escala 1:1                                                               | 2   | § Hub — Sprint 18, HUB-007                |
 | MEM-001   | Directorio común de miembros: GET /api/members (+ alias), useMembers, MemberAvatar                                                            | 2   | § Members — exposición firmada            |
+| GO-003    | Estados de to-dos (api): cinco estados, abierto = todo salvo DONE, PATCH /status                                                              | 2   | § Gestión organizacional, To-dos (GO-003) |
+| HUB-008   | Encuadre de la tarjeta activa (esquinas + brillo, una fuente de estado), starfield con movimiento reducido, barras móviles sin tapar tarjetas | 3   | § Hub — Sprint 18, HUB-008                |
 
-Última actualización: 2026-09-23 (BRAND-001 + HUB-007 + MEM-001)
+Última actualización: 2026-09-23 (GO-003 + HUB-008)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -667,9 +669,48 @@ gateadas por módulo) y superficies web.
 - Contraste medido en claro: `--hub-text-secondary` sobre el punto más claro
   del fondo tras header/footer = 5,47:1 (peor caso, «EXCELSIA · MÓDULOS»).
 - `Starfield` NO respeta `prefers-reduced-motion` (titila y hace fade igual);
-  comportamiento previo, sin cambios.
+  comportamiento previo, sin cambios. (Resuelto en HUB-008.)
 
-Última actualización: 2026-09-23 (HUB-007)
+#### HUB-008 (Sprint 19) — Encuadre de la tarjeta activa (2026-09-23)
+
+- Pedido del fundador (2026-09-22): al pasar por una tarjeta debe notarse más que
+  estamos en ella — un encuadre tipo foco de cámara, solo en las esquinas — y un leve
+  cambio de brillo. Sin girar, inclinar, ampliar ni desplazar tarjetas.
+- UNA fuente de estado: el aspecto activo (borde `ink`, esquinas y brillo) sigue al
+  mismo `activeKey` que reproduce la escena → `data-active="true"` en la tarjeta;
+  ya NO hay reglas `:hover` / `:focus-visible`, así que cursor, foco y animación no
+  pueden discrepar. El foco de teclado conserva la prioridad sobre el cursor (lógica
+  `focusedKey` existente). Se retiró el `outline` de `:focus-visible`: el borde `ink`
+  más las esquinas SON el indicador de foco.
+- Esquinas de encuadre: cuatro «L» FUERA de la tarjeta (la tarjeta recorta su contenido
+  y la esquina superior derecha chocaría con la flecha), en `.module-frame`, hermano de
+  la tarjeta dentro de `.module-slot` (envoltorio posicionado por ítem de la grilla),
+  `aria-hidden` y sin puntero. Brazos 14 px, trazo 2 px, `var(--card-ink)`, esquinas
+  rectas. Reposo: opacidad 0 a 12 px del borde; activa: opacidad 1 a 6 px; 180 ms
+  ease-out (el tiempo del borde), movidas con `transform` en las esquinas, nunca en la
+  tarjeta (su entrada es dueña de `transform`). Grilla 24 px ⇒ 2 × 8 px nunca se tocan;
+  margen lateral móvil 18 px.
+- Brillo: capa `.module-card__shine` entre el gradiente/brillo radial y la escena/texto,
+  con el token nuevo `--hub-shine` (`linear-gradient(150deg, rgba(255,255,255,0.07),
+rgba(255,255,255,0.02))`, bloque Hub de `tokens.css`), opacidad 0 → 1 en 180 ms. Jamás
+  un `filter` sobre la tarjeta (alteraría el `backdrop-filter` de la flecha).
+- Contraste de `--card-ink` contra el fondo tras las esquinas (píxel más claro, estrellas
+  ocultas): claro 3,88 (Finanzas) · 4,31 · 4,90 · 4,01 · 4,16 · 5,07 · 6,00:1 (Gestión);
+  oscuro 11,72–14,40:1. Todas ≥ 3:1. Una estrella que pase detrás puede bajarlo por un
+  instante.
+- Movimiento reducido: esquinas y brillo aparecen y desaparecen sin transición ni
+  desplazamiento. `Starfield` dibuja UN cuadro estático (sin bucle rAF, sin titileo:
+  0 callbacks rAF) mientras `prefers-reduced-motion` coincide, reacciona si la
+  preferencia cambia en caliente (listener `change`) y se omite su fade de entrada
+  (`global.css`). Movimiento normal sin cambios (~120 callbacks/s).
+- Móvil (≤ 640 px): `.mod-stage` reserva las barras fijas (topbar 72 px, pie de dos filas
+  80 px, medidos a 390) con `padding: 110px 18px 112px`: en reposo, arriba y al final del
+  scroll, ninguna tarjeta queda bajo el header o el pie. Detrás de ambas barras, un
+  fundido con tokens `--hub-bar-fade-top` / `--hub-bar-fade-bottom` (`::before`,
+  `z-index: -1` dentro de la barra) mantiene legible lo que pasa por debajo.
+  Escritorio sin cambios.
+
+Última actualización: 2026-09-23 (HUB-008)
 
 ## Plan de sprints del módulo
 
@@ -1065,6 +1106,8 @@ Puntos clave:
 - BRAND-001 — Lockup apilado del login (2026-09-23; Sprint 19, ola 2): isotipo + logotipo del kit con el aire del horizontal del diseñador (opción A del director), doctrina en § Marca, Lockup apilado (BRAND-001). Archivos: `components/shared/ExcelsiaLogo.tsx`, `app/(auth)/login/page.tsx`, `app/(auth)/AuthStageStyles.tsx` (inputs de 16 px en móvil), `app/p/asset/[qrToken]/page.tsx`; `public/brand/excelsia_logotipo_{color,inverso,blanco}.svg` (archivos del kit, sin editar).
 - HUB-007 — Escenas C · Barrido redibujadas desde el prototipo (2026-09-23; Sprint 19, ola 2; Codex): SVG fijo 96×52 a escala 1:1, conexiones completas; QA Chromium + WebKit a 1440/390. Archivos: components/hub/HubScene.module.css, components/hub/scenes/SceneFrame.tsx, components/hub/scenes/{finanzas,operaciones,hsec,comercial,marketing,rrhh,gestion}Scene.tsx, docs/design/hub-c/ (2 PNG de referencia).
 - MEM-001 — Directorio común de miembros (2026-09-23; Sprint 19, ola 2; Codex): GET /api/members en IAM, alias /actividades/members, useMembers, MemberAvatar. Archivos: iam/{members.controller,members.service}.ts, iam/dto/members-query.dto.ts, sus specs, iam/iam.module.ts, actividades/{actividades.controller,actividades.module}.ts; eliminados actividades/members/members-read.{service,module}.ts; web hooks/useMembers.ts, components/shared/MemberAvatar.tsx.
+- GO-003 — Estados de to-dos, api (2026-09-23; Sprint 19, ola 2; Codex): PENDING / IN_PROGRESS / IN_REVIEW / BLOCKED / DONE (migración aditiva 20260923120000_expand_todo_status); abierto = todo salvo DONE; listado OPEN por defecto, completedAfter en día civil Santiago, PATCH /todos/:id/status, flag canChangeStatus; alertas y línea del hub cuentan todos los abiertos. Archivos: prisma/schema/actividades.prisma, la migración, actividades/todos/{todo-status,todos.controller,todos.service}.ts, actividades/todos/dto/todo.dto.ts y los specs de todos y hub.
+- HUB-008 — Encuadre de la tarjeta activa (2026-09-23; Sprint 19, ola 3): esquinas de visor + brillo desde `activeKey` (`data-active`), sin `outline` aparte; starfield estático con movimiento reducido; padding y fundido de barras en móvil. Doctrina en § Hub, subsección HUB-008. Archivos: `app/modulos/page.tsx`, `components/Starfield.tsx`, `styles/tokens.css`, `app/global.css`.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -1230,7 +1273,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-23 (BRAND-001 + HUB-007 + MEM-001)
+Última actualización: 2026-09-23 (GO-003 + HUB-008)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1495,6 +1538,8 @@ entrada To-dos, modal y flags `todo` de `/actividades/permissions`.
 Atraso derivado con fecha Santiago; transiciones con compare-and-set.
 Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB.
 
+To-dos (GO-003): OPEN_TODO_STATUSES centraliza todos los estados salvo DONE. VIEWER y demás lectores sin update solo consultan lo propio y pueden mover sus tareas abiertas entre estados o completarlas; DONE → abierto exige update. Toda transición comprueba permisos, incluso los no-op, y usa compare-and-set sobre estado leído, responsable y updatedAt; carrera perdida → 409. complete/reopen comparten la transición. Listado: status=OPEN por defecto; PENDING sigue siendo exacto; completedAfter limita únicamente DONE desde el inicio del día civil Santiago. DONE queda último en el orden del enum.
+
 - GO-002 — Gestión organizacional (2026-09-17): renombrado el módulo en la tarjeta
   del hub, `SidebarBrand` y breadcrumbs; descripción «To-dos, calendario, áreas y
   alertas del equipo» e icono `ClipboardList` de Lucide; título de la página
@@ -1504,8 +1549,8 @@ Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB
 
 - ALERT-002 — Alertas de Gestión organizacional (2026-09-17):
   `GET /api/todos/alerts?scope&summary`, gate `read` sobre `TodoSubject`.
-  Alertas derivadas en vivo de `Todo`: vencidos = `PENDING` con fecha límite
-  anterior a hoy; vencen hoy o mañana = `PENDING` con fecha límite hoy o mañana.
+  Alertas derivadas en vivo de `Todo`: vencidos = fecha límite anterior a hoy;
+  vencen hoy o mañana = fecha límite hoy o mañana. Vencidos y próximos consideran todos los estados abiertos (PENDING, IN_PROGRESS, IN_REVIEW, BLOCKED), excluyendo DONE. Listado, resumen, badge y la línea de Gestión del hub comparten esa definición.
   Ambas definiciones usan fechas Santiago (`America/Santiago`), sin desplazamiento
   de la fecha civil. Alcance `scope=mine` por defecto; lectores sin `update` solo
   ven lo propio, aunque pidan `all`. El badge del sidebar cuenta lo propio.
@@ -1518,7 +1563,7 @@ Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB
   TypeScript, builds y Prettier aprobados; QA con fixtures en claro y oscuro,
   incluidos alcance de `VIEWER`, estados vacíos y teclado.
 
-Última actualización: 2026-09-23 (MEM-001 — Members promovido a directorio común)
+Última actualización: 2026-09-23 (GO-003 — estados de to-dos)
 
 ═══════════════════════════════════════════════════════════════════
 
