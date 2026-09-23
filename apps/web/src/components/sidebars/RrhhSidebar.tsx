@@ -2,19 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Briefcase,
-  CalendarCheck,
-  LayoutDashboard,
-  LogOut,
-  Moon,
-  SlidersHorizontal,
-  Sun,
-  Users,
-} from 'lucide-react';
+import { Briefcase, CalendarCheck, LayoutDashboard, SlidersHorizontal, Users } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { SidebarChangePassword } from './SidebarChangePassword';
-import { useTheme } from '../../lib/theme';
+import { SidebarFooter } from './SidebarFooter';
 import { SidebarBrand } from './SidebarBrand';
 
 /* HR-001 — RRHH sidebar. Cloned from the FinanceSidebar shell (NOT imported
@@ -32,7 +22,6 @@ const navItems = [
 
 export function RrhhSidebar() {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
 
   if (!user) return null;
@@ -65,24 +54,7 @@ export function RrhhSidebar() {
         })}
       </nav>
 
-      <div className="tn-sidebar__foot">
-        <button
-          onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-          className="tn-theme-toggle"
-        >
-          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-        </button>
-        <div className="tn-sidebar__email" title={user.email}>
-          {user.email}
-        </div>
-        <SidebarChangePassword />
-        <button onClick={logout} className="tn-logout">
-          <LogOut size={14} />
-          Cerrar sesión
-        </button>
-      </div>
+      <SidebarFooter email={user.email} onLogout={logout} />
     </aside>
   );
 }

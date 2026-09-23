@@ -1,6 +1,6 @@
 'use client';
 
-import { TODO_STATUS, type TodoStatus } from './todoStatus';
+import { TODO_PRIORITY, TODO_STATUS, type TodoStatus } from './todoStatus';
 
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type Person = { id: string; firstName: string; lastName: string };
@@ -35,13 +35,11 @@ export function TodoStatusPill({ status }: { status: TodoStatus }) {
     </span>
   );
 }
-export const PRIORITIES: Record<Priority, { label: string; classes: string }> = {
-  LOW: { label: 'Baja', classes: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200' },
-  MEDIUM: {
-    label: 'Media',
-    classes: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  },
-  HIGH: { label: 'Alta', classes: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200' },
+// Keep the form's LOW → HIGH option order; labels and fills come from the board.
+export const PRIORITIES = {
+  LOW: TODO_PRIORITY.LOW,
+  MEDIUM: TODO_PRIORITY.MEDIUM,
+  HIGH: TODO_PRIORITY.HIGH,
 };
 
 export const nameOf = (person: Person | null) =>
@@ -104,7 +102,7 @@ export function TodoRowCells({
         )}
       </td>
       <td className="px-4 py-3">
-        <span className={`rounded px-2 py-1 text-xs ${PRIORITIES[row.priority].classes}`}>
+        <span className={`rounded px-2 py-1 text-xs ${PRIORITIES[row.priority].fill}`}>
           {PRIORITIES[row.priority].label}
         </span>
       </td>

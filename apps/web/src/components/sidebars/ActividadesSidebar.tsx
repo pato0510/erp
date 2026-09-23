@@ -3,22 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  AlertTriangle,
-  CalendarDays,
-  CheckSquare,
-  Layers,
-  ListChecks,
-  LogOut,
-  Moon,
-  Sun,
-} from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckSquare, Layers, ListChecks } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { SidebarChangePassword } from './SidebarChangePassword';
+import { SidebarFooter } from './SidebarFooter';
 import { apiClient } from '../../lib/api';
 import { useActividadesPermissions } from '../../hooks/useActividadesPermissions';
 import { TODOS_CHANGED_EVENT } from '../actividades/TodoRowCells';
-import { useTheme } from '../../lib/theme';
 import { SidebarBrand } from './SidebarBrand';
 
 /* CAL-001 — Calendario de Actividades sidebar. Cloned from the MarketingSidebar shell;
@@ -35,7 +25,6 @@ const navItems = [
 
 export function ActividadesSidebar() {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const permissions = useActividadesPermissions();
   const canRead = permissions?.todo.read ?? false;
@@ -105,24 +94,7 @@ export function ActividadesSidebar() {
         })}
       </nav>
 
-      <div className="tn-sidebar__foot">
-        <button
-          onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-          className="tn-theme-toggle"
-        >
-          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-        </button>
-        <div className="tn-sidebar__email" title={user.email}>
-          {user.email}
-        </div>
-        <SidebarChangePassword />
-        <button onClick={logout} className="tn-logout">
-          <LogOut size={14} />
-          Cerrar sesión
-        </button>
-      </div>
+      <SidebarFooter email={user.email} onLogout={logout} />
     </aside>
   );
 }

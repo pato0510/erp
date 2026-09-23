@@ -279,7 +279,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             border-color: rgba(255, 255, 255, 0.25);
           }
 
-          @media (max-width: 768px) {
+          @media (width < 768px) {
             .tn-shell {
               flex-direction: column;
             }
@@ -293,6 +293,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             }
             .tn-sidebar nav {
               display: none !important;
+            }
+            /* AUTH-002-B — reserve the 56px bar for Cuenta + a visible logout.
+               The account menu uses a portal, outside the sidebar's clipping. */
+            .tn-sidebar__head {
+              flex: 1;
+              min-width: 0;
+              padding: 0 12px;
+              border-bottom: none;
+            }
+            .tn-back-modulos {
+              display: block;
+              margin-bottom: 2px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .tn-sidebar__brand-text {
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .tn-sidebar__foot {
+              display: flex;
+              flex-shrink: 0;
+              align-items: center;
+              gap: 8px;
+              padding: 4px 12px 4px 0;
+              border-top: none;
+            }
+            .tn-sidebar__foot > .tn-logout {
+              width: auto;
+              min-height: 44px;
+              white-space: nowrap;
             }
           }
         `}</style>

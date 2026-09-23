@@ -16,20 +16,16 @@ import {
   FileText,
   GitBranch,
   LayoutDashboard,
-  LogOut,
-  Moon,
   Settings,
   ShieldCheck,
   ShieldOff,
-  Sun,
   Truck,
   Users,
   Wrench,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
-import { SidebarChangePassword } from './SidebarChangePassword';
-import { useTheme } from '../../lib/theme';
+import { SidebarFooter } from './SidebarFooter';
 import { SidebarBrand } from './SidebarBrand';
 
 const navItems = [
@@ -55,7 +51,6 @@ const PENDING_REVIEW_POLL_MS = 60_000;
 
 export function OperationsSidebar() {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
   /* OPS-019 — only count ACTIVE+CRITICAL/BLOCKING alerts in the badge so
@@ -246,24 +241,7 @@ export function OperationsSidebar() {
         })()}
       </nav>
 
-      <div className="tn-sidebar__foot">
-        <button
-          onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-          className="tn-theme-toggle"
-        >
-          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-        </button>
-        <div className="tn-sidebar__email" title={user.email}>
-          {user.email}
-        </div>
-        <SidebarChangePassword />
-        <button onClick={logout} className="tn-logout">
-          <LogOut size={14} />
-          Cerrar sesión
-        </button>
-      </div>
+      <SidebarFooter email={user.email} onLogout={logout} />
     </aside>
   );
 }
