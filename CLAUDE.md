@@ -155,7 +155,7 @@ bloque de su módulo; este bloque es el índice del sprint.
 
 ═══════════════════════════════════════════════════════════════════
 
-# SPRINT 19 — HUB, ACCESO, DIRECTORIO Y TO-DOS (2026-09-22 → )
+# SPRINT 19 — HUB, ACCESO, DIRECTORIO Y TO-DOS (2026-09-22 → 2026-09-23)
 
 Sprint 19 (2026-09-22) — hub, acceso, directorio y to-dos. Decisiones del
 fundador 2026-09-22: fondo del hub = fondo del login (starfield, ambos temas,
@@ -183,7 +183,66 @@ calendario total.
 | MEM-002   | Nombres en vez de UUID: 23 superficies migradas a useMembers                                                                                                | 3   | § Members                                 |
 | GO-004    | To-dos estilo Monday (web): tabla agrupada por plazo con Estado/Prioridad a celda completa, avatares y Cronograma; kanban por estado con arrastrar y soltar | 3   | § Gestión organizacional, GO-004 (web)    |
 
-Última actualización: 2026-09-23 (MEM-002 + GO-004)
+#### Cierre del Sprint 19 (2026-09-23)
+
+Commits en `develop`: HUB-006 `5355d14` · AUTH-001 `fe18c16` · AUTH-001-A `fc57a97` ·
+HUB-006-A (doctrina AUTH-001) `dd5e848` · HUB-007 `4263d16` · AUTH-002 `95cf4f2` ·
+MEM-001 `31c935b` · BRAND-001 `b2774d9` · GO-003 `e2df432` · HUB-008 `0acc99d` ·
+MEM-002 `91a9610` · GO-004 `208b231` · S19-POLISH `957608a` · AUTH-002-B (commit
+inmediatamente anterior a este cierre) · DOC-S19-CLOSE (este commit).
+
+Olas:
+
+- Ola 1: HUB-006 ∥ AUTH-001 (+ correcciones), merge `dd5e848`, desplegada 2026-09-22.
+- Ola 2: HUB-007, AUTH-002, MEM-001, BRAND-001, GO-003, merge `e2df432` — el deploy del
+  api FALLÓ en el constructor de Railway («railpack prepare … context canceled»,
+  infraestructura, no código); relanzado por el director con OK del fundador el
+  2026-09-23 (deploy `fbd0e279`, SUCCESS, migración aplicada).
+- Ola 3: HUB-008, MEM-002, GO-004, S19-POLISH, AUTH-002-B, DOC-S19-CLOSE.
+
+Migraciones: `20260922180000_add_user_credential_state` (users: `mustChangePassword`,
+`tokenVersion`, `passwordChangedAt`) · `20260923120000_expand_todo_status` (`TodoStatus` +
+`IN_PROGRESS`, `IN_REVIEW`, `BLOCKED`). Sin tablas nuevas en el Sprint 19.
+
+**Decisiones tomadas para los Sprints 20 y 21 (2026-09-22; el fundador delegó en el director y aprobó)**
+
+Sprint 20 — Pipeline, vista tabla (documento del equipo «vista-tabla-excelsia-sprint.md»):
+
+- Acciones = extender Activity con estado Pendiente/Hecha (sin tabla nueva); «Vencida» se deriva; etiquetas «Correo» y «Visita técnica» (enum intacto).
+- «Actualización» derivada en vivo de la última acción (jamás guardada); editar valor, fecha de cierre, probabilidad o lead escribe una acción de sistema.
+- LostReason suma PLAZO y SIN_RESPUESTA y CONSERVA PROYECTO_CANCELADO (seis opciones).
+- Estado de cuenta: ACTIVA se muestra como «Cliente»; ganar una oportunidad pasa la cuenta a ACTIVA (desde PROSPECTO o INACTIVA) con registro; el badge de Empresas se separa.
+- Lead: entidad mínima (nombre, cuenta, contacto opcional), sección propia en Comercial, permisos espejo de Opportunity. No contradice «NO hay tabla de leads»: aquella regla es sobre prospectos sin cuenta (lo cubre la cuenta PROSPECTO); el Lead es el origen de oportunidades dentro de una cuenta.
+- Reglas: valor obligatorio desde Cotización (no editable en celda si hay líneas de servicios), fecha de cierre desde Visita Técnica, retroceso y reapertura con motivo como acción de sistema; aplican también al Kanban (sin cambio visual).
+- Probabilidad por defecto por etapa: configurable dentro de Comercial.
+- Limpieza Novandino: inventario de solo lectura primero; el borrado lo confirma el fundador (irreversible).
+- CardMoveMenu del pipeline suma Escape y devolución de foco (modelo: TodoMoveMenu).
+
+Sprint 21 — Configuración de empresa, áreas y calendario:
+
+- Áreas unificadas: ActivityArea pasa a ser el catálogo único de áreas de la empresa (renombre del modelo con @@map, sin renombrar la tabla); AreaRRHH (8 valores fijos) migra a FK con fusión por nombre; acción «Fusionar en…». La doctrina de coexistencia ActivityArea↔AreaRRHH queda LEVANTADA por decisión expresa del fundador (2026-09-22).
+- «Configuración de empresa» es un área de administración, NO una tarjeta del hub; entrada desde un menú de usuario del hub (hoy no existe: se crea). Contiene Empresa, Usuarios y accesos, Áreas y Perfiles (solo lectura). Cargos y tipos de documento quedan en sus módulos; períodos y umbrales de Finanzas vuelven a Finanzas.
+- Calendario total: suma to-dos, acciones comerciales pendientes, capacitaciones HSEC, vencimientos de RRHH (contratos, documentos, certificaciones) e hitos de Operaciones, cada fuente según el permiso de lectura de quien mira; sin montos.
+
+Pendiente sin sprint: recuperación de acceso por correo (opción A), cuando exista proveedor de email.
+
+**Deudas abiertas al cierre del Sprint 19**
+
+- (hardening) el trigger de auditoría copia passwordHash y refreshTokenHash de users a audit_logs.
+- (hardening, CRÍTICO) users.service consulta membresías de OTRAS empresas con Prisma directo para la regla de credencial global (409); bajo app_user con RLS activo esa consulta devolverá vacío y la regla dejará de proteger en silencio — ver handoff §11.
+- JwtStrategy lee users en cada request (tokenVersion/isActive): costo aceptado; vigilar.
+- Builds: tres fallas transitorias de next build en el sprint («this.currentReject is not a function», «next/font/google queries have exactly one entry» y una perdida) y la falla del constructor de Railway con builds de más de 12 minutos: vigilar; evaluar fijar la versión de Railpack o un Dockerfile.
+- Barras móviles del hub con alturas fijas (72/80 px) en el padding: re-medir si cambian.
+- Fechas Santiago duplicadas (todoStatus.ts, chileanWeek de gestión, todos.service y otros): un helper común (deuda del Sprint 17 que sigue).
+- /todos/assignees expone email a editores: migrar el modal a useMembers('active').
+- Prettier no revisa .prisma (sin plugin) y las migraciones están en .prettierignore.
+- Lint: 42 advertencias web y 54 api, preexistentes.
+- Lockup apilado pendiente de validación del diseñador; archivos «vertical» sin uso.
+- Paleta HUB-005 fuera del hub: espera al equipo de diseño (Sprint 18).
+- CompanySettings.timezone sin uso (Sprint 17).
+- useMembers: un usuario creado no aparece hasta recargar (existe refresh()).
+
+Última actualización: 2026-09-23 (DOC-S19-CLOSE)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1112,6 +1171,8 @@ Puntos clave:
 - HUB-008 — Encuadre de la tarjeta activa (2026-09-23; Sprint 19, ola 3): esquinas de visor + brillo desde `activeKey` (`data-active`), sin `outline` aparte; starfield estático con movimiento reducido; padding y fundido de barras en móvil. Doctrina en § Hub, subsección HUB-008. Archivos: `app/modulos/page.tsx`, `components/Starfield.tsx`, `styles/tokens.css`, `app/global.css`.
 - MEM-002 — Nombres en vez de UUID (2026-09-23; Sprint 19, ola 3; Codex): 23 superficies de Comercial, Operaciones y Actividades migradas a useMembers (all para la historia, active para seleccionar); ninguna muestra UUID («Usuario desconocido»); MemberAvatar en el propietario del kanban del pipeline; catálogos del permiso de trabajo independientes (MANAGER vuelve a poder crear permisos); los campos «UUID del responsable/supervisor» de equipos, vehículos y reportes pasan a selectores con nombres; los gates visuales de permisos de trabajo y procedimientos derivan el rol de la membresía de la empresa actual. Archivos: los 23 del commit de MEM-002.
 - GO-004 — To-dos estilo Monday, web (2026-09-23; Sprint 19, ola 3): tabla agrupada por plazo (Santiago, semanas lunes–domingo) y kanban por estado con arrastrar y soltar nativo + «Mover a…»; gating solo por flags. Doctrina en § Gestión organizacional, GO-004 (web). Archivos: `app/(dashboard)/actividades/todos/page.tsx`, `components/actividades/{todoStatus.ts,TodoBoardTable.tsx,TodoKanban.tsx,TodoMoveMenu.tsx,TodoRowCells.tsx}`.
+- AUTH-002-B — Pie del sidebar en móvil + paleta única de prioridades (2026-09-23; Sprint 19, ola 3; Codex): SidebarFooter compartido por los siete sidebars; bajo 768 px «Cerrar sesión» queda siempre visible (44 px) y el menú «Cuenta» reúne «Cambiar contraseña» y el tema (portal, Escape/clic fuera cierran y devuelven el foco, Tab sigue a logout); desde 768 px el pie de escritorio no cambia. TodoRowCells (alertas) usa las etiquetas y rellenos de TODO_PRIORITY. Archivos: app/(dashboard)/layout.tsx, components/sidebars/SidebarFooter.tsx (nuevo) y los siete \*Sidebar.tsx, components/actividades/TodoRowCells.tsx.
+- S19-POLISH — Cierres de revisión del Sprint 19 (2026-09-23; Codex): downloadFile comparte los redirects de sesión de api.ts (401 → /login; 403 PASSWORD_CHANGE_REQUIRED → /cambiar-clave); currentCompanyRole (useAuth.ts) es la ÚNICA derivación de rol para gates visuales — rol de la empresa seleccionada, la primera membresía solo si no hay selección, jamás el rol de otra empresa; usada en configuracion/usuarios, permisos de trabajo y procedimientos; los 16 px móviles de ambos formularios de auth viven solo en AuthStageStyles; retirado el alias GET /api/actividades/members y la dependencia Actividades → IamModule. Archivos: lib/{api,download}.ts, hooks/useAuth.ts, configuracion/usuarios, operaciones/permisos/trabajo/[id], operaciones/procedimientos/[id], (auth)/cambiar-clave, api actividades.{controller,module}.ts, iam/members.{controller,service}.spec.ts.
 - COM-018 — CUENTAS V2 (2026-09-15; CRM-1, CRM-3, CRM-7): entidad `Enterprise`
   = la EMPRESA MATRIZ DEL CLIENTE ("una empresa puede tener varias cuentas").
   Se llama Enterprise para NO colisionar jamás con Company, que es el TENANT.
@@ -1278,7 +1339,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   solo lectura (tres secciones en orden, "Sin alertas." por sección,
   "Actualizar", skeleton, estado 403; render gateado en `opportunity.read`).
 
-Última actualización: 2026-09-23 (MEM-002 + GO-004)
+Última actualización: 2026-09-23 (DOC-S19-CLOSE)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1416,7 +1477,7 @@ Puntos clave:
   CAL-008b — jamás la fecha UTC, que se dispara en la tarde chilena;
   precedente CHILE_IVA_RATE; tz por empresa = semilla V2). La UI pinta el
   flag del servidor, JAMÁS lo recomputa.
-- Members — EXPOSICIÓN FIRMADA (2026-07-21; promovida por MEM-001, 2026-09-23): GET /api/members?scope=all|active → [{ userId, displayName }] ESTRUCTURAL, jamás email/rol/estado. JwtAuthGuard + PoliciesGuard + @CheckPolicies(() => true): cualquier miembro activo de la empresa, de los seis roles. scope=all (default) conserva miembros inactivos para la historia; active filtra Membership.isActive para pickers. Orden apellido/nombre. Lee Membership→User dentro de executeWithRls(companyId, userId), con companyId explícito. displayName = "firstName lastName" recortado, fallback al local-part del email. GET /api/actividades/members queda como alias de scope=all y conserva read CalendarActivity. /todos/assignees mantiene su contrato y su política. Web: useMembers (caché por empresa+scope, refresh, nameOf devuelve null — jamás un UUID) y MemberAvatar (iniciales, nombre accesible, solo tokens). Consumidores web: useMembers en toda pantalla que solo necesita nombres (MEM-002); las asignaciones históricas inactivas conservan su nombre y no se ofrecen para nuevas selecciones. El alias /api/actividades/members queda sin consumidores web (se retira en S19-POLISH).
+- Members — EXPOSICIÓN FIRMADA (2026-07-21; promovida por MEM-001, 2026-09-23): GET /api/members?scope=all|active → [{ userId, displayName }] ESTRUCTURAL, jamás email/rol/estado. JwtAuthGuard + PoliciesGuard + @CheckPolicies(() => true): cualquier miembro activo de la empresa, de los seis roles. scope=all (default) conserva miembros inactivos para la historia; active filtra Membership.isActive para pickers. Orden apellido/nombre. Lee Membership→User dentro de executeWithRls(companyId, userId), con companyId explícito. displayName = "firstName lastName" recortado, fallback al local-part del email. GET /api/members?scope=all|active es la ruta canónica; el alias GET /api/actividades/members fue RETIRADO en S19-POLISH (sin consumidores desde MEM-002). /todos/assignees mantiene su contrato y su política. Web: useMembers (caché por empresa+scope, refresh, nameOf devuelve null — jamás un UUID) y MemberAvatar (iniciales, nombre accesible, solo tokens). Consumidores web: useMembers en toda pantalla que solo necesita nombres (MEM-002); las asignaciones históricas inactivas conservan su nombre y no se ofrecen para nuevas selecciones.
 - Bitácora — EDICIÓN LIBRE (revertido por el fundador 2026-07-22:
   edición/borrado libre por writers; auditoría conserva el contenido previo).
   CAL-009 la lanzó INMUTABLE (sin updatedAt, sin rutas de edición/borrado);
@@ -1545,7 +1606,7 @@ Migración escrita; ejecución real y enforcement RLS pendientes de deploy/QA DB
 
 To-dos (GO-003): OPEN_TODO_STATUSES centraliza todos los estados salvo DONE. VIEWER y demás lectores sin update solo consultan lo propio y pueden mover sus tareas abiertas entre estados o completarlas; DONE → abierto exige update. Toda transición comprueba permisos, incluso los no-op, y usa compare-and-set sobre estado leído, responsable y updatedAt; carrera perdida → 409. complete/reopen comparten la transición. Listado: status=OPEN por defecto; PENDING sigue siendo exacto; completedAfter limita únicamente DONE desde el inicio del día civil Santiago. DONE queda último en el orden del enum.
 
-**GO-004 (web, 2026-09-23).** `/actividades/todos` es un tablero estilo Monday con dos vistas (estado React, sin storage): «Tabla» por defecto y «Tarjetas». UNA petición por carga: `GET /api/todos?scope=…&status=ALL&completedAfter=<hoy Santiago − 30 días>[&assigneeId=…]` — los DONE quedan acotados a los últimos 30 días civiles de Santiago; mutar → recargar. Barra: vista, alcance («Mis to-dos» / «Todos» con `update`), filtro «Responsable» con `update` (`useMembers('active')`, envía `assigneeId`) y búsqueda por título en el cliente. Vocabulario único en `components/actividades/todoStatus.ts`: Pendiente (neutro por tokens), En curso (ámbar), En revisión (violeta), Detenida (rojo), Hecha (verde); prioridad Alta/Media/Baja en escala índigo-azul-celeste para no compartir tono con el estado. Contraste medido, texto sobre relleno, claro/oscuro: Pendiente 17,36/14,24 · En curso 8,97 · En revisión 5,70 · Detenida 4,83 · Hecha 5,02 · Alta 11,42 · Media 5,17 · Baja 10,46:1 (rellenos semánticos idénticos en ambos temas). Tabla agrupada por plazo con fechas Santiago y semanas lunes–domingo: «Vencidos» (abierto, plazo < hoy) · «Esta semana» (hoy → domingo) · «Próxima semana» (lunes → domingo siguientes) · «Más adelante» · «Sin plazo» · «Hechos (últimos 30 días)», este plegado por defecto; cabecera con barra de color, título, conteo y botón con `aria-expanded`/`aria-controls`. Columnas Tarea (fija a la izquierda bajo scroll horizontal) · Responsable (`MemberAvatar` + nombre, oculto bajo `md` pero en el `aria-label`) · Estado (celda completa: `<select>` nativo si la fila trae `canChangeStatus`, píldora estática si no) · Prioridad (celda completa, estática; se edita en el modal) · Plazo (dd-mm-aaaa + «Atrasado») · Cronograma (creación → plazo, fracción transcurrida; vencido lleno en rojo, hecha lleno en verde, sin plazo «—»; texto alternativo «Quedan N días» / «Vence hoy» / «Venció hace N días» / «Completada»). Tarjetas: cinco columnas en el orden del enum con cabecera de color y conteo; tarjeta con título, avatar + nombre, plazo dd-mm, prioridad y «Atrasado». Arrastrar y soltar HTML5 nativo (patrón del pipeline, con autoscroll en los bordes) solo si `canChangeStatus`; optimista, `PATCH /api/todos/:id/status`, y ante error revierte con aviso `role="alert"` que muestra el mensaje del servidor (403/409). Alternativa de teclado «Mover a…» por tarjeta (`TodoMoveMenu`, mismo manejador): flechas, Escape, clic fuera, scroll o resize la cierran y el foco vuelve a su disparador, también tras mover. Todo cambio de estado dispara `TODOS_CHANGED_EVENT` y recarga. Permisos SOLO por flags (`useActividadesPermissions().todo` y los flags de la fila), jamás por rol. `TodoRowCells` (alertas) acepta los cinco estados, mantiene el check abierto ↔ DONE y muestra la píldora de estado junto al título. El modal crear/editar no cambia (`/todos/assignees`).
+**GO-004 (web, 2026-09-23).** `/actividades/todos` es un tablero estilo Monday con dos vistas (estado React, sin storage): «Tabla» por defecto y «Tarjetas». UNA petición por carga: `GET /api/todos?scope=…&status=ALL&completedAfter=<hoy Santiago − 30 días>[&assigneeId=…]` — los DONE quedan acotados a los últimos 30 días civiles de Santiago; mutar → recargar. Barra: vista, alcance («Mis to-dos» / «Todos» con `update`), filtro «Responsable» con `update` (`useMembers('active')`, envía `assigneeId`) y búsqueda por título en el cliente. Vocabulario único en `components/actividades/todoStatus.ts`: Pendiente (neutro por tokens), En curso (ámbar), En revisión (violeta), Detenida (rojo), Hecha (verde); prioridad Alta/Media/Baja en escala índigo-azul-celeste para no compartir tono con el estado. Contraste medido, texto sobre relleno, claro/oscuro: Pendiente 17,36/14,24 · En curso 8,97 · En revisión 5,70 · Detenida 4,83 · Hecha 5,02 · Alta 11,42 · Media 5,17 · Baja 10,46:1 (rellenos semánticos idénticos en ambos temas). Tabla agrupada por plazo con fechas Santiago y semanas lunes–domingo: «Vencidos» (abierto, plazo < hoy) · «Esta semana» (hoy → domingo) · «Próxima semana» (lunes → domingo siguientes) · «Más adelante» · «Sin plazo» · «Hechos (últimos 30 días)», este plegado por defecto; cabecera con barra de color, título, conteo y botón con `aria-expanded`/`aria-controls`. Columnas Tarea (fija a la izquierda bajo scroll horizontal) · Responsable (`MemberAvatar` + nombre, oculto bajo `md` pero en el `aria-label`) · Estado (celda completa: `<select>` nativo si la fila trae `canChangeStatus`, píldora estática si no) · Prioridad (celda completa, estática; se edita en el modal) · Plazo (dd-mm-aaaa + «Atrasado») · Cronograma (creación → plazo, fracción transcurrida; vencido lleno en rojo, hecha lleno en verde, sin plazo «—»; texto alternativo «Quedan N días» / «Vence hoy» / «Venció hace N días» / «Completada»). Tarjetas: cinco columnas en el orden del enum con cabecera de color y conteo; tarjeta con título, avatar + nombre, plazo dd-mm, prioridad y «Atrasado». Arrastrar y soltar HTML5 nativo (patrón del pipeline, con autoscroll en los bordes) solo si `canChangeStatus`; optimista, `PATCH /api/todos/:id/status`, y ante error revierte con aviso `role="alert"` que muestra el mensaje del servidor (403/409). Alternativa de teclado «Mover a…» por tarjeta (`TodoMoveMenu`, mismo manejador): flechas, Escape, clic fuera, scroll o resize la cierran y el foco vuelve a su disparador, también tras mover. Todo cambio de estado dispara `TODOS_CHANGED_EVENT` y recarga. Permisos SOLO por flags (`useActividadesPermissions().todo` y los flags de la fila), jamás por rol. `TodoRowCells` (alertas) acepta los cinco estados, mantiene el check abierto ↔ DONE y muestra la píldora de estado junto al título. El modal crear/editar no cambia (`/todos/assignees`). Alertas y tablero comparten las prioridades de todoStatus.ts (AUTH-002-B).
 
 - GO-002 — Gestión organizacional (2026-09-17): renombrado el módulo en la tarjeta
   del hub, `SidebarBrand` y breadcrumbs; descripción «To-dos, calendario, áreas y
@@ -1570,7 +1631,7 @@ To-dos (GO-003): OPEN_TODO_STATUSES centraliza todos los estados salvo DONE. VIE
   TypeScript, builds y Prettier aprobados; QA con fixtures en claro y oscuro,
   incluidos alcance de `VIEWER`, estados vacíos y teclado.
 
-Última actualización: 2026-09-23 (GO-004 — tablero de to-dos)
+Última actualización: 2026-09-23 (DOC-S19-CLOSE)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1845,7 +1906,9 @@ docs/HARDENING-RECON.md · docs/MATRIZ-DE-PERMISOS.md.
 - Recuperación por correo (opción A): pendiente hasta que exista proveedor de email.
 - DEUDA (hardening): el trigger de auditoría copia `passwordHash` y `refreshTokenHash` de `users` a `audit_logs` en cada login y cambio de clave.
 
-**AUTH-002 (web, 2026-09-22).** `/cambiar-clave` vive en el grupo `(auth)` y entra a `SPACE_PATHS`: se pinta sobre el fondo compartido de HUB-006 y las estrellas persisten login → cambiar-clave → hub. Con `mustChangePassword` muestra «Crea tu nueva contraseña» (campo «Clave temporal», sin «volver»); en el uso voluntario, «Cambiar contraseña» (con «volver»). Checklist en vivo «10 caracteres o más» · «Una letra» · «Un número» (texto + ícono + estado para lector de pantalla, nunca solo color) que habilita el envío; «distinta de la actual» la valida SOLO el servidor. Errores del servidor en la línea `›` con `role="alert"`; el 429 se muestra como «Demasiados intentos…». Éxito → `router.replace('/modulos')`; «salir» = `logout` existente. `lib/api.ts`: un 403 con `code: 'PASSWORD_CHANGE_REQUIRED'` navega con recarga completa a `/cambiar-clave` (como el 401 → `/login`), sin bucle si ya se está ahí; `useAuth` hace lo mismo al leer `mustChangePassword` en `/auth/me`, para rutas que no hacen otra llamada. Login: tras `/auth/me`, `mustChangePassword` → `/cambiar-clave`, si no `/modulos`; «recuperar acceso» explica en la línea `›` que un administrador restablece el acceso (sin correo, sin ruta nueva). `/configuracion/usuarios`: la edición YA NO cambia contraseñas (las credenciales cambian solo por reset-access) y nunca envía el rol propio; «Restablecer acceso» = confirmación → clave temporal mostrada UNA vez, solo en el estado del diálogo (jamás storage, logs, URL ni toast), con «Copiar», borrada al cerrar; 403/404/409 dentro del diálogo. Oculta en la fila propia; las filas SUPER_ADMIN no muestran acciones a quien no es SUPER_ADMIN, y la opción SUPER_ADMIN del select solo la ve un SUPER_ADMIN. Rol y desactivación propios bloqueados con «No puedes cambiar tu propio rol ni desactivar tu cuenta.». Crear usa la misma política y checklist (`lib/password-policy.ts`, espejo del api). El rol del actor sale de `/auth/me` + la empresa actual; sin endpoint nuevo. Entradas: «Cambiar contraseña» justo antes de «Cerrar sesión» en los siete sidebars (`SidebarChangePassword`); el hub no tiene menú de usuario y no suma entrada. Las reglas `sw-*` del login pasaron VERBATIM a `app/(auth)/AuthStageStyles.tsx`, compartidas por login y cambiar-clave.
+**AUTH-002 (web, 2026-09-22).** `/cambiar-clave` vive en el grupo `(auth)` y entra a `SPACE_PATHS`: se pinta sobre el fondo compartido de HUB-006 y las estrellas persisten login → cambiar-clave → hub. Con `mustChangePassword` muestra «Crea tu nueva contraseña» (campo «Clave temporal», sin «volver»); en el uso voluntario, «Cambiar contraseña» (con «volver»). Checklist en vivo «10 caracteres o más» · «Una letra» · «Un número» (texto + ícono + estado para lector de pantalla, nunca solo color) que habilita el envío; «distinta de la actual» la valida SOLO el servidor. Errores del servidor en la línea `›` con `role="alert"`; el 429 se muestra como «Demasiados intentos…». Éxito → `router.replace('/modulos')`; «salir» = `logout` existente. `lib/api.ts`: un 403 con `code: 'PASSWORD_CHANGE_REQUIRED'` navega con recarga completa a `/cambiar-clave` (como el 401 → `/login`), sin bucle si ya se está ahí; `useAuth` hace lo mismo al leer `mustChangePassword` en `/auth/me`, para rutas que no hacen otra llamada. Login: tras `/auth/me`, `mustChangePassword` → `/cambiar-clave`, si no `/modulos`; «recuperar acceso» explica en la línea `›` que un administrador restablece el acceso (sin correo, sin ruta nueva). `/configuracion/usuarios`: la edición YA NO cambia contraseñas (las credenciales cambian solo por reset-access) y nunca envía el rol propio; «Restablecer acceso» = confirmación → clave temporal mostrada UNA vez, solo en el estado del diálogo (jamás storage, logs, URL ni toast), con «Copiar», borrada al cerrar; 403/404/409 dentro del diálogo. Oculta en la fila propia; las filas SUPER_ADMIN no muestran acciones a quien no es SUPER_ADMIN, y la opción SUPER_ADMIN del select solo la ve un SUPER_ADMIN. Rol y desactivación propios bloqueados con «No puedes cambiar tu propio rol ni desactivar tu cuenta.». Crear usa la misma política y checklist (`lib/password-policy.ts`, espejo del api). El rol del actor sale de `/auth/me` + la empresa actual; sin endpoint nuevo. Entradas: «Cambiar contraseña» justo antes de «Cerrar sesión» en los siete sidebars (`SidebarChangePassword`); el hub no tiene menú de usuario y no suma entrada. Las reglas `sw-*` del login pasaron VERBATIM a `app/(auth)/AuthStageStyles.tsx`, compartidas por login y cambiar-clave. AUTH-002-B: en móvil (< 768 px) «Cambiar contraseña» vive en el menú «Cuenta» del pie; «Cerrar sesión» nunca sale de la barra de 56 px.
+
+downloadFile comparte redirectIfPasswordChangeRequired con api.ts. currentCompanyRole es la única derivación de rol en la web (gates visuales; el api autoriza).
 
 ## Verificación en producción (2026-08-05, consultas read-only del fundador)
 
@@ -2201,8 +2264,7 @@ las dos planillas de roles, el plan firmado, el ledger diferido y el checklist d
 primera hora). handoff-1 queda como HISTORIA: sigue siendo válido en sus
 correcciones en sitio, pero ya no es el punto de entrada.
 
-Última actualización: 2026-09-22 (AUTH-001 + AUTH-002 — § Credenciales y sesiones; antes
-2026-08-10, DOC-HARDEN-004)
+Última actualización: 2026-09-23 (DOC-S19-CLOSE)
 
 # Próximos pasos
 

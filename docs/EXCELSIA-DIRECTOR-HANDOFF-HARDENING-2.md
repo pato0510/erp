@@ -5,6 +5,7 @@
 **HEAD at writing:** `f6855df` — HARDEN-004A
 **Migrations:** 77 applied in production (a 78th exists **uncommitted** — see §1)
 **Branch:** `develop` = production (Railway auto-deploy), zero rollbacks
+**Última actualización:** 2026-09-23 (DOC-S19-CLOSE — §11 added)
 
 ---
 
@@ -527,6 +528,53 @@ What the hardening director must know before designing Piece E:
   UUIDs — a debt in `CLAUDE.md` § SPRINT 17, not an isolation gap.
 - **(e) Before touching Piece E:** re-run the cold test of this handoff (§8), then read
   `CLAUDE.md` § SPRINT 17 in full.
+
+---
+
+## §11 Sprint 19 intervened between Piece B and Piece E (2026-09-22 → 23)
+
+Added 2026-09-23 (DOC-S19-CLOSE). The ticket index with SHAs and waves is `CLAUDE.md`
+§ SPRINT 19, subsection «Cierre del Sprint 19». What the hardening director must know
+before designing Piece E:
+
+- **(a) No new tables.** Two migrations: `20260922180000_add_user_credential_state`
+  (`users` gains `mustChangePassword`, `tokenVersion`, `passwordChangedAt`; `users` is
+  still one of the policy-less three and keeps its audit trigger) and
+  `20260923120000_expand_todo_status` (`TodoStatus` + `IN_PROGRESS`, `IN_REVIEW`,
+  `BLOCKED`, additive).
+- **(b) New or changed endpoints and their guards:**
+  - `POST /auth/change-password` — `JwtAuthGuard` only: an identity action with no
+    company, so no `PoliciesGuard`, no `x-company-id`, no RLS context.
+  - `POST /users/:id/reset-access` — `manage User`.
+  - `GET /api/members` — `JwtAuthGuard` + `PoliciesGuard` + `@CheckPolicies(() => true)`
+    (membership check only), read inside `executeWithRls`.
+  - `PATCH /todos/:id/status` — `read Todo` at the gate; the transition rules
+    (assignee vs editor, DONE → open needs `update`) are decided in the service.
+  - The alias `GET /api/actividades/members` is **retired** (S19-POLISH).
+- **(c) `JwtAuthGuard` is now a real class** (`iam/guards/jwt-auth.guard.ts`): it enforces
+  `PASSWORD_CHANGE_REQUIRED` (403 with `code`) by default, with the
+  `@AllowPendingPasswordChange()` allowlist — exactly `me`, `change-password` and
+  `logout` (`auth.controller.ts:36`, `:45`, `:55`). `PoliciesGuard` repeats the check as
+  defence in depth. `JwtStrategy` reads `users` on **every** request (`isActive` +
+  `tokenVersion`) — one more bare-client read per request for Piece C's census.
+- **(d) CRITICAL for Piece E (`app_user`).** The global-credential rule — an ADMIN may not
+  change the password (reset-access, or PATCH with `password`) of a user who also has an
+  active membership in ANOTHER company (409) — is enforced by a cross-company lookup that
+  runs with the bare Prisma client, OUTSIDE `executeWithRls`, on purpose
+  (`users.service.ts:219-225`, `assertMayModifyAccount`; the code comment already says
+  HARDEN-004 must preserve it). Under `app_user`, `membership_isolation`
+  (`companyId = rls.company_id`) and `membership_self_read` (`userId = rls.user_id`)
+  hide the other company's row from that query → it returns nothing → the 409 never
+  fires → an ADMIN of company A could again change the global password of a user who
+  also belongs to company B. **The failure is silent.** Before switching the runtime
+  role, this lookup needs a `SECURITY DEFINER` function or a dedicated narrow read path,
+  plus a test that proves the 409 still fires under `app_user`.
+- **(e) Audit rows of `users`** copy `passwordHash` and `refreshTokenHash` into
+  `audit_logs` on every login and password change (a debt in `CLAUDE.md` § SPRINT 19).
+  Decide in Piece E/C whether the trigger strips those keys.
+- **(f) Cold-test addendum.** A new director must be able to answer: (1) why the 409
+  check lives outside RLS and what breaks under `app_user`; (2) which three routes a user
+  with `mustChangePassword` may call.
 
 ---
 
