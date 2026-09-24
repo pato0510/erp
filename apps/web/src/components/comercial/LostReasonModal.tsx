@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { LOST_REASONS, LOST_REASON_LABELS, type LostReason } from './stageLabels';
 
-/* COM-007 — the "marcar Perdida" modal. Collects the LostReason (required) and an
-   optional detail — required ONLY when the reason is OTRO. The modal enforces that
+/* COM-007 — the "marcar Perdida" modal. Collects the LostReason (required; COM-027: the
+   six reasons of COM-023, from LOST_REASONS) and an optional detail — required ONLY when the reason is OTRO. The modal enforces that
    rule client-side, but the backend 400 is the final word (COM-005 rejects PERDIDA
    without a reason, and OTRO without detail). CANCELLING reverts the optimistic move
    in the caller — nothing persists. */

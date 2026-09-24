@@ -57,6 +57,14 @@ import {
 } from '../../../../components/comercial/NewOpportunityModal';
 import { LostReasonModal } from '../../../../components/comercial/LostReasonModal';
 import { CardMoveMenu } from '../../../../components/comercial/CardMoveMenu';
+// COM-027 — the one stage-entry dialog (required fields, move-back / reopen reason).
+import {
+  StageEntryDialog,
+  entryNeeds,
+  needsDialog,
+  stageErrText,
+  type StageIntent,
+} from '../../../../components/comercial/StageEntryDialog';
 // COM-025 — the grouped table view (Etapa | Cuenta) with its quick-add row.
 import { PipelineTable } from '../../../../components/comercial/PipelineTable';
 // COM-026 — each table row's actions dropdown.
@@ -84,6 +92,7 @@ interface Opportunity {
   pendingActions?: number;
   overdueActions?: number;
   lastUpdate?: { at: string; kind: string } | null;
+  valueFromBundle?: boolean; // COM-023 — value derived from service lines (never asked)
   account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null; // COM-020
 }
 interface AccountRow {
@@ -119,6 +128,14 @@ export default function PipelinePage() {
     prev: Opportunity;
   } | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  // COM-027 — an open stage-entry dialog: the PRE-move opportunity (its needs are computed
+  // from it), the intent, and whether an optimistic move must be reverted on cancel.
+  const [entry, setEntry] = useState<{
+    opp: Opportunity;
+    intent: StageIntent;
+    optimistic: boolean;
+    returnFocusId?: string;
+  } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 
@@ -250,11 +267,21 @@ export default function PipelinePage() {
     setOpps((cur) => cur.map((o) => (o.id === id ? { ...o, stage } : o)));
   const revert = (prev: Opportunity) =>
     setOpps((cur) => cur.map((o) => (o.id === prev.id ? prev : o)));
-  const replaceOpp = (u: Opportunity) => setOpps((cur) => cur.map((o) => (o.id === u.id ? u : o)));
+  // COM-027 — the stage / resume / reopen responses are the bare row (no account, counts,
+  // valueFromBundle): merge them over what we have; the table then refetches the derived
+  // fields (lastUpdate, pending counts). The kanban keeps the merge only (a refetch would
+  // flash its loading skeleton).
+  const replaceOpp = (u: Opportunity) =>
+    setOpps((cur) => cur.map((o) => (o.id === u.id ? { ...o, ...u } : o)));
+  const afterStageChange = (u: Opportunity) => {
+    replaceOpp(u);
+    if (view === 'table') fetchOpps();
+  };
 
   /* commit a stage change to the canonical endpoint; revert + toast on any 4xx.
      The backend is the machine — the frontend never pre-validates beyond routing
-     the drop to the right endpoint/dialog. */
+     the drop to the right endpoint/dialog (COM-027: moves that need fields or a reason
+     go through StageEntryDialog instead, whose errors stay inside the dialog). */
   const commitStage = async (
     id: string,
     body: { stage: OpportunityStage; lostReason?: LostReason; lostReasonDetail?: string },
@@ -265,7 +292,7 @@ export default function PipelinePage() {
         `/api/comercial/opportunities/${id}/stage`,
         body,
       );
-      replaceOpp(updated);
+      afterStageChange(updated);
     } catch (e) {
       revert(prev);
       setToast({
@@ -280,10 +307,18 @@ export default function PipelinePage() {
      optimistic move + revert, the GANADA light confirm, the PERDIDA modal (cancel =
      nothing persists), and the canonical PATCH for active/EN_PAUSA targets all live
      here — never duplicated per entry-point. */
-  const attemptMove = (opp: Opportunity, targetStage: OpportunityStage) => {
+  const attemptMove = (opp: Opportunity, targetStage: OpportunityStage, returnFocusId?: string) => {
     if (opp.stage === targetStage || isClosedStage(opp.stage)) return;
     const prev = opp;
     moveLocally(opp.id, targetStage); // optimistic
+
+    // COM-027 — a move that needs fields or a reason asks for them first (PERDIDA keeps
+    // LostReasonModal: it never needs fields). Cancel reverts the optimistic move.
+    const intent: StageIntent = { kind: 'move', to: targetStage };
+    if (targetStage !== 'PERDIDA' && needsDialog(entryNeeds(prev, intent))) {
+      setEntry({ opp: prev, intent, optimistic: true, returnFocusId });
+      return;
+    }
 
     if (isActiveStage(targetStage) || targetStage === 'EN_PAUSA') {
       void commitStage(opp.id, { stage: targetStage }, prev);
@@ -323,21 +358,20 @@ export default function PipelinePage() {
     setLostModal(null);
   };
 
-  const reopen = async (opp: Opportunity, ev?: React.MouseEvent) => {
+  // COM-027 — reopening always asks for a reason (and any field Negociación lacks).
+  const reopen = (opp: Opportunity, ev?: React.MouseEvent) => {
     ev?.stopPropagation();
-    if (!window.confirm(`¿Reabrir “${opp.name}”? Volverá a Negociación.`)) return;
-    try {
-      const u = await apiClient.post<Opportunity>(`/api/comercial/opportunities/${opp.id}/reopen`);
-      replaceOpp(u);
-    } catch (e) {
-      setToast({
-        msg: e instanceof ApiError ? e.message : 'No se pudo reabrir la oportunidad.',
-        type: 'error',
-      });
-    }
+    // After a reopen the card's «Reabrir» is gone: focus its new «Mover a…» trigger.
+    setEntry({
+      opp,
+      intent: { kind: 'reopen' },
+      optimistic: false,
+      returnFocusId: `pipeline-card-move-${opp.id}`,
+    });
   };
-  /* COM-025 — the table's quick-add row: POST (always PROSPECTO today) with the creator
-     as Responsable; the api's message goes to the page toast on error. */
+  /* COM-025 — the table's quick-add row: POST with the creator as Responsable (COM-027:
+     at the group's stage, with the fields that stage requires); the api's message goes to
+     the page toast on error. */
   const addFromTable = async (body: QuickAddBody): Promise<boolean> => {
     try {
       await apiClient.post('/api/comercial/opportunities', body);
@@ -351,16 +385,35 @@ export default function PipelinePage() {
     }
   };
 
-  const resume = async (opp: Opportunity, ev?: React.MouseEvent) => {
+  // COM-027 — resume asks for what the landing stage needs; otherwise it posts directly.
+  const resume = async (opp: Opportunity, ev?: React.MouseEvent, returnFocusId?: string) => {
     ev?.stopPropagation();
+    const intent: StageIntent = { kind: 'resume' };
+    if (needsDialog(entryNeeds(opp, intent))) {
+      setEntry({ opp, intent, optimistic: false, returnFocusId });
+      return;
+    }
     try {
       const u = await apiClient.post<Opportunity>(`/api/comercial/opportunities/${opp.id}/resume`);
-      replaceOpp(u);
+      afterStageChange(u);
+      // The card's «Reanudar» is gone after resuming: focus its «Mover a…» trigger.
+      if (returnFocusId)
+        window.requestAnimationFrame(() => document.getElementById(returnFocusId)?.focus());
     } catch (e) {
-      setToast({
-        msg: e instanceof ApiError ? e.message : 'No se pudo reanudar la oportunidad.',
-        type: 'error',
-      });
+      setToast({ msg: stageErrText(e, 'No se pudo reanudar la oportunidad.'), type: 'error' });
+    }
+  };
+
+  /* COM-027 — inline edits in the table: ONE field per PATCH, then refetch; the api's
+     message goes to the page toast and the cell shows its previous value. */
+  const editField = async (id: string, patch: Record<string, unknown>): Promise<boolean> => {
+    try {
+      await apiClient.patch(`/api/comercial/opportunities/${id}`, patch);
+      fetchOpps();
+      return true;
+    } catch (e) {
+      setToast({ msg: stageErrText(e, 'No se pudo guardar el cambio.'), type: 'error' });
+      return false;
     }
   };
 
@@ -455,8 +508,10 @@ export default function PipelinePage() {
           nameOf={nameOf}
           onChangeStage={(row, stage) => {
             const opp = opps.find((o) => o.id === row.id);
-            if (opp) attemptMove(opp, stage);
+            if (opp) attemptMove(opp, stage, `pipeline-stage-${row.id}`);
           }}
+          onEditField={editField}
+          ownerMembers={activeMembers}
           onNew={() => setNewModal(true)}
           onAdd={addFromTable}
           onCreated={fetchOpps}
@@ -612,8 +667,11 @@ export default function PipelinePage() {
                                 {draggable && (
                                   <CardMoveMenu
                                     stage={o.stage}
-                                    onMove={(t) => attemptMove(o, t)}
-                                    onResume={() => resume(o)}
+                                    triggerId={`pipeline-card-move-${o.id}`}
+                                    onMove={(t) => attemptMove(o, t, `pipeline-card-move-${o.id}`)}
+                                    onResume={() =>
+                                      resume(o, undefined, `pipeline-card-move-${o.id}`)
+                                    }
                                   />
                                 )}
                               </div>
@@ -652,7 +710,7 @@ export default function PipelinePage() {
                             {canWrite && o.stage === 'EN_PAUSA' && (
                               <div className="mt-2 border-t border-[var(--border-color)] pt-2">
                                 <button
-                                  onClick={(ev) => resume(o, ev)}
+                                  onClick={(ev) => resume(o, ev, `pipeline-card-move-${o.id}`)}
                                   className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                                 >
                                   <Play size={11} /> Reanudar
@@ -678,6 +736,22 @@ export default function PipelinePage() {
           onCreated={() => {
             setNewModal(false);
             fetchOpps();
+          }}
+        />
+      )}
+
+      {entry && (
+        <StageEntryDialog<Opportunity>
+          opportunity={entry.opp}
+          intent={entry.intent}
+          returnFocusId={entry.returnFocusId}
+          onDone={(u) => {
+            setEntry(null);
+            afterStageChange(u);
+          }}
+          onCancel={() => {
+            if (entry.optimistic) revert(entry.opp);
+            setEntry(null);
           }}
         />
       )}

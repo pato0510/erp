@@ -59,17 +59,64 @@ export function stageMoveTargets(stage: string): OpportunityStage[] {
   return [];
 }
 
-/* LostReason enum (COM-005). "Canceló el proyecto" is the display for
-   PROYECTO_CANCELADO; detail is required ONLY for OTRO (enforced in the modal AND
-   ultimately by the backend 400). */
-export const LOST_REASONS = ['PRECIO', 'COMPETENCIA', 'PROYECTO_CANCELADO', 'OTRO'] as const;
+/* LostReason enum (COM-005; COM-023 adds PLAZO and SIN_RESPUESTA). The api's order and
+   labels; detail is required ONLY for OTRO (enforced in the modal AND ultimately by the
+   backend 400). */
+export const LOST_REASONS = [
+  'PRECIO',
+  'PLAZO',
+  'COMPETENCIA',
+  'SIN_RESPUESTA',
+  'PROYECTO_CANCELADO',
+  'OTRO',
+] as const;
 export type LostReason = (typeof LOST_REASONS)[number];
 export const LOST_REASON_LABELS: Record<string, string> = {
   PRECIO: 'Precio',
+  PLAZO: 'Plazo',
   COMPETENCIA: 'Competencia',
+  SIN_RESPUESTA: 'Sin respuesta del cliente',
   PROYECTO_CANCELADO: 'Canceló el proyecto',
   OTRO: 'Otro',
 };
+
+/* ── COM-027 — espejo de COM-023; el api manda ──────────────────────────────────────
+   A STATIC mirror of the api's pipeline rules (precedent: lib/password-policy.ts). It
+   only decides what the stage-entry dialog, quick add and the new-opportunity modal ASK
+   for; the api validates every move and its 4xx is what the user sees. */
+
+/** Stages whose entry requires an estimated value (F1). */
+export const VALUE_STAGES: OpportunityStage[] = ['COTIZACION', 'NEGOCIACION', 'GANADA'];
+/** Stages whose entry requires an expected close date (F1). */
+export const DATE_STAGES: OpportunityStage[] = ['VISITA_TECNICA', ...VALUE_STAGES];
+
+export function stageRequires(stage: string): { value: boolean; date: boolean } {
+  return {
+    value: VALUE_STAGES.includes(stage as OpportunityStage),
+    date: DATE_STAGES.includes(stage as OpportunityStage),
+  };
+}
+
+/** F3 — moving to an active stage BEFORE the reference is a move back (needs a reason).
+ *  Reference = the current active stage; while En Pausa, previousStage (Negociación if
+ *  null). Pause, win and lose are never move backs. */
+export function isMoveBack(from: string, previousStage: string | null, to: string): boolean {
+  if (!isActiveStage(to)) return false;
+  const reference = from === 'EN_PAUSA' ? (previousStage ?? 'NEGOCIACION') : from;
+  const ri = ACTIVE_STAGES.indexOf(reference as OpportunityStage);
+  return ri >= 0 && ACTIVE_STAGES.indexOf(to as OpportunityStage) < ri;
+}
+
+/** Where a resume lands: previousStage, or Negociación when it is null. */
+export const resumeTarget = (previousStage: string | null): OpportunityStage =>
+  (previousStage as OpportunityStage | null) ?? 'NEGOCIACION';
+
+/** The reason rule shared by move back and reopen (trimmed 3..500). */
+export const REASON_MIN = 3;
+export const REASON_MAX = 500;
+
+/** Probabilities the api accepts: 0..100, multiples of 10. */
+export const PROBABILITY_OPTIONS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
 
 export function stageStyle(stage: string): React.CSSProperties {
   switch (stage) {

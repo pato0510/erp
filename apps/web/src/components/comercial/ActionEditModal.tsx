@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { useId, useState } from 'react';
 import { apiClient, ApiError } from '../../lib/api';
 import { santiagoDate } from '../../lib/dates';
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activityLabels';
+import { DIALOG_GHOST, DIALOG_PRIMARY, DialogShell } from './DialogShell';
 
 /* COM-026 — edit one manual commercial action (replaces COM-008's ActivityFormModal;
  * creating never goes through a modal anymore — ActionList's inline form does it).
@@ -12,8 +12,10 @@ import { ACTIVITY_TYPES, ACTIVITY_TYPE_LABELS, type ActivityType } from './activ
  * travels here (PATCH /:id/status is ActionList's checkbox). The date is a civil date
  * (type="date") prefilled with the Santiago day of activityDate and sent as YYYY-MM-DD
  * — the api pins it to that civil day in Santiago. Account scope also edits the
- * opportunity link («Solo la cuenta» = null, which unlinks). Escape closes, Tab cycles
- * inside, focus starts in the first field and returns to the opener on close. */
+ * opportunity link («Solo la cuenta» = null, which unlinks). COM-027: rendered through
+ * DialogShell (a portal to document.body — no ancestor can become its containing block):
+ * Escape / backdrop close, Tab cycles inside, focus starts in the first field and returns
+ * to the opener (the pencil) on close. */
 
 export interface ActionForEdit {
   id: string;
@@ -48,8 +50,6 @@ export function ActionEditModal({
   onSaved: () => void;
 }) {
   const uid = useId();
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const firstRef = useRef<HTMLSelectElement | null>(null);
   const initialDate = santiagoDate(action.activityDate);
   const initialOpp = action.opportunityId ?? NO_OPPORTUNITY;
 
@@ -60,41 +60,6 @@ export function ActionEditModal({
   const [opp, setOpp] = useState(initialOpp);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  // Focus the first field on open; hand focus back to whatever opened us on close.
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    firstRef.current?.focus();
-    return () => {
-      if (opener && document.contains(opener)) opener.focus();
-    };
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-      if (e.key !== 'Tab' || !dialogRef.current) return;
-      const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])',
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const save = async () => {
     const trimmed = subject.trim();
@@ -135,142 +100,113 @@ export function ActionEditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${uid}-title`}
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-card-solid shadow-xl"
-      >
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h2
-            id={`${uid}-title`}
-            className="text-lg font-semibold text-fg"
-            style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
-          >
-            Editar acción
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="rounded-md text-fg-secondary hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            <X size={20} aria-hidden="true" />
+    <DialogShell
+      title="Editar acción"
+      onCancel={onClose}
+      maxWidth="max-w-lg"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={DIALOG_GHOST}>
+            Cancelar
           </button>
-        </div>
-
-        <form
-          className="space-y-4 px-5 py-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            save();
-          }}
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor={`${uid}-type`} className={LABEL}>
-                Tipo
-              </label>
-              <select
-                id={`${uid}-type`}
-                ref={firstRef}
-                value={type}
-                onChange={(e) => setType(e.target.value as ActivityType)}
-                className={INPUT}
-              >
-                {ACTIVITY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {ACTIVITY_TYPE_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor={`${uid}-date`} className={LABEL}>
-                Fecha
-              </label>
-              <input
-                id={`${uid}-date`}
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className={INPUT}
-              />
-            </div>
+          <button type="submit" form={`${uid}-form`} disabled={saving} className={DIALOG_PRIMARY}>
+            {saving ? 'Guardando…' : 'Guardar'}
+          </button>
+        </>
+      }
+    >
+      <form
+        id={`${uid}-form`}
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor={`${uid}-type`} className={LABEL}>
+              Tipo
+            </label>
+            <select
+              id={`${uid}-type`}
+              value={type}
+              onChange={(e) => setType(e.target.value as ActivityType)}
+              className={INPUT}
+            >
+              {ACTIVITY_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {ACTIVITY_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
-            <label htmlFor={`${uid}-subject`} className={LABEL}>
-              Descripción
+            <label htmlFor={`${uid}-date`} className={LABEL}>
+              Fecha
             </label>
             <input
-              id={`${uid}-subject`}
-              value={subject}
-              maxLength={200}
-              onChange={(e) => setSubject(e.target.value)}
+              id={`${uid}-date`}
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
               className={INPUT}
             />
           </div>
+        </div>
+        <div>
+          <label htmlFor={`${uid}-subject`} className={LABEL}>
+            Descripción
+          </label>
+          <input
+            id={`${uid}-subject`}
+            value={subject}
+            maxLength={200}
+            onChange={(e) => setSubject(e.target.value)}
+            className={INPUT}
+          />
+        </div>
+        <div>
+          <label htmlFor={`${uid}-detail`} className={LABEL}>
+            Detalle (opcional)
+          </label>
+          <textarea
+            id={`${uid}-detail`}
+            value={detail}
+            maxLength={4000}
+            onChange={(e) => setDetail(e.target.value)}
+            rows={4}
+            className={INPUT}
+          />
+        </div>
+        {scope === 'account' && (
           <div>
-            <label htmlFor={`${uid}-detail`} className={LABEL}>
-              Detalle (opcional)
+            <label htmlFor={`${uid}-opp`} className={LABEL}>
+              Oportunidad
             </label>
-            <textarea
-              id={`${uid}-detail`}
-              value={detail}
-              maxLength={4000}
-              onChange={(e) => setDetail(e.target.value)}
-              rows={4}
+            <select
+              id={`${uid}-opp`}
+              value={opp}
+              onChange={(e) => setOpp(e.target.value)}
               className={INPUT}
-            />
-          </div>
-          {scope === 'account' && (
-            <div>
-              <label htmlFor={`${uid}-opp`} className={LABEL}>
-                Oportunidad
-              </label>
-              <select
-                id={`${uid}-opp`}
-                value={opp}
-                onChange={(e) => setOpp(e.target.value)}
-                className={INPUT}
-              >
-                {opportunities.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-                <option value={NO_OPPORTUNITY}>Solo la cuenta (sin oportunidad)</option>
-              </select>
-            </div>
-          )}
-
-          {err && (
-            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
-              {err}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 border-t border-line pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-line px-4 py-2 text-sm text-fg-secondary hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
+              {opportunities.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+              <option value={NO_OPPORTUNITY}>Solo la cuenta (sin oportunidad)</option>
+            </select>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        {err && (
+          <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+            {err}
+          </p>
+        )}
+      </form>
+    </DialogShell>
   );
 }
 

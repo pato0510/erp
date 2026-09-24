@@ -228,8 +228,10 @@ function CuentasContent() {
         </div>
       )}
 
-      {/* Table. container-type: the actions accordion sizes itself to this box (100cqw). */}
-      <div className="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] [container-type:inline-size]">
+      {/* Table. COM-027: scrolls sideways on narrow screens instead of clipping.
+          container-type: the actions accordion stays at this box's visible width (100cqw,
+          sticky at the left). */}
+      <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] [container-type:inline-size]">
         <table className="w-full text-sm">
           <thead className="border-b border-[var(--border-color)] bg-subtle">
             <tr>

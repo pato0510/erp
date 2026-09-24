@@ -71,7 +71,7 @@ export function DeleteOpportunityModal({
               Si la oportunidad tiene cotizaciones, no puede eliminarse (son documentos
               comerciales): elimina los borradores o conserva el historial.
             </li>
-            <li>Esta acción no se puede deshacer.</li>
+            <li>Esto no se puede deshacer.</li>
           </ul>
           {err && <p className="text-red-600">{err}</p>}
         </div>

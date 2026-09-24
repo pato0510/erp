@@ -24,7 +24,7 @@ const INPUT =
 
 function errMessage(e: unknown, fallback: string): string {
   if (e instanceof ApiError) {
-    if (e.status === 403) return 'No tienes permiso para esta acción.';
+    if (e.status === 403) return 'No tienes permiso para hacer esto.';
     const data = (e.data ?? {}) as { message?: string | string[] };
     const raw = Array.isArray(data.message) ? data.message.join(' ') : data.message;
     return raw || e.message || fallback;

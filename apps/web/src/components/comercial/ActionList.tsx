@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { History, Pencil, Plus, Trash2 } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
 import { formatSantiagoDate, santiagoToday } from '../../lib/dates';
 import { useComercialPermissions } from '../../hooks/useCanWrite';
@@ -477,7 +477,17 @@ function ActionItem({
       ) : (
         canUpdate && <span aria-hidden="true" className="w-4 shrink-0" />
       )}
-      <ActivityTypeIcon type={a.type} small />
+      {system ? (
+        // COM-027 — a system row is history, not an action type: neutral icon, no «Nota».
+        <span
+          aria-hidden="true"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line text-fg-secondary"
+        >
+          <History size={14} />
+        </span>
+      ) : (
+        <ActivityTypeIcon type={a.type} small />
+      )}
 
       <div className="min-w-[10rem] flex-1">
         <p
@@ -510,8 +520,12 @@ function ActionItem({
           </div>
         )}
         <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-fg-secondary">
-          <span>{ACTIVITY_TYPE_LABELS[a.type] ?? a.type}</span>
-          <span aria-hidden="true">·</span>
+          {!system && (
+            <>
+              <span>{ACTIVITY_TYPE_LABELS[a.type] ?? a.type}</span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
           <span className="tabular-nums">{formatSantiagoDate(a.activityDate)}</span>
           <span aria-hidden="true">·</span>
           <span>por {who}</span>

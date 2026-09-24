@@ -5,12 +5,21 @@ import { useMembers } from '../../hooks/useMembers';
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient, ApiError } from '../../lib/api';
+import {
+  ACTIVE_STAGES,
+  PROBABILITY_OPTIONS,
+  STAGE_LABELS,
+  stageRequires,
+  type OpportunityStage,
+} from './stageLabels';
 
 /* COM-007 — create an opportunity from the pipeline board. Mirrors the
-   AccountFormModal overlay shell. Stage is NOT a field: the backend always starts a
-   new opportunity at PROSPECTO (all stage movement goes through the canonical stage
-   endpoints), so the card lands in the Prospecto column. accountId is required;
-   estimatedValue / expectedCloseDate / probability / owner / notes are optional. */
+   AccountFormModal overlay shell. accountId is required.
+   COM-027 — «Etapa inicial»: one of the five active stages (default Prospecto; the api
+   creates there). The fields the chosen stage requires (static mirror of COM-023,
+   stageRequires) are marked required; the api validates and its 400 shows inside the
+   modal. Probability is a select: «Por defecto de la etapa» sends nothing (the api
+   applies the stage's configured default) or 0, 10 … 100. */
 
 export interface AccountOption {
   id: string;
@@ -34,11 +43,14 @@ export function NewOpportunityModal({
   const [accountId, setAccountId] = useState('');
   const [estimatedValue, setEstimatedValue] = useState('');
   const [expectedCloseDate, setExpectedCloseDate] = useState('');
-  const [probability, setProbability] = useState('');
+  const [stage, setStage] = useState<OpportunityStage>('PROSPECTO');
+  const [probability, setProbability] = useState(''); // '' = the stage's default
   const [ownerId, setOwnerId] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const req = stageRequires(stage);
 
   const save = async () => {
     if (!name.trim()) {
@@ -51,10 +63,10 @@ export function NewOpportunityModal({
     }
     setSaving(true);
     setErr(null);
-    const body: Record<string, unknown> = { name: name.trim(), accountId };
+    const body: Record<string, unknown> = { name: name.trim(), accountId, stage };
     if (estimatedValue.trim() !== '') body.estimatedValue = Number(estimatedValue);
     if (expectedCloseDate) body.expectedCloseDate = expectedCloseDate;
-    if (probability.trim() !== '') body.probability = Number(probability);
+    if (probability !== '') body.probability = Number(probability);
     if (ownerId) body.ownerId = ownerId;
     if (notes.trim()) body.notes = notes.trim();
     try {
@@ -113,19 +125,38 @@ export function NewOpportunityModal({
               ))}
             </select>
           </Field>
+          <Field label="Etapa inicial" htmlFor="new-opp-stage">
+            <select
+              id="new-opp-stage"
+              value={stage}
+              onChange={(e) => setStage(e.target.value as OpportunityStage)}
+              className={INPUT}
+            >
+              {ACTIVE_STAGES.map((st) => (
+                <option key={st} value={st}>
+                  {STAGE_LABELS[st]}
+                </option>
+              ))}
+            </select>
+          </Field>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Valor estimado (CLP)">
+            <Field label="Valor estimado (CLP)" htmlFor="new-opp-value" required={req.value}>
               <input
+                id="new-opp-value"
                 type="number"
                 min={0}
+                step={1}
+                aria-required={req.value || undefined}
                 value={estimatedValue}
                 onChange={(e) => setEstimatedValue(e.target.value)}
                 className={INPUT}
                 placeholder="Ej. 4500000"
               />
             </Field>
-            <Field label="Cierre estimado">
+            <Field label="Cierre estimado" htmlFor="new-opp-close" required={req.date}>
               <input
+                id="new-opp-close"
+                aria-required={req.date || undefined}
                 type="date"
                 value={expectedCloseDate}
                 onChange={(e) => setExpectedCloseDate(e.target.value)}
@@ -134,16 +165,20 @@ export function NewOpportunityModal({
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Probabilidad (%)">
-              <input
-                type="number"
-                min={0}
-                max={100}
+            <Field label="Probabilidad" htmlFor="new-opp-probability">
+              <select
+                id="new-opp-probability"
                 value={probability}
                 onChange={(e) => setProbability(e.target.value)}
                 className={INPUT}
-                placeholder="0–100"
-              />
+              >
+                <option value="">Por defecto de la etapa</option>
+                {PROBABILITY_OPTIONS.map((p) => (
+                  <option key={p} value={String(p)}>
+                    {p}%
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Responsable">
               <select
@@ -171,7 +206,16 @@ export function NewOpportunityModal({
             />
           </Field>
 
-          {err && <p className="text-sm text-red-600">{err}</p>}
+          {(req.value || req.date) && (
+            <p className="text-xs text-[var(--text-secondary)]">
+              * Obligatorio para crear en {STAGE_LABELS[stage]}.
+            </p>
+          )}
+          {err && (
+            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+              {err}
+            </p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-4">
@@ -195,11 +239,30 @@ export function NewOpportunityModal({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  htmlFor,
+  required = false,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+      <label
+        htmlFor={htmlFor}
+        className="mb-1 block text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]"
+      >
         {label}
+        {required && (
+          <>
+            <span aria-hidden="true"> *</span>
+            <span className="sr-only"> (obligatorio)</span>
+          </>
+        )}
       </label>
       {children}
     </div>

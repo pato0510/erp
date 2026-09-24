@@ -69,7 +69,7 @@ export function ContactFormModal({
     } catch (e) {
       setErr(
         e instanceof ApiError && e.status === 403
-          ? 'No tienes permiso para esta acción.'
+          ? 'No tienes permiso para hacer esto.'
           : 'No se pudo guardar el contacto.',
       );
       setSaving(false);

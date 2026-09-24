@@ -21,6 +21,7 @@ export interface PipelineRow {
   pendingActions?: number;
   overdueActions?: number;
   lastUpdate?: { at: string; kind: string } | null;
+  valueFromBundle?: boolean; // COM-023 — value derived from service lines (read-only)
   account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null;
 }
 

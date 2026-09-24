@@ -24,6 +24,8 @@ export interface ComercialPermissions {
   enterprise: SubjectFlags; // COM-018 — the client's parent company (mirror of account)
   contact: SubjectFlags;
   opportunity: SubjectFlags; // COM-007 — the pipeline board gates on this
+  // COM-027 — /comercial/probabilidades: read = the page, update = edit (ADMIN/SUPER_ADMIN).
+  stageProbabilities: { read: boolean; update: boolean };
   activity: SubjectFlags; // COM-008 — the interaction timeline gates on this
   opportunityNote: OpportunityNoteFlags; // COM-016 — the note thread gates on this
   opportunityDocument: OpportunityNoteFlags; // COM-017 — the document list gates on this (same shape)
@@ -39,6 +41,7 @@ const EMPTY: ComercialPermissions = {
   enterprise: NONE,
   contact: NONE,
   opportunity: NONE,
+  stageProbabilities: { read: false, update: false },
   activity: NONE,
   opportunityNote: { ...NONE, manageAny: false },
   opportunityDocument: { ...NONE, manageAny: false },

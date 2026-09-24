@@ -5,19 +5,24 @@ import Link from 'next/link';
 import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, Plus, Search } from 'lucide-react';
 import { formatCLP } from '../../lib/formatters';
 import {
-  civilDate,
   daysBetween,
-  formatDbDate,
   formatSantiagoDate,
   relativeDayLabel,
   santiagoDate,
   santiagoToday,
 } from '../../lib/dates';
-import { MemberAvatar } from '../shared/MemberAvatar';
 import { ColumnHelp } from './ColumnHelp';
 import { lastUpdateKindLabel } from './activityLabels';
 import { EnterpriseSelect, NO_ENTERPRISE } from './EnterpriseSelect';
 import { PipelineQuickAdd, type QuickAddBody } from './PipelineQuickAdd';
+import {
+  CloseDateCell,
+  OwnerCell,
+  ProbabilityCell,
+  ValueCell,
+  type EditField,
+  type SaveField,
+} from './PipelineInlineCells';
 import {
   COLUMNS,
   filterRows,
@@ -61,7 +66,22 @@ export type { PipelineRow } from './pipelineTableModel';
  * Etapa ↔ Cuenta. The detail row's content is sticky at the left and exactly as wide as
  * the scroll box (container query units), so it never needs horizontal scrolling. Row
  * and group indicators show the api's pendingActions / overdueActions (display only) and
- * «Actualización» reads the api's lastUpdate { at, kind }. */
+ * «Actualización» reads the api's lastUpdate { at, kind }.
+ *
+ * COM-027 — quick add in every active-stage group (at that stage, with the fields the
+ * stage requires) and in every Cuenta group (at Prospecto); inline edits of Valor
+ * estimado, Fecha estimada de cierre, Probabilidad and Responsable (PipelineInlineCells;
+ * one cell at a time, the table owns the editing key). */
+
+/** COM-027 — what a row needs to render its editable cells. */
+interface RowEdit {
+  canEdit: boolean;
+  editing: EditField | null;
+  start: (field: EditField) => void;
+  close: (field: EditField) => void;
+  onSave: SaveField;
+  members: { userId: string; displayName: string }[];
+}
 
 const CONTROL =
   'h-9 rounded-lg border border-line bg-card-solid px-3 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
@@ -112,6 +132,8 @@ export function PipelineTable({
   onNew,
   onAdd,
   onCreated,
+  onEditField,
+  ownerMembers = [],
   renderRowDetail,
 }: {
   rows: PipelineRow[];
@@ -129,6 +151,10 @@ export function PipelineTable({
   onAdd: (body: QuickAddBody) => Promise<boolean>;
   /** Refetch after a write. */
   onCreated: () => void;
+  /** COM-027 — one single-field PATCH; the page refetches (true on success). */
+  onEditField?: SaveField;
+  /** COM-027 — active members for the Responsable editor. */
+  ownerMembers?: { userId: string; displayName: string }[];
   /** COM-026 — the content of a row's full-width actions panel. */
   renderRowDetail?: (row: PipelineRow) => ReactNode;
 }) {
@@ -146,6 +172,21 @@ export function PipelineTable({
   useEffect(() => {
     if (!loading) setLoadedOnce(true);
   }, [loading]);
+  // COM-027 — the one cell being edited: `${rowId}:${field}`.
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const rowEdit = (rowId: string): RowEdit => {
+    const [id, field] = (editingKey ?? ':').split(':');
+    return {
+      canEdit: canWrite && !!onEditField,
+      editing: id === rowId ? (field as EditField) : null,
+      start: (f) => setEditingKey(`${rowId}:${f}`),
+      // Only close if this cell is still the one being edited (a slow save must not
+      // close an editor the user opened meanwhile).
+      close: (f) => setEditingKey((k) => (k === `${rowId}:${f}` ? null : k)),
+      onSave: onEditField ?? (async () => false),
+      members: ownerMembers,
+    };
+  };
   // COM-026 — rows whose actions panel is open (several at once, like Monday).
   const [openRows, setOpenRows] = useState<Set<string>>(() => new Set());
   const toggleRow = (id: string) =>
@@ -422,10 +463,11 @@ export function PipelineTable({
                 nameOf={nameOf}
                 onChangeStage={onChangeStage}
                 quickAdd={
-                  canCreate && (g.kind === 'account' || g.key === 'PROSPECTO') ? (
+                  canCreate && (g.kind === 'account' || isActiveStage(g.key)) ? (
                     <PipelineQuickAdd
                       groupLabel={g.kind === 'stage' ? STAGE_LABELS[g.key] : g.label}
                       fixedAccountId={g.kind === 'account' ? g.key : undefined}
+                      stage={g.kind === 'stage' ? (g.key as OpportunityStage) : undefined}
                       accounts={sortedAccounts}
                       currentUserId={currentUserId}
                       restColSpan={N_COLS - 1}
@@ -436,6 +478,7 @@ export function PipelineTable({
                 }
                 openRows={openRows}
                 onToggleRow={toggleRow}
+                rowEdit={rowEdit}
                 renderRowDetail={renderRowDetail}
               />
             ))
@@ -460,6 +503,7 @@ function GroupBody({
   quickAdd,
   openRows,
   onToggleRow,
+  rowEdit,
   renderRowDetail,
 }: {
   group: RowGroup;
@@ -473,6 +517,7 @@ function GroupBody({
   quickAdd: ReactNode;
   openRows: Set<string>;
   onToggleRow: (id: string) => void;
+  rowEdit: (rowId: string) => RowEdit;
   renderRowDetail?: (row: PipelineRow) => ReactNode;
 }) {
   const bodyId = `pipeline-group-${group.kind}-${group.key}`;
@@ -560,6 +605,7 @@ function GroupBody({
                   onChangeStage={onChangeStage}
                   expanded={expanded}
                   panelId={panelId}
+                  edit={rowEdit(r.id)}
                   onToggle={renderRowDetail ? () => onToggleRow(r.id) : undefined}
                 />
                 {expanded && renderRowDetail && (
@@ -679,6 +725,7 @@ function DataRow({
   expanded,
   panelId,
   onToggle,
+  edit,
 }: {
   row: PipelineRow;
   today: string;
@@ -689,13 +736,20 @@ function DataRow({
   panelId: string;
   /** Opens / closes the row's actions panel (absent → the name is a plain link). */
   onToggle?: () => void;
+  edit: RowEdit;
 }) {
   const accountName = r.account?.name ?? '—';
   const ownerName = r.ownerId ? (nameOf(r.ownerId) ?? 'Usuario desconocido') : null;
-  const overdue =
-    !!r.expectedCloseDate && isActiveStage(r.stage) && civilDate(r.expectedCloseDate) < today;
   const targets = canWrite ? stageMoveTargets(r.stage) : [];
   const fill = { background: stageAccent(r.stage) };
+  const cell = (field: EditField) => ({
+    row: r,
+    canEdit: edit.canEdit,
+    editing: edit.editing === field,
+    onStart: () => edit.start(field),
+    onClose: () => edit.close(field),
+    onSave: edit.onSave,
+  });
 
   return (
     <tr className="group hover:bg-subtle">
@@ -739,11 +793,7 @@ function DataRow({
       </td>
       {/* 2 · Responsable */}
       <td className={TD}>
-        {ownerName ? (
-          <MemberAvatar size="sm" displayName={ownerName} />
-        ) : (
-          <span className="text-xs text-fg-secondary">Sin responsable</span>
-        )}
+        <OwnerCell {...cell('owner')} ownerName={ownerName} members={edit.members} />
       </td>
 
       {/* 3 · Etapa — full-cell fill */}
@@ -787,7 +837,7 @@ function DataRow({
 
       {/* 4 · Valor estimado */}
       <td className={`${TD} text-right tabular-nums`}>
-        {r.estimatedValue != null ? formatCLP(r.estimatedValue) : '—'}
+        <ValueCell {...cell('value')} />
       </td>
 
       {/* 5 · Fecha de creación */}
@@ -795,19 +845,7 @@ function DataRow({
 
       {/* 6 · Fecha estimada de cierre */}
       <td className={`${TD} tabular-nums`}>
-        {r.expectedCloseDate ? (
-          overdue ? (
-            <span className="inline-flex items-center gap-1 font-medium text-red-700 dark:text-red-400">
-              <AlertTriangle size={13} aria-hidden="true" />
-              {formatDbDate(r.expectedCloseDate)}
-              <span className="sr-only"> (vencida)</span>
-            </span>
-          ) : (
-            <span className="text-fg-secondary">{formatDbDate(r.expectedCloseDate)}</span>
-          )
-        ) : (
-          <span className="text-fg-secondary">—</span>
-        )}
+        <CloseDateCell {...cell('close')} today={today} />
       </td>
 
       {/* 8 · Cuenta (column 7 «Lead» arrives in ola 2) */}
@@ -828,22 +866,7 @@ function DataRow({
 
       {/* 10 · Probabilidad */}
       <td className={TD}>
-        {r.probability != null ? (
-          <span className="flex items-center gap-2">
-            <span
-              aria-hidden="true"
-              className="h-1.5 w-14 overflow-hidden rounded-full bg-subtle-hover"
-            >
-              <span
-                className="block h-full rounded-full bg-accent"
-                style={{ width: `${Math.max(0, Math.min(100, r.probability))}%` }}
-              />
-            </span>
-            <span className="tabular-nums">{r.probability}%</span>
-          </span>
-        ) : (
-          <span className="text-fg-secondary">—</span>
-        )}
+        <ProbabilityCell {...cell('probability')} />
       </td>
     </tr>
   );

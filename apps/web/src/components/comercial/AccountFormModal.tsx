@@ -100,7 +100,7 @@ export function AccountFormModal({
     } catch (e) {
       setErr(
         e instanceof ApiError && e.status === 403
-          ? 'No tienes permiso para esta acción.'
+          ? 'No tienes permiso para hacer esto.'
           : 'No se pudo guardar la cuenta.',
       );
       setSaving(false);

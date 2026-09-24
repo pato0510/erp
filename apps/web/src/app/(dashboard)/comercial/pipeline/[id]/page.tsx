@@ -29,6 +29,13 @@ import { OpportunityBundle } from '../../../../../components/comercial/Opportuni
 import { OpportunityQuotes } from '../../../../../components/comercial/OpportunityQuotes';
 import { AvailableStaff } from '../../../../../components/comercial/AvailableStaff';
 import { DeleteOpportunityModal } from '../../../../../components/comercial/DeleteOpportunityModal';
+// COM-027 — Reanudar / Reabrir ask what the landing stage needs through the one dialog.
+import {
+  StageEntryDialog,
+  entryNeeds,
+  needsDialog,
+  type StageIntent,
+} from '../../../../../components/comercial/StageEntryDialog';
 
 interface Opportunity {
   id: string;
@@ -74,6 +81,16 @@ export default function OpportunityDetailPage() {
   // danger zone can pre-empt the backend 409 (an opp with quotes can't be deleted).
   const [quotesExist, setQuotesExist] = useState(false);
   const handleQuotesChanged = useCallback((has: boolean) => setQuotesExist(has), []);
+  // COM-027 — the dialog's intent, and whether the value comes from service lines (the
+  // detail endpoint does not carry valueFromBundle; the bundle's lines tell).
+  const [entry, setEntry] = useState<StageIntent | null>(null);
+  const [valueFromBundle, setValueFromBundle] = useState(false);
+  const loadBundleFlag = useCallback(() => {
+    apiClient
+      .get<unknown[]>(`/api/comercial/opportunities/${id}/services`)
+      .then((lines) => setValueFromBundle(lines.length > 0))
+      .catch(() => setValueFromBundle(false));
+  }, [id]);
 
   /* Re-fetch ONLY the opportunity — used after a bundle mutation, whose derived
      estimatedValue must be reflected in the header/value display. */
@@ -82,7 +99,8 @@ export default function OpportunityDetailPage() {
       .get<Opportunity>(`/api/comercial/opportunities/${id}`)
       .then(setOpp)
       .catch(() => undefined);
-  }, [id]);
+    loadBundleFlag();
+  }, [id, loadBundleFlag]);
 
   const load = useCallback(() => {
     apiClient
@@ -105,7 +123,8 @@ export default function OpportunityDetailPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadBundleFlag();
+  }, [load, loadBundleFlag]);
 
   const act = async (fn: () => Promise<Opportunity>) => {
     setBusy(true);
@@ -113,6 +132,12 @@ export default function OpportunityDetailPage() {
     try {
       const u = await fn();
       setOpp(u);
+      // COM-027 — the pressed button (Pausar / Reanudar) is replaced by the other one:
+      // keep focus on the page instead of letting it fall to <body>.
+      window.requestAnimationFrame(() => {
+        if (document.activeElement === document.body)
+          document.getElementById('opportunity-title')?.focus();
+      });
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'No se pudo actualizar la etapa.');
     } finally {
@@ -126,12 +151,15 @@ export default function OpportunityDetailPage() {
         stage: 'EN_PAUSA',
       }),
     );
-  const reanudar = () =>
+  const reanudar = () => {
+    if (opp && needsDialog(entryNeeds({ ...opp, valueFromBundle }, { kind: 'resume' }))) {
+      setEntry({ kind: 'resume' });
+      return;
+    }
     act(() => apiClient.post<Opportunity>(`/api/comercial/opportunities/${id}/resume`));
-  const reabrir = () => {
-    if (!opp || !window.confirm(`¿Reabrir “${opp.name}”? Volverá a Negociación.`)) return;
-    act(() => apiClient.post<Opportunity>(`/api/comercial/opportunities/${id}/reopen`));
   };
+  // Reopening always asks for a reason.
+  const reabrir = () => setEntry({ kind: 'reopen' });
 
   /* COM-013b — send the won deal to Operaciones. On success the ServiceOrder is created
      ASYNCHRONOUSLY by the listener (so "iniciado", not "creada"). handoffAt comes back set
@@ -193,7 +221,9 @@ export default function OpportunityDetailPage() {
             <span className="h-7 w-1.5 rounded-full" style={{ background: '#2563eb' }} />
             <div>
               <h1
-                className="text-xl font-semibold text-[var(--text-primary)]"
+                id="opportunity-title"
+                tabIndex={-1}
+                className="rounded text-xl font-semibold text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 style={{ fontFamily: "var(--font-display, 'Outfit'), sans-serif" }}
               >
                 {opp.name}
@@ -310,7 +340,8 @@ export default function OpportunityDetailPage() {
           Acciones
         </h2>
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 sm:p-5">
-          <ActionList scope="opportunity" scopeId={opp.id} variant="full" />
+          {/* key: a stage change remounts it, so its new system action shows. */}
+          <ActionList key={opp.stage} scope="opportunity" scopeId={opp.id} variant="full" />
         </div>
       </section>
 
@@ -397,6 +428,20 @@ export default function OpportunityDetailPage() {
             </div>
           )}
         </div>
+      )}
+
+      {entry && opp && (
+        <StageEntryDialog<Opportunity>
+          opportunity={{ ...opp, valueFromBundle }}
+          intent={entry}
+          fallbackFocusId="opportunity-title"
+          onDone={(u) => {
+            setEntry(null);
+            setErr(null);
+            setOpp(u);
+          }}
+          onCancel={() => setEntry(null)}
+        />
       )}
 
       {deleteOpen && (

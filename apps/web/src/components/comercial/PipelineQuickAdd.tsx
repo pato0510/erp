@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { STAGE_LABELS, stageRequires, type OpportunityStage } from './stageLabels';
 
 /* COM-025 — the table's quick-add row (last row of a group; writers with
  * opportunity.create only). «+ Agregar oportunidad» turns into an inline form: name
@@ -9,12 +10,23 @@ import { Plus } from 'lucide-react';
  * Escape or «Cancelar» cancels. A blank name creates nothing and closes the row; no
  * account → «Elige una cuenta.» and no request. The POST itself lives in the page
  * (onAdd, which toasts the api's message on error); on success the page refetches and
- * focus returns to «+ Agregar oportunidad». Today's POST always creates at PROSPECTO. */
+ * focus returns to «+ Agregar oportunidad».
+ *
+ * COM-027 (spec T13) — the row lives in every active-stage group and creates AT that
+ * stage (`stage`); Cuenta groups send no stage (the api creates at Prospecto). Groups
+ * whose stage requires fields (static mirror of COM-023, stageRequires) show them in the
+ * row — Visita Técnica: «Fecha estimada de cierre»; Cotización and Negociación: «Valor
+ * estimado» + «Fecha estimada de cierre». Missing → a field message and no request; the
+ * api's 400 still goes to the page toast. */
 
 export interface QuickAddBody {
   name: string;
   accountId: string;
   ownerId?: string;
+  /** COM-027 — the group's stage (omitted → Prospecto). */
+  stage?: OpportunityStage;
+  estimatedValue?: number;
+  expectedCloseDate?: string;
 }
 
 const INPUT =
@@ -25,6 +37,7 @@ const GHOST =
 export function PipelineQuickAdd({
   groupLabel,
   fixedAccountId,
+  stage,
   accounts,
   currentUserId,
   restColSpan,
@@ -33,8 +46,10 @@ export function PipelineQuickAdd({
 }: {
   /** For accessible names: «Prospecto» or the account's name. */
   groupLabel: string;
-  /** Cuenta grouping: the group's account. Etapa grouping (Prospecto): undefined → select. */
+  /** Cuenta grouping: the group's account. Etapa grouping: undefined → select. */
   fixedAccountId?: string;
+  /** COM-027 — Etapa grouping: the group's (active) stage. */
+  stage?: OpportunityStage;
   accounts: { id: string; name: string }[];
   currentUserId: string | null;
   restColSpan: number;
@@ -45,7 +60,15 @@ export function PipelineQuickAdd({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [accountId, setAccountId] = useState('');
-  const [accountError, setAccountError] = useState(false);
+  const [value, setValue] = useState('');
+  const [date, setDate] = useState('');
+  // COM-027 — which fields are missing (account, value, date).
+  const [missing, setMissing] = useState<{ account: boolean; value: boolean; date: boolean }>({
+    account: false,
+    value: false,
+    date: false,
+  });
+  const req = stage ? stageRequires(stage) : { value: false, date: false };
   const [saving, setSaving] = useState(false);
   const [refocus, setRefocus] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -61,7 +84,9 @@ export function PipelineQuickAdd({
     setOpen(false);
     setName('');
     setAccountId('');
-    setAccountError(false);
+    setValue('');
+    setDate('');
+    setMissing({ account: false, value: false, date: false });
     setRefocus(true);
   };
 
@@ -73,15 +98,21 @@ export function PipelineQuickAdd({
       return;
     }
     const target = fixedAccountId ?? accountId;
-    if (!target) {
-      setAccountError(true);
-      return;
-    }
+    const miss = {
+      account: !target,
+      value: req.value && value.trim() === '',
+      date: req.date && !date,
+    };
+    setMissing(miss);
+    if (miss.account || miss.value || miss.date) return;
     setSaving(true);
     const ok = await onAdd({
       name: trimmed,
       accountId: target,
       ...(currentUserId ? { ownerId: currentUserId } : {}),
+      ...(stage ? { stage } : {}),
+      ...(req.value ? { estimatedValue: Math.round(Number(value)) } : {}),
+      ...(req.date ? { expectedCloseDate: date } : {}),
     });
     setSaving(false);
     if (ok) {
@@ -100,7 +131,20 @@ export function PipelineQuickAdd({
     }
   };
 
-  const errorId = `${uid}-account-error`;
+  const errorId = `${uid}-error`;
+  const anyMissing = missing.account || missing.value || missing.date;
+  const missingText = [
+    missing.account && 'Elige una cuenta.',
+    (missing.value || missing.date) &&
+      `Para crear en ${stage ? STAGE_LABELS[stage] : ''} falta: ${[
+        missing.value && 'valor estimado',
+        missing.date && 'fecha estimada de cierre',
+      ]
+        .filter(Boolean)
+        .join(' y ')}.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <tr>
@@ -146,11 +190,11 @@ export function PipelineQuickAdd({
                   id={`${uid}-account`}
                   value={accountId}
                   disabled={saving}
-                  aria-invalid={accountError || undefined}
-                  aria-describedby={accountError ? errorId : undefined}
+                  aria-invalid={missing.account || undefined}
+                  aria-describedby={missing.account ? errorId : undefined}
                   onChange={(e) => {
                     setAccountId(e.target.value);
-                    if (e.target.value) setAccountError(false);
+                    if (e.target.value) setMissing((m) => ({ ...m, account: false }));
                   }}
                   className={`${INPUT} min-w-[200px] max-w-[280px]`}
                 >
@@ -161,6 +205,53 @@ export function PipelineQuickAdd({
                     </option>
                   ))}
                 </select>
+              </>
+            )}
+            {req.value && (
+              <>
+                <label htmlFor={`${uid}-value`} className="sr-only">
+                  Valor estimado de la nueva oportunidad (obligatorio)
+                </label>
+                <input
+                  id={`${uid}-value`}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={value}
+                  disabled={saving}
+                  aria-required="true"
+                  aria-invalid={missing.value || undefined}
+                  aria-describedby={missing.value ? errorId : undefined}
+                  onChange={(e) => {
+                    setValue(e.target.value);
+                    if (e.target.value) setMissing((m) => ({ ...m, value: false }));
+                  }}
+                  placeholder="Valor estimado *"
+                  className={`${INPUT} w-[160px]`}
+                />
+              </>
+            )}
+            {req.date && (
+              <>
+                <label htmlFor={`${uid}-date`} className="sr-only">
+                  Fecha estimada de cierre de la nueva oportunidad (obligatoria)
+                </label>
+                <input
+                  id={`${uid}-date`}
+                  type="date"
+                  value={date}
+                  disabled={saving}
+                  aria-required="true"
+                  aria-invalid={missing.date || undefined}
+                  aria-describedby={missing.date ? errorId : undefined}
+                  title="Fecha estimada de cierre"
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    if (e.target.value) setMissing((m) => ({ ...m, date: false }));
+                  }}
+                  className={`${INPUT} w-[160px]`}
+                />
               </>
             )}
             <button
@@ -174,13 +265,13 @@ export function PipelineQuickAdd({
             <button type="button" onClick={close} disabled={saving} className={GHOST}>
               Cancelar
             </button>
-            {accountError && (
+            {anyMissing && (
               <span
                 id={errorId}
                 role="alert"
                 className="text-xs font-medium text-red-700 dark:text-red-400"
               >
-                Elige una cuenta.
+                {missingText}
               </span>
             )}
           </div>

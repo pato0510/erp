@@ -71,7 +71,7 @@ export const ACTION_STATE_LABELS: Record<ActionState, string> = {
   PENDIENTE: 'Pendiente',
   VENCIDA: 'Vencida',
   HECHA: 'Hecha',
-  SISTEMA: 'Sistema',
+  SISTEMA: 'Registro del sistema', // COM-027 — says what the row is
 };
 
 /* ── COM-026 — «Actualización»: what the api's lastUpdate.kind means, in one place ── */

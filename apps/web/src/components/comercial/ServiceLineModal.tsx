@@ -95,7 +95,7 @@ export function ServiceLineModal({
       setErr(
         e instanceof ApiError
           ? e.status === 403
-            ? 'No tienes permiso para esta acción.'
+            ? 'No tienes permiso para hacer esto.'
             : e.message
           : 'No se pudo guardar el servicio.',
       );

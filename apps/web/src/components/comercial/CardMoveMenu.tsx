@@ -33,8 +33,11 @@ export function CardMoveMenu({
   stage,
   onMove,
   onResume,
+  triggerId,
 }: {
   stage: string;
+  /** COM-027 — lets the stage-entry dialog return focus here after the card re-renders. */
+  triggerId?: string;
   onMove: (target: OpportunityStage) => void;
   onResume: () => void;
 }) {
@@ -114,6 +117,7 @@ export function CardMoveMenu({
     <>
       <button
         ref={btnRef}
+        id={triggerId}
         type="button"
         onClick={toggle}
         aria-haspopup="menu"

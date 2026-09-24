@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Building2, KanbanSquare, LayoutDashboard, Users } from 'lucide-react';
+import { Bell, Building2, KanbanSquare, LayoutDashboard, Percent, Users } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+import { useComercialPermissions } from '../../hooks/useCanWrite';
 import { SidebarFooter } from './SidebarFooter';
 import { SidebarBrand } from './SidebarBrand';
 
@@ -16,19 +17,23 @@ import { SidebarBrand } from './SidebarBrand';
  * (the flagship board), placed first. COM-021 adds Empresas (the clients' parent
  * companies) right after Cuentas. COM-019 adds Dashboard, placed FIRST. ALERT-001 adds
  * Alertas right after Dashboard with a live count badge (GET comercial/alerts?summary=true
- * on mount and on every pathname change; hidden at 0 — the FinanceSidebar badge pattern). */
+ * on mount and on every pathname change; hidden at 0 — the FinanceSidebar badge pattern).
+ * COM-027 adds Probabilidades after Empresas, shown only with stageProbabilities.read. */
 const navItems = [
   { href: '/comercial/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: false },
   { href: '/comercial/alertas', label: 'Alertas', icon: Bell, exact: false },
   { href: '/comercial/pipeline', label: 'Pipeline', icon: KanbanSquare, exact: false },
   { href: '/comercial/cuentas', label: 'Cuentas', icon: Users, exact: false },
   { href: '/comercial/empresas', label: 'Empresas', icon: Building2, exact: false },
+  { href: '/comercial/probabilidades', label: 'Probabilidades', icon: Percent, exact: false },
 ];
 
 export function ComercialSidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [alertsCount, setAlertsCount] = useState(0);
+  const perms = useComercialPermissions();
+  const canReadProbabilities = perms?.stageProbabilities.read ?? false;
 
   // ALERT-001 — summary counts only; a 403 (no Opportunity/Quote read) or a network blip
   // leaves the badge hidden, matching the other sidebars.
@@ -58,30 +63,32 @@ export function ComercialSidebar() {
       </div>
 
       <nav className="tn-sidebar__nav">
-        {navItems.map((item) => {
-          const isActive = item.exact
-            ? pathname === item.href
-            : pathname === item.href || pathname?.startsWith(item.href + '/');
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`tn-nav__item${isActive ? ' tn-nav__item--active' : ''}`}
-            >
-              <Icon size={15} />
-              <span style={{ flex: 1 }}>{item.label}</span>
-              {item.href === '/comercial/alertas' && alertsCount > 0 && (
-                <span
-                  className="tn-nav__badge !bg-amber-400 !text-amber-950"
-                  aria-label={`${alertsCount} alertas`}
-                >
-                  {alertsCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+        {navItems
+          .filter((item) => item.href !== '/comercial/probabilidades' || canReadProbabilities)
+          .map((item) => {
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname === item.href || pathname?.startsWith(item.href + '/');
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`tn-nav__item${isActive ? ' tn-nav__item--active' : ''}`}
+              >
+                <Icon size={15} />
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.href === '/comercial/alertas' && alertsCount > 0 && (
+                  <span
+                    className="tn-nav__badge !bg-amber-400 !text-amber-950"
+                    aria-label={`${alertsCount} alertas`}
+                  >
+                    {alertsCount}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
       </nav>
 
       <SidebarFooter email={user.email} onLogout={logout} />
