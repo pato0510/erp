@@ -332,6 +332,9 @@ export class OpportunitiesService {
           'La oportunidad está cerrada (GANADA/PERDIDA). Usa "reabrir" para reactivarla.',
         );
       }
+      if (to === from) {
+        throw new BadRequestException(`La oportunidad ya está en ${STAGE_LABELS[from]}.`);
+      }
 
       const reference = from === 'EN_PAUSA' ? (opp.previousStage ?? 'NEGOCIACION') : from;
       const movingBack =

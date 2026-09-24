@@ -6,6 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app/app.module';
+import { CORS_METHODS } from './cors-methods';
 import { SentryExceptionFilter } from './modules/common/filters/sentry-exception.filter';
 
 async function bootstrap() {
@@ -49,7 +50,7 @@ async function bootstrap() {
   app.enableCors({
     origin: frontendUrl,
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: CORS_METHODS,
     allowedHeaders: ['Content-Type', 'x-company-id'],
   });
 

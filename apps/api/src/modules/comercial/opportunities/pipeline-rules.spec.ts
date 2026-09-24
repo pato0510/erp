@@ -122,8 +122,15 @@ describe('COM-023 entry requirements', () => {
     async (stage, value, date) => {
       for (const hasValue of [false, true])
         for (const hasDate of [false, true]) {
-          const w = world(fields(hasValue, hasDate));
-          const move = w.svc.changeStage(id, c, u, { stage, lostReason: 'PRECIO' });
+          const w = world({
+            ...fields(hasValue, hasDate),
+            stage: stage === 'PROSPECTO' ? 'CONTACTO' : 'PROSPECTO',
+          });
+          const move = w.svc.changeStage(id, c, u, {
+            stage,
+            lostReason: 'PRECIO',
+            reason: 'Revisar alcance',
+          });
           if ((value && !hasValue) || (date && !hasDate)) {
             const missing = [
               value && !hasValue && 'valor estimado',
@@ -363,9 +370,9 @@ describe('COM-023 create/probability', () => {
     },
   );
 
-  it('resets even on same-stage moves; custom default never emits PROBABILIDAD', async () => {
+  it('resets on stage changes; custom default never emits PROBABILIDAD', async () => {
     const w = world(
-      { stage: 'CONTACTO', probability: 90 },
+      { stage: 'PROSPECTO', probability: 90 },
       { defaults: [{ stage: 'CONTACTO', probability: 0 }] },
     );
     await w.svc.changeStage(id, c, u, { stage: 'CONTACTO' });
@@ -382,6 +389,47 @@ describe('COM-023 create/probability', () => {
           'La probabilidad no se edita en oportunidades ganadas o perdidas.',
         );
       }
+    },
+  );
+});
+
+describe('COM-023-B same-stage rejection', () => {
+  it.each([...ACTIVE_STAGES, 'EN_PAUSA'] as OpportunityStage[])(
+    '%s rejects before fill-in fields, probability reset or any write',
+    async (stage) => {
+      const w = world({ stage, probability: 90 });
+      await expect(
+        w.svc.changeStage(id, c, u, {
+          stage,
+          estimatedValue: 100,
+          expectedCloseDate: '2026-10-01',
+        }),
+      ).rejects.toMatchObject({
+        status: 400,
+        message: `La oportunidad ya está en ${STAGE_LABELS[stage]}.`,
+      });
+      expect(w.opp).toMatchObject({
+        stage,
+        probability: 90,
+        estimatedValue: null,
+        expectedCloseDate: null,
+      });
+      expect(w.tx.opportunityStageProbability.findMany).not.toHaveBeenCalled();
+      expect(w.tx.opportunity.update).not.toHaveBeenCalled();
+      expect(w.tx.account.updateMany).not.toHaveBeenCalled();
+      expect(w.tx.activity.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['GANADA', 'PERDIDA'] as const)(
+    '%s keeps the closed-stage error first',
+    async (stage) => {
+      const w = world({ stage });
+      await expect(w.svc.changeStage(id, c, u, { stage })).rejects.toThrow(
+        'La oportunidad está cerrada (GANADA/PERDIDA). Usa "reabrir" para reactivarla.',
+      );
+      expect(w.tx.opportunity.update).not.toHaveBeenCalled();
+      expect(w.tx.activity.create).not.toHaveBeenCalled();
     },
   );
 });

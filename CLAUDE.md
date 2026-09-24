@@ -56,6 +56,7 @@ role-based access control (RBAC) prepared for ABAC.
 - Stable useEffect pattern in frontend (primitive deps, no object state)
 - All amounts use formatCLP() from lib/formatters.ts
 - Decimal values from Prisma come as strings — use Number() before arithmetic
+- CORS (main.ts): métodos GET, POST, PUT, PATCH, DELETE y OPTIONS; un verbo HTTP nuevo en un controlador exige sumarlo ahí (faltó PUT desde 2026-04-20 hasta COM-023-B).
 
 ## RULES FOR CLAUDE CODE
 
@@ -282,16 +283,22 @@ acción». El modelo Activity, la tabla activities, los enums y las rutas
 /comercial/activities no cambian. Las «actividades» de Gestión organizacional
 (calendario) son otro concepto y no se tocan.
 
-| Ticket  | Título corto                                                                       | SHA       | Ola |
-| ------- | ---------------------------------------------------------------------------------- | --------- | --- |
-| COM-022 | Acciones Pendiente/Hecha, Actualización en vivo y registros de cambios comerciales | `405261a` | 1   |
-| COM-025 | Pipeline Tabla V2, agrupación por Etapa o Cuenta y fechas civiles                  | `98eccf0` | 1   |
-| COM-023 | Reglas del pipeline, probabilidades, responsables y conversión a Cliente (api)     | pendiente | 2   |
+Hallazgo de revisión (2026-09-23, COM-023-B): CORS no permitía PUT desde 2026-04-20
+(ddd7107); en producción, guardar la presencia mensual de Marketing y la compensación de un
+trabajador en RRHH fallaba en el navegador (preflight rechazado) aunque los endpoints
+existían. Corregido junto con las probabilidades por etapa, que usan PUT.
+
+| Ticket  | Título corto                                                                                                                   | SHA       | Ola |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------ | --------- | --- |
+| COM-022 | Acciones Pendiente/Hecha, Actualización en vivo y registros de cambios comerciales                                             | `405261a` | 1   |
+| COM-025 | Pipeline Tabla V2, agrupación por Etapa o Cuenta y fechas civiles                                                              | `98eccf0` | 1   |
+| COM-023 | Reglas del pipeline, probabilidades, responsables y conversión a Cliente (api)                                                 | `6897ce5` | 2   |
+| COM-026 | Acciones por oportunidad: desplegable en la tabla, ActionList único, vocabulario «acción», indicadores y Actualización en vivo | `45e1ee5` | 2   |
 
 Deuda: helper de fecha Santiago — Comercial ya usa common/santiago-date.ts (COM-022);
 quedan actividades, todos, hsec y hub.
 
-Última actualización: 2026-09-23 (COM-023 y COM-023-A; orden de olas y decisiones)
+Última actualización: 2026-09-23 (COM-023-B; CORS, rechazo de misma etapa y avance de ola 2)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1476,8 +1483,34 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   api en opportunity-labels.ts, compartido por oportunidades y dashboard; conserva
   STAGE_LABELS y los asuntos de sistema. COM-023-A cambia solo los cuatro mensajes
   api al vocabulario «acción», sin renombrar Activity, activities, enums ni rutas.
+  COM-023-B rechaza PATCH /:id/stage a la misma etapa antes de escribir o reiniciar
+  probabilidad: «La oportunidad ya está en <etiqueta>.»; Ganada / Perdida conservan
+  primero el rechazo por oportunidad cerrada.
+- COM-026 — ACCIONES POR OPORTUNIDAD (2026-09-23; Sprint 20, ola 2; web): «acción» es la
+  palabra del usuario en todo Comercial (Activity/ActivityType/rutas intactos; Gestión
+  organizacional conserva «actividades»). UN componente `ActionList` (scope
+  opportunity|account, variant compact|full) reemplaza ActivityTimeline y
+  ActivityFormModal (eliminados): bloques «Pendientes (N)» (fecha asc) y «Historial»
+  (hechas + sistema, más recientes primero; compact muestra 5 + «Ver todo el historial
+  (N)»), formulario en línea «Registrar acción» (Tipo, Descripción obligatoria, Fecha =
+  día civil Santiago, «Ya realizada» → HECHA; en cuenta, «Oportunidad»: 0 → queda en la
+  cuenta, 1 → preseleccionada, 2+ → obligatoria, «Solo la cuenta» explícito), checkbox
+  hecha/reabrir, `ActionEditModal` (PATCH solo de lo cambiado) y eliminar con
+  confirmación. Gating SOLO por flags `activity` leídos dentro del componente (se acabaron
+  los tres gates distintos). Tras cada escritura: refetch silencioso, `onChanged`, anuncio
+  polite y foco al ítem o al título de su bloque. Superficies: bajo cada fila de la tabla
+  del pipeline (el nombre es un toggle con chevron, varias abiertas a la vez, conjunto
+  dueño la tabla; ícono «Abrir ficha»; panel sticky y del ancho de la caja vía container
+  query), sección «Acciones» de la ficha tras los campos, acordeón y pestaña «Acciones» de
+  Cuentas. Indicadores = campos del api, jamás recalculados: fila «N pendientes» (rojo +
+  ícono + sr-only vencidas) o «Sin acción» en las cinco etapas activas; cabecera de grupo
+  Σ pendientes/vencidas. «Actualización» = `lastUpdate` (día relativo + etiqueta del kind,
+  mapa único en activityLabels.tsx; ámbar > 3 y rojo > 7 días Santiago solo en etapas
+  activas; fecha exacta accesible por teclado; orden por lastUpdate.at). Seguimientos
+  COM-025: Σ del grupo plegado en su cabecera, loadedOnce como estado, estado vacío sin
+  invitación para quien no crea. Cabeceras de operaciones de fila → «Opciones».
 
-Última actualización: 2026-09-23 (COM-023, COM-023-A y COM-025)
+Última actualización: 2026-09-23 (COM-023-B y COM-026; ola 2)
 
 ═══════════════════════════════════════════════════════════════════
 
