@@ -13,11 +13,19 @@ import { PROBABILITY_OPTIONS, isActiveStage, isClosedStage } from './stageLabels
  * estimado, Fecha estimada de cierre and Probabilidad on non-closed rows, Responsable on
  * every row (a won deal needs an owner for the handoff). Writers only (opportunity.update);
  * ONE cell at a time (the table owns the editing key). The display is a button; activating
- * it opens the editor: Enter or blur saves (a select saves on change), Escape cancels. One
- * single-field PATCH through onSave (the page PATCHes and refetches; on error it toasts
- * the api's message and the cell shows its previous value again). Focus returns to the
- * cell after Enter / Escape / a select change — never stolen after a blur. The api
- * validates every rule (required fields per stage, closed rows, active owner). */
+ * it opens the editor: Enter or blur saves, Escape cancels. One single-field PATCH through
+ * onSave (the page PATCHes and refetches; on error it toasts the api's message and the
+ * cell shows its previous value again). Focus returns to the cell after Enter / Escape /
+ * a pointer pick — never stolen after a blur. The api validates every rule (required
+ * fields per stage, closed rows, active owner).
+ *
+ * COM-027-A — a closed native <select> fires `change` on EVERY arrow key in Chromium /
+ * Windows, so saving on change turned keyboard navigation into writes. useSelectIntent
+ * remembers the last input on a select: a change after a keydown (arrows, Home / End,
+ * PageUp / PageDown, type-ahead) is only a DRAFT; a change after a pointerdown (mouse /
+ * touch pick) — or with no preceding input at all (a screen reader's own gesture) — is
+ * sent at once. Probabilidad / Responsable: Enter or blur sends a differing draft, Escape
+ * restores. The table's Etapa select uses the same hook. */
 
 export type EditField = 'value' | 'close' | 'probability' | 'owner';
 export type SaveField = (id: string, patch: Record<string, unknown>) => Promise<boolean>;
@@ -27,6 +35,27 @@ const EDITOR = `h-8 w-full rounded-md border border-accent bg-input px-2 text-sm
 const DISPLAY = `-mx-1.5 flex min-h-8 w-[calc(100%+0.75rem)] items-center rounded-md px-1.5 text-left hover:bg-subtle-hover ${FOCUS}`;
 
 const cellId = (field: EditField, rowId: string) => `pipeline-${field}-${rowId}`;
+
+/** COM-027-A — how the last change on a select was made. A keydown other than Tab /
+ *  Enter / Escape marks «keyboard», a pointerdown marks «pointer»; `take()` reads and
+ *  clears the mark, so a change with no preceding input reads as a pick. */
+export function useSelectIntent() {
+  const via = useRef<'keyboard' | 'pointer' | null>(null);
+  return {
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key !== 'Tab' && e.key !== 'Enter' && e.key !== 'Escape') via.current = 'keyboard';
+    },
+    onPointerDown: () => {
+      via.current = 'pointer';
+    },
+    /** true when the change came from keyboard navigation (keep it as a draft). */
+    take: () => {
+      const v = via.current;
+      via.current = null;
+      return v === 'keyboard';
+    },
+  };
+}
 
 function refocus(field: EditField, rowId: string) {
   window.requestAnimationFrame(() => document.getElementById(cellId(field, rowId))?.focus());
@@ -276,8 +305,8 @@ function ProbabilityEditor({
       value={r.probability != null ? String(r.probability) : ''}
       saving={saving}
       onCancel={cancel}
-      onPick={(v) =>
-        void commit(v === String(r.probability) ? null : { probability: Number(v) }, true)
+      onPick={(v, focusBack) =>
+        void commit(v === String(r.probability) ? null : { probability: Number(v) }, focusBack)
       }
     >
       {r.probability == null && <option value="">—</option>}
@@ -369,7 +398,9 @@ function OwnerEditor({
       value={current}
       saving={saving}
       onCancel={cancel}
-      onPick={(v) => void commit(v === current ? null : { ownerId: v === '' ? null : v }, true)}
+      onPick={(v, focusBack) =>
+        void commit(v === current ? null : { ownerId: v === '' ? null : v }, focusBack)
+      }
     >
       <option value="">Sin responsable</option>
       {!listed && <option value={current}>{ownerName ?? 'Usuario desconocido'} (inactivo)</option>}
@@ -393,7 +424,9 @@ interface CellProps {
   onSave: SaveField;
 }
 
-/** A select that saves on change, cancels on Escape and closes (unchanged) on blur. */
+/** COM-027-A — a select that never saves on keyboard navigation: a pointer pick is sent at
+ *  once; keyboard changes stay a draft that Enter or blur sends (only if it differs) and
+ *  Escape restores. onCancel closes unchanged. */
 function SelectEditor({
   label,
   value,
@@ -405,28 +438,41 @@ function SelectEditor({
   label: string;
   value: string;
   saving: boolean;
-  onPick: (value: string) => void;
+  onPick: (value: string, focusBack: boolean) => void;
   onCancel: (focusBack?: boolean) => void;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLSelectElement | null>(null);
+  const intent = useSelectIntent();
+  const [draft, setDraft] = useState(value);
   useEffect(() => {
     ref.current?.focus();
   }, []);
   return (
     <select
       ref={ref}
-      value={value}
+      value={draft}
       disabled={saving}
       aria-label={label}
-      onChange={(e) => onPick(e.target.value)}
+      onPointerDown={intent.onPointerDown}
+      onChange={(e) => {
+        const v = e.target.value;
+        setDraft(v);
+        if (!intent.take()) onPick(v, true); // pointer pick (or a gesture with no key)
+      }}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') {
+        intent.onKeyDown(e);
+        if (e.key === 'Enter') {
           e.preventDefault();
+          if (draft !== value) onPick(draft, true);
+          else onCancel(true);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          setDraft(value);
           onCancel(true);
         }
       }}
-      onBlur={() => onCancel(false)}
+      onBlur={() => (draft !== value ? onPick(draft, false) : onCancel(false))}
       className={EDITOR}
     >
       {children}

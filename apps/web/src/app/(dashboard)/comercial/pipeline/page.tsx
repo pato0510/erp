@@ -33,7 +33,11 @@ import { useMembers } from '../../../../hooks/useMembers';
  * line (formatDbDate: a @db.Date no longer renders one day early).
  *
  * COM-026 — every table row opens its actions (ActionList, compact) under it; a write
- * there refetches the list so the pending indicators and «Actualización» follow. */
+ * there refetches the list so the pending indicators and «Actualización» follow.
+ *
+ * COM-027-A — after a direct move (no dialog) focus follows the moved row / card to the
+ * trigger attemptMove received (restoreFocus), also after a revert, the Ganada confirm
+ * and LostReasonModal; each open action list reloads when its row's updatedAt changes. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KanbanSquare, LayoutList, Play, Plus, RotateCcw } from 'lucide-react';
@@ -126,6 +130,7 @@ export default function PipelinePage() {
     id: string;
     name: string;
     prev: Opportunity;
+    returnFocusId?: string; // COM-027-A — where focus goes when it confirms or cancels
   } | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   // COM-027 — an open stage-entry dialog: the PRE-move opportunity (its needs are computed
@@ -278,6 +283,22 @@ export default function PipelinePage() {
     if (view === 'table') fetchOpps();
   };
 
+  /* COM-027-A — after a direct move (no dialog) the moved row / card is re-created in its
+     new group or column, so the focused control vanishes. Once the rows re-render, put
+     focus on the trigger attemptMove was given (the row's Etapa select, the card's ⋮) —
+     only if focus actually fell to <body>, never stealing it from where the user went.
+     Two frames: the first lets React commit the move / revert, the second the refetch. */
+  const restoreFocus = (id?: string) => {
+    if (!id) return;
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (active && active !== document.body) return;
+        document.getElementById(id)?.focus();
+      }),
+    );
+  };
+
   /* commit a stage change to the canonical endpoint; revert + toast on any 4xx.
      The backend is the machine — the frontend never pre-validates beyond routing
      the drop to the right endpoint/dialog (COM-027: moves that need fields or a reason
@@ -286,6 +307,7 @@ export default function PipelinePage() {
     id: string,
     body: { stage: OpportunityStage; lostReason?: LostReason; lostReasonDetail?: string },
     prev: Opportunity,
+    returnFocusId?: string,
   ) => {
     try {
       const updated = await apiClient.patch<Opportunity>(
@@ -299,6 +321,8 @@ export default function PipelinePage() {
         msg: e instanceof ApiError ? e.message : 'No se pudo mover la oportunidad.',
         type: 'error',
       });
+    } finally {
+      restoreFocus(returnFocusId);
     }
   };
 
@@ -320,17 +344,20 @@ export default function PipelinePage() {
       return;
     }
 
+    // COM-027-A — the optimistic move re-created the row / card: keep focus on it.
+    restoreFocus(returnFocusId);
     if (isActiveStage(targetStage) || targetStage === 'EN_PAUSA') {
-      void commitStage(opp.id, { stage: targetStage }, prev);
+      void commitStage(opp.id, { stage: targetStage }, prev, returnFocusId);
     } else if (targetStage === 'GANADA') {
       if (window.confirm(`¿Marcar “${opp.name}” como ganada?`)) {
-        void commitStage(opp.id, { stage: 'GANADA' }, prev);
+        void commitStage(opp.id, { stage: 'GANADA' }, prev, returnFocusId);
       } else {
         revert(prev); // cancel reverts the card
+        restoreFocus(returnFocusId);
       }
     } else if (targetStage === 'PERDIDA') {
       // Persist only on modal confirm; cancel reverts (nothing persists).
-      setLostModal({ id: opp.id, name: opp.name, prev });
+      setLostModal({ id: opp.id, name: opp.name, prev, returnFocusId });
     }
   };
 
@@ -350,11 +377,15 @@ export default function PipelinePage() {
       lostModal.id,
       { stage: 'PERDIDA', lostReason, lostReasonDetail },
       lostModal.prev,
+      lostModal.returnFocusId,
     );
     setLostModal(null);
   };
   const cancelLost = () => {
-    if (lostModal) revert(lostModal.prev);
+    if (lostModal) {
+      revert(lostModal.prev);
+      restoreFocus(lostModal.returnFocusId);
+    }
     setLostModal(null);
   };
 
@@ -521,6 +552,8 @@ export default function PipelinePage() {
               scopeId={row.id}
               variant="compact"
               onChanged={fetchOpps}
+              // COM-027-A — the open list reloads (silently) when its opportunity changes.
+              refreshKey={row.updatedAt}
             />
           )}
         />

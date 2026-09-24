@@ -340,8 +340,14 @@ export default function OpportunityDetailPage() {
           Acciones
         </h2>
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 sm:p-5">
-          {/* key: a stage change remounts it, so its new system action shows. */}
-          <ActionList key={opp.stage} scope="opportunity" scopeId={opp.id} variant="full" />
+          {/* COM-027-A — refreshKey: any change to the opportunity (stage, pause / resume /
+              reopen, service lines) reloads the list silently; nothing typed is lost. */}
+          <ActionList
+            scope="opportunity"
+            scopeId={opp.id}
+            variant="full"
+            refreshKey={opp.updatedAt}
+          />
         </div>
       </section>
 

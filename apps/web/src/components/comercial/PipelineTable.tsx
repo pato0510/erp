@@ -20,6 +20,7 @@ import {
   OwnerCell,
   ProbabilityCell,
   ValueCell,
+  useSelectIntent,
   type EditField,
   type SaveField,
 } from './PipelineInlineCells';
@@ -71,7 +72,15 @@ export type { PipelineRow } from './pipelineTableModel';
  * COM-027 — quick add in every active-stage group (at that stage, with the fields the
  * stage requires) and in every Cuenta group (at Prospecto); inline edits of Valor
  * estimado, Fecha estimada de cierre, Probabilidad and Responsable (PipelineInlineCells;
- * one cell at a time, the table owns the editing key). */
+ * one cell at a time, the table owns the editing key).
+ *
+ * COM-027-A — the Etapa select never moves on keyboard navigation: arrows only change the
+ * value shown (a draft, useSelectIntent); Enter moves to it through the page's attemptMove
+ * (dialog, Ganada confirm, LostReasonModal unchanged); Escape or blur restore the real
+ * stage. A pointer pick moves at once, as before. */
+
+/** COM-027-A — the one sr-only hint every Etapa select points to. */
+const STAGE_HINT_ID = 'pipeline-stage-hint';
 
 /** COM-027 — what a row needs to render its editable cells. */
 interface RowEdit {
@@ -382,6 +391,10 @@ export function PipelineTable({
       {/* relative: the sr-only (absolute) texts must stay inside the scroll box.
           container-type: the actions panel sizes itself to this box (100cqw). */}
       <div className="relative overflow-x-auto rounded-xl border border-line bg-card-solid [container-type:inline-size]">
+        {/* COM-027-A — the Etapa selects' keyboard model (hidden; read via aria-describedby). */}
+        <span id={STAGE_HINT_ID} hidden>
+          Elige una etapa y presiona Enter para moverla.
+        </span>
         <table className="w-full min-w-[1280px] table-fixed border-separate border-spacing-0 text-sm text-fg md:min-w-[1320px]">
           <caption className="sr-only">
             Pipeline agrupado por {groupBy === 'stage' ? 'etapa' : 'cuenta'}
@@ -742,6 +755,9 @@ function DataRow({
   const ownerName = r.ownerId ? (nameOf(r.ownerId) ?? 'Usuario desconocido') : null;
   const targets = canWrite ? stageMoveTargets(r.stage) : [];
   const fill = { background: stageAccent(r.stage) };
+  // COM-027-A — a keyboard-chosen stage waits here until Enter (null = the real stage).
+  const [stageDraft, setStageDraft] = useState<string | null>(null);
+  const stageIntent = useSelectIntent();
   const cell = (field: EditField) => ({
     row: r,
     canEdit: edit.canEdit,
@@ -805,8 +821,33 @@ function DataRow({
             </label>
             <select
               id={`pipeline-stage-${r.id}`}
-              value={r.stage}
-              onChange={(e) => onChangeStage(r, e.target.value as OpportunityStage)}
+              value={stageDraft ?? r.stage}
+              aria-describedby={STAGE_HINT_ID}
+              onPointerDown={stageIntent.onPointerDown}
+              onChange={(e) => {
+                const v = e.target.value as OpportunityStage;
+                if (stageIntent.take()) {
+                  setStageDraft(v === r.stage ? null : v); // keyboard: draft only
+                  return;
+                }
+                setStageDraft(null);
+                onChangeStage(r, v); // pointer pick: move now
+              }}
+              onKeyDown={(e) => {
+                stageIntent.onKeyDown(e);
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (stageDraft && stageDraft !== r.stage) {
+                    const target = stageDraft as OpportunityStage;
+                    setStageDraft(null);
+                    onChangeStage(r, target);
+                  }
+                } else if (e.key === 'Escape' && stageDraft) {
+                  e.preventDefault();
+                  setStageDraft(null);
+                }
+              }}
+              onBlur={() => setStageDraft(null)}
               className="absolute inset-0 h-full w-full cursor-pointer appearance-none border-0 pl-3 pr-8 text-xs font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
               style={fill}
             >

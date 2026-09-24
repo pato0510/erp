@@ -100,11 +100,16 @@ export function ActionList({
   scopeId,
   variant,
   onChanged,
+  refreshKey,
 }: {
   scope: Scope;
   scopeId: string;
   variant: Variant;
   onChanged?: () => void;
+  /** COM-027-A — when it changes after the first load, the list reloads silently (the open
+   *  form with what is typed, open details and «Ver todo el historial» stay as they are).
+   *  The callers pass the opportunity's updatedAt. */
+  refreshKey?: string;
 }) {
   const uid = useId();
   const compact = variant === 'compact';
@@ -152,6 +157,14 @@ export function ActionList({
   useEffect(() => {
     load();
   }, [load]);
+
+  // COM-027-A — silent reload when the owner of the list says something changed.
+  const seenKey = useRef(refreshKey);
+  useEffect(() => {
+    if (refreshKey === seenKey.current) return;
+    seenKey.current = refreshKey;
+    void load(true);
+  }, [refreshKey, load]);
 
   // Account scope: the account's opportunities (register / edit select + item links).
   useEffect(() => {
