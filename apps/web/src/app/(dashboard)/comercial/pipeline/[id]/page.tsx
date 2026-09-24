@@ -7,11 +7,28 @@ import { useMembers } from '../../../../../hooks/useMembers';
  * fields, the "Acciones" list (COM-026's ActionList, right after the fields), the
  * "Servicios" bundle editor (COM-006), and a Delete danger zone (COM-005 DELETE). ALL rules live in the backend — the UI
  * renders them and relays their 4xx messages, never re-implements them. Ability-driven
- * via /comercial/permissions. Tokens: accent #2563eb, Outfit headings, glass cards. */
+ * via /comercial/permissions. Tokens: accent #2563eb, Outfit headings, glass cards.
+ *
+ * COM-029 — the «Lead» field: the originating lead's link (its ficha) or «Sin lead»;
+ * writers get «Vincular lead» / «Cambiar» (LeadPickerDialog) and «Desvincular» (a small
+ * confirm → PATCH { leadId: null }). After any change the opportunity is re-read, so its
+ * updatedAt moves and the Acciones list reloads (refreshKey) with the system record.
+ * Stage / handoff responses are the bare row: they are MERGED over the loaded one, so the
+ * lead relation (only on GET) is never dropped. */
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Pause, Play, RotateCcw, Send, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Link2,
+  Pause,
+  Play,
+  RotateCcw,
+  Send,
+  Trash2,
+  Unlink,
+} from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
 import { formatCLP, formatDate } from '../../../../../lib/formatters';
 import { formatDbDate } from '../../../../../lib/dates';
@@ -34,8 +51,16 @@ import {
   StageEntryDialog,
   entryNeeds,
   needsDialog,
+  stageErrText,
   type StageIntent,
 } from '../../../../../components/comercial/StageEntryDialog';
+// COM-029 — link / change / unlink the opportunity's lead.
+import { LeadPickerDialog } from '../../../../../components/comercial/LeadPickerDialog';
+import {
+  DIALOG_GHOST,
+  DIALOG_PRIMARY,
+  DialogShell,
+} from '../../../../../components/comercial/DialogShell';
 
 interface Opportunity {
   id: string;
@@ -54,7 +79,12 @@ interface Opportunity {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  leadId?: string | null; // COM-029 — the originating lead (COM-024)
+  lead?: { id: string; name: string } | null;
 }
+
+/** COM-029 — the focus target shared by «Vincular lead» and «Cambiar». */
+const LEAD_ACTION_ID = 'opportunity-lead-action';
 
 export default function OpportunityDetailPage() {
   const params = useParams();
@@ -77,6 +107,10 @@ export default function OpportunityDetailPage() {
   const [err, setErr] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // COM-029 — the lead picker and the unlink confirm.
+  const [leadPickerOpen, setLeadPickerOpen] = useState(false);
+  const [unlinkOpen, setUnlinkOpen] = useState(false);
+  const canCreateLead = perms?.lead?.create ?? false;
   // COM-011 — the quotes section reports whether any quote exists, so the delete
   // danger zone can pre-empt the backend 409 (an opp with quotes can't be deleted).
   const [quotesExist, setQuotesExist] = useState(false);
@@ -101,6 +135,15 @@ export default function OpportunityDetailPage() {
       .catch(() => undefined);
     loadBundleFlag();
   }, [id, loadBundleFlag]);
+
+  // COM-029 — stage / handoff responses are the bare row: keep the loaded relations (lead).
+  const mergeOpp = (u: Opportunity) => setOpp((cur) => (cur ? { ...cur, ...u } : u));
+  // COM-029 — re-read after a lead change (awaited, so focus lands on the new controls).
+  const reloadOpp = () =>
+    apiClient
+      .get<Opportunity>(`/api/comercial/opportunities/${id}`)
+      .then(setOpp)
+      .catch(() => undefined);
 
   const load = useCallback(() => {
     apiClient
@@ -131,7 +174,7 @@ export default function OpportunityDetailPage() {
     setErr(null);
     try {
       const u = await fn();
-      setOpp(u);
+      mergeOpp(u);
       // COM-027 — the pressed button (Pausar / Reanudar) is replaced by the other one:
       // keep focus on the page instead of letting it fall to <body>.
       window.requestAnimationFrame(() => {
@@ -179,7 +222,7 @@ export default function OpportunityDetailPage() {
     apiClient
       .post<Opportunity>(`/api/comercial/opportunities/${id}/handoff`)
       .then((u) => {
-        setOpp(u);
+        mergeOpp(u);
         setNotice('Handoff iniciado — la orden de servicio se está creando en Operaciones.');
       })
       .catch((e) => setErr(e instanceof ApiError ? e.message : 'No se pudo enviar a Operaciones.'))
@@ -303,6 +346,12 @@ export default function OpportunityDetailPage() {
           />
           <KV label="Probabilidad" value={opp.probability != null ? `${opp.probability}%` : '—'} />
           <KV label="Responsable" value={ownerName ?? '—'} />
+          <LeadField
+            lead={opp.lead ?? null}
+            canWrite={canWrite}
+            onLink={() => setLeadPickerOpen(true)}
+            onUnlink={() => setUnlinkOpen(true)}
+          />
           <KV label="Cerrada" value={opp.closedAt ? formatDate(opp.closedAt) : '—'} />
           <KV label="Actualizada" value={formatDate(opp.updatedAt)} />
         </div>
@@ -444,9 +493,41 @@ export default function OpportunityDetailPage() {
           onDone={(u) => {
             setEntry(null);
             setErr(null);
-            setOpp(u);
+            mergeOpp(u);
           }}
           onCancel={() => setEntry(null)}
+        />
+      )}
+
+      {leadPickerOpen && (
+        <LeadPickerDialog
+          opportunity={{
+            id: opp.id,
+            name: opp.name,
+            accountId: opp.accountId,
+            accountName,
+            leadId: opp.leadId ?? opp.lead?.id ?? null,
+          }}
+          canCreate={canCreateLead}
+          returnFocusId={LEAD_ACTION_ID}
+          fallbackFocusId="opportunity-title"
+          onDone={async () => {
+            await reloadOpp();
+            setLeadPickerOpen(false);
+          }}
+          onCancel={() => setLeadPickerOpen(false)}
+        />
+      )}
+
+      {unlinkOpen && opp.lead && (
+        <UnlinkLeadDialog
+          opportunityId={opp.id}
+          leadName={opp.lead.name}
+          onDone={async () => {
+            await reloadOpp();
+            setUnlinkOpen(false);
+          }}
+          onCancel={() => setUnlinkOpen(false)}
         />
       )}
 
@@ -487,6 +568,114 @@ function ActionButton({
     >
       {icon} {children}
     </button>
+  );
+}
+
+/** COM-029 — «Lead»: the link or «Sin lead»; writers link, change or unlink it. */
+function LeadField({
+  lead,
+  canWrite,
+  onLink,
+  onUnlink,
+}: {
+  lead: { id: string; name: string } | null;
+  canWrite: boolean;
+  onLink: () => void;
+  onUnlink: () => void;
+}) {
+  const btn =
+    'inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-fg-secondary hover:bg-subtle-hover hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+  return (
+    <div>
+      <p className="mb-0.5 text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+        Lead
+      </p>
+      {lead ? (
+        <Link
+          href={`/comercial/leads/${lead.id}`}
+          className="break-words rounded text-sm font-medium text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          {lead.name}
+        </Link>
+      ) : (
+        <p className="text-sm text-[var(--text-secondary)]">Sin lead</p>
+      )}
+      {canWrite && (
+        <div className="-ml-1.5 mt-1 flex flex-wrap items-center gap-1">
+          <button id={LEAD_ACTION_ID} type="button" onClick={onLink} className={btn}>
+            <Link2 size={13} aria-hidden="true" />
+            {lead ? 'Cambiar' : 'Vincular lead'}
+          </button>
+          {lead && (
+            <button type="button" onClick={onUnlink} className={btn}>
+              <Unlink size={13} aria-hidden="true" />
+              Desvincular
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** COM-029 — «Desvincular»: one PATCH { leadId: null }; the api's 4xx shows inside. */
+function UnlinkLeadDialog({
+  opportunityId,
+  leadName,
+  onDone,
+  onCancel,
+}: {
+  opportunityId: string;
+  leadName: string;
+  onDone: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const confirm = async () => {
+    setSaving(true);
+    setErr(null);
+    try {
+      await apiClient.patch(`/api/comercial/opportunities/${opportunityId}`, { leadId: null });
+    } catch (e) {
+      setErr(stageErrText(e, 'No se pudo desvincular el lead.'));
+      setSaving(false);
+      return;
+    }
+    await onDone();
+  };
+  return (
+    <DialogShell
+      title="Desvincular lead"
+      onCancel={onCancel}
+      returnFocusId={LEAD_ACTION_ID}
+      fallbackFocusId="opportunity-title"
+      footer={
+        <>
+          <button type="button" onClick={onCancel} className={DIALOG_GHOST}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            data-autofocus
+            onClick={() => void confirm()}
+            disabled={saving}
+            className={DIALOG_PRIMARY}
+          >
+            {saving ? 'Guardando…' : 'Desvincular'}
+          </button>
+        </>
+      }
+    >
+      <p className="text-sm text-fg">
+        ¿Desvincular «{leadName}» de esta oportunidad? El lead no se borra.
+      </p>
+      {err && (
+        <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-400">
+          {err}
+        </p>
+      )}
+    </DialogShell>
   );
 }
 

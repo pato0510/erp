@@ -32,6 +32,7 @@ export interface ComercialPermissions {
   quote: SubjectFlags; // COM-011 — the quotes section gates on this
   availability: { read: boolean }; // COM-012 — RRHH availability projection (read-only)
   serviceCatalog: SubjectFlags;
+  lead: SubjectFlags; // COM-029 — the Lead (COM-024): picker «Crear lead nuevo», lead ficha
 }
 export type ComercialSubject = keyof ComercialPermissions;
 
@@ -48,6 +49,7 @@ const EMPTY: ComercialPermissions = {
   quote: NONE,
   availability: { read: false },
   serviceCatalog: NONE,
+  lead: NONE,
 };
 
 /* Session/company-scoped cache: one fetch per company, shared across every hook

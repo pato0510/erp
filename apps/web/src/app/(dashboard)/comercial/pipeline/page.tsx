@@ -37,7 +37,11 @@ import { useMembers } from '../../../../hooks/useMembers';
  *
  * COM-027-A — after a direct move (no dialog) focus follows the moved row / card to the
  * trigger attemptMove received (restoreFocus), also after a revert, the Ganada confirm
- * and LostReasonModal; each open action list reloads when its row's updatedAt changes. */
+ * and LostReasonModal; each open action list reloads when its row's updatedAt changes.
+ *
+ * COM-029 — the table's column 7 «+ Vincular lead» opens LeadPickerDialog; after the one
+ * write the list is refetched (awaited) before the dialog closes, so focus lands on the
+ * row's new lead link. The kanban is unchanged. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KanbanSquare, LayoutList, Play, Plus, RotateCcw } from 'lucide-react';
@@ -74,6 +78,8 @@ import { PipelineTable } from '../../../../components/comercial/PipelineTable';
 // COM-026 — each table row's actions dropdown.
 import { ActionList } from '../../../../components/comercial/ActionList';
 import type { QuickAddBody } from '../../../../components/comercial/PipelineQuickAdd';
+// COM-029 — link an existing lead of the account, or create one and link it.
+import { LeadPickerDialog } from '../../../../components/comercial/LeadPickerDialog';
 
 interface Opportunity {
   id: string;
@@ -98,6 +104,8 @@ interface Opportunity {
   lastUpdate?: { at: string; kind: string } | null;
   valueFromBundle?: boolean; // COM-023 — value derived from service lines (never asked)
   account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null; // COM-020
+  leadId?: string | null; // COM-029 — the originating lead (COM-024)
+  lead?: { id: string; name: string } | null;
 }
 interface AccountRow {
   id: string;
@@ -111,6 +119,7 @@ export default function PipelinePage() {
   const perms = useComercialPermissions();
   const canWrite = perms?.opportunity.update ?? false;
   const canCreate = perms?.opportunity.create ?? false;
+  const canCreateLead = perms?.lead?.create ?? false;
   const { user } = useAuth();
 
   const [opps, setOpps] = useState<Opportunity[]>([]);
@@ -142,6 +151,8 @@ export default function PipelinePage() {
     returnFocusId?: string;
   } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  // COM-029 — the row whose lead picker is open.
+  const [leadPicker, setLeadPicker] = useState<Opportunity | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 
   /* ── Edge auto-scroll during drag ──────────────────────────────────────────
@@ -215,7 +226,8 @@ export default function PipelinePage() {
       if (ownerFilter) params.set('ownerId', ownerFilter);
     }
     const qs = params.toString();
-    apiClient
+    // Returned so a caller can wait for the refreshed rows (COM-029's picker).
+    return apiClient
       .get<Opportunity[]>(`/api/comercial/opportunities${qs ? `?${qs}` : ''}`)
       .then((data) => {
         setOpps(data);
@@ -546,6 +558,10 @@ export default function PipelinePage() {
           onNew={() => setNewModal(true)}
           onAdd={addFromTable}
           onCreated={fetchOpps}
+          onLinkLead={(row) => {
+            const opp = opps.find((o) => o.id === row.id);
+            if (opp) setLeadPicker(opp);
+          }}
           renderRowDetail={(row) => (
             <ActionList
               scope="opportunity"
@@ -786,6 +802,26 @@ export default function PipelinePage() {
             if (entry.optimistic) revert(entry.opp);
             setEntry(null);
           }}
+        />
+      )}
+
+      {leadPicker && (
+        <LeadPickerDialog
+          opportunity={{
+            id: leadPicker.id,
+            name: leadPicker.name,
+            accountId: leadPicker.accountId,
+            accountName:
+              leadPicker.account?.name ?? accountsById.get(leadPicker.accountId)?.name ?? null,
+            leadId: leadPicker.leadId ?? null,
+          }}
+          canCreate={canCreateLead}
+          returnFocusId={`pipeline-lead-${leadPicker.id}`}
+          onDone={async () => {
+            await fetchOpps();
+            setLeadPicker(null);
+          }}
+          onCancel={() => setLeadPicker(null)}
         />
       )}
 

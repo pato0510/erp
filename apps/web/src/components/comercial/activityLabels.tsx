@@ -88,6 +88,7 @@ export const LAST_UPDATE_KIND_LABELS: Record<string, string> = {
   FECHA_CIERRE: 'Fecha de cierre definida',
   PROBABILIDAD: 'Probabilidad ajustada',
   LEAD: 'Lead vinculado',
+  LEAD_DESVINCULADO: 'Lead desvinculado', // COM-029
   RESPONSABLE: 'Responsable cambiado',
   CUENTA_CLIENTE: 'Cuenta pasa a Cliente',
   ACCION_AGREGADA: 'Acción agregada',

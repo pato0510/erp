@@ -77,7 +77,11 @@ export type { PipelineRow } from './pipelineTableModel';
  * COM-027-A — the Etapa select never moves on keyboard navigation: arrows only change the
  * value shown (a draft, useSelectIntent); Enter moves to it through the page's attemptMove
  * (dialog, Ganada confirm, LostReasonModal unchanged); Escape or blur restore the real
- * stage. A pointer pick moves at once, as before. */
+ * stage. A pointer pick moves at once, as before.
+ *
+ * COM-029 — column 7 «Lead»: the linked lead is a link to its ficha; without one, writers
+ * get «+ Vincular lead» (the page opens LeadPickerDialog), readers «—». The link and the
+ * button share the id `pipeline-lead-<row>`, so focus returns to the cell after linking. */
 
 /** COM-027-A — the one sr-only hint every Etapa select points to. */
 const STAGE_HINT_ID = 'pipeline-stage-hint';
@@ -144,6 +148,7 @@ export function PipelineTable({
   onEditField,
   ownerMembers = [],
   renderRowDetail,
+  onLinkLead,
 }: {
   rows: PipelineRow[];
   loading: boolean;
@@ -166,6 +171,8 @@ export function PipelineTable({
   ownerMembers?: { userId: string; displayName: string }[];
   /** COM-026 — the content of a row's full-width actions panel. */
   renderRowDetail?: (row: PipelineRow) => ReactNode;
+  /** COM-029 — opens the lead picker for a row without a lead (writers). */
+  onLinkLead?: (row: PipelineRow) => void;
 }) {
   // COM-028 — the table opens grouped by Cuenta (founder, 2026-09-24); Etapa is one click away.
   const [groupBy, setGroupBy] = useState<GroupBy>('account');
@@ -396,7 +403,7 @@ export function PipelineTable({
         <span id={STAGE_HINT_ID} hidden>
           Elige una etapa y presiona Enter para moverla.
         </span>
-        <table className="w-full min-w-[1280px] table-fixed border-separate border-spacing-0 text-sm text-fg md:min-w-[1320px]">
+        <table className="w-full min-w-[1432px] table-fixed border-separate border-spacing-0 text-sm text-fg md:min-w-[1472px]">
           <caption className="sr-only">
             Pipeline agrupado por {groupBy === 'stage' ? 'etapa' : 'cuenta'}
           </caption>
@@ -494,6 +501,7 @@ export function PipelineTable({
                 onToggleRow={toggleRow}
                 rowEdit={rowEdit}
                 renderRowDetail={renderRowDetail}
+                onLinkLead={canWrite ? onLinkLead : undefined}
               />
             ))
           )}
@@ -519,6 +527,7 @@ function GroupBody({
   onToggleRow,
   rowEdit,
   renderRowDetail,
+  onLinkLead,
 }: {
   group: RowGroup;
   open: boolean;
@@ -533,6 +542,7 @@ function GroupBody({
   onToggleRow: (id: string) => void;
   rowEdit: (rowId: string) => RowEdit;
   renderRowDetail?: (row: PipelineRow) => ReactNode;
+  onLinkLead?: (row: PipelineRow) => void;
 }) {
   const bodyId = `pipeline-group-${group.kind}-${group.key}`;
   const isStage = group.kind === 'stage';
@@ -621,6 +631,7 @@ function GroupBody({
                   panelId={panelId}
                   edit={rowEdit(r.id)}
                   onToggle={renderRowDetail ? () => onToggleRow(r.id) : undefined}
+                  onLinkLead={onLinkLead ? () => onLinkLead(r) : undefined}
                 />
                 {expanded && renderRowDetail && (
                   <tr id={panelId}>
@@ -740,6 +751,7 @@ function DataRow({
   panelId,
   onToggle,
   edit,
+  onLinkLead,
 }: {
   row: PipelineRow;
   today: string;
@@ -751,6 +763,8 @@ function DataRow({
   /** Opens / closes the row's actions panel (absent → the name is a plain link). */
   onToggle?: () => void;
   edit: RowEdit;
+  /** COM-029 — writers only: opens the lead picker (absent → «—» when there is no lead). */
+  onLinkLead?: () => void;
 }) {
   const accountName = r.account?.name ?? '—';
   const ownerName = r.ownerId ? (nameOf(r.ownerId) ?? 'Usuario desconocido') : null;
@@ -890,7 +904,12 @@ function DataRow({
         <CloseDateCell {...cell('close')} today={today} />
       </td>
 
-      {/* 8 · Cuenta (column 7 «Lead» arrives in ola 2) */}
+      {/* 7 · Lead (COM-029) */}
+      <td className={TD}>
+        <LeadCell row={r} onLink={onLinkLead} />
+      </td>
+
+      {/* 8 · Cuenta */}
       <td className={TD}>
         <Link
           href={`/comercial/cuentas/${r.accountId}`}
@@ -911,6 +930,36 @@ function DataRow({
         <ProbabilityCell {...cell('probability')} />
       </td>
     </tr>
+  );
+}
+
+/** COM-029 — column 7: the lead's link, «+ Vincular lead» for writers, or «—». */
+function LeadCell({ row: r, onLink }: { row: PipelineRow; onLink?: () => void }) {
+  const id = `pipeline-lead-${r.id}`;
+  if (r.lead) {
+    return (
+      <Link
+        id={id}
+        href={`/comercial/leads/${r.lead.id}`}
+        title={r.lead.name}
+        className={`block truncate rounded text-fg hover:text-accent hover:underline ${FOCUS}`}
+      >
+        {r.lead.name}
+      </Link>
+    );
+  }
+  if (!onLink) return <span className="text-fg-secondary">—</span>;
+  return (
+    <button
+      id={id}
+      type="button"
+      onClick={onLink}
+      aria-label={`Vincular lead a «${r.name}»`}
+      className={`inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-fg-secondary hover:bg-subtle-hover hover:text-accent ${FOCUS}`}
+    >
+      <Plus size={13} aria-hidden="true" className="shrink-0" />
+      <span className="truncate">Vincular lead</span>
+    </button>
   );
 }
 

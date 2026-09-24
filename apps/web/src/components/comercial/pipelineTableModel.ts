@@ -2,7 +2,8 @@ import { STAGE_ORDER, type OpportunityStage } from './stageLabels';
 
 /* COM-025 — the pipeline table's pure model: row shape, columns, client-side search /
  * filters, grouping (Etapa | Cuenta) and in-group sorting. No React here, so ola 2 can
- * add columns (Lead between 6 and 8) and derived fields without touching the view. */
+ * add columns (Lead between 6 and 8) and derived fields without touching the view.
+ * COM-029 — column 7 «Lead» (the lead that originated the opportunity; COM-024 api). */
 
 export interface PipelineRow {
   id: string;
@@ -23,6 +24,9 @@ export interface PipelineRow {
   lastUpdate?: { at: string; kind: string } | null;
   valueFromBundle?: boolean; // COM-023 — value derived from service lines (read-only)
   account?: { id: string; name: string; enterprise: { id: string; name: string } | null } | null;
+  // COM-029 — the lead that originated the opportunity (COM-024); null = none linked.
+  leadId?: string | null;
+  lead?: { id: string; name: string } | null;
 }
 
 export type GroupBy = 'stage' | 'account';
@@ -36,6 +40,7 @@ export type ColumnKey =
   | 'value'
   | 'created'
   | 'expectedClose'
+  | 'lead'
   | 'account'
   | 'updated'
   | 'probability';
@@ -50,7 +55,7 @@ export interface ColumnDef {
   width: string;
 }
 
-/** The spec's order; column 7 «Lead» slots in between expectedClose and account (ola 2). */
+/** The spec's order; column 7 «Lead» sits between expectedClose and account (COM-029). */
 export const COLUMNS: ColumnDef[] = [
   {
     key: 'opportunity',
@@ -92,6 +97,12 @@ export const COLUMNS: ColumnDef[] = [
     help: 'Fecha en que se espera cerrar. En rojo si ya pasó y la oportunidad sigue abierta.',
     sort: 'expectedClose',
     width: 'w-[136px]',
+  },
+  {
+    key: 'lead',
+    label: 'Lead',
+    help: 'Lead que originó la oportunidad. Clic en el nombre para ver su ficha.',
+    width: 'w-[152px]',
   },
   {
     key: 'account',
