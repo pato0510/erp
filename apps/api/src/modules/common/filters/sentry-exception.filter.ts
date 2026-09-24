@@ -52,7 +52,7 @@ export class SentryExceptionFilter implements ExceptionFilter {
       if (typeof resMessage === 'string') {
         message = resMessage;
       } else if (Array.isArray(resMessage)) {
-        message = resMessage.join(' · ');
+        message = [...new Set(resMessage)].join(' · ');
       } else {
         message = exception.message;
       }

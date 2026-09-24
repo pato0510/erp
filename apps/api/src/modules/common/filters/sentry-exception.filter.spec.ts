@@ -46,6 +46,29 @@ describe('SentryExceptionFilter API error contract', () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      name: 'reopen validation text appears once',
+      messages: ['Reabrir requiere un motivo.', 'Reabrir requiere un motivo.'],
+      expected: 'Reabrir requiere un motivo.',
+    },
+    {
+      name: 'distinct validation messages retain first-occurrence order',
+      messages: ['A', 'B', 'A'],
+      expected: 'A · B',
+    },
+  ])('deduplicates validation messages: $name', ({ messages, expected }) => {
+    new SentryExceptionFilter().catch(new BadRequestException(messages), host);
+    expect(status).toHaveBeenCalledWith(400);
+    expect(json).toHaveBeenCalledWith({
+      statusCode: 400,
+      message: expected,
+      timestamp: expect.any(String),
+      path: '/api/test',
+    });
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
   it('hides unexpected errors while retaining 5xx reporting', () => {
     const logger = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     try {

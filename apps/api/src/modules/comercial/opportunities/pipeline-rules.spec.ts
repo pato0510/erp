@@ -1,4 +1,4 @@
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { ArgumentsHost, BadRequestException, ValidationPipe } from '@nestjs/common';
 import { OpportunityStage, Prisma } from '@prisma/client';
 import { OpportunitiesService } from './opportunities.service';
 import { OpportunitiesController } from './opportunities.controller';
@@ -9,6 +9,7 @@ import { ReopenOpportunityDto } from './dto/reopen-opportunity.dto';
 import { ResumeOpportunityDto } from './dto/resume-opportunity.dto';
 import { INITIAL_STAGE_PROBABILITIES, PROBABILITY_MESSAGE } from './stage-probabilities';
 import { LOST_REASON_LABELS, STAGE_LABELS } from './opportunity-labels';
+import { SentryExceptionFilter } from '../../common/filters/sentry-exception.filter';
 
 type Row = Record<string, unknown>;
 const c = 'c1',
@@ -559,8 +560,27 @@ describe('COM-023 DTO validation', () => {
   it.each([{}, { reason: '' }, { reason: '  ' }, { reason: null }])(
     'reopen missing/blank reason returns exact message',
     async (dto) => {
-      await expect(validate(ReopenOpportunityDto, dto)).rejects.toMatchObject({
+      const rejection = validate(ReopenOpportunityDto, dto);
+      await expect(rejection).rejects.toMatchObject({
         response: { message: expect.arrayContaining(['Reabrir requiere un motivo.']) },
+      });
+      const json = jest.fn();
+      const status = jest.fn(() => ({ json }));
+      const path = '/api/comercial/opportunities/o1/reopen';
+      const host = {
+        switchToHttp: () => ({
+          getResponse: () => ({ status }),
+          getRequest: () => ({ url: path, method: 'POST' }),
+        }),
+      } as unknown as ArgumentsHost;
+      await rejection.catch((error: unknown) => new SentryExceptionFilter().catch(error, host));
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json).toHaveBeenCalledTimes(1);
+      expect(json).toHaveBeenCalledWith({
+        statusCode: 400,
+        message: 'Reabrir requiere un motivo.',
+        timestamp: expect.any(String),
+        path,
       });
     },
   );

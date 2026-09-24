@@ -56,7 +56,9 @@ role-based access control (RBAC) prepared for ABAC.
 - Stable useEffect pattern in frontend (primitive deps, no object state)
 - All amounts use formatCLP() from lib/formatters.ts
 - Decimal values from Prisma come as strings — use Number() before arithmetic
-- CORS (main.ts): métodos GET, POST, PUT, PATCH, DELETE y OPTIONS; un verbo HTTP nuevo en un controlador exige sumarlo ahí (faltó PUT desde 2026-04-20 hasta COM-023-B).
+- CORS: la lista de métodos vive en apps/api/src/cors-methods.ts (main.ts la usa): GET,
+  POST, PUT, PATCH, DELETE y OPTIONS; cors-methods.spec.ts falla si un controlador usa un
+  verbo que no está (faltó PUT desde 2026-04-20 hasta COM-023-B).
 
 ## RULES FOR CLAUDE CODE
 
@@ -251,7 +253,12 @@ Pendiente sin sprint: recuperación de acceso por correo (opción A), cuando exi
 
 Plan aprobado por el fundador (2026-09-23): ola 1 cerrada, COM-022 `405261a`
 y COM-025 `98eccf0`; deploy de la web SKIPPED por Railway sin motivo con CI verde
-y relanzado a mano. Ola 2: COM-023 (reglas, api) ∥ COM-026 (acciones: desplegable
+y relanzado a mano.
+COM-026 salió antes a producción (develop `45e1ee5`), porque solo usa el api de COM-022.
+Ola 2 cerrada el 2026-09-24 con COM-023, COM-023-B y COM-027 (develop `45abba8`, migración
+20260923200000_add_commercial_rules aplicada en producción; api y web SUCCESS); COM-023-C
+y COM-027-A la siguen en una rama corta.
+Ola 2: COM-023 (reglas, api) ∥ COM-026 (acciones: desplegable
 por oportunidad en la tabla, agrupada por Etapa y por Cuenta; un solo componente
 de acciones en tabla, ficha y Cuentas; indicadores; «Actualización» en vivo),
 después COM-027 (UI de reglas + edición en celda de valor, fecha de cierre,
@@ -288,17 +295,18 @@ Hallazgo de revisión (2026-09-23, COM-023-B): CORS no permitía PUT desde 2026-
 trabajador en RRHH fallaba en el navegador (preflight rechazado) aunque los endpoints
 existían. Corregido junto con las probabilidades por etapa, que usan PUT.
 
-| Ticket  | Título corto                                                                                                                   | SHA       | Ola |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------ | --------- | --- |
-| COM-022 | Acciones Pendiente/Hecha, Actualización en vivo y registros de cambios comerciales                                             | `405261a` | 1   |
-| COM-025 | Pipeline Tabla V2, agrupación por Etapa o Cuenta y fechas civiles                                                              | `98eccf0` | 1   |
-| COM-023 | Reglas del pipeline, probabilidades, responsables y conversión a Cliente (api)                                                 | `6897ce5` | 2   |
-| COM-026 | Acciones por oportunidad: desplegable en la tabla, ActionList único, vocabulario «acción», indicadores y Actualización en vivo | `45e1ee5` | 2   |
+| Ticket  | Título corto                                                                                                                                             | SHA       | Ola |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --- |
+| COM-022 | Acciones Pendiente/Hecha, Actualización en vivo y registros de cambios comerciales                                                                       | `405261a` | 1   |
+| COM-025 | Pipeline Tabla V2, agrupación por Etapa o Cuenta y fechas civiles                                                                                        | `98eccf0` | 1   |
+| COM-023 | Reglas del pipeline, probabilidades, responsables y conversión a Cliente (api)                                                                           | `6897ce5` | 2   |
+| COM-026 | Acciones por oportunidad: desplegable en la tabla, ActionList único, vocabulario «acción», indicadores y Actualización en vivo                           | `45e1ee5` | 2   |
+| COM-027 | Reglas del pipeline en pantalla: diálogo único de entrada de etapa, seis motivos, agregado rápido por etapa, edición en celda y probabilidades por etapa | `45abba8` | 2   |
 
 Deuda: helper de fecha Santiago — Comercial ya usa common/santiago-date.ts (COM-022);
 quedan actividades, todos, hsec y hub.
 
-Última actualización: 2026-09-23 (COM-023-B; CORS, rechazo de misma etapa y avance de ola 2)
+Última actualización: 2026-09-24 (cierre de ola 2; COM-027, COM-027-A y COM-023-C)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1486,6 +1494,8 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   COM-023-B rechaza PATCH /:id/stage a la misma etapa antes de escribir o reiniciar
   probabilidad: «La oportunidad ya está en <etiqueta>.»; Ganada / Perdida conservan
   primero el rechazo por oportunidad cerrada.
+  COM-023-C: el filtro global de errores deja una sola vez cada mensaje de validación
+  repetido (reabrir sin motivo decía dos veces «Reabrir requiere un motivo.»).
 - COM-026 — ACCIONES POR OPORTUNIDAD (2026-09-23; Sprint 20, ola 2; web): «acción» es la
   palabra del usuario en todo Comercial (Activity/ActivityType/rutas intactos; Gestión
   organizacional conserva «actividades»). UN componente `ActionList` (scope
@@ -1509,8 +1519,47 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   activas; fecha exacta accesible por teclado; orden por lastUpdate.at). Seguimientos
   COM-025: Σ del grupo plegado en su cabecera, loadedOnce como estado, estado vacío sin
   invitación para quien no crea. Cabeceras de operaciones de fila → «Opciones».
+- COM-027 — REGLAS DEL PIPELINE EN PANTALLA (2026-09-23; Sprint 20, ola 2; web): UN
+  diálogo de entrada de etapa (`StageEntryDialog`) para TODO movimiento — select de la
+  tabla, arrastre y «Mover a…» del kanban, Reanudar/Reabrir de las tarjetas y
+  Pausar/Reanudar/Reabrir de la ficha — que pide SOLO lo que el movimiento necesita según
+  un espejo estático de COM-023 en stageLabels.tsx («espejo de COM-023; el api manda»:
+  VALUE_STAGES, DATE_STAGES, isMoveBack con la referencia del api): «Motivo» en retroceso
+  o reapertura, «Valor estimado» si la etapa destino lo exige, falta y no viene de las
+  líneas (valueFromBundle), «Fecha estimada de cierre» si la exige y falta. Sin validación
+  propia: lo vacío no se envía y el mensaje del api se muestra DENTRO del diálogo,
+  conservando lo escrito; confirmar = UNA petición (stage / resume / reopen); cancelar,
+  Escape o el fondo revierten el movimiento optimista. Ganada sin faltantes conserva el
+  confirm liviano; Perdida conserva LostReasonModal con los SEIS motivos en el orden del
+  api. Las respuestas de stage/resume/reopen son la fila pelada: la página las FUSIONA
+  sobre la fila y la tabla refresca. Agregado rápido en las cinco etapas activas (crea en
+  esa etapa con los campos que exige) y en cada grupo Cuenta (Prospecto). Edición en celda
+  (solo opportunity.update, una celda a la vez, un PATCH de un campo y refresco; error del
+  api en el toast): valor, cierre y probabilidad en filas no cerradas, responsable en
+  todas (useMembers('active')); valor derivado de líneas = solo lectura con la pista «Se
+  calcula con las líneas de servicios». NewOpportunityModal: «Etapa inicial» (cinco
+  activas) con obligatorios marcados y probabilidad «Por defecto de la etapa» / 0–100 de
+  10 en 10. /comercial/probabilidades (entrada «Probabilidades» tras Empresas, con
+  stageProbabilities.read): ocho etapas, Ganada 100 y Perdida 0 fijas, «Por
+  defecto»/«Configurada» según isDefault (una etapa devuelta a su valor inicial sigue
+  «Configurada»: el api conserva la fila); con update (ADMIN/SUPER_ADMIN) guarda SOLO lo
+  cambiado (PUT) y «Descartar»; aplica a nuevas y a próximos cambios de etapa, nunca a
+  existentes. `DialogShell` (portal a document.body, foco atrapado, retorno al disparador
+  o a un respaldo, jamás <body>) lo usan el diálogo de etapa y ActionEditModal.
+  Seguimientos COM-026: filas de sistema sin tipo ni «Nota» (ícono de historial, chip
+  «Registro del sistema»); «No tienes permiso para hacer esto.» y «Esto no se puede
+  deshacer.» en Comercial; la tabla de Cuentas se desplaza en pantallas angostas.
+  COM-027-A: ningún select de la tabla (Etapa, Probabilidad, Responsable) guarda al
+  navegar con el teclado (en Windows y Linux cada flecha dispara change): el teclado solo
+  cambia el borrador; en Probabilidad y Responsable Enter o salir del campo guardan y
+  Escape descarta; en Etapa solo Enter mueve (mismo attemptMove y mismo diálogo; pista
+  sr-only) y salir o Escape restauran; elegir con el puntero guarda al tiro. Tras un
+  movimiento sin diálogo el foco vuelve al select de la fila (o al ⋮ de la tarjeta) aunque
+  la fila cambie de grupo. Las listas de acciones abiertas (fila de la tabla y ficha) se
+  recargan en silencio cuando cambia `updatedAt` de la oportunidad (prop `refreshKey`, que
+  reemplaza el `key={opp.stage}` de la ficha) sin perder lo escrito.
 
-Última actualización: 2026-09-23 (COM-023-B y COM-026; ola 2)
+Última actualización: 2026-09-24 (cierre de ola 2; COM-027, COM-027-A y COM-023-C)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -2471,10 +2520,10 @@ correcciones en sitio, pero ya no es el punto de entrada.
   caso culpable, con assert de que el id nunca contiene ':'). PLAT-001 — el
   SentryExceptionFilter solo leía exception.message, así que los mensajes de
   class-validator colapsaban en "Bad Request Exception" a nivel PLATAFORMA
-  (hallazgo HSEC-008); hoy lee getResponse() (sentry-exception.filter.ts:38) y
-  une los arrays de constraints con ' · ' (:46), dejando el path de string
-  byte-idéntico. Deuda registrada: el filtro sigue SIN spec (tres ramas:
-  string, string[], no-HttpException) — crear una cuando se lo toque.
+  (hallazgo HSEC-008); hoy lee getResponse() y une los arrays de constraints
+  con ' · ' sin repetir mensajes idénticos (COM-023-C), dejando el path de string
+  byte-idéntico. Spec: sentry-exception.filter.spec.ts (string, string[], mensajes
+  repetidos, código de AUTH-001 y no-HttpException).
 - OPS-039 — CREAR Y EDITAR tipos de permiso estaba ROTO EN PRODUCCIÓN (c89491f,
   live 2026-08-10; api y web SUCCESS 14:59Z). El formulario mandaba siempre
   isActive y create-permit-type.dto.ts NO lo declara — es el ÚNICO DTO de
