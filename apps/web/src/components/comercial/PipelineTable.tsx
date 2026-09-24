@@ -167,7 +167,8 @@ export function PipelineTable({
   /** COM-026 — the content of a row's full-width actions panel. */
   renderRowDetail?: (row: PipelineRow) => ReactNode;
 }) {
-  const [groupBy, setGroupBy] = useState<GroupBy>('stage');
+  // COM-028 — the table opens grouped by Cuenta (founder, 2026-09-24); Etapa is one click away.
+  const [groupBy, setGroupBy] = useState<GroupBy>('account');
   const [filters, setFilters] = useState<TableFilters>(EMPTY_FILTERS);
   const [collapsed, setCollapsed] = useState<Record<GroupBy, Record<string, boolean>>>({
     stage: {},
@@ -271,8 +272,8 @@ export function PipelineTable({
         >
           {(
             [
-              ['stage', 'Etapa'],
               ['account', 'Cuenta'],
+              ['stage', 'Etapa'],
             ] as const
           ).map(([value, label]) => (
             <button

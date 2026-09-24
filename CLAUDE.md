@@ -306,7 +306,7 @@ existían. Corregido junto con las probabilidades por etapa, que usan PUT.
 Deuda: helper de fecha Santiago — Comercial ya usa common/santiago-date.ts (COM-022);
 quedan actividades, todos, hsec y hub.
 
-Última actualización: 2026-09-24 (cierre de ola 2; COM-027, COM-027-A y COM-023-C)
+Última actualización: 2026-09-24 (cierre de ola 2; COM-027, COM-027-A y COM-023-C; COM-028)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1558,8 +1558,11 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   la fila cambie de grupo. Las listas de acciones abiertas (fila de la tabla y ficha) se
   recargan en silencio cuando cambia `updatedAt` de la oportunidad (prop `refreshKey`, que
   reemplaza el `key={opp.stage}` de la ficha) sin perder lo escrito.
+- COM-028 — AGRUPAR POR CUENTA POR DEFECTO (2026-09-24; Sprint 20; web): la vista Tabla
+  del pipeline abre agrupada por Cuenta y «Agrupar por» muestra Cuenta primero; Etapa
+  queda a un clic. Pedido del fundador al entregar el CRM a uso. Sin api.
 
-Última actualización: 2026-09-24 (cierre de ola 2; COM-027, COM-027-A y COM-023-C)
+Última actualización: 2026-09-24 (COM-028: agrupar por Cuenta por defecto)
 
 ═══════════════════════════════════════════════════════════════════
 
