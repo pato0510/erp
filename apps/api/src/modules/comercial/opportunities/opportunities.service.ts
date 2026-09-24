@@ -26,6 +26,7 @@ import { ReopenOpportunityDto } from './dto/reopen-opportunity.dto';
 import { LOST_REASON_LABELS, STAGE_LABELS } from './opportunity-labels';
 import { loadStageProbabilities } from './stage-probabilities';
 import { memberDisplayName } from '../../iam/member-display-name';
+import { lockLeadOpportunity, prepareLeadChange } from '../leads/lead-link';
 
 const CLOSED_STAGES: OpportunityStage[] = [OpportunityStage.GANADA, OpportunityStage.PERDIDA];
 const VALUE_STAGES: OpportunityStage[] = ['COTIZACION', 'NEGOCIACION', 'GANADA'];
@@ -116,6 +117,7 @@ export class OpportunitiesService {
       where,
       orderBy: [{ updatedAt: 'desc' }],
       include: {
+        lead: { select: { id: true, name: true } },
         _count: { select: { services: true } },
         account: {
           select: { id: true, name: true, enterprise: { select: { id: true, name: true } } },
@@ -209,7 +211,10 @@ export class OpportunitiesService {
   }
 
   async findOne(id: string, companyId: string) {
-    const opp = await this.prisma.opportunity.findFirst({ where: { id, companyId } });
+    const opp = await this.prisma.opportunity.findFirst({
+      where: { id, companyId },
+      include: { lead: { select: { id: true, name: true } } },
+    });
     if (!opp) throw new NotFoundException('Oportunidad no encontrada');
     return opp;
   }
@@ -265,6 +270,8 @@ export class OpportunitiesService {
     }
     if (dto.accountId) await this.assertAccountInCompany(dto.accountId, companyId);
     return this.rlsService.executeWithRls(companyId, userId, async (tx) => {
+      const editsOrigin = dto.leadId !== undefined || dto.accountId !== undefined;
+      if (editsOrigin) await lockLeadOpportunity(tx, companyId, id);
       const existing = await this.findForMutation(tx, id, companyId);
       const effectiveStage =
         existing.stage === 'EN_PAUSA' ? existing.previousStage : existing.stage;
@@ -296,6 +303,19 @@ export class OpportunitiesService {
       if (dto.ownerId !== undefined) data.ownerId = dto.ownerId;
       if (dto.notes !== undefined) data.notes = dto.notes;
       const changes = this.fieldChanges(existing, dto);
+      if (editsOrigin) {
+        const beforeId = existing.leadId ?? null;
+        const afterId = dto.leadId === undefined ? beforeId : dto.leadId;
+        const change = await prepareLeadChange(
+          tx,
+          companyId,
+          dto.accountId ?? existing.accountId,
+          beforeId,
+          afterId,
+        );
+        if (dto.leadId !== undefined) data.leadId = dto.leadId;
+        if (change) changes.push(change);
+      }
       if (dto.ownerId !== undefined && dto.ownerId !== existing.ownerId) {
         const before = existing.ownerId
           ? await this.ownerName(tx, companyId, existing.ownerId)

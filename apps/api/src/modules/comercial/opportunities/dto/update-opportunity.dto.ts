@@ -1,6 +1,15 @@
 import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { OpportunityStage } from '@prisma/client';
-import { IsDivisibleBy, IsEnum, IsInt, IsOptional, Max, Min, ValidateIf } from 'class-validator';
+import {
+  IsDivisibleBy,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 import { CreateOpportunityDto } from './create-opportunity.dto';
 import { Transform } from 'class-transformer';
 import { PROBABILITY_MESSAGE } from '../stage-probabilities';
@@ -12,6 +21,11 @@ import { PROBABILITY_MESSAGE } from '../stage-probabilities';
 export class UpdateOpportunityDto extends PartialType(
   OmitType(CreateOpportunityDto, ['stage', 'probability'] as const),
 ) {
+  @Transform(({ value }) => (value === '' ? null : value))
+  @IsOptional()
+  @IsUUID('all', { message: 'El lead debe ser un UUID válido.' })
+  leadId?: string | null;
+
   // PartialType's IsOptional would also skip null; explicit probability writes are numbers.
   @ValidateIf((_object, value) => value !== undefined)
   @IsInt({ message: PROBABILITY_MESSAGE })

@@ -5,12 +5,28 @@
  * `read Account`, so ANALYST/VIEWER 403 before this runs — but the flag LOGIC is
  * verified here for all six roles. */
 import { UserRole } from '@prisma/client';
-import { CaslAbilityFactory } from '../common/casl/casl-ability.factory';
+import { CaslAbilityFactory, LeadSubject } from '../common/casl/casl-ability.factory';
 import { ComercialController } from './comercial.controller';
 
 const FULL = { read: true, create: true, update: true, delete: true };
 const READ_ONLY = { read: true, create: false, update: false, delete: false };
 const NONE = { read: false, create: false, update: false, delete: false };
+
+describe('COM-024 permissions lead flags', () => {
+  const controller = new ComercialController({} as never);
+  const factory = new CaslAbilityFactory();
+  it.each(Object.values(UserRole))('%s mirrors opportunity CRUD', (role) => {
+    const p = controller.permissions(factory.defineAbilityFor(role));
+    expect(p.lead).toEqual(p.opportunity);
+    expect(Object.keys(p.lead).sort()).toEqual(['create', 'delete', 'read', 'update']);
+  });
+  it('derives lead flags from its own subject, not opportunity flags or role strings', () => {
+    const ability = {
+      can: (action: string, subject: unknown) => action === 'create' && subject === LeadSubject,
+    };
+    expect(controller.permissions(ability as never).lead).toEqual({ ...NONE, create: true });
+  });
+});
 
 describe('COM-004b ComercialController.permissions — ability-derived flags', () => {
   const factory = new CaslAbilityFactory();

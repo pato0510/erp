@@ -54,6 +54,7 @@ type Subjects =
       | typeof EnterpriseSubject
       | typeof ContactSubject
       | typeof OpportunitySubject
+      | typeof LeadSubject
       | typeof ActivitySubject
       | typeof OpportunityNoteSubject
       | typeof OpportunityDocumentSubject
@@ -269,6 +270,10 @@ class ContactSubject {
 class OpportunitySubject {
   static readonly modelName = 'Opportunity' as const;
 }
+// COM-024 — origin metadata; grants mirror Opportunity role by role.
+class LeadSubject {
+  static readonly modelName = 'Lead' as const;
+}
 class ActivitySubject {
   static readonly modelName = 'Activity' as const;
 }
@@ -380,6 +385,7 @@ const RRHH_COMPENSATION_SUBJECTS = [
    inherited Comercial read revoked in their branches below, so no role reads
    Comercial data until a later ticket grants it per-entity. */
 const COMERCIAL_SUBJECTS = [
+  LeadSubject,
   AccountSubject,
   EnterpriseSubject,
   ContactSubject,
@@ -460,6 +466,7 @@ export type Action =
 export type AppAbility = MongoAbility<[Action, Subjects]>;
 
 export {
+  LeadSubject,
   UserSubject,
   CompanySubject,
   TenantSubject,
@@ -635,6 +642,7 @@ export class CaslAbilityFactory {
         can(['read', 'create', 'update', 'delete'], ContactSubject);
         /* COM-005 — opportunities (pipeline core) share the same profile → full CRUD. */
         can(['read', 'create', 'update', 'delete'], OpportunitySubject);
+        can(['read', 'create', 'update', 'delete'], LeadSubject);
         /* COM-008 — activities (CRM timeline) share the same profile → full CRUD. */
         can(['read', 'create', 'update', 'delete'], ActivitySubject);
         /* COM-016 — opportunity notes mirror the activity profile → full CRUD. */
@@ -712,6 +720,7 @@ export class CaslAbilityFactory {
         can('read', ContactSubject);
         /* COM-005 — opportunities: ACCOUNTANT read-only (pipeline visibility). No write. */
         can('read', OpportunitySubject);
+        can('read', LeadSubject);
         /* COM-008 — activities: ACCOUNTANT read-only (timeline visibility). No write. */
         can('read', ActivitySubject);
         /* COM-016 — opportunity notes mirror activities: ACCOUNTANT read-only. No write. */

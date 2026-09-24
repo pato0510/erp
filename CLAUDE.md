@@ -258,6 +258,7 @@ COM-026 salió antes a producción (develop `45e1ee5`), porque solo usa el api d
 Ola 2 cerrada el 2026-09-24 con COM-023, COM-023-B y COM-027 (develop `45abba8`, migración
 20260923200000_add_commercial_rules aplicada en producción; api y web SUCCESS); COM-023-C
 y COM-027-A la siguen en una rama corta.
+Ola 3 en curso en la rama review/s20-ola3 (develop congelado: CRM en uso desde el 2026-09-24): COM-024 Lead api ∥ COM-029 Lead web.
 Ola 2: COM-023 (reglas, api) ∥ COM-026 (acciones: desplegable
 por oportunidad en la tabla, agrupada por Etapa y por Cuenta; un solo componente
 de acciones en tabla, ficha y Cuentas; indicadores; «Actualización» en vivo),
@@ -306,7 +307,7 @@ existían. Corregido junto con las probabilidades por etapa, que usan PUT.
 Deuda: helper de fecha Santiago — Comercial ya usa common/santiago-date.ts (COM-022);
 quedan actividades, todos, hsec y hub.
 
-Última actualización: 2026-09-24 (cierre de ola 2; COM-027, COM-027-A y COM-023-C; COM-028)
+Última actualización: 2026-09-24 (ola 3: COM-024 en rama)
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -1099,7 +1100,7 @@ comercial), COM-020 (Pipeline 2.0: vista tabla) y ALERT-001 (panel de alertas),
 Schema: apps/api/prisma/schema/comercial.prisma
 Backend: apps/api/src/modules/comercial/ · Frontend: /comercial/...
 
-Tablas: service_catalog, enterprises, accounts, contacts, opportunities,
+Tablas: service_catalog, enterprises, accounts, contacts, leads, opportunities,
 opportunity_services, opportunity_stage_probabilities, activities, opportunity_notes,
 opportunity_documents, quotes, quote_lines
 (+ service_orders en Operaciones, target del handoff COM-013a).
@@ -1108,8 +1109,8 @@ Puntos clave:
 
 - service_catalog: catálogo compartido — Comercial escribe (MANAGER+),
   todos los roles leen.
-- accounts: lifecycle PROSPECTO/ACTIVA/INACTIVA; NO hay tabla de leads
-  (deliberado). Link opcional y desacoplado a counterparties (SET NULL).
+- accounts: lifecycle PROSPECTO/ACTIVA/INACTIVA; COM-024 agrega leads dentro
+  de la cuenta como origen de oportunidades. Link opcional y desacoplado a counterparties (SET NULL).
   sourceCampaignId: hook UUID sin FK, reservado para Marketing.
   paymentTermDays (30/60/90) alimenta el Commitment proyectado de COM-014.
 - opportunities: stage machine — 5 etapas activas (COM-023: requisitos al entrar
@@ -1443,7 +1444,7 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   con cambio real (Decimal / día civil / número); nombre, notas y cuenta no generan registro. Responsable y valor derivado por
   bundle, originalmente sin registro en COM-022, se registran desde COM-023. Dashboard cuenta únicamente manuales creadas en
   rango, en ambos estados; mapa único de etiquetas: Correo / Visita técnica
-  (ActivityType intacto). LEAD queda declarado para COM-024, sin implementar Lead.
+  (ActivityType intacto). LEAD fue declarado aquí y se implementa en COM-024.
 
 - COM-025 — PIPELINE TABLA V2 (2026-09-23; Sprint 20, ola 1; web): la vista Tabla de /comercial/pipeline pide solo GET /comercial/opportunities?includeClosed=true; búsqueda (nombre de oportunidad o de cuenta, sin mayúsculas ni tildes), filtros Responsable / Empresa y agrupación son del cliente. «Agrupar por» Etapa (las ocho de STAGE_ORDER; Ganada y Perdida plegadas con «últimos 90 días») o Cuenta (orden es-CL). Una <table> table-fixed con <colgroup>, un <tbody> por grupo, un solo scroll horizontal y primera columna sticky. Columnas: Oportunidad y Cuenta · Responsable (MemberAvatar) · Etapa (celda llena con el color de la etapa; <select> con los destinos de stageMoveTargets y el mismo attemptMove del kanban) · Valor estimado · Fecha de creación · Fecha estimada de cierre (roja con ícono si ya pasó en etapa activa; En Pausa y cerradas nunca) · Cuenta · Actualización (interino: lastMovementAt) · Probabilidad; la columna 7 Lead llega en la ola 3. Ayuda de encabezado accesible (ColumnHelp, WCAG 1.4.13). Alta rápida en el grupo Prospecto y en cada grupo de Cuenta, con quien crea como responsable. «Nueva oportunidad» del encabezado solo en Kanban. ACTIVA se muestra «Cliente» (enum intacto); Empresas usa EnterpriseStatusBadge. Tipos de acción: EMAIL «Correo», VISITA_FAENA «Visita técnica». CardMoveMenu con el modelo de teclado de TodoMoveMenu (conserva el backdrop). Fechas: lib/dates.ts (helpers Santiago que todoStatus re-exporta) + formatDbDate (un @db.Date por su fecha civil, jamás por hora local), formatSantiagoDate y relativeDayLabel; corrige el día de desfase del cierre esperado en kanban, ficha y alertas y de «Válida» en cotizaciones. Sin api, sin migración, sin CASL.
 - COM-023 — REGLAS DEL PIPELINE (2026-09-23; Sprint 20, ola 2; api): todos los
@@ -1562,7 +1563,43 @@ read Quote` (MANAGER/ADMIN/SUPER_ADMIN + ACCOUNTANT); `companyId` explícito
   del pipeline abre agrupada por Cuenta y «Agrupar por» muestra Cuenta primero; Etapa
   queda a un clic. Pedido del fundador al entregar el CRM a uso. Sin api.
 
-Última actualización: 2026-09-24 (COM-028: agrupar por Cuenta por defecto)
+- COM-024 — LEAD MÍNIMO (2026-09-24; Sprint 20, ola 3; api en review/s20-ola3):
+  entidad Lead con nombre, cuenta inmutable, contacto opcional, autor y fechas;
+  un lead origina muchas oportunidades. Migración hand-authored
+  `20260924120000_add_leads`: tabla `leads`, CHECK de nombre trimmed 1..200,
+  UNIQUE `(accountId, lower(name))` solo en SQL, índices, ENABLE RLS,
+  `lead_isolation` con la expresión de Enterprise, GRANT `app_user` y trigger
+  `audit_leads`; `opportunities.leadId` opcional con índice y FK RESTRICT.
+  L1: contacto existente de la misma cuenta, validado al crear/editar; borrar el
+  contacto deja contactId NULL (SET NULL). El endpoint existente de Contacts aún
+  permite moverlo de cuenta: ese movimiento no revalida leads (fuera de COM-024).
+  L2: los leads se crean desde «+ Vincular lead» de la tabla (web en COM-029),
+  con creación y vínculo en una transacción; se editan en su ficha, sin página
+  de leads en el menú. L3: vínculo solo con oportunidades de la misma cuenta;
+  PATCH valida la cuenta resultante, permite desvincular y admite Ganada/Perdida.
+  L4: DELETE físico solo sin oportunidades vinculadas (409 con cantidad;
+  pre-check y P2003 como respaldo); auditoría conserva la traza.
+  Endpoints `/comercial/leads`: GET `?accountId&q` (ambos opcionales, nombre
+  case-insensitive, orden por nombre, cuenta/contacto y opportunitiesCount), GET
+  `/:id` (contacto completo y oportunidades más nuevas primero), POST
+  `{name, accountId, contactId?, opportunityId?}`, PATCH `/:id` solo
+  `{name?, contactId?}` (null limpia), DELETE `/:id`. Nombre único por cuenta:
+  pre-check SQL parametrizado `lower(name) = lower(valor)` (sin comodines ILIKE)
+  y P2002 → 409. Todos con `@CheckPolicies`; escrituras con
+  `executeWithRls` y companyId explícito. CASL `LeadSubject` espejo de Opportunity:
+  MANAGER CRUD, ACCOUNTANT read, ADMIN/SUPER_ADMIN manage all, ANALYST/VIEWER nada;
+  flag `lead` en permissions. POST con opportunityId exige además update
+  Opportunity desde `@CurrentAbility`, nunca desde un string de rol.
+  PATCH `/comercial/opportunities/:id` admite `leadId` (null o vacío desvincula);
+  GET lista/ficha incluye `lead {id, name} | null`. Registro único por cambio real,
+  en la misma transacción: «Lead vinculado: X» / «Lead: A → B» (LEAD),
+  «Lead desvinculado (era X)» (LEAD_DESVINCULADO, enum aditivo). Las ediciones de
+  origen/cuenta serializan la lectura previa de la oportunidad; sin cambio no
+  hay registro. Renombrar el lead no escribe acciones en oportunidades.
+  «Actualización» usa los eventos existentes en vivo; stage/resume/reopen conservan
+  sus respuestas, sin cambios en Kanban, dashboard ni alertas.
+
+Última actualización: 2026-09-24 (ola 3: COM-024 en rama)
 
 ═══════════════════════════════════════════════════════════════════
 

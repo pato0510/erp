@@ -5,6 +5,7 @@ import {
   AvailabilitySubject,
   ContactSubject,
   EnterpriseSubject,
+  LeadSubject,
   OpportunityDocumentSubject,
   OpportunityNoteSubject,
   OpportunitySubject,
@@ -68,6 +69,7 @@ export class ComercialController {
         | typeof ActivitySubject
         | typeof ContactSubject
         | typeof EnterpriseSubject
+        | typeof LeadSubject
         | typeof OpportunityDocumentSubject
         | typeof OpportunityNoteSubject
         | typeof OpportunitySubject
@@ -88,6 +90,7 @@ export class ComercialController {
       // COM-007 — the kanban gates drag/create/close/reopen on opportunity.update
       // (MANAGER/ADMIN/SUPER_ADMIN); ACCOUNTANT reads the board but sees no controls.
       opportunity: flagsFor(OpportunitySubject),
+      lead: flagsFor(LeadSubject),
       stageProbabilities: {
         read: ability.can('read', OpportunitySubject),
         update: ability.can('manage', OpportunitySubject),

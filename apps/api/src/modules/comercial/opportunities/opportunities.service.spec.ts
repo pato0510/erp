@@ -27,6 +27,7 @@ function makeService(
   );
   // Mutation reads and WRITES live on the tx (mirrors a real Prisma transaction client).
   const tx = {
+    $queryRaw: jest.fn().mockResolvedValue([]),
     opportunity: {
       findFirst: () => Promise.resolve(oppRow),
       update: oppUpdate,
@@ -466,6 +467,7 @@ describe('OpportunitiesService — COM-020 list filters + lastMovementAt', () =>
       expect.objectContaining({
         where: { companyId: 'c1' },
         include: {
+          lead: { select: { id: true, name: true } },
           _count: { select: { services: true } },
           account: {
             select: { id: true, name: true, enterprise: { select: { id: true, name: true } } },

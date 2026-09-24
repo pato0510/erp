@@ -7,6 +7,7 @@ import { ComercialController } from './comercial.controller';
 import { ContactsModule } from './contacts/contacts.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { EnterprisesModule } from './enterprises/enterprises.module';
+import { LeadsModule } from './leads/leads.module';
 import { OpportunitiesModule } from './opportunities/opportunities.module';
 import { OpportunityDocumentsModule } from './opportunity-documents/opportunity-documents.module';
 import { OpportunityNotesModule } from './opportunity-notes/opportunity-notes.module';
@@ -34,6 +35,7 @@ import { ServiceCatalogModule } from './service-catalog/service-catalog.module';
     ServiceCatalogModule,
     AccountsModule,
     EnterprisesModule,
+    LeadsModule,
     ContactsModule,
     OpportunitiesModule,
     ActivitiesModule,

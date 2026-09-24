@@ -21,6 +21,7 @@ import {
   HsecIncidentSubject,
   HsecTrainingSubject,
   JobPositionSubject,
+  LeadSubject,
   OperationsCalendarSubject,
   OperationsDashboardSubject,
   OpportunitySubject,
@@ -29,6 +30,30 @@ import {
   ServiceCatalogSubject,
   TerminationSimulationSubject,
 } from './casl-ability.factory';
+
+describe('COM-024 — Lead grants mirror Opportunity', () => {
+  const factory = new CaslAbilityFactory();
+  it.each([
+    [UserRole.SUPER_ADMIN, true, true, true],
+    [UserRole.ADMIN, true, true, true],
+    [UserRole.MANAGER, true, true, false],
+    [UserRole.ACCOUNTANT, true, false, false],
+    [UserRole.ANALYST, false, false, false],
+    [UserRole.VIEWER, false, false, false],
+  ])(
+    '%s: explicit read/write/manage matrix and Opportunity parity',
+    (role, read, write, manage) => {
+      const ability = factory.defineAbilityFor(role as UserRole);
+      expect(LeadSubject.modelName).toBe('Lead');
+      expect(ability.can('read', LeadSubject)).toBe(read);
+      expect(ability.can('manage', LeadSubject)).toBe(manage);
+      for (const action of ['create', 'update', 'delete'] as const)
+        expect(ability.can(action, LeadSubject)).toBe(write);
+      for (const action of ['read', 'create', 'update', 'delete', 'manage'] as const)
+        expect(ability.can(action, LeadSubject)).toBe(ability.can(action, OpportunitySubject));
+    },
+  );
+});
 
 describe('CaslAbilityFactory — RRHH baseline (HR-001/HR-002)', () => {
   const factory = new CaslAbilityFactory();

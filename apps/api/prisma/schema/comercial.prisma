@@ -59,8 +59,8 @@ enum AccountPriority {
 }
 
 /* COM-003 — accounts: the CRM's core entity (AGS's commercial portfolio). New
-   business enters directly as an account with status PROSPECTO (there is NO
-   separate leads table — deliberate). Fiscal identity (RUT, tax history) lives in
+   business enters directly as an account with status PROSPECTO. COM-024 adds leads
+   within an account as opportunity origins. Fiscal identity (RUT, tax history) lives in
    Finance `counterparties`; an account only OPTIONALLY references it and stays
    DECOUPLED — creating an account never auto-creates a counterparty; linkage is
    manual. `ownerId` (commercial executive) and `createdBy` are bare actor UUIDs
@@ -90,6 +90,7 @@ model Account {
   counterparty  Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
   contacts      Contact[] // COM-004 — people within this account (FK on contacts.accountId, ON DELETE CASCADE)
   opportunities Opportunity[] // COM-005 — deals on this account (FK on opportunities.accountId, ON DELETE RESTRICT)
+  leads         Lead[] // COM-024 — opportunity origins within this account (RESTRICT)
   activities    Activity[] // COM-008 — the account's interaction history (FK ON DELETE CASCADE)
   // MKT-006 — the Marketing campaign this account is attributed to (schema-only relation;
   // Comercial NEVER queries campaigns directly — enrichment goes through the Marketing-
@@ -160,6 +161,7 @@ model Contact {
   updatedAt DateTime @updatedAt
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  leads   Lead[] // COM-024 — deleting a contact clears the optional lead contact (SET NULL)
 
   @@index([companyId])
   @@index([accountId])
@@ -203,6 +205,7 @@ model Opportunity {
   id                String            @id @default(uuid()) @db.Uuid
   companyId         String            @db.Uuid
   accountId         String            @db.Uuid
+  leadId            String?           @db.Uuid // COM-024 — optional origin; RESTRICT prevents deleting a linked lead
   name              String
   stage             OpportunityStage  @default(PROSPECTO)
   previousStage     OpportunityStage? // where it was before EN_PAUSA (for resume)
@@ -220,6 +223,7 @@ model Opportunity {
   updatedAt         DateTime          @updatedAt
 
   account    Account              @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  lead       Lead?                @relation(fields: [leadId], references: [id], onDelete: Restrict)
   services   OpportunityService[] // COM-006 — the service bundle (FK on opportunity_services.opportunityId, ON DELETE CASCADE)
   activities Activity[] // COM-008 — timeline entries linked to this deal (FK ON DELETE SET NULL)
   quotes     Quote[] // COM-010 — quotes issued for this deal (FK ON DELETE RESTRICT — blocks opp delete)
@@ -229,7 +233,35 @@ model Opportunity {
   @@index([companyId])
   @@index([accountId])
   @@index([stage])
+  @@index([leadId])
   @@map("opportunities")
+}
+
+/* COM-024 — minimal opportunity origin: one lead can originate many opportunities
+   in its own account. Contact is optional and must belong to that account (service).
+   Account is immutable; a contact hard delete clears contactId. A linked lead cannot
+   be deleted (opportunities FK RESTRICT). createdBy is the bare JWT actor UUID.
+   The name CHECK and UNIQUE (accountId, lower(name)) live in the hand-authored
+   migration 20260924120000_add_leads (Prisma cannot express lower()), together with
+   the five platform blocks: table/indexes, ENABLE RLS, policy, GRANT, audit trigger. */
+model Lead {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  accountId String   @db.Uuid
+  contactId String?  @db.Uuid
+  name      String
+  createdBy String   @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  contact       Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunities Opportunity[]
+
+  @@index([companyId])
+  @@index([accountId])
+  @@index([contactId])
+  @@map("leads")
 }
 
 /* COM-023 — per-company pipeline defaults, created lazily on explicit edits.
@@ -317,6 +349,7 @@ enum CommercialActivityEvent {
   PROBABILIDAD
   RESPONSABLE
   LEAD
+  LEAD_DESVINCULADO
   ACCION_ELIMINADA
 }
 
