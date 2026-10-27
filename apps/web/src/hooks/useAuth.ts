@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { apiClient } from '../lib/api';
+import type { AccessModule } from '../lib/moduleAccess';
 
-interface Company {
+export interface Company {
   companyId: string;
   companyName: string;
   taxId: string;
   role: string;
   membershipId: string;
+  // ACCESS-002 — modules this membership is blocked from ([] = full access). Optional only
+  // for payloads from an api older than ACCESS-001; the web treats absent as [].
+  restrictedModules?: AccessModule[];
 }
 
-interface User {
+export interface User {
   id: string;
   email: string;
   firstName: string;

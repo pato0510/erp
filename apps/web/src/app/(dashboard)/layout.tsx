@@ -11,7 +11,11 @@ import { ComercialSidebar } from '../../components/sidebars/ComercialSidebar';
 import { MarketingSidebar } from '../../components/sidebars/MarketingSidebar';
 import { ActividadesSidebar } from '../../components/sidebars/ActividadesSidebar';
 import { HsecSidebar } from '../../components/sidebars/HsecSidebar';
+import { RestrictedSidebar } from '../../components/sidebars/RestrictedSidebar';
+import { ModuleAccessDenied } from '../../components/access/ModuleAccessDenied';
 import { NotificationCenter } from '../../components/NotificationCenter';
+import { apiClient } from '../../lib/api';
+import { currentRestrictedModules, moduleForPath } from '../../lib/moduleAccess';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -50,6 +54,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!user) return null;
 
+  /* ACCESS-002 — the membership's blocked modules (never inferred from the role). A route of
+     a blocked module renders the denied panel INSTEAD of children: nothing mounts, no module
+     api call fires. A FINANZAS-restricted member never sees FinanceSidebar, which is the
+     fallback for the shared routes (/configuracion, /notificaciones): they get the minimal one. */
+  const restricted = currentRestrictedModules(user, apiClient.getCompanyId());
+  const routeModule = moduleForPath(pathname);
+  const denied = routeModule !== null && restricted.includes(routeModule);
+  const finanzasRestricted = restricted.includes('FINANZAS');
+
   const isOperations = pathname?.startsWith('/operaciones') ?? false;
   const isRrhh = pathname?.startsWith('/rrhh') ?? false;
   const isComercial = pathname?.startsWith('/comercial') ?? false;
@@ -61,7 +74,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <>
       <DarkGradientBackground />
       <div className="tn-shell">
-        {isHsec ? (
+        {denied ? (
+          <RestrictedSidebar />
+        ) : isHsec ? (
           <HsecSidebar />
         ) : isActividades ? (
           <ActividadesSidebar />
@@ -73,6 +88,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <RrhhSidebar />
         ) : isOperations ? (
           <OperationsSidebar />
+        ) : finanzasRestricted ? (
+          <RestrictedSidebar />
         ) : (
           <FinanceSidebar />
         )}
@@ -84,7 +101,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="tn-topbar">
             <NotificationCenter />
           </div>
-          <div style={{ padding: '12px 40px 32px' }}>{children}</div>
+          <div style={{ padding: '12px 40px 32px' }}>
+            {denied ? <ModuleAccessDenied module={routeModule} /> : children}
+          </div>
         </main>
 
         <style jsx global>{`

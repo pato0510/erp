@@ -12,6 +12,7 @@ import { HubFooter } from '../../components/hub/HubFooter';
 import { HubScene, type HubModuleKey } from '../../components/hub/HubScene';
 import { HubStatusLine, type HubStatusKind } from '../../components/hub/HubStatusLine';
 import { apiClient } from '../../lib/api';
+import { currentRestrictedModules, type AccessModule } from '../../lib/moduleAccess';
 
 type ModuleDef = {
   key: string;
@@ -21,6 +22,8 @@ type ModuleDef = {
   description: string;
   href: string | null;
   active: boolean;
+  /* ACCESS-002 — the card is HIDDEN (not locked) when the membership blocks this module. */
+  accessModule?: AccessModule;
 };
 
 type ModuleStatusLine = {
@@ -37,6 +40,7 @@ const MODULES: ModuleDef[] = [
     description: 'Gestión financiera, tributario, conciliación bancaria y reportes ejecutivos',
     href: '/dashboard',
     active: true,
+    accessModule: 'FINANZAS',
   },
   {
     key: 'operaciones',
@@ -83,6 +87,7 @@ const MODULES: ModuleDef[] = [
     description: 'Gestión del talento, nóminas, evaluaciones y desarrollo organizacional',
     href: '/rrhh',
     active: true,
+    accessModule: 'RRHH',
   },
   {
     // CAL-007 — un-gated: Calendario de Actividades is live (three views, chips by area,
@@ -104,6 +109,12 @@ export default function ModulosPage() {
   const [activeKey, setActiveKey] = useState<HubModuleKey | null>(null);
   const [lines, setLines] = useState<ModuleStatusLine[]>([]);
   const isReady = !isLoading && !!user;
+  /* ACCESS-002 — restricted modules leave the grid entirely; the stagger index follows the
+     visible order, so the entrance and the 3/2/1-column reflow need no special case. */
+  const restricted = currentRestrictedModules(user, apiClient.getCompanyId());
+  const visibleModules = MODULES.filter(
+    (mod) => !mod.accessModule || !restricted.includes(mod.accessModule),
+  );
 
   useEffect(() => {
     if (!isReady) return;
@@ -187,7 +198,7 @@ export default function ModulosPage() {
             </div>
 
             <div className="modulos-grid">
-              {MODULES.map((mod, index) => {
+              {visibleModules.map((mod, index) => {
                 const isActive = mod.active;
                 const line = lines.find((item) => item.moduleKey === mod.hubKey);
                 // HUB-008 — ONE state source: the active look (ink border, brackets, shine)

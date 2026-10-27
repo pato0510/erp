@@ -22,6 +22,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
+import { currentRestrictedModules } from '../../../../lib/moduleAccess';
 import { useAuth } from '../../../../hooks/useAuth';
 import { Toast } from '../../../../components/shared/Toast';
 import {
@@ -76,13 +77,21 @@ type TabKey =
   | 'alertas'
   | 'compromisos'
   | 'avanzado';
-const TABS: Array<{ key: TabKey; label: string; icon: typeof Layers; adminOnly?: boolean }> = [
+const TABS: Array<{
+  key: TabKey;
+  label: string;
+  icon: typeof Layers;
+  adminOnly?: boolean;
+  /* ACCESS-002 — hidden for members blocked from Finanzas (the tab configures cashflow
+     commitments and needs the Finanzas category catalog). The api endpoints stay as they are. */
+  finanzasOnly?: boolean;
+}> = [
   { key: 'tipos', label: 'Tipos de Activo', icon: Layers },
   { key: 'ubicaciones', label: 'Ubicaciones', icon: MapPin },
   { key: 'documentos', label: 'Tipos de Documento', icon: FileText },
   { key: 'permisos', label: 'Tipos de Permiso', icon: ShieldCheck },
   { key: 'alertas', label: 'Alertas', icon: Bell },
-  { key: 'compromisos', label: 'Compromisos automáticos', icon: Wallet },
+  { key: 'compromisos', label: 'Compromisos automáticos', icon: Wallet, finanzasOnly: true },
   /* OPS-034 — admin-only tab for performance maintenance (currently:
      manual refresh of the operations dashboard's materialized views). */
   { key: 'avanzado', label: 'Avanzado', icon: Zap, adminOnly: true },
@@ -134,8 +143,12 @@ function ConfiguracionContent() {
   const activeCompanyId = apiClient.getCompanyId();
   const userRole = user?.companies.find((c) => c.companyId === activeCompanyId)?.role ?? null;
   const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+  const finanzasRestricted = currentRestrictedModules(user, activeCompanyId).includes('FINANZAS');
 
-  const visibleTabs = useMemo(() => TABS.filter((t) => !t.adminOnly || isAdmin), [isAdmin]);
+  const visibleTabs = useMemo(
+    () => TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.finanzasOnly || !finanzasRestricted)),
+    [isAdmin, finanzasRestricted],
+  );
   const validKeys = useMemo(() => visibleTabs.map((t) => t.key), [visibleTabs]);
 
   const initialTab = (searchParams.get('tab') as TabKey | null) ?? 'tipos';
@@ -242,7 +255,7 @@ function ConfiguracionContent() {
       {tab === 'documentos' && <TiposDocumentoTab toaster={showToast} />}
       {tab === 'permisos' && <PermisosTabRouter toaster={showToast} />}
       {tab === 'alertas' && <AlertsConfigTab toaster={showToast} />}
-      {tab === 'compromisos' && <AutoCommitmentsTab toaster={showToast} />}
+      {tab === 'compromisos' && !finanzasRestricted && <AutoCommitmentsTab toaster={showToast} />}
       {tab === 'avanzado' && isAdmin && <AvanzadoTab toaster={showToast} />}
 
       <style jsx global>{`

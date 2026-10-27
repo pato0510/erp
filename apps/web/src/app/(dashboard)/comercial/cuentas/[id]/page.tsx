@@ -12,6 +12,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Link2, Pencil, Unlink } from 'lucide-react';
 import { apiClient, ApiError } from '../../../../../lib/api';
+import { useRestrictedModules } from '../../../../../hooks/useModuleAccess';
 import { useCanWrite } from '../../../../../hooks/useCanWrite';
 import {
   PRIORITY_LABELS,
@@ -201,13 +202,18 @@ function AccountDatosTab({
   const [counterparties, setCounterparties] = useState<CounterpartyOption[]>([]);
   const [pick, setPick] = useState('');
   const [busy, setBusy] = useState(false);
+  /* ACCESS-002 — the counterparty link is a Finanzas picker (read Counterparty). A member
+     blocked from Finanzas never loads it and never sees the card: no 403, no empty select. */
+  const { isRestricted, isLoading: accessLoading } = useRestrictedModules();
+  const showCounterparty = !accessLoading && !isRestricted('FINANZAS');
 
   useEffect(() => {
+    if (!showCounterparty) return;
     apiClient
       .get<{ data: CounterpartyOption[] }>('/api/counterparties?limit=200')
       .then((r) => setCounterparties(r.data))
       .catch(() => undefined);
-  }, []);
+  }, [showCounterparty]);
 
   const linked = account.counterpartyId
     ? counterparties.find((c) => c.id === account.counterpartyId)
@@ -283,71 +289,73 @@ function AccountDatosTab({
         )}
       </Card>
 
-      {/* Counterparty link (facturación) */}
-      <Card>
-        <div className="flex items-center gap-2">
-          <Link2 size={15} style={{ color: 'var(--color-accent)' }} />
-          <p className="text-sm font-medium text-[var(--text-primary)]">
-            Contraparte (facturación)
+      {/* Counterparty link (facturación) — hidden for members blocked from Finanzas (ACCESS-002) */}
+      {showCounterparty ? (
+        <Card>
+          <div className="flex items-center gap-2">
+            <Link2 size={15} style={{ color: 'var(--color-accent)' }} />
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              Contraparte (facturación)
+            </p>
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">
+            Vincula la cuenta a un tercero de Finanzas para facturar. No se crean contrapartes desde
+            Comercial.
           </p>
-        </div>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">
-          Vincula la cuenta a un tercero de Finanzas para facturar. No se crean contrapartes desde
-          Comercial.
-        </p>
 
-        <div className="mt-3">
-          {account.counterpartyId ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2">
-              <div className="text-sm">
-                <span className="font-medium text-[var(--text-primary)]">
-                  {linked?.name ?? 'Contraparte vinculada'}
-                </span>
-                {linked?.taxId && (
-                  <span className="ml-2 font-mono text-xs text-[var(--text-secondary)]">
-                    {linked.taxId}
+          <div className="mt-3">
+            {account.counterpartyId ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2">
+                <div className="text-sm">
+                  <span className="font-medium text-[var(--text-primary)]">
+                    {linked?.name ?? 'Contraparte vinculada'}
                   </span>
+                  {linked?.taxId && (
+                    <span className="ml-2 font-mono text-xs text-[var(--text-secondary)]">
+                      {linked.taxId}
+                    </span>
+                  )}
+                </div>
+                {canWrite && (
+                  <button
+                    onClick={unlink}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    <Unlink size={12} /> Desvincular
+                  </button>
                 )}
               </div>
-              {canWrite && (
-                <button
-                  onClick={unlink}
-                  disabled={busy}
-                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border-color)] px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-60"
+            ) : canWrite ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={pick}
+                  onChange={(e) => setPick(e.target.value)}
+                  className="min-w-[240px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
-                  <Unlink size={12} /> Desvincular
+                  <option value="">Seleccionar contraparte…</option>
+                  {counterparties.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.taxId ? ` — ${c.taxId}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={link}
+                  disabled={busy || !pick}
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  style={{ background: 'var(--color-accent)' }}
+                >
+                  <Link2 size={14} /> Vincular
                 </button>
-              )}
-            </div>
-          ) : canWrite ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={pick}
-                onChange={(e) => setPick(e.target.value)}
-                className="min-w-[240px] flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)]"
-              >
-                <option value="">Seleccionar contraparte…</option>
-                {counterparties.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                    {c.taxId ? ` — ${c.taxId}` : ''}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={link}
-                disabled={busy || !pick}
-                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-                style={{ background: 'var(--color-accent)' }}
-              >
-                <Link2 size={14} /> Vincular
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm text-[var(--text-secondary)]">Sin contraparte vinculada.</p>
-          )}
-        </div>
-      </Card>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--text-secondary)]">Sin contraparte vinculada.</p>
+            )}
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }

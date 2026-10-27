@@ -20,6 +20,13 @@ import { Toast } from '../../../../components/shared/Toast';
 import { currentCompanyRole, useAuth } from '../../../../hooks/useAuth';
 import { meetsPasswordPolicy, PASSWORD_POLICY_MESSAGE } from '../../../../lib/password-policy';
 import { PasswordChecklist } from '../../../../components/shared/PasswordChecklist';
+import {
+  ACCESS_PROFILE_LABELS,
+  RESTRICTED_PROFILE_CHIP,
+  modulesFromProfile,
+  profileFromModules,
+  type AccessModule,
+} from '../../../../lib/moduleAccess';
 
 type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'ACCOUNTANT' | 'ANALYST' | 'VIEWER';
 
@@ -31,9 +38,14 @@ interface CompanyUser {
   role: UserRole;
   membershipId: string;
   isActive: boolean;
+  /* ACCESS-002 — modules this membership is blocked from ([] = full access). */
+  restrictedModules: AccessModule[];
   lastLoginAt: string | null;
   createdAt: string;
 }
+
+type AccessProfile = 'all' | 'restricted';
+const isAdminRole = (role: UserRole) => role === 'SUPER_ADMIN' || role === 'ADMIN';
 
 const ROLE_META: Record<UserRole, { label: string; color: string; badgeCls: string }> = {
   SUPER_ADMIN: { label: 'Super Admin', color: '#1E3A5F', badgeCls: 'bg-indigo-50 text-indigo-800' },
@@ -60,8 +72,10 @@ const ROLES: UserRole[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'ANA
 
 type ModalState = null | { mode: 'create' } | { mode: 'edit'; user: CompanyUser };
 
-/* AUTH-002 — the api rejects both (400); the UI says why before anyone tries. */
-const SELF_LOCK_HINT = 'No puedes cambiar tu propio rol ni desactivar tu cuenta.';
+/* AUTH-002 + ACCESS-002 — the api rejects all three (400); the UI says why before anyone tries. */
+const SELF_LOCK_HINT = 'No puedes cambiar tu propio rol, tu propio acceso ni desactivar tu cuenta.';
+/* ACCESS-002 — same text as the api's 400 for an admin with a block. */
+const ADMIN_ACCESS_HINT = 'Los administradores ven todos los módulos.';
 
 const FOCUSABLE =
   'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -158,6 +172,8 @@ export default function UsuariosPage() {
     load();
   }, [load]);
 
+  /* Throws on failure so the modal shows the api message inline (ACCESS-002: the two 400s of
+     the access rules land next to the field, not in a toast behind the dialog). */
   const handleSave = async (dto: {
     id?: string;
     firstName: string;
@@ -165,35 +181,34 @@ export default function UsuariosPage() {
     email: string;
     password?: string;
     role: UserRole;
+    restrictedModules: AccessModule[];
   }) => {
-    try {
-      if (dto.id) {
-        // AUTH-002 — credentials change only through reset-access; your own role is never sent.
-        const body: Record<string, unknown> = {
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-        };
-        if (dto.id !== me?.id) body.role = dto.role;
-        await apiClient.patch(`/api/users/${dto.id}`, body);
-        setToast({ message: 'Usuario actualizado', type: 'success' });
-      } else {
-        await apiClient.post('/api/users', {
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          email: dto.email,
-          password: dto.password,
-          role: dto.role,
-        });
-        setToast({ message: 'Usuario creado', type: 'success' });
+    if (dto.id) {
+      // AUTH-002 — credentials change only through reset-access; your own role is never sent.
+      // ACCESS-002 — nor your own access.
+      const body: Record<string, unknown> = {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+      };
+      if (dto.id !== me?.id) {
+        body.role = dto.role;
+        body.restrictedModules = dto.restrictedModules;
       }
-      setModal(null);
-      load();
-    } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Error al guardar',
-        type: 'error',
+      await apiClient.patch(`/api/users/${dto.id}`, body);
+      setToast({ message: 'Usuario actualizado', type: 'success' });
+    } else {
+      await apiClient.post('/api/users', {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        email: dto.email,
+        password: dto.password,
+        role: dto.role,
+        restrictedModules: dto.restrictedModules,
       });
+      setToast({ message: 'Usuario creado', type: 'success' });
     }
+    setModal(null);
+    load();
   };
 
   const handleToggle = async (u: CompanyUser) => {
@@ -322,6 +337,14 @@ export default function UsuariosPage() {
                       >
                         {meta.label}
                       </span>
+                      {u.restrictedModules?.length > 0 && (
+                        <span
+                          className="badge rounded-full border border-line bg-subtle px-2 py-0.5 text-[10px] text-fg-secondary"
+                          title={ACCESS_PROFILE_LABELS.restricted}
+                        >
+                          {RESTRICTED_PROFILE_CHIP}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span
@@ -434,7 +457,8 @@ function UserModal({
     email: string;
     password?: string;
     role: UserRole;
-  }) => void;
+    restrictedModules: AccessModule[];
+  }) => Promise<void>;
 }) {
   const initial = modal.mode === 'edit' ? modal.user : null;
 
@@ -442,6 +466,15 @@ function UserModal({
   const [lastName, setLastName] = useState(initial?.lastName ?? '');
   const [email, setEmail] = useState(initial?.email ?? '');
   const [role, setRole] = useState<UserRole>(initial?.role ?? 'ACCOUNTANT');
+  /* ACCESS-002 — the chosen profile. A new non-admin user starts restricted (founder default);
+     an admin role forces «Todos» while keeping the choice for when the role changes back. */
+  const [accessChoice, setAccessChoice] = useState<AccessProfile>(() =>
+    initial ? profileFromModules(initial.restrictedModules) : 'restricted',
+  );
+  const adminRole = isAdminRole(role);
+  const accessProfile: AccessProfile = adminRole ? 'all' : accessChoice;
+  const accessLocked = isSelf || adminRole;
+  const accessHint = isSelf ? SELF_LOCK_HINT : adminRole ? ADMIN_ACCESS_HINT : undefined;
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -482,7 +515,10 @@ function UserModal({
         email: email.trim().toLowerCase(),
         password: isCreate ? password : undefined,
         role,
+        restrictedModules: modulesFromProfile(accessProfile),
       });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Error al guardar');
     } finally {
       setSubmitting(false);
     }
@@ -577,6 +613,62 @@ function UserModal({
               ))}
             </select>
           </Field>
+
+          {/* ACCESS-002 — interim access profile; the api validates against the resulting role. */}
+          <fieldset
+            className="rounded-lg border border-line p-3"
+            aria-describedby={accessHint ? 'user-access-help' : undefined}
+          >
+            <legend
+              className="px-1 text-[var(--text-secondary)]"
+              style={{
+                fontFamily: 'var(--font-outfit), sans-serif',
+                fontWeight: 500,
+                fontSize: 13,
+              }}
+            >
+              Acceso a módulos
+            </legend>
+            <div className="mt-1 grid gap-2">
+              {(
+                [
+                  { value: 'all', label: ACCESS_PROFILE_LABELS.all },
+                  { value: 'restricted', label: ACCESS_PROFILE_LABELS.restricted },
+                ] as const
+              ).map((opt) => {
+                const checked = accessProfile === opt.value;
+                return (
+                  <label
+                    key={opt.value}
+                    className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 text-sm transition-colors ${
+                      checked ? 'border-accent bg-accent-surface text-fg' : 'border-line text-fg'
+                    } ${accessLocked ? 'cursor-not-allowed opacity-60' : 'hover:bg-subtle-hover'}`}
+                    style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
+                  >
+                    <input
+                      type="radio"
+                      name="user-access-profile"
+                      value={opt.value}
+                      checked={checked}
+                      disabled={accessLocked}
+                      onChange={() => setAccessChoice(opt.value)}
+                      className="h-4 w-4 accent-[var(--color-accent)]"
+                    />
+                    {opt.label}
+                  </label>
+                );
+              })}
+            </div>
+            {accessHint && (
+              <p
+                id="user-access-help"
+                className="mt-2 text-xs text-[var(--text-muted)]"
+                style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 300 }}
+              >
+                {accessHint}
+              </p>
+            )}
+          </fieldset>
 
           {isCreate && (
             <>

@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import { useRestrictedModules } from '../../../hooks/useModuleAccess';
 import { formatCLP } from '../../../lib/formatters';
 import { Toast } from '../../../components/shared/Toast';
 
@@ -75,6 +76,10 @@ export default function ConfiguracionPage() {
     message: string;
     type: 'success' | 'error' | 'info';
   } | null>(null);
+  /* ACCESS-002 — Períodos and Umbrales are Finanzas (fiscal periods, alert thresholds): a
+     member blocked from Finanzas never mounts them, so no 403 and no error toast. */
+  const { isRestricted } = useRestrictedModules();
+  const showFinanzas = !isRestricted('FINANZAS');
 
   return (
     <div>
@@ -89,8 +94,12 @@ export default function ConfiguracionPage() {
       <nav className="flex gap-2 flex-wrap mb-6 text-xs">
         {[
           { id: 'empresa', label: 'Empresa' },
-          { id: 'periodos', label: 'Períodos' },
-          { id: 'alertas', label: 'Alertas' },
+          ...(showFinanzas
+            ? [
+                { id: 'periodos', label: 'Períodos' },
+                { id: 'alertas', label: 'Alertas' },
+              ]
+            : []),
         ].map((a) => (
           <a
             key={a.id}
@@ -135,8 +144,12 @@ export default function ConfiguracionPage() {
         </Link>
 
         <CompanySection onToast={setToast} />
-        <PeriodsSection onToast={setToast} />
-        <ThresholdsSection onToast={setToast} />
+        {showFinanzas ? (
+          <>
+            <PeriodsSection onToast={setToast} />
+            <ThresholdsSection onToast={setToast} />
+          </>
+        ) : null}
       </div>
 
       <style jsx global>{`
