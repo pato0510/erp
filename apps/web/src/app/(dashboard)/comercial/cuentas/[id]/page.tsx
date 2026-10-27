@@ -204,8 +204,8 @@ function AccountDatosTab({
   const [busy, setBusy] = useState(false);
   /* ACCESS-002 — the counterparty link is a Finanzas picker (read Counterparty). A member
      blocked from Finanzas never loads it and never sees the card: no 403, no empty select. */
-  const { isRestricted, isLoading: accessLoading } = useRestrictedModules();
-  const showCounterparty = !accessLoading && !isRestricted('FINANZAS');
+  const { canSee } = useRestrictedModules();
+  const showCounterparty = canSee('FINANZAS');
 
   useEffect(() => {
     if (!showCounterparty) return;

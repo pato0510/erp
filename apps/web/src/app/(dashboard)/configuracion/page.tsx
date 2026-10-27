@@ -76,10 +76,11 @@ export default function ConfiguracionPage() {
     message: string;
     type: 'success' | 'error' | 'info';
   } | null>(null);
-  /* ACCESS-002 — Períodos and Umbrales are Finanzas (fiscal periods, alert thresholds): a
-     member blocked from Finanzas never mounts them, so no 403 and no error toast. */
-  const { isRestricted } = useRestrictedModules();
-  const showFinanzas = !isRestricted('FINANZAS');
+  /* ACCESS-002 — Períodos and Umbrales are Finanzas (fiscal periods, alert thresholds). They
+     mount only once access is KNOWN and Finanzas is not blocked (canSee): a restricted member
+     never fires their requests, so no 403 and no error toast, not even while /auth/me loads. */
+  const { canSee } = useRestrictedModules();
+  const showFinanzas = canSee('FINANZAS');
 
   return (
     <div>

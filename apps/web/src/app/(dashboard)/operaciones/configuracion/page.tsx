@@ -22,8 +22,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { apiClient } from '../../../../lib/api';
-import { currentRestrictedModules } from '../../../../lib/moduleAccess';
 import { useAuth } from '../../../../hooks/useAuth';
+import { useRestrictedModules } from '../../../../hooks/useModuleAccess';
 import { Toast } from '../../../../components/shared/Toast';
 import {
   ASSET_CATEGORY_LABELS,
@@ -143,7 +143,13 @@ function ConfiguracionContent() {
   const activeCompanyId = apiClient.getCompanyId();
   const userRole = user?.companies.find((c) => c.companyId === activeCompanyId)?.role ?? null;
   const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
-  const finanzasRestricted = currentRestrictedModules(user, activeCompanyId).includes('FINANZAS');
+  /* ACCESS-002 — «Compromisos automáticos» is Finanzas content (needs the category catalog).
+     The tab BUTTON hides once the member is known to be restricted; the tab BODY mounts only
+     when access is known and Finanzas is not blocked (canSee), so a restricted member never
+     fires /api/categories, not even while /auth/me loads. */
+  const { isRestricted, canSee, isLoading: accessLoading } = useRestrictedModules();
+  const finanzasRestricted = isRestricted('FINANZAS');
+  const canSeeFinanzas = canSee('FINANZAS');
 
   const visibleTabs = useMemo(
     () => TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.finanzasOnly || !finanzasRestricted)),
@@ -156,12 +162,15 @@ function ConfiguracionContent() {
 
   /* If the URL points at avanzado but the user isn't admin, drop them
      back to the default tab silently. Avoids a "blank tab body" state
-     when an admin-shared link is opened by a non-admin. */
+     when an admin-shared link is opened by a non-admin. ACCESS-002: while /auth/me loads the
+     key set is provisional (the restriction is unknown), so the reset waits for it; an
+     unrestricted member deep-linking ?tab=compromisos keeps landing on that tab. */
   useEffect(() => {
+    if (accessLoading) return;
     if (!validKeys.includes(tab)) {
       setTab('tipos');
     }
-  }, [validKeys, tab]);
+  }, [accessLoading, validKeys, tab]);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -255,7 +264,7 @@ function ConfiguracionContent() {
       {tab === 'documentos' && <TiposDocumentoTab toaster={showToast} />}
       {tab === 'permisos' && <PermisosTabRouter toaster={showToast} />}
       {tab === 'alertas' && <AlertsConfigTab toaster={showToast} />}
-      {tab === 'compromisos' && !finanzasRestricted && <AutoCommitmentsTab toaster={showToast} />}
+      {tab === 'compromisos' && canSeeFinanzas && <AutoCommitmentsTab toaster={showToast} />}
       {tab === 'avanzado' && isAdmin && <AvanzadoTab toaster={showToast} />}
 
       <style jsx global>{`
