@@ -411,10 +411,10 @@ además administra usuarios y la configuración de la empresa (incluida la conex
 al SII). Nunca se le niega nada. _Quién lo tiene:_ el dueño del sistema / el socio
 fundador o la persona de máxima confianza técnica. Idealmente una sola persona.
 
-**ADMIN.** En la práctica, lo mismo que SUPER*ADMIN: control total de datos y
+**ADMIN.** En la práctica, lo mismo que `SUPER_ADMIN`: control total de datos y
 configuración, incluida la gestión de usuarios, el borrado de registros que los
 demás no pueden borrar, y las aprobaciones finales (excepciones de activos,
-finiquitos, etc.). \_Quién lo tiene:* el gerente general o el gerente de
+finiquitos, etc.). _Quién lo tiene:_ el gerente general o el gerente de
 administración y finanzas — quien responde por la operación completa.
 
 **MANAGER.** El caballo de batalla operativo. Ve todo lo que hay, y **gestiona
@@ -464,7 +464,7 @@ roles de §2 y las tablas de §3 **no cambian**: `Membership.restrictedModules` 
 `AccessModule` = `FINANZAS` | `RRHH`) se aplica en `CaslAbilityFactory` **después** del
 rol como `cannot('manage', subject)` por cada subject del módulo (last-rule-wins), así que
 la celda NET de un rol restringido es «—» en esas filas y la del resto de la matriz queda
-igual. SUPER_ADMIN/ADMIN nunca llevan la lista (el servicio responde 400). Con la lista
+igual. `SUPER_ADMIN`/`ADMIN` nunca llevan la lista (el servicio responde 400). Con la lista
 vacía, las reglas son idénticas a las de este documento para los seis roles.
 
 **Conjuntos de subjects**
