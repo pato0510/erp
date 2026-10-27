@@ -122,3 +122,29 @@ describe('DocumentRemindersService — same-day idempotency', () => {
     expect(res.notified).toBe(0);
   });
 });
+
+describe('ACCESS-001 — DocumentRemindersService excludes RRHH-restricted managers', () => {
+  it('the recipient query carries NOT restrictedModules has RRHH next to the role filter', async () => {
+    const createGeneric = jest.fn().mockResolvedValue({ delivered: 1 });
+    let membershipWhere: Any | undefined;
+    const prisma = prismaWith({}) as unknown as Any;
+    (prisma as { membership: Any }).membership = {
+      findMany: (args: Any) => {
+        membershipWhere = args.where as Any;
+        return Promise.resolve([{ userId: 'm1' }]);
+      },
+    };
+    const svc = makeService(prisma, createGeneric);
+
+    await svc.runForCompany('c1');
+
+    expect(membershipWhere).toMatchObject({
+      companyId: 'c1',
+      isActive: true,
+      role: { in: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] },
+      NOT: { restrictedModules: { has: 'RRHH' } },
+    });
+    expect(createGeneric).toHaveBeenCalledTimes(1);
+    expect(createGeneric.mock.calls[0][1].userIds).toEqual(['m1']);
+  });
+});

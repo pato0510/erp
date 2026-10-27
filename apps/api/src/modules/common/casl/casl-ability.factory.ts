@@ -1,6 +1,6 @@
 import { AbilityBuilder, createMongoAbility, MongoAbility, InferSubjects } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { AccessModule, UserRole } from '@prisma/client';
 
 type Subjects =
   | InferSubjects<
@@ -417,6 +417,29 @@ const HSEC_SUBJECTS = [
   HsecEppItemSubject,
 ];
 
+/* ACCESS-001 (founder decision 2026-10-27, INTERIM until real access profiles exist) —
+   per-membership module access. `Membership.restrictedModules` lists the modules a member
+   is blocked from; `defineAbilityFor` applies `cannot('manage', subject)` for every subject
+   of each listed module AFTER the role switch (last-rule-wins), so it overrides `read all`
+   and `manage all` alike. Roles are untouched: a restricted MANAGER keeps full MANAGER
+   power everywhere else. SUPER_ADMIN/ADMIN are never restricted (UsersService rejects it).
+   FINANZAS deliberately EXCLUDES ReportSubject: Operaciones Reportes gates on it too
+   (operations-reports.controller), so the three Finanzas report endpoints gate on
+   `read Report && read Movement` instead (reports.controller). CommitmentTemplate,
+   ServiceOrder, Quote and Campaign stay as they are. To be replaced by profiles. */
+export const FINANZAS_SUBJECTS = [
+  MovementSubject,
+  CategorySubject,
+  CounterpartySubject,
+  CostCenterSubject,
+  FiscalPeriodSubject,
+] as const;
+type BlockableSubject = (typeof FINANZAS_SUBJECTS)[number] | (typeof RRHH_SUBJECTS)[number];
+export const MODULE_SUBJECTS: Record<AccessModule, readonly BlockableSubject[]> = {
+  [AccessModule.FINANZAS]: FINANZAS_SUBJECTS,
+  [AccessModule.RRHH]: RRHH_SUBJECTS,
+};
+
 /* `approve`/`reject`/`resubmit`/`supersede` are document-workflow specific
    actions. They ride on the same CASL action union so the policy decorator
    stays uniform. `manage` continues to imply all of them
@@ -537,7 +560,7 @@ export {
 
 @Injectable()
 export class CaslAbilityFactory {
-  defineAbilityFor(role: UserRole): AppAbility {
+  defineAbilityFor(role: UserRole, restrictedModules: readonly AccessModule[] = []): AppAbility {
     const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
 
     switch (role) {
@@ -857,6 +880,13 @@ export class CaslAbilityFactory {
            uniformly across the four non-admin branches. Founder-signed matrix. */
         HSEC_SUBJECTS.forEach((subject) => cannot('read', subject));
         break;
+    }
+
+    /* ACCESS-001 — module blocks come LAST so they win over every role rule above
+       (including `manage all`; the service layer never lets an admin carry a block).
+       With an empty list the rules are byte-identical to the role switch. */
+    for (const module of restrictedModules) {
+      MODULE_SUBJECTS[module].forEach((subject) => cannot('manage', subject));
     }
 
     return build();

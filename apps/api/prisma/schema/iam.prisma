@@ -7,6 +7,14 @@ enum UserRole {
   VIEWER
 }
 
+// ACCESS-001 (founder decision 2026-10-27, interim until real profiles exist):
+// modules a membership is blocked from, applied in CaslAbilityFactory AFTER the
+// role rules. SUPER_ADMIN/ADMIN are never restricted (UsersService enforces it).
+enum AccessModule {
+  FINANZAS
+  RRHH
+}
+
 model User {
   id                 String    @id @default(uuid()) @db.Uuid
   email              String    @unique
@@ -30,13 +38,15 @@ model User {
 }
 
 model Membership {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  companyId String   @db.Uuid
-  role      UserRole
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String         @id @default(uuid()) @db.Uuid
+  userId            String         @db.Uuid
+  companyId         String         @db.Uuid
+  role              UserRole
+  isActive          Boolean        @default(true)
+  // ACCESS-001 — empty array = today's access. Validated against the role on write.
+  restrictedModules AccessModule[] @default([])
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   user    User    @relation(fields: [userId], references: [id])
   company Company @relation(fields: [companyId], references: [id])

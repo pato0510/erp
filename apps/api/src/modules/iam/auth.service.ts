@@ -167,6 +167,7 @@ export class AuthService {
           select: {
             id: true,
             role: true,
+            restrictedModules: true,
             company: {
               select: {
                 id: true,
@@ -195,6 +196,8 @@ export class AuthService {
         taxId: m.company.taxId,
         role: m.role,
         membershipId: m.id,
+        // ACCESS-001 — the web hides restricted modules from this list; the api blocks.
+        restrictedModules: m.restrictedModules,
       })),
     };
   }

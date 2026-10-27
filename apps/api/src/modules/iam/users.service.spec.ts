@@ -1,4 +1,4 @@
-import { UserRole } from '@prisma/client';
+import { AccessModule, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from './users.service';
 import { PASSWORD_POLICY } from './password-policy';
@@ -16,6 +16,7 @@ describe('UsersService access recovery and administration', () => {
     companyId,
     role: UserRole.VIEWER,
     isActive: true,
+    restrictedModules: [] as AccessModule[],
     createdAt: new Date(),
   };
   const user = {
@@ -339,4 +340,179 @@ describe('UsersService access recovery and administration', () => {
       expect(tx.user.update).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('ACCESS-001 — restrictedModules on create and update', () => {
+  const companyId = 'c1';
+  const actorId = 'admin';
+  const userId = 'target';
+  const baseMembership = {
+    id: 'm1',
+    userId,
+    companyId,
+    role: UserRole.MANAGER,
+    isActive: true,
+    restrictedModules: [] as AccessModule[],
+    createdAt: new Date(),
+  };
+  const user = {
+    id: userId,
+    email: 'target@example.cl',
+    firstName: 'Test',
+    lastName: 'User',
+    isActive: true,
+    lastLoginAt: null,
+  };
+  let targetMembership: typeof baseMembership;
+  let prisma: { membership: { findUnique: jest.Mock; findFirst: jest.Mock } };
+  let tx: {
+    user: { update: jest.Mock; findUnique: jest.Mock; create: jest.Mock };
+    membership: { update: jest.Mock; findUnique: jest.Mock; create: jest.Mock };
+  };
+  let service: UsersService;
+
+  beforeEach(() => {
+    hash.mockReset().mockResolvedValue('hashed-password');
+    targetMembership = { ...baseMembership };
+    prisma = {
+      membership: {
+        findUnique: jest.fn(async ({ where }) =>
+          where.userId_companyId.userId === actorId
+            ? { ...baseMembership, userId: actorId, role: UserRole.ADMIN }
+            : targetMembership,
+        ),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    };
+    tx = {
+      user: {
+        update: jest.fn().mockResolvedValue(user),
+        findUnique: jest.fn().mockResolvedValue(user),
+        create: jest.fn(async ({ data }) => ({
+          ...user,
+          memberships: [{ ...baseMembership, ...data.memberships.create }],
+        })),
+      },
+      membership: {
+        update: jest.fn(async ({ data }) => ({ ...targetMembership, ...data })),
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn(async ({ data }) => ({ ...baseMembership, ...data })),
+      },
+    };
+    const rls = { executeWithRls: jest.fn(async (_c, _a, callback) => callback(tx)) };
+    service = new UsersService(prisma as never, rls as never);
+  });
+
+  const createDto = {
+    firstName: 'Test',
+    lastName: 'User',
+    email: user.email,
+    password: 'TestPass123',
+    role: UserRole.MANAGER,
+  };
+
+  it('create with a restriction persists it and returns it on the list item', async () => {
+    tx.user.findUnique.mockResolvedValue(null); // brand-new user → user.create branch
+    const result = await service.create(companyId, actorId, {
+      ...createDto,
+      restrictedModules: [AccessModule.FINANZAS, AccessModule.RRHH],
+    });
+    expect(tx.user.create.mock.calls[0][0].data.memberships.create.restrictedModules).toEqual([
+      AccessModule.FINANZAS,
+      AccessModule.RRHH,
+    ]);
+    expect(result.restrictedModules).toEqual([AccessModule.FINANZAS, AccessModule.RRHH]);
+  });
+
+  it("create without the list stores [] (today's access) — existing-user branch", async () => {
+    // tx.user.findUnique resolves the existing global user → membership.create branch
+    const result = await service.create(companyId, actorId, createDto);
+    expect(tx.user.create).not.toHaveBeenCalled();
+    expect(tx.membership.create.mock.calls[0][0].data.restrictedModules).toEqual([]);
+    expect(result.restrictedModules).toEqual([]);
+  });
+
+  it('create: ADMIN with a restriction → 400 before any write', async () => {
+    await expect(
+      service.create(companyId, actorId, {
+        ...createDto,
+        role: UserRole.ADMIN,
+        restrictedModules: [AccessModule.FINANZAS],
+      }),
+    ).rejects.toThrow('Un administrador ve todos los módulos.');
+    expect(hash).not.toHaveBeenCalled();
+    expect(tx.user.create).not.toHaveBeenCalled();
+  });
+
+  it('update: restriction on a MANAGER is written as a full replacement', async () => {
+    const result = await service.update(userId, companyId, actorId, {
+      restrictedModules: [AccessModule.RRHH],
+    });
+    expect(tx.membership.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { restrictedModules: [AccessModule.RRHH] } }),
+    );
+    expect(result.restrictedModules).toEqual([AccessModule.RRHH]);
+  });
+
+  it('update: ADMIN + restriction → 400 (resulting role)', async () => {
+    await expect(
+      service.update(userId, companyId, actorId, {
+        role: UserRole.ADMIN,
+        restrictedModules: [AccessModule.FINANZAS],
+      }),
+    ).rejects.toThrow('Un administrador ve todos los módulos.');
+    expect(tx.membership.update).not.toHaveBeenCalled();
+  });
+
+  it('update: an already-ADMIN target cannot receive a restriction', async () => {
+    targetMembership = { ...baseMembership, role: UserRole.ADMIN };
+    await expect(
+      service.update(userId, companyId, actorId, { restrictedModules: [AccessModule.RRHH] }),
+    ).rejects.toThrow('Un administrador ve todos los módulos.');
+  });
+
+  it('update: role raised to ADMIN without the list clears the blocks in the same write', async () => {
+    targetMembership = { ...baseMembership, restrictedModules: [AccessModule.FINANZAS] };
+    await service.update(userId, companyId, actorId, { role: UserRole.ADMIN });
+    expect(tx.membership.update).toHaveBeenCalledTimes(1);
+    expect(tx.membership.update.mock.calls[0][0].data).toEqual({
+      role: UserRole.ADMIN,
+      restrictedModules: [],
+    });
+  });
+
+  it('update: role raised to ADMIN on an unrestricted member does not touch the list', async () => {
+    await service.update(userId, companyId, actorId, { role: UserRole.ADMIN });
+    expect(tx.membership.update.mock.calls[0][0].data).toEqual({ role: UserRole.ADMIN });
+  });
+
+  it('update: the actor changing their own access → 400 (mirror of the self-role lock)', async () => {
+    await expect(
+      service.update(actorId, companyId, actorId, { restrictedModules: [AccessModule.RRHH] }),
+    ).rejects.toThrow('No puedes cambiar tu propio acceso.');
+    expect(tx.membership.update).not.toHaveBeenCalled();
+  });
+
+  it('update: the actor re-sending their own unchanged (empty) list is a no-op, not an error', async () => {
+    await expect(
+      service.update(actorId, companyId, actorId, { firstName: 'Ana', restrictedModules: [] }),
+    ).resolves.toBeDefined();
+    expect(tx.membership.update).not.toHaveBeenCalled();
+  });
+
+  it('findAll projects restrictedModules per row', async () => {
+    const list = await new UsersService(
+      {
+        membership: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([
+              { ...baseMembership, restrictedModules: [AccessModule.FINANZAS], user },
+            ]),
+        },
+      } as never,
+      {} as never,
+    ).findAll(companyId);
+    expect(list[0].restrictedModules).toEqual([AccessModule.FINANZAS]);
+  });
 });

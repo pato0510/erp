@@ -44,7 +44,11 @@ export class PoliciesGuard implements CanActivate {
       throw new ForbiddenException('No active membership for this company');
     }
 
-    const ability = this.caslAbilityFactory.defineAbilityFor(membership.role);
+    // ACCESS-001 — the membership's module blocks ride on top of the role.
+    const ability = this.caslAbilityFactory.defineAbilityFor(
+      membership.role,
+      membership.restrictedModules,
+    );
 
     // Attach ability to request for use in controllers
     (request as Request & { ability: typeof ability }).ability = ability;

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AlertSeverity } from '@prisma/client';
+import { AccessModule, AlertSeverity } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationService } from '../../operations/notifications/notification.service';
 
@@ -124,7 +124,13 @@ export class CertificationRemindersService {
 
   private async resolveManagers(companyId: string): Promise<string[]> {
     const memberships = await this.prisma.membership.findMany({
-      where: { companyId, isActive: true, role: { in: [...MANAGER_ROLES] } },
+      where: {
+        companyId,
+        isActive: true,
+        role: { in: [...MANAGER_ROLES] },
+        // ACCESS-001 — RRHH content never reaches a member blocked from RRHH.
+        NOT: { restrictedModules: { has: AccessModule.RRHH } },
+      },
       select: { userId: true },
     });
     return Array.from(new Set(memberships.map((m) => m.userId)));

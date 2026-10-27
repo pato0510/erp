@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Membership, Prisma, User, UserRole } from '@prisma/client';
+import { AccessModule, Membership, Prisma, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -16,6 +16,15 @@ import { assertPasswordPolicy } from './password-policy';
 
 const BCRYPT_ROUNDS = 10;
 
+/* ACCESS-001 — roles that can never carry a module block. */
+const UNRESTRICTABLE_ROLES: ReadonlySet<UserRole> = new Set([UserRole.SUPER_ADMIN, UserRole.ADMIN]);
+export const ADMIN_SEES_ALL_MESSAGE = 'Un administrador ve todos los módulos.';
+export const SELF_ACCESS_MESSAGE = 'No puedes cambiar tu propio acceso.';
+
+function sameModules(a: readonly AccessModule[], b: readonly AccessModule[]) {
+  return a.length === b.length && a.every((m) => b.includes(m));
+}
+
 export interface UserListItem {
   id: string;
   email: string;
@@ -24,6 +33,8 @@ export interface UserListItem {
   role: UserRole;
   membershipId: string;
   isActive: boolean;
+  /* ACCESS-001 — modules this membership is blocked from ([] = full access). */
+  restrictedModules: AccessModule[];
   lastLoginAt: Date | null;
   createdAt: Date;
 }
@@ -50,6 +61,7 @@ export class UsersService {
       role: m.role,
       membershipId: m.id,
       isActive: m.isActive && m.user.isActive,
+      restrictedModules: m.restrictedModules,
       lastLoginAt: m.user.lastLoginAt,
       createdAt: m.createdAt,
     }));
@@ -58,6 +70,11 @@ export class UsersService {
   async create(companyId: string, actorUserId: string, dto: CreateUserDto): Promise<UserListItem> {
     if (dto.role === UserRole.SUPER_ADMIN) {
       await this.requireSuperAdmin(companyId, actorUserId);
+    }
+    // ACCESS-001 — validated against the role being assigned; omitted = no block.
+    const restrictedModules = dto.restrictedModules ?? [];
+    if (restrictedModules.length > 0 && UNRESTRICTABLE_ROLES.has(dto.role)) {
+      throw new BadRequestException(ADMIN_SEES_ALL_MESSAGE);
     }
     assertPasswordPolicy(dto.password);
     // Hash outside the RLS transaction so we don't hold it longer than necessary.
@@ -76,7 +93,7 @@ export class UsersService {
         }
         // Reuse the existing global user — just add a membership to this company.
         const newMembership = await tx.membership.create({
-          data: { userId: existing.id, companyId, role: dto.role },
+          data: { userId: existing.id, companyId, role: dto.role, restrictedModules },
         });
         return this.toListItem(existing, newMembership);
       }
@@ -87,7 +104,7 @@ export class UsersService {
           passwordHash,
           firstName: dto.firstName.trim(),
           lastName: dto.lastName.trim(),
-          memberships: { create: { companyId, role: dto.role } },
+          memberships: { create: { companyId, role: dto.role, restrictedModules } },
         },
         include: { memberships: { where: { companyId } } },
       });
@@ -114,6 +131,24 @@ export class UsersService {
         'No puedes cambiar tu propio rol ni desactivar tu propia cuenta.',
       );
     }
+    /* ACCESS-001 — mirror of the self-role lock: the actor never changes their own blocks.
+       The list is validated against the RESULTING role; a role raised to SUPER_ADMIN/ADMIN
+       without a list clears the blocks in the same write. */
+    const accessChanges =
+      dto.restrictedModules !== undefined &&
+      !sameModules(dto.restrictedModules, membership.restrictedModules);
+    if (userId === actorUserId && accessChanges) {
+      throw new BadRequestException(SELF_ACCESS_MESSAGE);
+    }
+    const resultingRole = dto.role ?? membership.role;
+    if (UNRESTRICTABLE_ROLES.has(resultingRole) && (dto.restrictedModules?.length ?? 0) > 0) {
+      throw new BadRequestException(ADMIN_SEES_ALL_MESSAGE);
+    }
+    const restrictedModules: AccessModule[] | undefined = accessChanges
+      ? dto.restrictedModules
+      : UNRESTRICTABLE_ROLES.has(resultingRole) && membership.restrictedModules.length > 0
+        ? []
+        : undefined;
     if (
       roleChanges &&
       (dto.role === UserRole.SUPER_ADMIN || membership.role === UserRole.SUPER_ADMIN)
@@ -143,6 +178,7 @@ export class UsersService {
       const membershipData: Prisma.MembershipUpdateInput = {};
       if (dto.role !== undefined) membershipData.role = dto.role;
       if (dto.isActive !== undefined) membershipData.isActive = dto.isActive;
+      if (restrictedModules !== undefined) membershipData.restrictedModules = restrictedModules;
 
       if (Object.keys(userData).length > 0) {
         await tx.user.update({ where: { id: userId }, data: userData });
@@ -249,7 +285,13 @@ export class UsersService {
 
   private toListItem(
     user: User,
-    membership: { id: string; role: UserRole; isActive: boolean; createdAt: Date },
+    membership: {
+      id: string;
+      role: UserRole;
+      isActive: boolean;
+      restrictedModules: AccessModule[];
+      createdAt: Date;
+    },
   ): UserListItem {
     return {
       id: user.id,
@@ -259,6 +301,7 @@ export class UsersService {
       role: membership.role,
       membershipId: membership.id,
       isActive: membership.isActive && user.isActive,
+      restrictedModules: membership.restrictedModules,
       lastLoginAt: user.lastLoginAt,
       createdAt: membership.createdAt,
     };

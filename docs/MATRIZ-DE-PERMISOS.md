@@ -411,10 +411,10 @@ además administra usuarios y la configuración de la empresa (incluida la conex
 al SII). Nunca se le niega nada. _Quién lo tiene:_ el dueño del sistema / el socio
 fundador o la persona de máxima confianza técnica. Idealmente una sola persona.
 
-**ADMIN.** En la práctica, lo mismo que SUPER_ADMIN: control total de datos y
+**ADMIN.** En la práctica, lo mismo que SUPER*ADMIN: control total de datos y
 configuración, incluida la gestión de usuarios, el borrado de registros que los
 demás no pueden borrar, y las aprobaciones finales (excepciones de activos,
-finiquitos, etc.). _Quién lo tiene:_ el gerente general o el gerente de
+finiquitos, etc.). \_Quién lo tiene:* el gerente general o el gerente de
 administración y finanzas — quien responde por la operación completa.
 
 **MANAGER.** El caballo de batalla operativo. Ve todo lo que hay, y **gestiona
@@ -456,6 +456,56 @@ necesita consultar el estado de la operación y las cuentas sin poder modificarl
 
 ---
 
+## 8. Acceso por módulo (ACCESS-001, 2026-10-27 — interino)
+
+Decisión del fundador (2026-10-27): dos perfiles de acceso por membresía, «Todos los
+módulos» y «Sin Finanzas ni Recursos Humanos», hasta que existan perfiles reales. Los
+roles de §2 y las tablas de §3 **no cambian**: `Membership.restrictedModules` (enum
+`AccessModule` = `FINANZAS` | `RRHH`) se aplica en `CaslAbilityFactory` **después** del
+rol como `cannot('manage', subject)` por cada subject del módulo (last-rule-wins), así que
+la celda NET de un rol restringido es «—» en esas filas y la del resto de la matriz queda
+igual. SUPER_ADMIN/ADMIN nunca llevan la lista (el servicio responde 400). Con la lista
+vacía, las reglas son idénticas a las de este documento para los seis roles.
+
+**Conjuntos de subjects**
+
+| Módulo bloqueado | Subjects que pasan a «—»                                                                                                                                                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FINANZAS`       | Movement · Category · Counterparty · CostCenter · FiscalPeriod                                                                                                                                                               |
+| `RRHH`           | Employee · EmployeeContract · EmployeeDocument · Certification · Availability · VacationRequest · LeaveRequest · MedicalLeave · SalaryRecord · TerminationSimulation · PayrollParameter · EmployeeCompensation · JobPosition |
+
+`ReportSubject` **no** está en Finanzas: lo comparten los diez endpoints de Reportes de
+Operaciones (`operations-reports.controller`). Los tres reportes Finanzas
+(`GET /reports/movements/export`, `/reports/cashflow/export`, `/reports/executive-summary`)
+gatean `read Report && read Movement` desde ACCESS-001: misma audiencia que antes y 403
+para Finanzas bloqueado vía Movement. CommitmentTemplate, ServiceOrder, Quote y Campaign
+no se tocan.
+
+**Efectos fuera de Finanzas/RRHH para una membresía restringida**
+
+| Superficie                                                                    | Subject                          | Resultado                                                                                                             |
+| ----------------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Hub, línea Finanzas (`hub.service`)                                           | read Movement                    | línea ausente                                                                                                         |
+| Hub, línea RRHH (`hub.service`)                                               | read Employee                    | línea ausente                                                                                                         |
+| Calendario, `link` de ausencias (`actividades.controller`, `canOpenEmployee`) | read Employee                    | link `null`; `birthdays` y `ausencias` SIGUEN visibles (matriz firmada de seis roles: nombre + fecha/rango, nada más) |
+| `GET /comercial/available-staff` y flag `availability.read`                   | read Availability                | 403; la ficha de oportunidad ya oculta «Personal disponible» por el flag                                              |
+| Reportes de Operaciones (10 endpoints)                                        | read Report                      | sin cambio                                                                                                            |
+| Reportes Finanzas (3 endpoints)                                               | read Report ∧ read Movement      | 403                                                                                                                   |
+| `GET /auth/test-permissions`                                                  | read Movement                    | 403 (sonda de desarrollo)                                                                                             |
+| Operaciones → Configuración → «Compromisos automáticos» (web)                 | read Category                    | tab oculta por la web; los endpoints de CommitmentTemplate siguen abiertos por api (deuda del interino)               |
+| `/configuracion` Períodos y Umbrales (web)                                    | read FiscalPeriod, read Movement | secciones ocultas por la web                                                                                          |
+| Ficha de cuenta, «Contraparte (facturación)» (web)                            | read Counterparty                | tarjeta oculta por la web                                                                                             |
+| Recordatorios RRHH (contratos, documentos, certificaciones)                   | —                                | la membresía con RRHH bloqueado no recibe la notificación                                                             |
+| Resto de consultas de destinatarios por rol (Operaciones, HSEC)               | —                                | sin cambio (contenido propio)                                                                                         |
+
+**Rutas web**: Finanzas = `/dashboard`, `/movimientos`, `/caja`, `/banco`, `/tributario`,
+`/conciliacion`, `/cierre`, `/alertas`, `/reportes`, `/categorias`, `/contrapartes` (las de
+FinanceSidebar); RRHH = `/rrhh`; compartidas = `/configuracion`, `/notificaciones`. El hub
+oculta la tarjeta; una URL directa a una ruta bloqueada muestra «No tienes acceso a este
+módulo.» sin montar la página (cero llamadas al api).
+
+---
+
 _Documento de referencia. Cambios de código futuros deben re-verificarse contra
 las dos capas (ability CASL **y** `@CheckPolicies` del endpoint). Los números de
-línea corresponden al 2026-08-04 y pueden derivar._
+línea corresponden al 2026-08-04 y pueden derivar; §8 corresponde al 2026-10-27._

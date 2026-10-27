@@ -1,6 +1,6 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserRole } from '@prisma/client';
+import { AccessModule, UserRole } from '@prisma/client';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { PoliciesGuard } from './policies.guard';
 
@@ -65,5 +65,77 @@ describe('PoliciesGuard forced password change', () => {
     );
     await expect(guard.canActivate(context)).rejects.toThrow('Insufficient permissions');
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ACCESS-001 — PoliciesGuard passes the membership module blocks to the factory', () => {
+  const run = async (restrictedModules: AccessModule[]) => {
+    const handler = jest.fn(() => true);
+    const factory = { defineAbilityFor: jest.fn(() => ({ can: () => true })) };
+    const prisma = {
+      membership: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ isActive: true, role: UserRole.MANAGER, restrictedModules }),
+      },
+    };
+    const request: Record<string, unknown> = {
+      user: { id: 'u1', mustChangePassword: false },
+      headers: { 'x-company-id': 'c1' },
+    };
+    const context = {
+      getHandler: () => handler,
+      switchToHttp: () => ({ getRequest: () => request }),
+    } as unknown as ExecutionContext;
+    const guard = new PoliciesGuard(
+      { get: () => [handler] } as never,
+      factory as never,
+      prisma as never,
+    );
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    return { factory, request };
+  };
+
+  it('forwards [FINANZAS] from the membership row', async () => {
+    const { factory, request } = await run([AccessModule.FINANZAS]);
+    expect(factory.defineAbilityFor).toHaveBeenCalledWith(UserRole.MANAGER, [
+      AccessModule.FINANZAS,
+    ]);
+    expect(request.ability).toBe(factory.defineAbilityFor.mock.results[0].value);
+  });
+
+  it("forwards the empty list unchanged (today's access)", async () => {
+    const { factory } = await run([]);
+    expect(factory.defineAbilityFor).toHaveBeenCalledWith(UserRole.MANAGER, []);
+  });
+
+  it('a FINANZAS-restricted MANAGER is denied a read Movement gate end to end', async () => {
+    const { MovementSubject } = await import('../casl/casl-ability.factory');
+    const handler = (ability: { can: (a: string, s: unknown) => boolean }) =>
+      ability.can('read', MovementSubject);
+    const prisma = {
+      membership: {
+        findUnique: jest.fn().mockResolvedValue({
+          isActive: true,
+          role: UserRole.MANAGER,
+          restrictedModules: [AccessModule.FINANZAS],
+        }),
+      },
+    };
+    const context = {
+      getHandler: () => handler,
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user: { id: 'u1', mustChangePassword: false },
+          headers: { 'x-company-id': 'c1' },
+        }),
+      }),
+    } as unknown as ExecutionContext;
+    const guard = new PoliciesGuard(
+      { get: () => [handler] } as never,
+      new CaslAbilityFactory(),
+      prisma as never,
+    );
+    await expect(guard.canActivate(context)).rejects.toThrow('Insufficient permissions');
   });
 });
