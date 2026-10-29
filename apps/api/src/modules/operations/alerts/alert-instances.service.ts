@@ -69,6 +69,9 @@ export class AlertInstancesService {
           documentRecord: {
             select: { id: true, fileName: true, version: true, status: true, expirationDate: true },
           },
+          /* Permit-driven alerts carry no asset/documentType: the UI names them by these. */
+          location: { select: { id: true, name: true, code: true } },
+          permitType: { select: { id: true, name: true, code: true } },
         },
         orderBy: { triggeredAt: 'desc' },
         skip,
@@ -94,6 +97,8 @@ export class AlertInstancesService {
         documentType: true,
         documentRecord: true,
         alertRule: { select: { id: true, name: true, severity: true } },
+        location: { select: { id: true, name: true, code: true } },
+        permitType: { select: { id: true, name: true, code: true } },
       },
     });
     if (!row) throw new NotFoundException('Alerta no encontrada.');

@@ -33,8 +33,13 @@ export type AlertInstanceStatus =
 export interface AlertInstance {
   id: string;
   alertRuleId: string | null;
-  documentTypeId: string;
-  assetId: string;
+  /* Nullable since OPS-024: permit-driven alerts carry permitTypeId/permitId and may be
+     attached to a location with no asset. Every consumer must handle the null side. */
+  documentTypeId: string | null;
+  assetId: string | null;
+  permitTypeId?: string | null;
+  permitId?: string | null;
+  locationId?: string | null;
   documentRecordId: string | null;
   triggerType: AlertTriggerType;
   severity: AlertSeverity;
@@ -53,7 +58,9 @@ export interface AlertInstance {
   title: string;
   message: string | null;
   metadata: Record<string, unknown>;
-  asset: { id: string; code: string; name: string; status: string };
+  asset: { id: string; code: string; name: string; status: string } | null;
+  location?: { id: string; name: string; code: string | null } | null;
+  permitType?: { id: string; name: string; code: string } | null;
   documentType: {
     id: string;
     name: string;
@@ -61,7 +68,7 @@ export interface AlertInstance {
     category: string;
     criticality?: string;
     blocksOperation?: boolean;
-  };
+  } | null;
   documentRecord: {
     id: string;
     fileName: string;
@@ -176,7 +183,7 @@ export function AlertDetailModal({
   const sev = alert ? SEVERITY_META[alert.severity] : null;
   const stat = alert ? STATUS_META[alert.status] : null;
   const isVehicle = (assetTypeCategory ?? '').toUpperCase() === 'VEHICLE';
-  const assetHref = alert
+  const assetHref = alert?.asset
     ? isVehicle
       ? `/operaciones/vehiculos`
       : `/operaciones/equipos/${alert.asset.id}`
@@ -291,39 +298,70 @@ export function AlertDetailModal({
                   </div>
                 </div>
 
-                {/* Asset card */}
-                <Section title="Activo">
-                  <KvRow label="Código" value={alert.asset.code} mono />
-                  <KvRow label="Nombre" value={alert.asset.name} />
-                  <KvRow label="Estado actual" value={alert.asset.status} mono />
-                  <Link
-                    href={assetHref}
-                    onClick={onClose}
-                    className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-                    style={{
-                      fontFamily: 'var(--font-outfit), sans-serif',
-                      fontSize: 13,
-                      fontWeight: 500,
-                      marginTop: 6,
-                    }}
-                  >
-                    <ExternalLink size={12} /> Ir al activo →
-                  </Link>
-                </Section>
+                {/* Asset card — permit alerts may hang off a location instead */}
+                {alert.asset ? (
+                  <Section title="Activo">
+                    <KvRow label="Código" value={alert.asset.code} mono />
+                    <KvRow label="Nombre" value={alert.asset.name} />
+                    <KvRow label="Estado actual" value={alert.asset.status} mono />
+                    <Link
+                      href={assetHref}
+                      onClick={onClose}
+                      className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                      style={{
+                        fontFamily: 'var(--font-outfit), sans-serif',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        marginTop: 6,
+                      }}
+                    >
+                      <ExternalLink size={12} /> Ir al activo →
+                    </Link>
+                  </Section>
+                ) : alert.location ? (
+                  <Section title="Ubicación">
+                    <KvRow label="Nombre" value={alert.location.name} />
+                    {alert.location.code && (
+                      <KvRow label="Código" value={alert.location.code} mono />
+                    )}
+                  </Section>
+                ) : null}
+
+                {alert.permitType && (
+                  <Section title="Permiso">
+                    <KvRow label="Tipo" value={alert.permitType.name} />
+                    <KvRow label="Código" value={alert.permitType.code} mono />
+                    <Link
+                      href="/operaciones/permisos"
+                      onClick={onClose}
+                      className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                      style={{
+                        fontFamily: 'var(--font-outfit), sans-serif',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        marginTop: 6,
+                      }}
+                    >
+                      <ExternalLink size={12} /> Ir a permisos →
+                    </Link>
+                  </Section>
+                )}
 
                 {/* Document type */}
-                <Section title="Tipo de documento">
-                  <KvRow label="Nombre" value={alert.documentType.name} />
-                  <KvRow label="Código" value={alert.documentType.code} mono />
-                  <KvRow label="Categoría" value={alert.documentType.category} />
-                  {alert.documentType.criticality && (
-                    <KvRow label="Criticidad" value={alert.documentType.criticality} />
-                  )}
-                  <KvRow
-                    label="Bloquea operación"
-                    value={alert.documentType.blocksOperation ? 'Sí' : 'No'}
-                  />
-                </Section>
+                {alert.documentType && (
+                  <Section title="Tipo de documento">
+                    <KvRow label="Nombre" value={alert.documentType.name} />
+                    <KvRow label="Código" value={alert.documentType.code} mono />
+                    <KvRow label="Categoría" value={alert.documentType.category} />
+                    {alert.documentType.criticality && (
+                      <KvRow label="Criticidad" value={alert.documentType.criticality} />
+                    )}
+                    <KvRow
+                      label="Bloquea operación"
+                      value={alert.documentType.blocksOperation ? 'Sí' : 'No'}
+                    />
+                  </Section>
+                )}
 
                 {/* Document record (when present) */}
                 {alert.documentRecord && (
@@ -511,9 +549,9 @@ export function AlertDetailModal({
           documentId={alert.documentRecord.id}
           fileName={alert.documentRecord.fileName}
           mimeType="application/octet-stream"
-          documentTypeName={alert.documentType.name}
-          assetCode={alert.asset.code}
-          assetName={alert.asset.name}
+          documentTypeName={alert.documentType?.name ?? ''}
+          assetCode={alert.asset?.code ?? ''}
+          assetName={alert.asset?.name ?? alert.location?.name ?? ''}
           derivedStatus={alert.documentRecord.status as DerivedDocumentStatus}
           version={alert.documentRecord.version}
           onClose={() => setPreviewing(false)}

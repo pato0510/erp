@@ -44,7 +44,26 @@ interface AssetTypeRef {
 }
 
 interface AlertRow extends AlertInstance {
-  asset: AlertInstance['asset'] & { assetType?: AssetTypeRef | null };
+  asset: (NonNullable<AlertInstance['asset']> & { assetType?: AssetTypeRef | null }) | null;
+}
+
+/* What the alert is about: its asset, or — for permit alerts with no asset (OPS-024) — the
+   location or the permit type. `href` is null when there is no page to open. */
+function alertSubject(row: AlertRow): { short: string; full: string; href: string | null } {
+  if (row.asset) {
+    const isVehicle = (row.asset.assetType?.category ?? '').toUpperCase() === 'VEHICLE';
+    return {
+      short: row.asset.code,
+      full: `${row.asset.code} · ${row.asset.name}`,
+      href: isVehicle ? '/operaciones/vehiculos' : `/operaciones/equipos/${row.asset.id}`,
+    };
+  }
+  const permitHref = row.permitId ? '/operaciones/permisos' : null;
+  if (row.location) return { short: row.location.name, full: row.location.name, href: permitHref };
+  if (row.permitType) {
+    return { short: row.permitType.name, full: row.permitType.name, href: permitHref };
+  }
+  return { short: '—', full: '—', href: null };
 }
 
 interface Paginated<T> {
@@ -975,7 +994,7 @@ function AlertasContent() {
       {detailAlert && (
         <AlertDetailModal
           alertId={detailAlert.id}
-          assetTypeCategory={detailAlert.asset.assetType?.category}
+          assetTypeCategory={detailAlert.asset?.assetType?.category}
           onClose={() => setDetailAlert(null)}
           onAcknowledge={async (id) => {
             await performAcknowledge(id);
@@ -1285,8 +1304,7 @@ function ListRow({
 }) {
   const sev = SEVERITY_META[row.severity];
   const stat = STATUS_META[row.status];
-  const isVehicle = (row.asset.assetType?.category ?? '').toUpperCase() === 'VEHICLE';
-  const assetHref = isVehicle ? '/operaciones/vehiculos' : `/operaciones/equipos/${row.asset.id}`;
+  const subject = alertSubject(row);
   const isActionable = row.status === 'ACTIVE' || row.status === 'ESCALATED';
   return (
     <tr className="border-b border-[var(--border-color)] last:border-b-0 hover:bg-[var(--input-bg)] transition">
@@ -1329,9 +1347,8 @@ function ListRow({
         </button>
       </td>
       <td style={{ padding: '8px 12px' }}>
-        <Link
-          href={assetHref}
-          className="hover:underline"
+        <SubjectLink
+          href={subject.href}
           style={{
             fontFamily: 'var(--font-jetbrains-mono), monospace',
             fontSize: 12,
@@ -1339,8 +1356,8 @@ function ListRow({
             color: 'var(--text-primary)',
           }}
         >
-          {row.asset.code}
-        </Link>
+          {subject.short}
+        </SubjectLink>
       </td>
       <td style={{ padding: '8px 12px' }}>
         <span
@@ -1423,10 +1440,7 @@ function CardsView({
         const sev = SEVERITY_META[r.severity];
         const stat = STATUS_META[r.status];
         const isActionable = r.status === 'ACTIVE' || r.status === 'ESCALATED';
-        const isVehicle = (r.asset.assetType?.category ?? '').toUpperCase() === 'VEHICLE';
-        const assetHref = isVehicle
-          ? '/operaciones/vehiculos'
-          : `/operaciones/equipos/${r.asset.id}`;
+        const subject = alertSubject(r);
         return (
           <div
             key={r.id}
@@ -1470,9 +1484,8 @@ function CardsView({
               {r.title}
             </button>
             <div className="mb-2">
-              <Link
-                href={assetHref}
-                className="hover:underline"
+              <SubjectLink
+                href={subject.href}
                 style={{
                   fontFamily: 'var(--font-jetbrains-mono), monospace',
                   fontSize: 12,
@@ -1480,8 +1493,8 @@ function CardsView({
                   color: 'var(--text-secondary)',
                 }}
               >
-                {r.asset.code} · {r.asset.name}
-              </Link>
+                {subject.full}
+              </SubjectLink>
             </div>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span
@@ -1536,6 +1549,23 @@ function CardsView({
         );
       })}
     </div>
+  );
+}
+
+function SubjectLink({
+  href,
+  style,
+  children,
+}: {
+  href: string | null;
+  style: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  if (!href) return <span style={style}>{children}</span>;
+  return (
+    <Link href={href} className="hover:underline" style={style}>
+      {children}
+    </Link>
   );
 }
 
