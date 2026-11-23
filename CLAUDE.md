@@ -314,6 +314,21 @@ quedan actividades, todos, hsec y hub.
 
 ═══════════════════════════════════════════════════════════════════
 
+# FINANZAS — REDISEÑO (FR)
+
+- Rediseño del módulo Finanzas con itSave como referencia funcional y de UX. Fase actual:
+  PLAN, solo documentación (sin cambios de lógica, schema, migraciones ni UI).
+- Estado vivo, índice de tickets y trabajo previo: `docs/finanzas-redesign/00-ESTADO.md`.
+  Decisiones: `docs/finanzas-redesign/DECISIONES.md`. Fotografía del paquete de traspaso
+  (solo lectura): `docs/finanzas-redesign/paquete-traspaso-2026-11-23/`.
+- Espacio de IDs `FR-NNN` («Finanzas Rediseño»), 1:1 con el paquete (FIN-000 → FR-000 …
+  FIN-038 → FR-038; FR-009 reservado). No confundir con FIN-001 (presupuestos revertidos)
+  ni con FIN-A / FIN-B del Sprint 17. Los IDs de investigación F01–F18, R01–R12, T01–T20,
+  S01–S23 y D-NNN se conservan sin cambio.
+- Prosa de `docs/finanzas-redesign/` en español; identificadores, rutas y código, verbatim.
+
+═══════════════════════════════════════════════════════════════════
+
 # MÓDULO FINANZAS (V1 COMPLETO EN PRODUCCIÓN)
 
 ═══════════════════════════════════════════════════════════════════
@@ -922,6 +937,10 @@ Sprint 8: Hardening
 ═══════════════════════════════════════════════════════════════════
 
 # TICKET ACTUAL
+
+Ola 0 del rediseño de Finanzas (2026-11-23), rama `review/fr-ola0`, solo documentación:
+FR-000 (continuidad, Claude Code) ∥ FR-001-A (recon api/datos, Codex) ∥ FR-001-B (recon
+web/UX, Claude Code). Estado en `docs/finanzas-redesign/00-ESTADO.md`.
 
 ═══════════════════════════════════════════════════════════════════
 
