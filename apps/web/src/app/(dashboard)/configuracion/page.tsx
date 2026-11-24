@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Save,
@@ -11,6 +11,10 @@ import {
   Users as UsersIcon,
   ChevronRight,
 } from 'lucide-react';
+import { useFiscalPeriods, useFiscalYearSelection } from '../../../hooks/useFiscalPeriods';
+import { FiscalPeriodNotice } from '../../../components/shared/PeriodSelector';
+import { santiagoToday } from '../../../lib/dates';
+import type { FiscalPeriod } from '../../../lib/fiscal-periods';
 import { apiClient } from '../../../lib/api';
 import { useRestrictedModules } from '../../../hooks/useModuleAccess';
 import { formatCLP } from '../../../lib/formatters';
@@ -31,17 +35,6 @@ interface CompanySettings {
   invoicePrefix?: string | null;
   decimalSeparator?: string;
   thousandSeparator?: string;
-}
-
-interface FiscalPeriod {
-  id: string;
-  name: string;
-  year: number;
-  month: number;
-  status: 'OPEN' | 'IN_REVIEW' | 'CLOSED';
-  startDate: string;
-  endDate: string;
-  closedAt?: string | null;
 }
 
 interface Thresholds {
@@ -371,85 +364,40 @@ function CompanySection({
 
 // ─────────────────────────────── Periods section ───────────────────────────────
 
-interface PeriodsStatus {
-  total: number;
-  existing: number;
-  missing: number[];
-}
-
 function PeriodsSection({
   onToast,
 }: {
   onToast: (t: { message: string; type: 'success' | 'error' | 'info' }) => void;
 }) {
-  const currentYear = new Date().getFullYear();
-  const YEAR_OPTIONS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
-
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
-  const [statusByYear, setStatusByYear] = useState<Record<number, PeriodsStatus>>({});
-  const [loading, setLoading] = useState(true);
+  const fiscalPeriods = useFiscalPeriods();
+  const { year: selectedYear, setYear: setSelectedYear } = useFiscalYearSelection(fiscalPeriods);
+  const periods = fiscalPeriods.periods.filter((period) => period.year === selectedYear);
+  const loading = fiscalPeriods.isLoading;
+  const [generationYear, setGenerationYear] = useState(() => santiagoToday().slice(0, 4));
   const [generating, setGenerating] = useState(false);
-
-  const loadStatuses = useCallback(async () => {
-    try {
-      const entries = await Promise.all(
-        YEAR_OPTIONS.map(async (y) => {
-          const s = await apiClient.get<PeriodsStatus>(`/api/fiscal-periods/status/${y}`);
-          return [y, s] as const;
-        }),
-      );
-      setStatusByYear(Object.fromEntries(entries));
-    } catch (err) {
-      onToast({
-        message: err instanceof Error ? err.message : 'Error cargando estado de períodos',
-        type: 'error',
-      });
-    }
-    // YEAR_OPTIONS is a constant literal; safe to omit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onToast]);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiClient.get<FiscalPeriod[]>(`/api/fiscal-periods?year=${selectedYear}`);
-      res.sort((a, b) => a.month - b.month);
-      setPeriods(res);
-    } catch (err) {
-      onToast({
-        message: err instanceof Error ? err.message : 'Error cargando períodos',
-        type: 'error',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedYear, onToast]);
-
-  // Primitive-only deps (selectedYear + stable setter) — no infinite loop.
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    loadStatuses();
-  }, [loadStatuses]);
+  const yearToGenerate = Number(generationYear);
+  const validGenerationYear = /^\d{4}$/.test(generationYear) && yearToGenerate > 0;
+  const generatedMonths = fiscalPeriods.periods.filter(
+    (period) => period.year === yearToGenerate,
+  ).length;
 
   const generate = async () => {
+    if (!validGenerationYear || loading || fiscalPeriods.error) return;
     setGenerating(true);
     try {
       const res = await apiClient.post<{ created: number; periods: string[] }>(
-        `/api/fiscal-periods/generate/${selectedYear}`,
+        `/api/fiscal-periods/generate/${yearToGenerate}`,
       );
       onToast({
         message:
           res.created === 0
-            ? `Todos los períodos de ${selectedYear} ya existían`
-            : `${res.created} período${res.created === 1 ? '' : 's'} de ${selectedYear} generado${res.created === 1 ? '' : 's'}`,
+            ? `Todos los períodos de ${yearToGenerate} ya existían`
+            : `${res.created} período${res.created === 1 ? '' : 's'} de ${yearToGenerate} generado${res.created === 1 ? '' : 's'}`,
         type: 'success',
       });
       // Immediate refresh so new cards appear without a manual reload.
-      await Promise.all([load(), loadStatuses()]);
+      setSelectedYear(yearToGenerate);
+      fiscalPeriods.refresh();
     } catch (err) {
       onToast({
         message: err instanceof Error ? err.message : 'Error al generar períodos',
@@ -462,8 +410,6 @@ function PeriodsSection({
 
   // Index existing periods by month so the 12-card grid can look them up in O(1).
   const byMonth = new Map(periods.map((p) => [p.month, p]));
-  const selectedStatus = statusByYear[selectedYear];
-  const hasMissing = !selectedStatus || selectedStatus.missing.length > 0;
 
   return (
     <section
@@ -479,7 +425,7 @@ function PeriodsSection({
             Períodos fiscales
           </h2>
           <p className="text-xs text-[var(--text-secondary)]" style={{ fontWeight: 300 }}>
-            Selecciona un año para ver o generar sus períodos
+            Selecciona un año existente o indica el año que deseas generar
           </p>
         </div>
       </header>
@@ -487,19 +433,20 @@ function PeriodsSection({
       {/* Year selector + generate action */}
       <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-3 flex-wrap">
         <div className="flex gap-2 overflow-x-auto max-w-full pb-1 -mb-1 fiscal-years-scroll">
-          {YEAR_OPTIONS.map((y) => {
+          {fiscalPeriods.years.map((y) => {
             const active = selectedYear === y;
-            const status = statusByYear[y];
+            const existing = fiscalPeriods.periods.filter((period) => period.year === y).length;
             let dotColor: string | null = null;
-            if (status) {
-              if (status.existing === 12)
+            if (existing > 0) {
+              if (existing === 12)
                 dotColor = '#22C55E'; // green
-              else if (status.existing > 0) dotColor = '#EAB308'; // yellow
+              else if (existing > 0) dotColor = '#EAB308'; // yellow
             }
             return (
               <button
                 key={y}
                 onClick={() => setSelectedYear(y)}
+                aria-pressed={active}
                 className={`relative shrink-0 px-3 py-1.5 text-sm rounded-md transition border ${
                   active ? 'text-white' : 'text-[var(--text-primary)] hover:bg-subtle-hover'
                 }`}
@@ -521,10 +468,27 @@ function PeriodsSection({
             );
           })}
         </div>
-        {hasMissing && (
+        <div className="flex items-end gap-2 flex-wrap">
+          <label className="text-sm text-fg-secondary">
+            Año a generar
+            <input
+              type="number"
+              name="generationYear"
+              value={generationYear}
+              onChange={(event) => setGenerationYear(event.target.value)}
+              disabled={generating}
+              className="block w-28 border border-line rounded-lg px-3 py-2 text-sm bg-input text-fg"
+            />
+          </label>
           <button
             onClick={generate}
-            disabled={generating}
+            disabled={
+              generating ||
+              loading ||
+              !!fiscalPeriods.error ||
+              !validGenerationYear ||
+              generatedMonths === 12
+            }
             className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-full disabled:opacity-50"
             style={{
               background: 'var(--color-dark)',
@@ -533,13 +497,14 @@ function PeriodsSection({
             }}
           >
             <Calendar size={14} />
-            {generating ? 'Generando...' : `Generar períodos ${selectedYear}`}
+            {generating ? 'Generando...' : `Generar períodos ${generationYear}`}
           </button>
-        )}
+        </div>
       </div>
 
       {/* Grid or empty state */}
       <div className="p-6">
+        <FiscalPeriodNotice catalog={fiscalPeriods} />
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 12 }).map((_, i) => (
@@ -552,15 +517,15 @@ function PeriodsSection({
               className="text-sm text-[var(--text-secondary)]"
               style={{ fontFamily: 'var(--font-outfit), sans-serif', fontWeight: 500 }}
             >
-              No hay períodos para {selectedYear}. Genera los períodos.
+              No hay períodos fiscales disponibles. Indica el año a generar.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 12 }, (_, i) => {
-              const month = i + 1;
+              const month = 12 - i;
               const period = byMonth.get(month);
-              const monthLabel = MONTH_NAMES[i];
+              const monthLabel = MONTH_NAMES[month - 1];
 
               if (!period) {
                 return (

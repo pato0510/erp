@@ -1,16 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../hooks/useFiscalPeriods';
+import { PeriodSelector } from '../shared/PeriodSelector';
 import { formatCLP } from '../../lib/formatters';
-
-interface FiscalPeriod {
-  id: string;
-  name: string;
-  year: number;
-  month: number;
-}
 
 interface OpeningBalanceModalProps {
   accountId: string;
@@ -31,29 +26,15 @@ export function OpeningBalanceModal({
   onSaved,
   onError,
 }: OpeningBalanceModalProps) {
-  const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
-  const [periodId, setPeriodId] = useState(defaultPeriodId ?? '');
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(
+    fiscalPeriods,
+    defaultPeriodId || undefined,
+  );
   const [rawAmount, setRawAmount] = useState<string>(
     Number.isFinite(initialBalance) ? String(Math.round(initialBalance)) : '0',
   );
   const [submitting, setSubmitting] = useState(false);
-
-  const year = new Date().getFullYear();
-  useEffect(() => {
-    apiClient
-      .get<FiscalPeriod[]>(`/api/fiscal-periods?year=${year}`)
-      .then((fetched) => {
-        setPeriods(fetched);
-        if (fetched.length === 0) return;
-        const now = new Date();
-        const match = fetched.find(
-          (p) => p.year === now.getFullYear() && p.month === now.getMonth() + 1,
-        );
-        const fallback = match?.id ?? fetched[0].id;
-        setPeriodId((prev) => prev || fallback);
-      })
-      .catch(() => undefined);
-  }, [year]);
 
   const numericAmount = useMemo(() => {
     const n = Number(rawAmount);
@@ -113,18 +94,12 @@ export function OpeningBalanceModal({
           </p>
 
           <Field label="Período fiscal" required>
-            <select
+            <PeriodSelector
+              catalog={fiscalPeriods}
               value={periodId}
-              onChange={(e) => setPeriodId(e.target.value)}
+              onChange={setPeriodId}
               className="tn-input"
-            >
-              <option value="">Seleccionar...</option>
-              {periods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
         </div>
 

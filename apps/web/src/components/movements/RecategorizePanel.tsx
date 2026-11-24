@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../hooks/useFiscalPeriods';
+import { PeriodSelector } from '../shared/PeriodSelector';
 import { apiClient } from '../../lib/api';
 
 interface Preview {
@@ -20,16 +22,26 @@ interface Preview {
 }
 
 export function RecategorizePanel({ onApplied }: { onApplied: (count: number) => void }) {
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(fiscalPeriods);
+  const periodsReady =
+    !fiscalPeriods.isLoading && !fiscalPeriods.error && fiscalPeriods.periods.length > 0;
   const [preview, setPreview] = useState<Preview | null>(null);
   const [pending, setPending] = useState<'preview' | 'apply' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const runPreview = async () => {
+    if (!periodsReady) return;
     setPending('preview');
     setError(null);
     setPreview(null);
     try {
-      setPreview(await apiClient.post<Preview>('/api/movements/recategorize', { dryRun: true }));
+      setPreview(
+        await apiClient.post<Preview>('/api/movements/recategorize', {
+          dryRun: true,
+          fiscalPeriodId: periodId || undefined,
+        }),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al previsualizar los cambios.');
     } finally {
@@ -38,7 +50,7 @@ export function RecategorizePanel({ onApplied }: { onApplied: (count: number) =>
   };
 
   const apply = async () => {
-    if (!preview?.cambios || pending) return;
+    if (!preview?.cambios || pending || !periodsReady) return;
     if (
       !window.confirm(
         `Se cambiará la categoría de ${preview.cambios} movimientos. Las categorías elegidas manualmente no se tocan.`,
@@ -51,9 +63,15 @@ export function RecategorizePanel({ onApplied }: { onApplied: (count: number) =>
     try {
       const result = await apiClient.post<Preview>('/api/movements/recategorize', {
         dryRun: false,
+        fiscalPeriodId: periodId || undefined,
       });
       onApplied(result.aplicados ?? 0);
-      setPreview(await apiClient.post<Preview>('/api/movements/recategorize', { dryRun: true }));
+      setPreview(
+        await apiClient.post<Preview>('/api/movements/recategorize', {
+          dryRun: true,
+          fiscalPeriodId: periodId || undefined,
+        }),
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -85,20 +103,23 @@ export function RecategorizePanel({ onApplied }: { onApplied: (count: number) =>
             >
               Período
             </label>
-            <select
+            <PeriodSelector
               id="recategorize-period"
-              name="fiscalPeriodId"
-              defaultValue=""
-              disabled={!!pending}
+              catalog={fiscalPeriods}
+              value={periodId}
+              onChange={(value) => {
+                setPeriodId(value);
+                setPreview(null);
+              }}
+              allowAll
+              disabled={!!pending || !periodsReady}
               className="px-3 py-2 text-sm border border-line rounded-lg bg-input text-fg focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <option value="">Todos los períodos</option>
-            </select>
+            />
           </div>
           <button
             type="button"
             onClick={runPreview}
-            disabled={!!pending}
+            disabled={!!pending || !periodsReady}
             className="px-4 py-2 text-sm border border-line text-fg rounded-lg hover:bg-subtle-hover disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent"
           >
             {pending === 'preview' ? 'Previsualizando…' : 'Previsualizar'}
@@ -106,7 +127,7 @@ export function RecategorizePanel({ onApplied }: { onApplied: (count: number) =>
           <button
             type="button"
             onClick={apply}
-            disabled={!!pending || !preview?.cambios}
+            disabled={!!pending || !preview?.cambios || !periodsReady}
             className="px-4 py-2 text-sm bg-accent text-white rounded-lg disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent"
           >
             {pending === 'apply' ? 'Aplicando…' : `Aplicar ${preview?.cambios ?? 0} cambios`}

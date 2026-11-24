@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Download } from 'lucide-react';
-import { apiClient } from '../../../../lib/api';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../../hooks/useFiscalPeriods';
+import { PeriodSelector } from '../../../../components/shared/PeriodSelector';
 import { useMovements } from '../../../../hooks/useMovements';
 import { formatCLP } from '../../../../lib/formatters';
 
@@ -22,11 +23,6 @@ interface ImportError {
   message: string;
 }
 
-interface Period {
-  id: string;
-  name: string;
-}
-
 type Step = 'upload' | 'preview' | 'result';
 
 export default function ImportarPage() {
@@ -40,20 +36,10 @@ export default function ImportarPage() {
   const [preview, setPreview] = useState<PreviewRow[]>([]);
   const [errors, setErrors] = useState<ImportError[]>([]);
   const [validCount, setValidCount] = useState(0);
-  const [periods, setPeriods] = useState<Period[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('');
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId: selectedPeriod, setPeriodId: setSelectedPeriod } =
+    useFiscalPeriodSelection(fiscalPeriods);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .get<Period[]>('/api/fiscal-periods?year=2026')
-      .then((ps) => {
-        setPeriods(ps);
-        const current = ps.find((p) => p.name.includes('Abril'));
-        if (current) setSelectedPeriod(current.id);
-      })
-      .catch(() => undefined);
-  }, []);
 
   const handleFile = useCallback(
     async (f: File) => {
@@ -172,21 +158,16 @@ export default function ImportarPage() {
 
           {/* Period selector */}
           <div className="bg-card border border-line rounded-xl p-4">
-            <label className="block text-sm font-medium text-fg mb-2">
+            <label htmlFor="import-period" className="block text-sm font-medium text-fg mb-2">
               Período fiscal de destino
             </label>
-            <select
+            <PeriodSelector
+              id="import-period"
+              catalog={fiscalPeriods}
               value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
+              onChange={setSelectedPeriod}
               className="border border-line rounded-lg px-3 py-2 text-sm w-full max-w-xs"
-            >
-              <option value="">Seleccionar período...</option>
-              {periods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* Preview table */}

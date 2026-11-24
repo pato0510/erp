@@ -6,6 +6,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { apiClient } from '../../../../lib/api';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../../hooks/useFiscalPeriods';
+import { PeriodSelector } from '../../../../components/shared/PeriodSelector';
+import { santiagoToday } from '../../../../lib/dates';
 import { useMovements } from '../../../../hooks/useMovements';
 
 const schema = z.object({
@@ -35,21 +38,27 @@ export default function NuevoMovimientoPage() {
   const [categories, setCategories] = useState<SelectOption[]>([]);
   const [counterparties, setCounterparties] = useState<SelectOption[]>([]);
   const [costCenters, setCostCenters] = useState<SelectOption[]>([]);
-  const [periods, setPeriods] = useState<SelectOption[]>([]);
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(fiscalPeriods);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const {
     register,
     handleSubmit,
+    setValue,
     watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { type: 'EXPENSE', date: new Date().toISOString().split('T')[0] },
+    defaultValues: { type: 'EXPENSE', date: santiagoToday() },
   });
 
   const selectedType = watch('type');
+
+  useEffect(() => {
+    setValue('fiscalPeriodId', periodId);
+  }, [periodId, setValue]);
 
   useEffect(() => {
     const typeFilter = selectedType === 'INCOME' ? '?type=INCOME' : '?type=EXPENSE';
@@ -65,11 +74,11 @@ export default function NuevoMovimientoPage() {
         .get<{ data: SelectOption[] }>('/api/counterparties?limit=100')
         .then((r) => setCounterparties(r.data)),
       apiClient.get<SelectOption[]>('/api/cost-centers').then(setCostCenters),
-      apiClient.get<SelectOption[]>('/api/fiscal-periods?year=2026').then(setPeriods),
     ]).catch(() => undefined);
   }, []);
 
   const onSubmit = async (data: FormData, andConfirm = false) => {
+    if (!periodId) return;
     setIsSubmitting(true);
     setError('');
     try {
@@ -177,18 +186,16 @@ export default function NuevoMovimientoPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-fg mb-1">Período Fiscal</label>
-            <select
-              {...register('fiscalPeriodId')}
+            <label htmlFor="fiscal-period" className="block text-sm font-medium text-fg mb-1">
+              Período Fiscal
+            </label>
+            <PeriodSelector
+              id="fiscal-period"
+              catalog={fiscalPeriods}
+              value={periodId}
+              onChange={setPeriodId}
               className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            >
-              <option value="">Seleccionar...</option>
-              {periods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
             {errors.fiscalPeriodId && (
               <p className="text-red-500 text-xs mt-1">{errors.fiscalPeriodId.message}</p>
             )}
@@ -264,14 +271,14 @@ export default function NuevoMovimientoPage() {
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !periodId}
             className="px-6 py-2.5 bg-[var(--color-dark)] text-white rounded-lg text-sm font-medium hover:bg-[var(--color-dark)] disabled:opacity-50 transition"
           >
             Guardar como Borrador
           </button>
           <button
             type="button"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !periodId}
             onClick={handleSubmit((d) => onSubmit(d, true))}
             className="px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
           >

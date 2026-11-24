@@ -14,6 +14,8 @@ import {
   Tag,
   X,
 } from 'lucide-react';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../hooks/useFiscalPeriods';
+import { FiscalPeriodNotice } from '../../../components/shared/PeriodSelector';
 import { apiClient } from '../../../lib/api';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../lib/formatters';
 import { Toast } from '../../../components/shared/Toast';
@@ -33,28 +35,6 @@ const MONTH_SHORT = [
   'Nov',
   'Dic',
 ];
-const MONTH_LONG = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
-
-interface FiscalPeriodLite {
-  id: string;
-  year: number;
-  month: number;
-  name: string;
-}
-
 const SII_COMPANY_NAME = 'AGS SOLUTIONS SPA';
 const SII_COMPANY_RUT = '77.004.647-5';
 
@@ -168,15 +148,12 @@ function SummaryCard({
 }
 
 export default function TributarioPage() {
-  const now = new Date();
-  const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
-  const [periodId, setPeriodId] = useState('');
-  const [periodsByMonth, setPeriodsByMonth] = useState<Map<number, FiscalPeriodLite>>(
-    () => new Map(),
-  );
-  const [isPeriodsLoading, setIsPeriodsLoading] = useState(true);
-  const [creatingPeriod, setCreatingPeriod] = useState(false);
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(fiscalPeriods);
+  const selectedPeriod = fiscalPeriods.periods.find((period) => period.id === periodId);
+  const selectedYear = selectedPeriod?.year;
+  const selectedMonth = selectedPeriod?.month;
+  const yearPeriods = fiscalPeriods.periods.filter((period) => period.year === selectedYear);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [documents, setDocuments] = useState<Paginated<TaxDocument> | null>(null);
   const [tab, setTab] = useState<Tab>('EMITIDO');
@@ -198,37 +175,6 @@ export default function TributarioPage() {
 
   const reloadRef = useRef<(() => void) | null>(null);
 
-  const loadYearPeriods = useCallback(async () => {
-    setIsPeriodsLoading(true);
-    try {
-      const res = await apiClient.get<FiscalPeriodLite[]>(
-        `/api/fiscal-periods?year=${selectedYear}`,
-      );
-      const map = new Map<number, FiscalPeriodLite>();
-      for (const p of res) map.set(p.month, p);
-      setPeriodsByMonth(map);
-    } catch (err) {
-      setPeriodsByMonth(new Map());
-      setToast({
-        message: err instanceof Error ? err.message : 'Error cargando períodos',
-        type: 'error',
-      });
-    } finally {
-      setIsPeriodsLoading(false);
-    }
-  }, [selectedYear]);
-
-  // Keep periodId in sync with (year, month). Clears when the period is missing;
-  // summary/documents/sync paths gate on periodId, which keeps them honest.
-  useEffect(() => {
-    const period = periodsByMonth.get(selectedMonth);
-    setPeriodId(period?.id ?? '');
-  }, [periodsByMonth, selectedMonth]);
-
-  useEffect(() => {
-    loadYearPeriods();
-  }, [loadYearPeriods]);
-
   const loadSummary = useCallback(async () => {
     if (!periodId) {
       setSummary(null);
@@ -248,37 +194,12 @@ export default function TributarioPage() {
     }
   }, [periodId]);
 
-  const createPeriod = async () => {
-    setCreatingPeriod(true);
-    try {
-      // Covers the case where the user chose a year/month the company hasn't
-      // generated yet. Reusing the /generate/:year endpoint would create all
-      // 12 months; POST here creates just the one the user is looking at.
-      const startDate = new Date(selectedYear, selectedMonth - 1, 1).toISOString().slice(0, 10);
-      const endDate = new Date(selectedYear, selectedMonth, 0).toISOString().slice(0, 10);
-      await apiClient.post('/api/fiscal-periods', {
-        name: `${MONTH_LONG[selectedMonth - 1]} ${selectedYear}`,
-        year: selectedYear,
-        month: selectedMonth,
-        startDate,
-        endDate,
-      });
-      setToast({
-        message: `Período ${MONTH_LONG[selectedMonth - 1]} ${selectedYear} creado`,
-        type: 'success',
-      });
-      await loadYearPeriods();
-    } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Error creando período',
-        type: 'error',
-      });
-    } finally {
-      setCreatingPeriod(false);
-    }
-  };
-
   const loadDocuments = useCallback(async () => {
+    if (!periodId) {
+      setDocuments(null);
+      setIsDocsLoading(false);
+      return;
+    }
     setIsDocsLoading(true);
     try {
       const params = new URLSearchParams();
@@ -476,12 +397,19 @@ export default function TributarioPage() {
         <div>
           <p className="text-xs text-fg-secondary mb-2 font-medium uppercase tracking-wider">Año</p>
           <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">
-            {Array.from({ length: now.getFullYear() - 2019 + 1 }, (_, i) => 2019 + i).map((y) => {
+            {fiscalPeriods.years.map((y) => {
               const active = selectedYear === y;
               return (
                 <button
                   key={y}
-                  onClick={() => setSelectedYear(y)}
+                  onClick={() => {
+                    const period =
+                      fiscalPeriods.periods.find(
+                        (p) => p.year === y && p.month === selectedMonth,
+                      ) ?? fiscalPeriods.periods.find((p) => p.year === y);
+                    if (period) setPeriodId(period.id);
+                  }}
+                  aria-pressed={active}
                   className={`shrink-0 px-3 py-1.5 text-sm rounded-md border transition ${
                     active ? 'text-white' : 'text-fg hover:bg-subtle-hover'
                   }`}
@@ -499,14 +427,15 @@ export default function TributarioPage() {
         <div>
           <p className="text-xs text-fg-secondary mb-2 font-medium uppercase tracking-wider">Mes</p>
           <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">
-            {MONTH_SHORT.map((m, i) => {
-              const monthNum = i + 1;
+            {yearPeriods.map((period) => {
+              const monthNum = period.month;
+              const m = MONTH_SHORT[monthNum - 1];
               const active = selectedMonth === monthNum;
-              const exists = periodsByMonth.has(monthNum);
               return (
                 <button
                   key={monthNum}
-                  onClick={() => setSelectedMonth(monthNum)}
+                  onClick={() => setPeriodId(period.id)}
+                  aria-pressed={active}
                   className={`shrink-0 px-3 py-1.5 text-sm rounded-md border transition relative ${
                     active ? 'text-white' : 'text-fg hover:bg-subtle-hover'
                   }`}
@@ -514,12 +443,8 @@ export default function TributarioPage() {
                     background: active ? 'var(--color-accent)' : 'var(--bg-card)',
                     borderColor: active ? 'var(--color-accent)' : 'var(--border-color)',
                   }}
-                  title={exists ? '' : 'Sin período fiscal'}
                 >
                   {m}
-                  {!exists && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-subtle-hover border border-white" />
-                  )}
                 </button>
               );
             })}
@@ -527,21 +452,7 @@ export default function TributarioPage() {
         </div>
       </div>
 
-      {!isPeriodsLoading && !periodId && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex items-center gap-3 flex-wrap">
-          <AlertCircle size={18} className="text-yellow-600 flex-shrink-0" />
-          <p className="text-sm text-yellow-900 flex-1 min-w-0">
-            No existe período fiscal para {MONTH_LONG[selectedMonth - 1]} {selectedYear}
-          </p>
-          <button
-            onClick={createPeriod}
-            disabled={creatingPeriod}
-            className="px-3 py-1.5 text-sm bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition"
-          >
-            {creatingPeriod ? 'Creando...' : 'Crear período'}
-          </button>
-        </div>
-      )}
+      <FiscalPeriodNotice catalog={fiscalPeriods} />
 
       {/* SECTION 0 — SII Connection (BaseAPI) */}
       <div className="bg-card rounded-xl border border-line p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -571,12 +482,12 @@ export default function TributarioPage() {
 
       {/* SECTION 1 — Summary cards */}
       <h2 className="text-sm font-semibold text-fg mb-3">
-        Resumen tributario — {MONTH_LONG[selectedMonth - 1]} {selectedYear}
+        Resumen tributario{selectedPeriod ? ` — ${selectedPeriod.name}` : ''}
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {!periodId ? (
           <div className="md:col-span-2 lg:col-span-4 text-center py-8 text-sm text-fg-muted">
-            Selecciona o crea un período fiscal para ver el resumen tributario.
+            Selecciona un período fiscal para ver el resumen tributario.
           </div>
         ) : isSummaryLoading || !summary ? (
           <>

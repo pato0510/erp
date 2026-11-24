@@ -1,49 +1,97 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { apiClient } from '../../lib/api';
-
-interface Period {
-  id: string;
-  name: string;
-  year: number;
-  month: number;
-  status: string;
-}
+import Link from 'next/link';
+import { useId } from 'react';
+import type { FiscalPeriods } from '../../hooks/useFiscalPeriods';
 
 interface PeriodSelectorProps {
+  catalog: FiscalPeriods;
   value: string;
   onChange: (periodId: string) => void;
+  id?: string;
+  className?: string;
+  allowAll?: boolean;
+  disabled?: boolean;
 }
 
-export function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
-  const [periods, setPeriods] = useState<Period[]>([]);
-
-  useEffect(() => {
-    apiClient
-      .get<Period[]>('/api/fiscal-periods?year=2026')
-      .then(setPeriods)
-      .catch(() => undefined);
-  }, []);
-
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-
+export function FiscalPeriodNotice({ catalog, id }: { catalog: FiscalPeriods; id?: string }) {
+  if (catalog.isLoading)
+    return (
+      <p id={id} role="status" className="text-sm text-fg-secondary">
+        Cargando períodos…
+      </p>
+    );
+  if (catalog.error)
+    return (
+      <p id={id} role="alert" className="text-sm text-fg-secondary">
+        No se pudieron cargar los períodos: {catalog.error}.{' '}
+        <button type="button" onClick={catalog.refresh} className="underline">
+          Reintentar
+        </button>
+      </p>
+    );
+  if (catalog.currentPeriod) return null;
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="border border-line rounded-lg px-3 py-2 text-sm"
-      style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
-    >
-      <option value="">Período actual</option>
-      {periods.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name}
-          {p.year === currentYear && p.month === currentMonth ? ' (actual)' : ''}
-        </option>
-      ))}
-    </select>
+    <p id={id} role="status" className="text-sm text-fg-secondary">
+      {catalog.periods.length === 0 && 'No hay períodos fiscales para esta empresa. '}
+      No existe el período {catalog.todayPeriodLabel}. Un administrador puede generarlo en{' '}
+      <Link href="/configuracion#periodos" className="underline">
+        Configuración → Períodos fiscales
+      </Link>
+      .
+    </p>
+  );
+}
+
+export function PeriodSelector({
+  catalog,
+  value,
+  onChange,
+  id,
+  className,
+  allowAll = false,
+  disabled = false,
+}: PeriodSelectorProps) {
+  const noticeId = useId();
+  return (
+    <div className="min-w-0 space-y-2">
+      <select
+        id={id}
+        aria-label="Período fiscal"
+        aria-describedby={
+          catalog.isLoading || catalog.error || !catalog.currentPeriod ? noticeId : undefined
+        }
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled || catalog.isLoading || !!catalog.error || catalog.periods.length === 0}
+        className={className ?? 'border border-line rounded-lg px-3 py-2 text-sm'}
+        style={
+          className === undefined
+            ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }
+            : undefined
+        }
+      >
+        {catalog.periods.length === 0 ? (
+          <option value="">
+            {catalog.isLoading ? 'Cargando períodos…' : 'Sin períodos disponibles'}
+          </option>
+        ) : allowAll ? (
+          <option value="">Todos los períodos</option>
+        ) : null}
+        {catalog.years.map((year) => (
+          <optgroup key={year} label={String(year)}>
+            {catalog.periods
+              .filter((period) => period.year === year)
+              .map((period) => (
+                <option key={period.id} value={period.id}>
+                  {period.name}
+                  {period.id === catalog.currentPeriod?.id ? ' (actual)' : ''}
+                </option>
+              ))}
+          </optgroup>
+        ))}
+      </select>
+      <FiscalPeriodNotice catalog={catalog} id={noticeId} />
+    </div>
   );
 }

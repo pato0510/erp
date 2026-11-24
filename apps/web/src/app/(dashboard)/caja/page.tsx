@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../hooks/useFiscalPeriods';
 import { downloadFile } from '../../../lib/download';
 import { CashPositionCard } from '../../../components/cashflow/CashPositionCard';
 import { CommitmentStatusBadge } from '../../../components/cashflow/CommitmentStatusBadge';
@@ -111,7 +112,8 @@ export default function CajaPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [periodId, setPeriodId] = useState('');
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(fiscalPeriods);
   const [commitTab, setCommitTab] = useState<'upcoming' | 'all'>('upcoming');
   const [modal, setModal] = useState<ModalState>({ kind: 'none' });
   const [toast, setToast] = useState<{
@@ -122,6 +124,10 @@ export default function CajaPage() {
   const reloadRef = useRef<(() => void) | null>(null);
 
   const load = useCallback(async () => {
+    if (!periodId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const periodParam = periodId ? `?fiscalPeriodId=${periodId}` : '';
@@ -198,7 +204,7 @@ export default function CajaPage() {
               <Download size={16} /> Exportar
             </button>
           )}
-          <PeriodSelector value={periodId} onChange={setPeriodId} />
+          <PeriodSelector catalog={fiscalPeriods} value={periodId} onChange={setPeriodId} />
         </div>
       </div>
 

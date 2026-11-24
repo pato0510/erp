@@ -4,8 +4,13 @@ import { useThemeTokens } from '../../../hooks/useThemeTokens';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiClient } from '../../../lib/api';
+import {
+  useFiscalPeriods,
+  useFiscalPeriodSelection,
+  useFiscalYearSelection,
+} from '../../../hooks/useFiscalPeriods';
 import { formatCLP, formatDate, formatRelativeDate } from '../../../lib/formatters';
-import { PeriodSelector } from '../../../components/shared/PeriodSelector';
+import { PeriodSelector, FiscalPeriodNotice } from '../../../components/shared/PeriodSelector';
 import { Toast } from '../../../components/shared/Toast';
 import { Gauge } from '../../../components/dashboard/Gauge';
 import { GoalsModal } from '../../../components/dashboard/GoalsModal';
@@ -276,14 +281,18 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [periodId, setPeriodId] = useState('');
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(fiscalPeriods);
   const [viewMode, setViewMode] = useState<'month' | 'year' | 'multiyear'>('month');
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const { year: selectedYear, setYear: setSelectedYear } = useFiscalYearSelection(fiscalPeriods);
   const [annualData, setAnnualData] = useState<AnnualData | null>(null);
   const [realtimeCash, setRealtimeCash] = useState<RealtimeCash | null>(null);
   const [multiYearData, setMultiYearData] = useState<MultiYearData | null>(null);
-  const [multiYearFrom, setMultiYearFrom] = useState(2019);
-  const [multiYearTo, setMultiYearTo] = useState(new Date().getFullYear());
+  const { year: multiYearFrom, setYear: setMultiYearFrom } = useFiscalYearSelection(
+    fiscalPeriods,
+    fiscalPeriods.years.at(-1),
+  );
+  const { year: multiYearTo, setYear: setMultiYearTo } = useFiscalYearSelection(fiscalPeriods);
   const [multiYearChartMode, setMultiYearChartMode] = useState<'year' | 'month'>('month');
   const [goalsModalOpen, setGoalsModalOpen] = useState(false);
   const [toast, setToast] = useState<{
@@ -292,6 +301,10 @@ export default function DashboardPage() {
   } | null>(null);
 
   const load = useCallback(async () => {
+    if (!periodId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     const param = periodId ? `?fiscalPeriodId=${periodId}` : '';
     try {
@@ -305,7 +318,7 @@ export default function DashboardPage() {
   }, [periodId]);
 
   const loadAnnual = useCallback(async () => {
-    if (viewMode !== 'year') return;
+    if (viewMode !== 'year' || !selectedYear) return;
     const url = `/api/dashboard/annual?year=${selectedYear}`;
 
     console.log('[dashboard] fetching annual', { url, viewMode, selectedYear });
@@ -340,7 +353,7 @@ export default function DashboardPage() {
   }, [loadRealtimeCash]);
 
   const loadMultiYear = useCallback(async () => {
-    if (viewMode !== 'multiyear') return;
+    if (viewMode !== 'multiyear' || !multiYearFrom || !multiYearTo) return;
     try {
       const result = await apiClient.get<MultiYearData>(
         `/api/dashboard/multiyear?fromYear=${multiYearFrom}&toYear=${multiYearTo}`,
@@ -435,9 +448,7 @@ export default function DashboardPage() {
       ? `Categorías de Gasto — ${selectedYear}`
       : `Categorías de Gasto${data ? ` — ${data.period.name}` : ''}`;
 
-  // Company has data from 2019 onwards; include next year so users can set goals ahead of time.
-  const yearOptions: number[] = [];
-  for (let y = 2019; y <= new Date().getFullYear() + 1; y++) yearOptions.push(y);
+  const yearOptions = fiscalPeriods.years;
 
   return (
     <div>
@@ -483,7 +494,7 @@ export default function DashboardPage() {
             ))}
           </div>
           {viewMode === 'month' ? (
-            <PeriodSelector value={periodId} onChange={setPeriodId} />
+            <PeriodSelector catalog={fiscalPeriods} value={periodId} onChange={setPeriodId} />
           ) : viewMode === 'year' ? (
             <div
               className="flex gap-2 overflow-x-auto max-w-full pb-1 -mb-1 bg-subtle rounded-lg p-0.5"
@@ -506,6 +517,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <MultiYearRange
+              years={yearOptions}
               fromYear={multiYearFrom}
               toYear={multiYearTo}
               onChange={(f, t) => {
@@ -517,10 +529,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {viewMode !== 'month' && <FiscalPeriodNotice catalog={fiscalPeriods} />}
+
       {viewMode === 'multiyear' && (
         <MultiYearContent
           data={multiYearData}
           onYearClick={(year) => {
+            if (!yearOptions.includes(year)) return;
             setSelectedYear(year);
             setViewMode('year');
           }}
@@ -1140,7 +1155,7 @@ export default function DashboardPage() {
         </>
       )}
 
-      {goalsModalOpen && (
+      {goalsModalOpen && selectedYear > 0 && (
         <GoalsModal
           year={selectedYear}
           initialIncomeGoal={goals?.incomeGoal ?? null}
@@ -1237,21 +1252,22 @@ function RealtimeCashSection({ cash }: { cash: RealtimeCash | null }) {
 // ───────────────────────── MultiYear components ─────────────────────────
 
 function MultiYearRange({
+  years,
   fromYear,
   toYear,
   onChange,
 }: {
+  years: number[];
   fromYear: number;
   toYear: number;
   onChange: (from: number, to: number) => void;
 }) {
-  const currentYear = new Date().getFullYear();
-  const years: number[] = [];
-  for (let y = 2019; y <= currentYear + 1; y++) years.push(y);
   return (
     <div className="flex items-center gap-2 text-xs">
       <label className="text-[var(--text-secondary)]">Desde</label>
       <select
+        aria-label="Desde el año"
+        disabled={years.length === 0}
         value={fromYear}
         onChange={(e) => {
           const v = Number(e.target.value);
@@ -1267,6 +1283,8 @@ function MultiYearRange({
       </select>
       <label className="text-[var(--text-secondary)]">Hasta</label>
       <select
+        aria-label="Hasta el año"
+        disabled={years.length === 0}
         value={toYear}
         onChange={(e) => {
           const v = Number(e.target.value);

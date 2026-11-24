@@ -6,6 +6,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { apiClient } from '../../../../lib/api';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../../hooks/useFiscalPeriods';
+import { PeriodSelector } from '../../../../components/shared/PeriodSelector';
 
 const schema = z.object({
   type: z.enum(['INCOME', 'EXPENSE']),
@@ -29,13 +31,15 @@ export default function NuevoCompromisoPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<SelectOption[]>([]);
   const [counterparties, setCounterparties] = useState<SelectOption[]>([]);
-  const [periods, setPeriods] = useState<SelectOption[]>([]);
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(fiscalPeriods);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const {
     register,
     handleSubmit,
+    setValue,
     watch,
     formState: { errors },
   } = useForm<FormData>({
@@ -44,6 +48,10 @@ export default function NuevoCompromisoPage() {
   });
 
   const selectedType = watch('type');
+
+  useEffect(() => {
+    setValue('fiscalPeriodId', periodId);
+  }, [periodId, setValue]);
 
   useEffect(() => {
     const typeFilter = selectedType === 'INCOME' ? '?type=INCOME' : '?type=EXPENSE';
@@ -58,11 +66,11 @@ export default function NuevoCompromisoPage() {
       apiClient
         .get<{ data: SelectOption[] }>('/api/counterparties?limit=100')
         .then((r) => setCounterparties(r.data)),
-      apiClient.get<SelectOption[]>('/api/fiscal-periods?year=2026').then(setPeriods),
     ]).catch(() => undefined);
   }, []);
 
   const onSubmit = async (data: FormData) => {
+    if (!periodId) return;
     setIsSubmitting(true);
     setError('');
     try {
@@ -168,18 +176,16 @@ export default function NuevoCompromisoPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-fg mb-1">Período Fiscal</label>
-            <select
-              {...register('fiscalPeriodId')}
+            <label htmlFor="fiscal-period" className="block text-sm font-medium text-fg mb-1">
+              Período Fiscal
+            </label>
+            <PeriodSelector
+              id="fiscal-period"
+              catalog={fiscalPeriods}
+              value={periodId}
+              onChange={setPeriodId}
               className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            >
-              <option value="">Seleccionar...</option>
-              {periods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
             {errors.fiscalPeriodId && (
               <p className="text-red-500 text-xs mt-1">{errors.fiscalPeriodId.message}</p>
             )}
@@ -224,7 +230,7 @@ export default function NuevoCompromisoPage() {
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !periodId}
             className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
           >
             {isSubmitting ? 'Guardando...' : 'Crear Compromiso'}

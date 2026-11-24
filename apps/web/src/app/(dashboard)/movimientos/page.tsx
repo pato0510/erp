@@ -13,6 +13,8 @@ import {
   Download,
 } from 'lucide-react';
 import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../hooks/useFiscalPeriods';
+import { PeriodSelector } from '../../../components/shared/PeriodSelector';
 import { apiClient } from '../../../lib/api';
 import { downloadFile } from '../../../lib/download';
 import { MovementStatusBadge } from '../../../components/movements/MovementStatusBadge';
@@ -46,13 +48,6 @@ interface SelectOption {
   name: string;
 }
 
-interface FiscalPeriodOption {
-  id: string;
-  name: string;
-  year: number;
-  month: number;
-}
-
 export default function MovimientosPage() {
   const themeTokens = useThemeTokens();
   const [movements, setMovements] = useState<Movement[]>([]);
@@ -70,7 +65,11 @@ export default function MovimientosPage() {
   const [filterCategoryId, setFilterCategoryId] = useState('');
   const [filterCounterpartyId, setFilterCounterpartyId] = useState('');
   const [filterCostCenterId, setFilterCostCenterId] = useState('');
-  const [filterFiscalPeriodId, setFilterFiscalPeriodId] = useState('');
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId: filterFiscalPeriodId, setPeriodId: setFilterFiscalPeriodId } =
+    useFiscalPeriodSelection(fiscalPeriods);
+  const periodsReady =
+    !fiscalPeriods.isLoading && !fiscalPeriods.error && fiscalPeriods.periods.length > 0;
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
@@ -105,12 +104,15 @@ export default function MovimientosPage() {
   const [categories, setCategories] = useState<SelectOption[]>([]);
   const [counterparties, setCounterparties] = useState<SelectOption[]>([]);
   const [costCenters, setCostCenters] = useState<SelectOption[]>([]);
-  const [fiscalPeriods, setFiscalPeriods] = useState<FiscalPeriodOption[]>([]);
 
   // Ref to avoid stale closure in confirm/cancel handlers
   const reloadRef = useRef<(() => void) | null>(null);
 
   const load = useCallback(async () => {
+    if (!periodsReady) {
+      setIsLoading(false);
+      return;
+    }
     const request = ++mainRequest.current;
     setIsLoading(true);
     try {
@@ -129,7 +131,7 @@ export default function MovimientosPage() {
     } finally {
       if (request === mainRequest.current) setIsLoading(false);
     }
-  }, [filterQuery, page]);
+  }, [filterQuery, page, periodsReady]);
 
   useEffect(() => {
     load();
@@ -140,6 +142,7 @@ export default function MovimientosPage() {
   // backend's bumped limit=1000 cap, which is enough for even a year's worth
   // of movements in this app. If a company ever exceeds that, we'll page here.
   const loadChartData = useCallback(async () => {
+    if (!periodsReady) return;
     try {
       const params = new URLSearchParams(filterQuery);
       params.set('page', '1');
@@ -151,13 +154,14 @@ export default function MovimientosPage() {
       // handled by apiClient; leave previous chart data in place on failure.
     }
     // Deliberately omits `page` so changing pages doesn't refire this fetch.
-  }, [filterQuery]);
+  }, [filterQuery, periodsReady]);
 
   useEffect(() => {
     loadChartData();
   }, [loadChartData]);
 
   const loadUncategorizedCount = useCallback(async () => {
+    if (!periodsReady) return;
     const request = ++countRequest.current;
     setUncategorizedError(null);
     try {
@@ -171,9 +175,10 @@ export default function MovimientosPage() {
           err instanceof Error ? err.message : 'Error cargando el conteo de no categorizados.',
         );
     }
-  }, [filterQuery]);
+  }, [filterQuery, periodsReady]);
 
   const loadUncategorized = useCallback(async () => {
+    if (!periodsReady) return;
     const request = ++uncategorizedRequest.current;
     setUncategorizedLoading(true);
     setUncategorizedError(null);
@@ -192,7 +197,7 @@ export default function MovimientosPage() {
     } finally {
       if (request === uncategorizedRequest.current) setUncategorizedLoading(false);
     }
-  }, [filterQuery, uncategorizedPage]);
+  }, [filterQuery, uncategorizedPage, periodsReady]);
 
   useEffect(() => {
     loadUncategorizedCount();
@@ -216,10 +221,6 @@ export default function MovimientosPage() {
       apiClient
         .get<SelectOption[]>('/api/cost-centers')
         .then(setCostCenters)
-        .catch(() => undefined),
-      apiClient
-        .get<FiscalPeriodOption[]>('/api/fiscal-periods')
-        .then(setFiscalPeriods)
         .catch(() => undefined),
     ]);
   }, []);
@@ -298,7 +299,9 @@ export default function MovimientosPage() {
         <h1 className="text-2xl text-[var(--text-primary)]">Movimientos</h1>
         <div className="flex gap-3">
           <button
+            disabled={!periodsReady}
             onClick={() => {
+              if (!periodsReady) return;
               const params = new URLSearchParams();
               if (filterType) params.set('type', filterType);
               if (filterStatus) params.set('status', filterStatus);
@@ -428,18 +431,13 @@ export default function MovimientosPage() {
             <label className="block text-xs text-[var(--text-secondary)] mb-1">
               Período fiscal
             </label>
-            <select
+            <PeriodSelector
+              catalog={fiscalPeriods}
               value={filterFiscalPeriodId}
-              onChange={(e) => updateFilter(setFilterFiscalPeriodId, e.target.value)}
+              onChange={(value) => updateFilter(setFilterFiscalPeriodId, value)}
+              allowAll
               className="border border-line rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Todos</option>
-              {fiscalPeriods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div>
             <label className="block text-xs text-[var(--text-secondary)] mb-1">Categoría</label>

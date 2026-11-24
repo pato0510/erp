@@ -14,6 +14,7 @@ import {
   Check,
 } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../hooks/useFiscalPeriods';
 import { formatCLP, formatDate } from '../../../lib/formatters';
 import { PeriodSelector } from '../../../components/shared/PeriodSelector';
 import { Toast } from '../../../components/shared/Toast';
@@ -111,7 +112,8 @@ function KpiCard({
 }
 
 export default function ConciliacionPage() {
-  const [periodId, setPeriodId] = useState('');
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(fiscalPeriods);
   const [workbench, setWorkbench] = useState<Workbench | null>(null);
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -129,6 +131,10 @@ export default function ConciliacionPage() {
   const reloadRef = useRef<(() => void) | null>(null);
 
   const load = useCallback(async () => {
+    if (!periodId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const qs = periodId ? `?fiscalPeriodId=${periodId}` : '';
@@ -152,6 +158,7 @@ export default function ConciliacionPage() {
   reloadRef.current = load;
 
   const handleRun = async () => {
+    if (!periodId) return;
     setIsRunning(true);
     try {
       const qs = periodId ? `?fiscalPeriodId=${periodId}` : '';
@@ -237,10 +244,10 @@ export default function ConciliacionPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PeriodSelector value={periodId} onChange={setPeriodId} />
+          <PeriodSelector catalog={fiscalPeriods} value={periodId} onChange={setPeriodId} />
           <button
             onClick={handleRun}
-            disabled={isRunning}
+            disabled={isRunning || !periodId}
             className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
           >
             <RefreshCw size={14} className={isRunning ? 'animate-spin' : ''} />

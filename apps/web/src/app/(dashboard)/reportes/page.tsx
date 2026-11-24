@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Download, FileSpreadsheet, FileText, Printer } from 'lucide-react';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../hooks/useFiscalPeriods';
 import { apiClient } from '../../../lib/api';
 import { downloadFile } from '../../../lib/download';
 import { PeriodSelector } from '../../../components/shared/PeriodSelector';
@@ -18,15 +19,20 @@ interface ExecutiveSummary {
 }
 
 export default function ReportesPage() {
-  const [movPeriodId, setMovPeriodId] = useState('');
-  const [cashPeriodId, setCashPeriodId] = useState('');
-  const [summaryPeriodId, setSummaryPeriodId] = useState('');
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId: movPeriodId, setPeriodId: setMovPeriodId } =
+    useFiscalPeriodSelection(fiscalPeriods);
+  const { periodId: cashPeriodId, setPeriodId: setCashPeriodId } =
+    useFiscalPeriodSelection(fiscalPeriods);
+  const { periodId: summaryPeriodId, setPeriodId: setSummaryPeriodId } =
+    useFiscalPeriodSelection(fiscalPeriods);
   const [isExportingMov, setIsExportingMov] = useState(false);
   const [isExportingCash, setIsExportingCash] = useState(false);
   const [summary, setSummary] = useState<ExecutiveSummary | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
   const handleExportMovements = async () => {
+    if (!movPeriodId) return;
     setIsExportingMov(true);
     try {
       const params = movPeriodId ? `?fiscalPeriodId=${movPeriodId}` : '';
@@ -56,6 +62,7 @@ export default function ReportesPage() {
   };
 
   const handleLoadSummary = useCallback(async () => {
+    if (!summaryPeriodId) return;
     setIsLoadingSummary(true);
     try {
       const params = summaryPeriodId ? `?fiscalPeriodId=${summaryPeriodId}` : '';
@@ -85,10 +92,10 @@ export default function ReportesPage() {
             Exporta todos los movimientos con categorías, contrapartes y montos.
           </p>
           <div className="space-y-3">
-            <PeriodSelector value={movPeriodId} onChange={setMovPeriodId} />
+            <PeriodSelector catalog={fiscalPeriods} value={movPeriodId} onChange={setMovPeriodId} />
             <button
               onClick={handleExportMovements}
-              disabled={isExportingMov}
+              disabled={isExportingMov || !movPeriodId}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium"
             >
               <Download size={16} />
@@ -109,7 +116,11 @@ export default function ReportesPage() {
             Exporta posición de caja, compromisos y cuentas bancarias.
           </p>
           <div className="space-y-3">
-            <PeriodSelector value={cashPeriodId} onChange={setCashPeriodId} />
+            <PeriodSelector
+              catalog={fiscalPeriods}
+              value={cashPeriodId}
+              onChange={setCashPeriodId}
+            />
             <button
               onClick={handleExportCashflow}
               disabled={isExportingCash || !cashPeriodId}
@@ -133,10 +144,14 @@ export default function ReportesPage() {
             Genera un resumen imprimible con todos los KPIs del período.
           </p>
           <div className="space-y-3">
-            <PeriodSelector value={summaryPeriodId} onChange={setSummaryPeriodId} />
+            <PeriodSelector
+              catalog={fiscalPeriods}
+              value={summaryPeriodId}
+              onChange={setSummaryPeriodId}
+            />
             <button
               onClick={handleLoadSummary}
-              disabled={isLoadingSummary}
+              disabled={isLoadingSummary || !summaryPeriodId}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition font-medium"
             >
               <FileText size={16} />

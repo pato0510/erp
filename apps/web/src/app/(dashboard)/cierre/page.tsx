@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckSquare, Lock, Unlock, Printer, AlertTriangle, ChevronRight, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import { useFiscalPeriods, useFiscalPeriodSelection } from '../../../hooks/useFiscalPeriods';
 import { formatCLP, formatDate } from '../../../lib/formatters';
+import { PeriodSelector } from '../../../components/shared/PeriodSelector';
 import { Toast } from '../../../components/shared/Toast';
 import { ChecklistItem, ChecklistItemData } from '../../../components/closing/ChecklistItem';
 
@@ -58,8 +60,8 @@ const STATUS_BADGE: Record<PeriodStatus, { label: string; cls: string }> = {
 };
 
 export default function CierrePage() {
-  const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
-  const [periodId, setPeriodId] = useState('');
+  const fiscalPeriods = useFiscalPeriods();
+  const { periodId, setPeriodId } = useFiscalPeriodSelection(fiscalPeriods);
   const [period, setPeriod] = useState<FiscalPeriod | null>(null);
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [summary, setSummary] = useState<ClosingSummary | null>(null);
@@ -77,23 +79,11 @@ export default function CierrePage() {
 
   const reloadRef = useRef<(() => void) | null>(null);
 
-  // Load period list once.
-  useEffect(() => {
-    apiClient
-      .get<FiscalPeriod[]>('/api/fiscal-periods')
-      .then((ps) => {
-        setPeriods(ps);
-        const now = new Date();
-        const current = ps.find(
-          (p) => p.year === now.getFullYear() && p.month === now.getMonth() + 1,
-        );
-        setPeriodId((prev) => prev || current?.id || ps[0]?.id || '');
-      })
-      .catch(() => setToast({ message: 'Error cargando períodos', type: 'error' }));
-  }, []);
-
   const load = useCallback(async () => {
-    if (!periodId) return;
+    if (!periodId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const [p, cl] = await Promise.all([
@@ -235,17 +225,12 @@ export default function CierrePage() {
       <div className="bg-card rounded-xl border border-line p-5 mb-6 flex flex-col md:flex-row md:items-center gap-4">
         <div className="flex-1">
           <label className="block text-xs font-medium text-fg-secondary mb-1">Período fiscal</label>
-          <select
+          <PeriodSelector
+            catalog={fiscalPeriods}
             value={periodId}
-            onChange={(e) => setPeriodId(e.target.value)}
+            onChange={setPeriodId}
             className="w-full max-w-xs border border-line rounded-lg px-3 py-2 text-sm bg-card"
-          >
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         {period && (
           <div className="flex items-center gap-4">
